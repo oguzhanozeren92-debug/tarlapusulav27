@@ -7,7 +7,6 @@ import InAppAdminMode from './features/admin-mode/InAppAdminMode';
 import AppNotificationBridge from './features/admin-mode/AppNotificationBridge';
 import './styles/TarlaPusulaTheme.css';
 import './styles/MobileAppShell.css';
-import './styles/WhiteAppTheme.css';
 import './styles/MonochromeUI.css';
 import './styles/MapReadabilityFix.css';
 
