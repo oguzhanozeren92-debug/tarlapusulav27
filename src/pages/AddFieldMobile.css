@@ -917,3 +917,49 @@ html body .tp-chat-field .tp-chat-shell .tp-field-form
   transform: scale(.98);
 }
 
+/* =========================================================
+   REFACTOR 0.5 — MONOCHROME ADD FIELD
+   Field logic, map geometry and compass artwork are untouched.
+   ========================================================= */
+.tp-chat-field {
+  color-scheme:dark;
+  color:#f5f5f5 !important;
+  background:linear-gradient(180deg,#080808 0%,#050505 54%,#020202 100%) !important;
+}
+.tp-chat-field::before,.tp-chat-field::after {
+  opacity:.15 !important;
+  filter:invert(1) grayscale(1) !important;
+}
+.tp-field-back { background:#111 !important; border-color:#303030 !important; color:#f5f5f5 !important; box-shadow:none !important; }
+.tp-field-brand-word { filter:none !important; color:#f5f5f5 !important; }
+.tp-field-brand-word span,.tp-field-brand-word strong { color:#f5f5f5 !important; }
+.tp-field-brand small,.tp-field-eyebrow,.tp-note { color:#858585 !important; }
+.tp-field-step-badge { background:#f5f5f5 !important; color:#080808 !important; box-shadow:none !important; }
+.tp-field-step { background:#0d0d0d !important; border-color:#242424 !important; color:#7d7d7d !important; }
+.tp-field-step i { background:#191919 !important; color:#969696 !important; }
+.tp-field-step.is-current { background:#151515 !important; border-color:#f5f5f5 !important; color:#f5f5f5 !important; box-shadow:none !important; }
+.tp-field-step.is-current i { background:#f5f5f5 !important; color:#080808 !important; }
+.tp-field-step.is-done { color:#c7c7c7 !important; }
+.tp-field-step.is-done i { background:#333 !important; color:#fff !important; }
+.tp-field-hero { border-color:#262626 !important; background:linear-gradient(135deg,#111 0%,#090909 100%) !important; box-shadow:none !important; }
+.tp-field-hero::before { opacity:.16 !important; filter:invert(1) grayscale(1) !important; }
+.tp-field-hero::after { background:linear-gradient(90deg,#f5f5f5 0 36%,#787878 36% 54%,#292929 54% 100%) !important; }
+.tp-field-hero h1 { color:#f5f5f5 !important; }
+.tp-field-hero p { color:#a8a8a8 !important; }
+.tp-field-form { background:rgba(11,11,11,.97) !important; border-color:#242424 !important; box-shadow:none !important; backdrop-filter:none !important; }
+.tp-field-form label { background:#111 !important; border-color:#242424 !important; color:#f5f5f5 !important; }
+.tp-field-form input,.tp-field-form textarea,.tp-chat-field .tp-mobile-picker-trigger {
+  background:#171717 !important; border-color:#333 !important; color:#f5f5f5 !important; box-shadow:none !important;
+}
+.tp-field-form input::placeholder,.tp-field-form textarea::placeholder { color:#727272 !important; }
+.tp-field-form input:focus,.tp-field-form textarea:focus,.tp-chat-field .tp-mobile-picker-trigger:focus-visible {
+  border-color:#f5f5f5 !important; box-shadow:0 0 0 2px rgba(255,255,255,.08) !important;
+}
+.tp-found { background:#111 !important; border-color:#292929 !important; color:#d6d6d6 !important; }
+.tp-field-primary-action,.tp-field-actions .next {
+  background:#f5f5f5 !important; border-color:#f5f5f5 !important; color:#080808 !important; box-shadow:none !important;
+}
+.tp-field-actions .back { background:#111 !important; border-color:#333 !important; color:#f5f5f5 !important; }
+.tp-chat-field :is(.tp-parcel-mode,.tp-map-boundary-card,.tp-map-boundary-status,.tp-map-boundary-candidate,.tp-field-summary-card) {
+  background:#101010 !important; border-color:#292929 !important; color:#f5f5f5 !important; box-shadow:none !important;
+}

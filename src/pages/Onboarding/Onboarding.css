@@ -492,3 +492,60 @@
     transition: none;
   }
 }
+
+/* =========================================================
+   REFACTOR 0.5 — MONOCHROME ONBOARDING / READY
+   ========================================================= */
+.tp-ob-page {
+  color-scheme:dark;
+  color:#f5f5f5 !important;
+  background:linear-gradient(180deg,#080808 0%,#050505 54%,#020202 100%) !important;
+}
+.tp-ob-page::before,.tp-ob-page::after,.tp-ob-pattern {
+  opacity:.18 !important;
+  filter:invert(1) grayscale(1) !important;
+}
+.tp-ob-shell.tp-ui-card,.tp-ready-shell.tp-ui-card {
+  background:rgba(11,11,11,.97) !important;
+  border-color:#242424 !important;
+  box-shadow:0 18px 44px rgba(0,0,0,.26) !important;
+  backdrop-filter:none !important;
+}
+.tp-ob-back.tp-ui-button { background:#111 !important; border-color:#303030 !important; color:#f5f5f5 !important; }
+.tp-ob-step,.tp-ob-copy > p,.tp-ready-lead,.tp-ready-progress-copy span { color:#a8a8a8 !important; }
+.tp-ob-step strong,.tp-ob-copy h1,.tp-ready-shell h1,.tp-ready-progress-copy strong,
+.tp-ready-benefit p,.tp-ob-option-label,.tp-ob-other label { color:#f5f5f5 !important; }
+.tp-ob-progress span { background:#252525 !important; }
+.tp-ob-progress span.is-active { background:#f5f5f5 !important; }
+.tp-ob-kicker { color:#7e7e7e !important; }
+.tp-ob-option {
+  border-color:#262626 !important;
+  background:#0f0f0f !important;
+  color:#f5f5f5 !important;
+  box-shadow:none !important;
+}
+.tp-ob-option:hover { border-color:#444 !important; background:#121212 !important; }
+.tp-ob-option.is-selected { border-color:#f5f5f5 !important; background:#171717 !important; box-shadow:none !important; }
+.tp-ob-option-icon,.tp-ready-benefit-icon { background:#191919 !important; color:#f5f5f5 !important; }
+.tp-ob-option-check { background:#111 !important; border-color:#383838 !important; color:#111 !important; }
+.tp-ob-option.is-selected .tp-ob-option-check {
+  background:#f5f5f5 !important; border-color:#f5f5f5 !important; color:#080808 !important;
+}
+.tp-ob-other.tp-ui-card,.tp-ready-progress-card.tp-ui-card,.tp-ready-benefit.tp-ui-card {
+  background:#101010 !important; border-color:#282828 !important; box-shadow:none !important;
+}
+.tp-ob-other input { background:#171717 !important; border-color:#333 !important; color:#f5f5f5 !important; }
+.tp-ob-other input::placeholder { color:#737373 !important; }
+.tp-ob-other input:focus {
+  border-color:#f5f5f5 !important;
+  box-shadow:0 0 0 2px rgba(255,255,255,.08) !important;
+}
+.tp-ob-other small,.tp-ob-message { color:#8f8f8f !important; }
+.tp-ob-message { background:#111 !important; border-color:#2b2b2b !important; }
+.tp-ready-check {
+  background:#f5f5f5 !important;
+  color:#080808 !important;
+  box-shadow:0 0 0 7px rgba(255,255,255,.035) !important;
+}
+.tp-ready-progress-bar { background:#252525 !important; }
+.tp-ready-progress-bar span { background:#f5f5f5 !important; }
