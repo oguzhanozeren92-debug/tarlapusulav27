@@ -23,3 +23,5 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Build
         run: npm run build
+
+# TarlaPusula v27 build gate
