@@ -1,22 +1,22 @@
 :root {
-  /* Neutral application chrome — data visualisation colours are deliberately separate. */
-  --tp-color-page: #f6f6f4;
-  --tp-color-surface: #ffffff;
-  --tp-color-surface-subtle: #f1f2f2;
-  --tp-color-surface-strong: #111214;
+  /* TarlaPusula ana arayüzü: siyah-beyaz, nötr ve mobil odaklı. */
+  --tp-color-page: #050505;
+  --tp-color-surface: #0b0b0b;
+  --tp-color-surface-subtle: #111111;
+  --tp-color-surface-strong: #f5f5f5;
 
-  --tp-color-text: #111214;
-  --tp-color-text-secondary: #5f6368;
-  --tp-color-text-muted: #85898f;
-  --tp-color-text-inverse: #ffffff;
+  --tp-color-text: #f5f5f5;
+  --tp-color-text-secondary: #b9b9b9;
+  --tp-color-text-muted: #7f7f7f;
+  --tp-color-text-inverse: #080808;
 
-  --tp-color-border: #d8dadd;
-  --tp-color-border-strong: #a9adb2;
-  --tp-color-focus: #111214;
+  --tp-color-border: #242424;
+  --tp-color-border-strong: #3d3d3d;
+  --tp-color-focus: #ffffff;
 
-  /* Semantic only — these are not theme colours. */
-  --tp-color-success: #237a4b;
-  --tp-color-warning: #a76700;
-  --tp-color-danger: #c43842;
-  --tp-color-info: #246da8;
+  /* Semantik durum renkleri yalnız veri/durum anlatımı içindir. */
+  --tp-color-success: #46a66f;
+  --tp-color-warning: #d49a3a;
+  --tp-color-danger: #d85a63;
+  --tp-color-info: #5f9fd4;
 }
