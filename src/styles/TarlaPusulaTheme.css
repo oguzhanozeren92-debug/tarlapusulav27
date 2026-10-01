@@ -57,14 +57,14 @@
      GLOBAL TECH ACCENT
      ======================================================= */
 
-  --tp-primary: #65d8ee;
-  --tp-primary-strong: #92e8f8;
-  --tp-primary-soft: #36aac1;
-  --tp-primary-dark: #123944;
+  --tp-primary: #f5f5f5;
+  --tp-primary-strong: #ffffff;
+  --tp-primary-soft: #a3a3a3;
+  --tp-primary-dark: #1a1a1a;
 
-  --tp-cyan: #65d8ee;
-  --tp-cyan-strong: #92e8f8;
-  --tp-cyan-soft: #36aac1;
+  --tp-cyan: #f5f5f5;
+  --tp-cyan-strong: #ffffff;
+  --tp-cyan-soft: #a3a3a3;
 
   /* =======================================================
      DATA DOMAIN COLORS
@@ -119,26 +119,26 @@
     rgba(255, 255, 255, 0.055);
 
   --tp-line-active:
-    rgba(101, 216, 238, 0.45);
+    rgba(255, 255, 255, 0.34);
 
   --tp-line-cyan:
-    rgba(101, 216, 238, 0.30);
+    rgba(255, 255, 255, 0.20);
 
   /* =======================================================
      LEGACY COMPATIBILITY
      ======================================================= */
 
   --tp-green:
-    var(--tp-health);
+    #f5f5f5;
 
   --tp-green-strong:
-    #72e99b;
+    #ffffff;
 
   --tp-green-soft:
-    #31b968;
+    #a3a3a3;
 
   --tp-green-dark:
-    #164d2c;
+    #1a1a1a;
 
   --tp-gold:
     #b8c0c6;
@@ -208,7 +208,7 @@ body {
   background:
     radial-gradient(
       circle at 50% -12%,
-      rgba(101, 216, 238, 0.022),
+      rgba(255, 255, 255, 0.018),
       transparent 30%
     ),
     linear-gradient(

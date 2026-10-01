@@ -1,6 +1,6 @@
 /* =========================================================
    TARLAPUSULA — BASE / LEGACY LAYOUT
-   Neon Cyber-Agri / Obsidian Glassmorphism
+   Neutral black-and-white application fallback
    ========================================================= */
 
 * {
@@ -10,7 +10,7 @@
 html {
   min-width: 320px;
   min-height: 100%;
-  background: #020804;
+  background: #050505;
   color-scheme: dark;
 }
 
@@ -18,9 +18,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 50% -14%, rgba(34, 197, 94, 0.07), transparent 30%),
-    linear-gradient(180deg, #040d06 0%, #020804 58%, #010402 100%);
+  background: linear-gradient(180deg, #070707 0%, #050505 58%, #020202 100%);
   color: #f1f5f9;
   font-family:
     Inter,
@@ -47,7 +45,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgba(34, 197, 94, 0.70);
+  outline: 2px solid rgba(255, 255, 255, 0.82);
   outline-offset: 2px;
 }
 
@@ -62,9 +60,7 @@ textarea:focus-visible {
   min-height: 100vh;
   margin: 0 auto;
   padding-bottom: 100px;
-  background:
-    radial-gradient(circle at 50% -10%, rgba(34, 197, 94, 0.045), transparent 30%),
-    #020804;
+  background: #050505;
   color: #f1f5f9;
 }
 
@@ -74,8 +70,8 @@ textarea:focus-visible {
   grid-template-columns: 52px 1fr 52px;
   align-items: center;
   padding: 0 24px;
-  border-bottom: 1px solid #1e3a24;
-  background: rgba(4, 13, 6, 0.90);
+  border-bottom: 1px solid #242424;
+  background: rgba(5, 5, 5, 0.94);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.20);
