@@ -1,0 +1,54 @@
+/* Tarlalarım: genel beyaz yüzey korunur; yalnız başlık ve ana aksiyon siyah vurgu alır. */
+html body .tp-fields-sheet .tp-fields-sheet-head {
+  margin: -23px -18px 20px !important;
+  padding: 20px 18px 16px !important;
+  border-radius: 26px 26px 0 0 !important;
+  border-bottom: 1px solid #0b0b0b !important;
+  background: #0b0b0b !important;
+  color: #ffffff !important;
+}
+
+html body .tp-fields-sheet .tp-fields-sheet-head > div > small,
+html body .tp-fields-sheet .tp-fields-sheet-sort-help {
+  color: #b9b9b9 !important;
+}
+
+html body .tp-fields-sheet .tp-fields-sheet-head h2 {
+  color: #ffffff !important;
+  text-shadow: none !important;
+}
+
+html body .tp-fields-sheet .tp-fields-sheet-close {
+  background: #171717 !important;
+  border-color: #3a3a3a !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+html body .tp-fields-sheet .tp-fields-sheet-field-status {
+  color: #20252b !important;
+  font-weight: 800 !important;
+}
+
+html body .tp-fields-sheet .tp-fields-sheet-add {
+  background: #0b0b0b !important;
+  border-color: #0b0b0b !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+html body .tp-fields-sheet .tp-fields-sheet-add:hover,
+html body .tp-fields-sheet .tp-fields-sheet-add:focus-visible {
+  background: #1a1a1a !important;
+  border-color: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 390px) {
+  html body .tp-fields-sheet .tp-fields-sheet-head {
+    margin-left: -12px !important;
+    margin-right: -12px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}
