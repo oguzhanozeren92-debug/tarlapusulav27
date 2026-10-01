@@ -5,23 +5,37 @@ on:
     branches:
       - main
     paths:
+      - 'src/**'
+      - 'supabase/**'
+      - 'services/**'
+      - 'workers/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig*.json'
       - '.github/workflows/build-check.yml'
   workflow_dispatch:
+
+concurrency:
+  group: tarlapusula-v27-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+
       - name: Install
         run: npm ci --no-audit --no-fund
+
       - name: Build
         run: npm run build
-
-# TarlaPusula v27 build gate
