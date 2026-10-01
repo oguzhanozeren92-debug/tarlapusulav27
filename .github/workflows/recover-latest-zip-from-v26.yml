@@ -1,0 +1,96 @@
+name: Recover latest ZIP blobs from v26
+
+on:
+  push:
+    paths:
+      - '.github/workflows/recover-latest-zip-from-v26.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout v27
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build latest ZIP manifest
+        run: |
+          cat .bootstrap/latest-manifest-*.tsv > /tmp/latest.tsv
+          echo "Latest ZIP files: $(wc -l < /tmp/latest.tsv)"
+
+      - name: Recover exact blobs from v26 history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          : > /tmp/missing.tsv
+          : > /tmp/recovered.tsv
+          : > /tmp/already.tsv
+
+          while IFS=$'\t' read -r wanted_sha path; do
+            [ -n "${wanted_sha:-}" ] || continue
+            [ -n "${path:-}" ] || continue
+
+            current_sha=""
+            if [ -f "$path" ]; then
+              current_sha="$(git hash-object "$path")"
+            fi
+
+            if [ "$current_sha" = "$wanted_sha" ]; then
+              printf '%s\t%s\n' "$wanted_sha" "$path" >> /tmp/already.tsv
+              continue
+            fi
+
+            tmpjson="$(mktemp)"
+            code="$(curl -sS -o "$tmpjson" -w '%{http_code}' \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/oguzhanozeren92-debug/tarlapusulav26/git/blobs/${wanted_sha}")"
+
+            if [ "$code" = "200" ]; then
+              mkdir -p "$(dirname "$path")"
+              jq -r '.content // empty' "$tmpjson" | tr -d '\n' | base64 --decode > "$path" || true
+              actual="$(git hash-object "$path" 2>/dev/null || true)"
+
+              if [ "$actual" = "$wanted_sha" ]; then
+                printf '%s\t%s\n' "$wanted_sha" "$path" >> /tmp/recovered.tsv
+              else
+                printf '%s\t%s\n' "$wanted_sha" "$path" >> /tmp/missing.tsv
+                if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+                  git checkout -- "$path"
+                else
+                  rm -f "$path"
+                fi
+              fi
+            else
+              printf '%s\t%s\n' "$wanted_sha" "$path" >> /tmp/missing.tsv
+            fi
+
+            rm -f "$tmpjson"
+          done < /tmp/latest.tsv
+
+          cp /tmp/missing.tsv .bootstrap/missing-from-v26.tsv
+          cp /tmp/recovered.tsv .bootstrap/recovered-from-v26.tsv
+          cp /tmp/already.tsv .bootstrap/already-exact.tsv
+
+          echo "Already exact: $(wc -l < /tmp/already.tsv)"
+          echo "Recovered: $(wc -l < /tmp/recovered.tsv)"
+          echo "Still missing: $(wc -l < /tmp/missing.tsv)"
+
+      - name: Commit recovered exact files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Recover latest ZIP blobs available in v26 history"
+          git push origin HEAD:main
