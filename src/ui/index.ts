@@ -21,3 +21,6 @@ export type { SectionProps } from './layout/Section';
 
 export { default as Stack } from './layout/Stack';
 export type { StackProps } from './layout/Stack';
+
+export { PusulaMark } from './brand';
+export type { PusulaMarkProps } from './brand';
