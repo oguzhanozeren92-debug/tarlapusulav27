@@ -135,6 +135,7 @@ export default function PusulaGuide({
   const lastPlayedIdRef = useRef<string | null>(null);
   const keepOpenRef = useRef(false);
   const guideRootRef = useRef<HTMLDivElement | null>(null);
+  const userRequestedPlayRef = useRef(false);
 
   const activeInsight = insight ?? lastInsight;
 
@@ -386,10 +387,18 @@ export default function PusulaGuide({
   useEffect(() => {
     if (!insight?.id) return;
     if (!assetsReady) return;
-    if (lastPlayedIdRef.current === insight.id) return;
+
+    // Yeni mesaj gelmesi yalnızca üstte sinyal/ışıltı üretir.
+    // Pusula ancak kullanıcı logoya dokunduysa aşağı inip konuşur.
+    if (!userRequestedPlayRef.current) return;
+    userRequestedPlayRef.current = false;
+
+    if (lastPlayedIdRef.current === insight.id) {
+      void replayLastMessage();
+      return;
+    }
 
     lastPlayedIdRef.current = insight.id;
-
     void playInsight(insight);
   }, [insight?.id, assetsReady]);
 
@@ -467,10 +476,27 @@ export default function PusulaGuide({
         className="pusula-guide__logo"
         onClick={() => {
           if (phase !== 'idle') return;
+
+          userRequestedPlayRef.current = true;
+
           if (onLogoClick) {
             onLogoClick();
             return;
           }
+
+          if (insight?.id) {
+            if (lastPlayedIdRef.current === insight.id) {
+              userRequestedPlayRef.current = false;
+              void replayLastMessage();
+            } else {
+              userRequestedPlayRef.current = false;
+              lastPlayedIdRef.current = insight.id;
+              void playInsight(insight);
+            }
+            return;
+          }
+
+          userRequestedPlayRef.current = false;
           void replayLastMessage();
         }}
         aria-label={
