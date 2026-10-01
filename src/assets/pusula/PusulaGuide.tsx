@@ -134,6 +134,7 @@ export default function PusulaGuide({
   const runRef = useRef(0);
   const lastPlayedIdRef = useRef<string | null>(null);
   const keepOpenRef = useRef(false);
+  const guideRootRef = useRef<HTMLDivElement | null>(null);
 
   const activeInsight = insight ?? lastInsight;
 
@@ -159,7 +160,9 @@ export default function PusulaGuide({
   ) => {
     if (!activeInsight?.id) return;
 
-    keepOpenRef.current = true;
+    // Beğenmedim seçildiğinde neden seçenekleri açık kalabilir; diğer
+    // cevaplarda Pusula eski yerine dönebilmelidir.
+    keepOpenRef.current = !liked && reason === null;
 
     const value: PusulaFeedbackValue = {
       insightId: activeInsight.id,
@@ -407,6 +410,12 @@ export default function PusulaGuide({
     if (token !== runRef.current) return;
 
     setPhase('hold');
+    await wait(6500);
+
+    if (token !== runRef.current) return;
+    if (keepOpenRef.current) return;
+
+    await returnToHeader(token);
   };
 
   const closeMessage = () => {
@@ -415,6 +424,24 @@ export default function PusulaGuide({
     setShowDislikeReasons(false);
     void returnToHeader(token);
   };
+
+  // Pusula aşağıdayken kullanıcı mesajın dışındaki herhangi bir yere
+  // dokunursa konuşmayı kapat ve logoyu eski header konumuna geri getir.
+  // Logo ve mesaj panelinin kendi tıklamaları bu davranıştan etkilenmez.
+  useEffect(() => {
+    if (phase === 'idle' || phase === 'back') return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && guideRootRef.current?.contains(target)) return;
+      closeMessage();
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointer, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer, true);
+    };
+  }, [phase]);
 
   const largeSize = 198;
   const scale = largeSize / Math.max(anchor.size, 1);
@@ -431,6 +458,7 @@ export default function PusulaGuide({
 
   return (
     <div
+      ref={guideRootRef}
       className={`pusula-guide pusula-guide--${phase}${hasUnread ? ' pusula-guide--has-unread' : ''}`}
       style={style}
     >
@@ -540,6 +568,7 @@ export default function PusulaGuide({
                       onClick={() => {
                         setShowDislikeReasons(false);
                         void submitFeedback(true);
+                        window.setTimeout(closeMessage, 280);
                       }}
                     >
                       <span aria-hidden="true">👍</span>
@@ -578,7 +607,10 @@ export default function PusulaGuide({
                             feedback.reason === option.value ? 'is-selected' : ''
                           }
                           aria-pressed={feedback.reason === option.value}
-                          onClick={() => void submitFeedback(false, option.value)}
+                          onClick={() => {
+                            void submitFeedback(false, option.value);
+                            window.setTimeout(closeMessage, 280);
+                          }}
                         >
                           {option.label}
                         </button>
