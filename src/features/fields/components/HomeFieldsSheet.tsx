@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GripVertical } from 'lucide-react';
+import PusulaLoadingOverlay from '../../../components/PusulaLoadingOverlay';
 import { getEntitlementSnapshot } from '../../../entitlements/useEntitlementStore';
 import { reorderUserFields } from '../services/fieldOrder.service';
 import './HomeFieldsSheet.css';
@@ -319,6 +320,11 @@ export default function HomeFieldsSheet({
           </>
         )}
       </section>
+      <PusulaLoadingOverlay
+        open={deleting}
+        label="Tarla siliniyor…"
+        hint="Tarla ve bağlı kayıtlar kaldırılıyor."
+      />
     </div>,
     document.body,
   );

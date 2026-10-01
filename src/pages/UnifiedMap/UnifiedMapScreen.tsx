@@ -34,6 +34,9 @@ import {
 } from '../../services/unifiedMapAiService';
 import { supabase } from '../../supabaseClient';
 import { createSatelliteRasterSource, vividSatellitePaint } from '../../lib/mapStyle';
+import { isOrchardTreePilotCrop } from '../../features/orchard/services/orchardTree.service';
+import { loadOrchardIntelligenceSnapshot } from '../../features/orchard/services/orchardIntelligence.service';
+import type { OrchardTreeMapPoint } from '../../features/orchard/types/orchardTree';
 
 export type UnifiedMapSection = MapSection;
 
@@ -941,6 +944,23 @@ async function recolorSoilWmsImage(
   }
 }
 
+function orchardTreesGeoJson(points: OrchardTreeMapPoint[]) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: points.map((point) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [point.longitude, point.latitude] },
+      properties: {
+        treeId: point.treeId,
+        treeCode: point.treeCode,
+        variety: point.variety ?? '',
+        status: point.status,
+        latestObservationAt: point.latestObservationAt ?? '',
+      },
+    })),
+  };
+}
+
 function SoilGeoMap({
   field,
   property,
@@ -1202,10 +1222,14 @@ function VegetationGeoMap({
   field,
   ndvi,
   view,
+  orchardTreePoints,
+  showOrchardTrees,
 }: {
   field: Field | null;
   ndvi: SatelliteHealthResult | null;
   view: 'ndvi' | 'trueColor';
+  orchardTreePoints: OrchardTreeMapPoint[];
+  showOrchardTrees: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -1286,6 +1310,62 @@ function VegetationGeoMap({
           'line-width': 2.5,
           'line-opacity': 1,
         },
+      });
+
+      map.addSource('orchard-trees', {
+        type: 'geojson',
+        data: orchardTreesGeoJson([]),
+      });
+      map.addLayer({
+        id: 'orchard-tree-points',
+        type: 'circle',
+        source: 'orchard-trees',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 15, 4.5, 18, 8],
+          'circle-color': [
+            'match', ['get', 'status'],
+            'attention', '#f59e0b',
+            'watch', '#facc15',
+            'normal', '#ffffff',
+            '#9ca3af',
+          ],
+          'circle-stroke-color': '#090909',
+          'circle-stroke-width': 2,
+          'circle-opacity': 0.95,
+        },
+      });
+      map.addLayer({
+        id: 'orchard-tree-labels',
+        type: 'symbol',
+        source: 'orchard-trees',
+        minzoom: 17,
+        layout: {
+          visibility: 'none',
+          'text-field': ['get', 'treeCode'],
+          'text-size': 10,
+          'text-offset': [0, 1.5],
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#000000',
+          'text-halo-width': 1.4,
+        },
+      });
+
+      map.on('click', 'orchard-tree-points', (event) => {
+        const feature = event.features?.[0];
+        const coords = feature?.geometry?.type === 'Point' ? feature.geometry.coordinates : null;
+        if (!coords || !Array.isArray(coords)) return;
+        const code = String(feature?.properties?.treeCode ?? 'Ağaç');
+        const variety = String(feature?.properties?.variety ?? '').trim();
+        const status = String(feature?.properties?.status ?? 'unknown');
+        const statusLabel = status === 'attention' ? 'Öncelikli kontrol' : status === 'watch' ? 'Takip' : status === 'normal' ? 'Normal gözlem' : 'Gözlem yok';
+        new maplibregl.Popup({ closeButton: true, closeOnClick: true, offset: 10 })
+          .setLngLat([Number(coords[0]), Number(coords[1])])
+          .setHTML(`<strong>${code}</strong>${variety ? `<br/><span>${variety}</span>` : ''}<br/><small>${statusLabel}</small>`)
+          .addTo(map);
       });
 
       if (parcelBounds) {
@@ -1411,6 +1491,22 @@ function VegetationGeoMap({
     parcelBounds?.east,
     parcelBounds?.north,
   ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const updateTrees = () => {
+      const source = map.getSource('orchard-trees') as GeoJSONSource | undefined;
+      source?.setData(orchardTreesGeoJson(orchardTreePoints));
+      const visibility = showOrchardTrees ? 'visible' : 'none';
+      if (map.getLayer('orchard-tree-points')) map.setLayoutProperty('orchard-tree-points', 'visibility', visibility);
+      if (map.getLayer('orchard-tree-labels')) map.setLayoutProperty('orchard-tree-labels', 'visibility', visibility);
+    };
+
+    if (map.isStyleLoaded()) updateTrees();
+    else map.once('load', updateTrees);
+  }, [orchardTreePoints, showOrchardTrees]);
 
   const satelliteDate = formatSatelliteDate(ndvi?.latestImageDate);
 
@@ -2351,6 +2447,10 @@ export default function UnifiedMapScreen({
   const [soilProperty, setSoilProperty] = useState<SoilGridsPropertyKey>('phh2o');
   const [soilDepth, setSoilDepth] = useState<SoilGridsDepth>('0-5cm');
   const [climateVariable, setClimateVariable] = useState<Era5MapVariable>('soil_moisture_0_to_7cm');
+  const [orchardTreePoints, setOrchardTreePoints] = useState<OrchardTreeMapPoint[]>([]);
+  const [orchardTreeTotalCount, setOrchardTreeTotalCount] = useState(0);
+  const [orchardTreeState, setOrchardTreeState] = useState<LoadState>('idle');
+  const [showOrchardTrees, setShowOrchardTrees] = useState(false);
 
   const [ndvi, setNdvi] = useState<SatelliteHealthResult | null>(null);
   const [ndviState, setNdviState] = useState<LoadState>('idle');
@@ -2376,6 +2476,33 @@ export default function UnifiedMapScreen({
   const coords = useMemo(() => fieldCoordinates(selectedField), [selectedField]);
   const parcelBounds = useMemo(() => parcelBoundsFromField(selectedField), [selectedField]);
   const meta = SECTION_META[section];
+
+  const orchardPilot = isOrchardTreePilotCrop(selectedField?.crop);
+
+  useEffect(() => {
+    let cancelled = false;
+    setOrchardTreePoints([]);
+    setOrchardTreeTotalCount(0);
+    setShowOrchardTrees(false);
+    if (!selectedField?.id || !orchardPilot) {
+      setOrchardTreeState('idle');
+      return () => { cancelled = true; };
+    }
+    setOrchardTreeState('loading');
+    void loadOrchardIntelligenceSnapshot(selectedField.id, selectedField.crop ?? '')
+      .then((snapshot) => {
+        if (cancelled) return;
+        setOrchardTreePoints(snapshot.mapPoints);
+        setOrchardTreeTotalCount(snapshot.treeCount);
+        setOrchardTreeState('ready');
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.warn('[TarlaPusula] ağaç harita katmanı alınamadı:', error);
+        setOrchardTreeState('error');
+      });
+    return () => { cancelled = true; };
+  }, [selectedField?.id, selectedField?.crop, orchardPilot]);
 
   useEffect(() => {
     if (selectedFieldId) setFieldId(String(selectedFieldId));
@@ -2729,6 +2856,8 @@ export default function UnifiedMapScreen({
           field={selectedField}
           ndvi={ndvi}
           view={ndviView}
+          orchardTreePoints={orchardTreePoints}
+          showOrchardTrees={showOrchardTrees}
         />
       ) : (
         <div style={styles.emptyStage}>Uydu görüntüsü bulunamadı.</div>
@@ -3007,6 +3136,20 @@ export default function UnifiedMapScreen({
                 >
                   Gerçek Görüntü
                 </button>
+                {orchardPilot ? (
+                  <button
+                    type="button"
+                    disabled={orchardTreeState === 'loading'}
+                    title="Yalnız kayıtlı gerçek ağaç GPS noktalarını gösterir."
+                    style={{ ...styles.layerChip, ...(showOrchardTrees ? styles.layerChipActive : {}) }}
+                    onClick={() => {
+                      setSection('vegetation');
+                      setShowOrchardTrees((value) => !value);
+                    }}
+                  >
+                    Ağaçlar{orchardTreeState === 'ready' ? ` · ${orchardTreePoints.length}/${orchardTreeTotalCount}` : ''}
+                  </button>
+                ) : null}
                 {FUTURE_VEGETATION_LAYERS.map((label) => (
                   <button
                     key={label}

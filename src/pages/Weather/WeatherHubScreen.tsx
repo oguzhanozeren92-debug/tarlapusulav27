@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Field, FieldWeatherState, Screen } from '../../types';
+import ClassicBottomNav from '../../components/ClassicBottomNav';
 import SprayWeatherGuide from '../../features/weather/components/SprayWeatherGuide';
+import MicroclimateSensorPanel from '../../features/microclimate/components/MicroclimateSensorPanel';
 import type { HourlySprayState } from '../../features/weather/services/hourlySprayForecast';
 import {
   fetchWaterClimatePoint,
@@ -555,7 +557,14 @@ type Weather3DKey =
 function weather3DKey(condition?: string): Weather3DKey {
   const value = String(condition ?? '').toLocaleLowerCase('tr-TR');
 
-  if (value.includes('fırt') || value.includes('thunder') || value.includes('şimş') || value.includes('storm')) return 'storm';
+  if (
+    value.includes('fırt') ||
+    value.includes('thunder') ||
+    value.includes('şimş') ||
+    value.includes('storm') ||
+    value.includes('gürült') ||
+    value.includes('gök gür')
+  ) return 'storm';
   if (value.includes('kar') || value.includes('snow')) return 'snow';
   if (value.includes('sis') || value.includes('fog') || value.includes('mist')) return 'fog';
   if (value.includes('sağanak') || value.includes('kuvvetli yağ') || value.includes('heavy rain') || value.includes('shower')) return 'heavy-rain';
@@ -1455,6 +1464,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
             </button>
           </div>
         </main>
+        <ClassicBottomNav activeScreen="weatherHub" setScreen={setScreen} />
       </div>
     );
   }
@@ -1530,23 +1540,21 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
       <style>{cmsRuntimeCss + WEATHER_STYLES}</style>
 
       <main className="tp-wxr-main">
-        <section className="tp-wxr-top">
-          <div className="tp-wxr-field">
-            <span className="tp-wxr-pin" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
+        <section className="tp-wxref-fieldbar">
+          <div className="tp-wxref-field-left">
+            <span className="tp-wxref-pin" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
                 <path d="M12 21s6-5.3 6-11a6 6 0 1 0-12 0c0 5.7 6 11 6 11Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 <circle cx="12" cy="10" r="2.2" stroke="currentColor" strokeWidth="1.8" />
               </svg>
             </span>
 
-            <label>
+            <label className="tp-wxref-field-select">
               <select
                 value={weatherKey}
                 onChange={(event) => {
                   const nextId = event.target.value;
                   setWeatherHubFieldId(nextId);
-                  // Yeni tarla seçilince otomatik 8 saat kontrolü devreye girer.
-                  // Burada doğrudan API çağrısı yapmıyoruz.
                 }}
               >
                 {safeFields.map((field) => (
@@ -1556,8 +1564,8 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 ))}
               </select>
 
-              <span className="tp-wxr-crop-badge">
-                <span>ÜRÜN</span>
+              <span className="tp-wxref-crop">
+                <span>Ürün:</span>
                 <b>{String((weatherField as any)?.crop ?? (weatherField as any)?.cropName ?? 'Belirtilmedi')}</b>
               </span>
             </label>
@@ -1565,153 +1573,171 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
           <button
             type="button"
-            className="tp-wxr-compare"
+            className="tp-wxref-map-button"
             onClick={goToComparison}
           >
-            <span>▥</span>
-            Kaynakları Karşılaştır
+            <span>Kaynakları Karşılaştır</span>
           </button>
         </section>
 
-        <section className="tp-wxr-hero">
-          <article className="tp-wxr-current">
-            <div className="tp-wxr-current-top">
-              <div className="tp-wxr-big-weather">
-                <span className="tp-wxr-weather-halo" />
-                <img
-                  src={weather3DIcon(currentCondition)}
-                  crossOrigin="anonymous"
-                  alt={currentCondition || 'Hava durumu'}
-                  draggable={false}
-                  style={{ width: 154, height: 154, objectFit: 'contain', display: 'block' }}
-                />
-              </div>
-
-              <div className="tp-wxr-current-copy">
-                <strong className="tp-wxr-temp">
-                  {currentTemp === null ? '—' : `${Math.round(currentTemp)}°C`}
-                </strong>
-                <h2>{currentCondition}</h2>
-
-                <div className="tp-wxr-minmax">
-                  <span>
-                    <Icon name="thermo" size={17} />
-                    <b>{tempMax === null ? '—' : `${Math.round(tempMax)}°C`}</b>
-                    <small>En Yüksek</small>
-                  </span>
-                  <span>
-                    <Icon name="thermo" size={17} />
-                    <b>{tempMin === null ? '—' : `${Math.round(tempMin)}°C`}</b>
-                    <small>En Düşük</small>
-                  </span>
-                </div>
-              </div>
+        <section className="tp-wxref-card">
+          <div className="tp-wxref-current">
+            <div className="tp-wxref-art">
+              <img
+                src={weather3DIcon(currentCondition)}
+                crossOrigin="anonymous"
+                alt={currentCondition || 'Hava durumu'}
+                draggable={false}
+              />
             </div>
 
-            <div className="tp-wxr-weather-stats">
-              <span>
-                <Icon name="drop" size={18} />
-                <b>{humidity === null ? '—' : `%${Math.round(humidity)}`}</b>
-                <small>Nem</small>
-              </span>
-              <span>
-                <Icon name="wind" size={18} />
-                <b>{windSpeed === null ? '—' : `${Math.round(windSpeed)} km/sa`}</b>
-                <small>Rüzgâr</small>
-              </span>
-              <span>
-                <Icon name="globe" size={18} />
-                <b>{nasaTemperature === null ? '—' : `${Math.round(nasaTemperature)}°`}</b>
-                <small>İklim ref.</small>
-              </span>
-            </div>
+            <div className="tp-wxref-current-copy">
+              <strong>{currentTemp === null ? '—' : `${Math.round(currentTemp)}°C`}</strong>
+              <h2>{currentCondition}</h2>
 
-            <div className="tp-wxr-inline-risks" aria-label="Bugünün hava riskleri">
-              <div className={rainChance >= 60 ? 'warn' : ''}>
-                <span>Yağış Riski</span>
+              <div className="tp-wxref-minmax">
+                <span>
+                  <Icon name="thermo" size={16} />
+                  <b>{tempMax === null ? '—' : `${Math.round(tempMax)}°C`}</b>
+                  <small>En Yüksek</small>
+                </span>
+                <span>
+                  <Icon name="thermo" size={16} />
+                  <b>{tempMin === null ? '—' : `${Math.round(tempMin)}°C`}</b>
+                  <small>En Düşük</small>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="tp-wxref-stats">
+            <span>
+              <Icon name="drop" size={18} />
+              <b>{humidity === null ? '—' : `%${Math.round(humidity)}`}</b>
+              <small>Nem</small>
+            </span>
+            <span>
+              <Icon name="wind" size={18} />
+              <b>{windSpeed === null ? '—' : `${Math.round(windSpeed)} km/sa`}</b>
+              <small>Rüzgâr</small>
+            </span>
+            <span>
+              <Icon name="globe" size={18} />
+              <b>{nasaTemperature === null ? '—' : `${Math.round(nasaTemperature)}°`}</b>
+              <small>Rüzgâr Yönü</small>
+            </span>
+          </div>
+
+          <div className="tp-wxref-risk-grid">
+            <article className={rainChance >= 60 ? 'is-danger' : ''}>
+              <span className="tp-wxref-risk-accent" />
+              <span className="tp-wxref-risk-icon"><Icon name="rain" size={19} /></span>
+              <div>
+                <small>Yağış Riski</small>
                 <strong>%{Math.round(rainChance)}</strong>
-                <small>{rainRisk}</small>
+                <em>{rainRisk}</em>
               </div>
-              <div className={frostRisk === 'Var' ? 'warn' : ''}>
-                <span>Don Riski</span>
+            </article>
+
+            <article className={frostRisk === 'Var' ? 'is-danger' : 'is-calm'}>
+              <span className="tp-wxref-risk-accent" />
+              <span className="tp-wxref-risk-icon"><Icon name="thermo" size={19} /></span>
+              <div>
+                <small>Don Riski</small>
                 <strong>{frostRisk}</strong>
-                <small>{tempMin === null ? 'Sıcaklık verisi yok' : `${Math.round(tempMin)}°C en düşük`}</small>
+                <em>{tempMin === null ? 'Sıcaklık verisi yok' : `${Math.round(tempMin)}°C'nin altında`}</em>
               </div>
-            </div>
+            </article>
+          </div>
 
-            <div className="tp-wxr-inline-field-data" aria-label="Tarla koşulları">
+          <div className="tp-wxref-data-grid">
+            <article>
+              <span className="tp-wxref-data-icon"><Icon name="rain" size={17} /></span>
               <div>
-                <span><Icon name="rain" size={14} /> Yağış Geçmişi</span>
+                <small>Yağış Geçmişi</small>
                 <strong>{rain30dValue === null ? '—' : `${rain30dValue.toFixed(1)} mm`}</strong>
-                <small>Son 30 gün · {rain30dFarmerText}</small>
+                <p>Son 30 günde toplam yağış.</p>
               </div>
+              <b className="tp-wxref-chevron">›</b>
+            </article>
 
+            <article>
+              <span className="tp-wxref-data-icon"><Icon name="thermo" size={17} /></span>
               <div>
-                <span><Icon name="thermo" size={14} /> Yüzey Sıcaklığı</span>
+                <small>Yüzey Sıcaklığı</small>
                 <strong>{surfaceTemperatureValue === null ? '—' : `${surfaceTemperatureValue.toFixed(1)}°C`}</strong>
-                <small>{surfaceTemperatureFarmerText}</small>
+                <p>Yüzeye yakın toprak sıcaklığı.</p>
               </div>
+              <b className="tp-wxref-chevron">›</b>
+            </article>
 
+            <article>
+              <span className="tp-wxref-data-icon"><Icon name="soil" size={17} /></span>
               <div>
-                <span><Icon name="soil" size={14} /> Tarla İklimi</span>
+                <small>Tarla İklimi</small>
                 <strong>{climatePrimaryValue}</strong>
-                <small>
+                <p>
                   {conditionSoilMoistureSurface !== null
-                    ? `Üst toprak nemi${
-                        conditionSoilMoistureRoot !== null
-                          ? ` · kök ${conditionSoilMoistureRoot.toFixed(3)} m³/m³`
-                          : ''
-                      }`
+                    ? 'Model tabanlı toprak nemi.'
                     : combinedClimateTone === 'loading'
-                      ? 'Model verisi hazırlanıyor'
-                      : 'Model kaydı bekleniyor'}
-                </small>
+                      ? 'Model kaydı hazırlanıyor.'
+                      : 'Model kaydı bekleniyor.'}
+                </p>
               </div>
+              <b className="tp-wxref-chevron">›</b>
+            </article>
 
-              <div className="tp-wxr-inline-field-data-et0">
-                <span><Icon name="drop" size={14} /> ET₀ · Su Talebi</span>
+            <article>
+              <span className="tp-wxref-data-icon is-blue"><Icon name="drop" size={17} /></span>
+              <div>
+                <small>ET₀ · Su Talebi</small>
                 <strong>{et0SevenDayValue === null ? '—' : `${et0SevenDayValue.toFixed(1)} mm / 7 gün`}</strong>
-                <small>
+                <p>
                   {et0DailyAverage === null
-                    ? 'Referans su talebi verisi bekleniyor'
-                    : `≈ ${et0DailyAverage.toFixed(1)} mm/gün · ${et0FarmerLabel}`}
-                </small>
+                    ? 'Referans su talebi bekleniyor.'
+                    : `≈ ${et0DailyAverage.toFixed(1)} mm/gün · atmosferik talep.`}
+                </p>
               </div>
-            </div>
+              <b className="tp-wxref-chevron">›</b>
+            </article>
+          </div>
 
-            {fieldConditionCards.status === 'loading' ? (
-              <div className="tp-wxr-inline-field-state">Tarla verileri güncelleniyor…</div>
-            ) : fieldConditionCards.status === 'error' && fieldConditionCards.message ? (
-              <div className="tp-wxr-inline-field-state error">{fieldConditionCards.message}</div>
-            ) : null}
+          {fieldConditionCards.status === 'loading' ? (
+            <div className="tp-wxref-inline-state">Tarla verileri güncelleniyor…</div>
+          ) : fieldConditionCards.status === 'error' && fieldConditionCards.message ? (
+            <div className="tp-wxref-inline-state is-error">{fieldConditionCards.message}</div>
+          ) : null}
 
-            <div className="tp-wxr-field-status">
-              <span aria-hidden="true">♧</span>
-              <p>{agriculturalMessage}</p>
-            </div>
+          <div className="tp-wxref-advice">
+            <span aria-hidden="true">✦</span>
+            <p>{agriculturalMessage}</p>
+            <b aria-hidden="true">›</b>
+          </div>
 
-            <div className="tp-wxr-current-actions">
-              <button
-                type="button"
-                className="tp-wxr-refresh"
-                onClick={() => void refreshWeatherNow(weatherField)}
-                disabled={weatherState.status === 'loading'}
-              >
-                <Icon name="refresh" size={15} />
-                {weatherState.status === 'loading' ? 'Güncelleniyor…' : 'Tahmini Yenile'}
-              </button>
+          <div className="tp-wxref-actions">
+            <button
+              type="button"
+              className="tp-wxref-refresh"
+              onClick={() => void refreshWeatherNow(weatherField)}
+              disabled={weatherState.status === 'loading'}
+            >
+              <Icon name="refresh" size={16} />
+              {weatherState.status === 'loading' ? 'Güncelleniyor…' : 'Tahmini Yenile'}
+            </button>
 
-              <button
-                type="button"
-                className="tp-wxr-spray-open"
-                onClick={openSprayGuide}
-              >
-                İlaçlama Hava Kontrolü
-                <Icon name="chevron" size={15} />
-              </button>
-            </div>
-          </article>
+            <button
+              type="button"
+              className="tp-wxref-primary"
+              onClick={openSprayGuide}
+            >
+              <Icon name="wind" size={16} />
+              İlaçlama Hava Kontrolü
+              <Icon name="chevron" size={15} />
+            </button>
+          </div>
         </section>
+
+        <MicroclimateSensorPanel fieldId={weatherKey} />
 
         <section className="tp-wxr-forecast">
           <div className="tp-wxr-section-title">
@@ -1899,6 +1925,8 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           </small>
         </section>
       </main>
+
+      <ClassicBottomNav activeScreen="weatherHub" setScreen={setScreen} />
 
       {sprayGuideOpen && (
         <div className="tp-wxr-spray-modal-layer" role="presentation">
@@ -3254,5 +3282,651 @@ const WEATHER_STYLES = `
   }
 
 
+
+
+  /* =========================================================
+     WXREF-V2 — ONAYLANAN MOCKUP'A YAKIN YENİ DOM
+     2026-10-01
+     Bu blok önceki hava kartını skin etmez; yeni tp-wxref yapısını çizer.
+     ========================================================= */
+  .tp-wxr-page{
+    background:#f5f5f2!important;
+    color:#0b0c0d!important;
+  }
+
+  .tp-wxr-main{
+    width:min(calc(100% - 18px),720px)!important;
+    padding-bottom:34px!important;
+  }
+
+  .tp-wxref-fieldbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:9px;
+    padding:8px 9px;
+    border:1px solid #d7dadd;
+    border-radius:19px;
+    background:#f8f8f7;
+    box-shadow:0 1px 2px rgba(15,23,42,.03);
+  }
+
+  .tp-wxref-field-left{
+    min-width:0;
+    display:flex;
+    align-items:flex-start;
+    gap:7px;
+  }
+
+  .tp-wxref-pin{
+    width:39px;
+    height:39px;
+    flex:0 0 39px;
+    display:grid;
+    place-items:center;
+    border:1px solid #d8dcdf;
+    border-radius:11px;
+    background:#fff;
+    color:#111315;
+  }
+
+  .tp-wxref-field-select{
+    min-width:0;
+    display:grid;
+    gap:4px;
+  }
+
+  .tp-wxref-field-select select{
+    width:205px;
+    max-width:100%;
+    height:37px;
+    padding:0 34px 0 11px;
+    border:1px solid #cdd2d7;
+    border-radius:10px;
+    outline:0;
+    background:#fff;
+    color:#0b0c0d;
+    font:800 12px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-crop{
+    width:max-content;
+    max-width:100%;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    padding:3px 7px;
+    border:1px solid #e0e3e5;
+    border-radius:999px;
+    background:#fff;
+    font:700 7px/1 Inter,system-ui,sans-serif;
+    color:#111315;
+  }
+
+  .tp-wxref-crop span{
+    color:#747b82;
+    font-weight:650;
+  }
+
+  .tp-wxref-map-button{
+    min-height:38px;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:0 12px;
+    border:1px solid #bec5ca;
+    border-radius:11px;
+    background:#fff;
+    color:#111315;
+    font:800 8.5px/1 Inter,system-ui,sans-serif;
+    box-shadow:0 1px 2px rgba(15,23,42,.025);
+  }
+
+  .tp-wxref-card{
+    position:relative;
+    margin-top:10px;
+    padding:12px;
+    border:1px solid #d5d9dc;
+    border-radius:22px;
+    background:#fff;
+    box-shadow:
+      0 1px 2px rgba(15,23,42,.035),
+      0 10px 25px rgba(15,23,42,.035);
+    overflow:hidden;
+  }
+
+  .tp-wxref-card::before{
+    content:"";
+    position:absolute;
+    top:-30px;
+    right:-20px;
+    width:190px;
+    height:145px;
+    border-radius:50%;
+    background:radial-gradient(circle,rgba(172,214,240,.34),transparent 67%);
+    pointer-events:none;
+  }
+
+  .tp-wxref-current{
+    position:relative;
+    z-index:1;
+    display:grid;
+    grid-template-columns:112px minmax(0,1fr);
+    gap:13px;
+    align-items:center;
+    min-height:126px;
+  }
+
+  .tp-wxref-art{
+    width:112px;
+    height:112px;
+    display:grid;
+    place-items:center;
+    border-radius:21px;
+    background:
+      radial-gradient(circle at 40% 40%,rgba(255,196,40,.35),transparent 43%),
+      linear-gradient(145deg,#fff9e9,#f2f7fa);
+    overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(15,23,42,.035);
+  }
+
+  .tp-wxref-art img{
+    width:104px;
+    height:104px;
+    object-fit:contain;
+    display:block;
+  }
+
+  .tp-wxref-current-copy{
+    min-width:0;
+  }
+
+  .tp-wxref-current-copy>strong{
+    display:block;
+    color:#08090a;
+    font:900 42px/.92 Inter,system-ui,sans-serif;
+    letter-spacing:-.05em;
+  }
+
+  .tp-wxref-current-copy h2{
+    margin:6px 0 12px;
+    color:#111315;
+    font:850 15px/1.05 Inter,system-ui,sans-serif;
+    letter-spacing:-.015em;
+  }
+
+  .tp-wxref-minmax{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .tp-wxref-minmax span{
+    min-width:0;
+    display:grid;
+    grid-template-columns:17px 1fr;
+    gap:1px 5px;
+    align-items:center;
+    color:#111315;
+  }
+
+  .tp-wxref-minmax svg{
+    grid-row:1/3;
+    color:#1dbf73;
+  }
+
+  .tp-wxref-minmax b{
+    color:#111315;
+    font:850 9.5px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-minmax small{
+    color:#777f86;
+    font:600 6.4px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-stats{
+    position:relative;
+    z-index:1;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    min-height:55px;
+    margin-top:7px;
+    padding:9px 0;
+    border-top:1px solid #e5e8ea;
+    border-bottom:1px solid #e5e8ea;
+  }
+
+  .tp-wxref-stats span{
+    display:grid;
+    grid-template-columns:20px 1fr;
+    grid-template-rows:auto auto;
+    gap:1px 6px;
+    align-items:center;
+    padding:0 10px;
+    border-right:1px solid #e6e9eb;
+  }
+  .tp-wxref-stats span:last-child{border-right:0}
+  .tp-wxref-stats svg{grid-row:1/3;color:#111315}
+  .tp-wxref-stats b{
+    color:#111315;
+    font:850 9.5px/1 Inter,system-ui,sans-serif;
+  }
+  .tp-wxref-stats small{
+    color:#777f86;
+    font:600 6.4px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-risk-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+    margin-top:10px;
+  }
+
+  .tp-wxref-risk-grid article{
+    position:relative;
+    min-height:68px;
+    display:grid;
+    grid-template-columns:38px 1fr;
+    gap:8px;
+    align-items:center;
+    padding:8px 9px 8px 13px;
+    border:1px solid #dde1e4;
+    border-radius:13px;
+    background:#fff;
+    overflow:hidden;
+  }
+
+  .tp-wxref-risk-accent{
+    position:absolute;
+    left:5px;
+    top:12px;
+    bottom:12px;
+    width:3px;
+    border-radius:999px;
+    background:#59d9ad;
+  }
+  .tp-wxref-risk-grid article.is-danger .tp-wxref-risk-accent{background:#ff6b72}
+
+  .tp-wxref-risk-icon{
+    width:38px;
+    height:38px;
+    display:grid;
+    place-items:center;
+    border-radius:50%;
+    background:#edf9f5;
+    color:#15795c;
+  }
+  .tp-wxref-risk-grid article.is-danger .tp-wxref-risk-icon{
+    background:#fff0f1;
+    color:#d7434c;
+  }
+
+  .tp-wxref-risk-grid article>div{
+    min-width:0;
+    display:grid;
+    gap:2px;
+  }
+
+  .tp-wxref-risk-grid small{
+    color:#33393f;
+    font:750 7.4px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-risk-grid strong{
+    color:#08090a;
+    font:900 16px/.95 Inter,system-ui,sans-serif;
+    letter-spacing:-.02em;
+  }
+
+  .tp-wxref-risk-grid em{
+    color:#727a81;
+    font:600 6.4px/1.15 Inter,system-ui,sans-serif;
+    font-style:normal;
+  }
+
+  .tp-wxref-data-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+    margin-top:7px;
+  }
+
+  .tp-wxref-data-grid article{
+    min-height:74px;
+    display:grid;
+    grid-template-columns:34px minmax(0,1fr) 12px;
+    gap:7px;
+    align-items:center;
+    padding:8px 9px;
+    border:1px solid #dde1e4;
+    border-radius:13px;
+    background:#fff;
+  }
+
+  .tp-wxref-data-icon{
+    width:34px;
+    height:34px;
+    display:grid;
+    place-items:center;
+    border-radius:50%;
+    background:#eff5f9;
+    color:#1b5f98;
+  }
+  .tp-wxref-data-icon.is-blue{
+    background:#eef7ff;
+    color:#166eb5;
+  }
+
+  .tp-wxref-data-grid article>div{
+    min-width:0;
+    display:grid;
+    gap:2px;
+  }
+
+  .tp-wxref-data-grid small{
+    color:#343a40;
+    font:750 7.2px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-data-grid strong{
+    color:#08090a;
+    font:900 12px/1.05 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-data-grid p{
+    margin:0;
+    color:#767e85;
+    font:600 6.4px/1.2 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-chevron{
+    color:#111315;
+    font:800 18px/1 Inter,system-ui,sans-serif;
+    text-align:right;
+  }
+
+  .tp-wxref-inline-state{
+    margin-top:6px;
+    color:#717980;
+    font:650 7px/1.2 Inter,system-ui,sans-serif;
+  }
+  .tp-wxref-inline-state.is-error{color:#a23d45}
+
+  .tp-wxref-advice{
+    display:grid;
+    grid-template-columns:30px minmax(0,1fr) 12px;
+    gap:8px;
+    align-items:center;
+    min-height:48px;
+    margin-top:8px;
+    padding:8px 9px;
+    border:1px solid #dce1e5;
+    border-radius:13px;
+    background:#fafbfb;
+  }
+
+  .tp-wxref-advice>span{
+    width:30px;
+    height:30px;
+    display:grid;
+    place-items:center;
+    border:1px solid #dae2e8;
+    border-radius:50%;
+    background:#edf5fa;
+    color:#111315;
+    font-size:13px;
+  }
+
+  .tp-wxref-advice p{
+    margin:0;
+    color:#2b3035;
+    font:650 7.6px/1.35 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-advice>b{
+    color:#111315;
+    font:800 18px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-actions{
+    display:grid;
+    grid-template-columns:1fr 1.12fr;
+    gap:8px;
+    margin-top:9px;
+  }
+
+  .tp-wxref-actions button{
+    min-height:39px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:0 10px;
+    border-radius:12px;
+    font:850 8px/1 Inter,system-ui,sans-serif;
+  }
+
+  .tp-wxref-refresh{
+    border:1px solid #bfc6cc;
+    background:#fff;
+    color:#111315;
+  }
+
+  .tp-wxref-primary{
+    border:1px solid #050607;
+    background:#08090a;
+    color:#fff;
+    box-shadow:0 5px 14px rgba(0,0,0,.12);
+  }
+
+  .tp-wxref-forecast-title{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:10px!important;
+  }
+
+  .tp-wxref-forecast-title button{
+    min-height:30px;
+    padding:0 9px;
+    border:1px solid #cfd4d8;
+    border-radius:9px;
+    background:#fff;
+    color:#111315;
+    font:800 7px/1 Inter,system-ui,sans-serif;
+  }
+
+  /* Alttaki bölümlere de aynı açık/siyah dili taşı. */
+  .tp-wxr-table-card,
+  .tp-wxr-alert,
+  .tp-wxr-details article,
+  .tp-wxr-pusula,
+  .tp-wxr-page .tp-micro-sensor{
+    border-color:#d9dde1!important;
+    background:#fff!important;
+    color:#111315!important;
+    box-shadow:0 3px 14px rgba(15,23,42,.035)!important;
+  }
+
+  .tp-wxr-section-title h2,
+  .tp-wxr-alert h3,
+  .tp-wxr-pusula strong,
+  .tp-wxr-details article>strong{
+    color:#111315!important;
+  }
+
+  @media(max-width:560px){
+    .tp-wxr-main{
+      width:calc(100% - 16px)!important;
+      padding-top:72px!important;
+    }
+
+    .tp-wxref-fieldbar{
+      padding:7px;
+      border-radius:17px;
+    }
+
+    .tp-wxref-pin{
+      width:36px;
+      height:36px;
+      flex-basis:36px;
+    }
+
+    .tp-wxref-field-select select{
+      width:146px;
+      height:35px;
+      padding-left:9px;
+      font-size:10.5px;
+    }
+
+    .tp-wxref-crop{
+      font-size:6.3px;
+    }
+
+    .tp-wxref-map-button{
+      min-height:35px;
+      max-width:124px;
+      padding:0 8px;
+      font-size:7px;
+      line-height:1.1;
+    }
+
+    .tp-wxref-card{
+      padding:10px;
+      border-radius:19px;
+    }
+
+    .tp-wxref-current{
+      grid-template-columns:96px minmax(0,1fr);
+      gap:9px;
+      min-height:108px;
+    }
+
+    .tp-wxref-art{
+      width:96px;
+      height:96px;
+      border-radius:18px;
+    }
+
+    .tp-wxref-art img{
+      width:90px;
+      height:90px;
+    }
+
+    .tp-wxref-current-copy>strong{
+      font-size:37px;
+    }
+
+    .tp-wxref-current-copy h2{
+      margin:5px 0 9px;
+      font-size:12px;
+    }
+
+    .tp-wxref-minmax{
+      gap:8px;
+    }
+
+    .tp-wxref-minmax b{font-size:8.3px}
+    .tp-wxref-minmax small{font-size:5.8px}
+
+    .tp-wxref-stats{
+      min-height:49px;
+      padding:7px 0;
+    }
+    .tp-wxref-stats span{
+      padding:0 7px;
+      grid-template-columns:18px 1fr;
+      gap:1px 4px;
+    }
+    .tp-wxref-stats b{font-size:8.3px}
+    .tp-wxref-stats small{font-size:5.8px}
+
+    .tp-wxref-risk-grid{
+      gap:6px;
+      margin-top:8px;
+    }
+    .tp-wxref-risk-grid article{
+      min-height:61px;
+      grid-template-columns:34px 1fr;
+      gap:6px;
+      padding:7px 7px 7px 12px;
+      border-radius:12px;
+    }
+    .tp-wxref-risk-icon{
+      width:34px;
+      height:34px;
+    }
+    .tp-wxref-risk-grid small{font-size:6.8px}
+    .tp-wxref-risk-grid strong{font-size:14px}
+    .tp-wxref-risk-grid em{font-size:5.9px}
+
+    .tp-wxref-data-grid{
+      gap:6px;
+      margin-top:6px;
+    }
+    .tp-wxref-data-grid article{
+      min-height:67px;
+      grid-template-columns:30px minmax(0,1fr) 10px;
+      gap:6px;
+      padding:7px;
+      border-radius:12px;
+    }
+    .tp-wxref-data-icon{
+      width:30px;
+      height:30px;
+    }
+    .tp-wxref-data-grid small{font-size:6.5px}
+    .tp-wxref-data-grid strong{font-size:10.5px}
+    .tp-wxref-data-grid p{font-size:5.8px}
+
+    .tp-wxref-advice{
+      min-height:44px;
+      grid-template-columns:27px minmax(0,1fr) 10px;
+      gap:7px;
+      margin-top:7px;
+      padding:7px;
+      border-radius:12px;
+    }
+    .tp-wxref-advice>span{
+      width:27px;
+      height:27px;
+    }
+    .tp-wxref-advice p{font-size:6.8px}
+
+    .tp-wxref-actions{
+      gap:7px;
+      margin-top:8px;
+    }
+    .tp-wxref-actions button{
+      min-height:36px;
+      padding:0 7px;
+      border-radius:10px;
+      font-size:6.9px;
+    }
+  }
+
+
+  /* WXREF-V3 — Üst sağ aksiyon doğru hali: Kaynakları Karşılaştır */
+  .tp-wxref-map-button{
+    min-width:132px!important;
+    max-width:150px!important;
+    padding:0 10px!important;
+    font-size:7.8px!important;
+    font-weight:850!important;
+    white-space:nowrap!important;
+  }
+
+  @media(max-width:560px){
+    .tp-wxref-map-button{
+      min-width:108px!important;
+      max-width:118px!important;
+      padding:0 7px!important;
+      font-size:6.6px!important;
+    }
+  }
 
 `;

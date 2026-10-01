@@ -3,6 +3,7 @@ import {
   useState,
 } from 'react';
 import type { Field, Screen } from '../types';
+import ClassicBottomNav from './ClassicBottomNav';
 import './ProducerMarketScreen.css';
 
 export interface MarketListing {
@@ -1443,42 +1444,10 @@ export default function ProducerMarketScreen({
         </main>
       </div>
 
-      <nav className="tp-producer-market-bottom-nav">
-        <button type="button" onClick={() => navigate('home')}>
-          <Icon name="home" size={18} />
-          <span>Ana Sayfa</span>
-        </button>
-
-        <button type="button" onClick={() => navigate('home')}>
-          <Icon name="field" size={18} />
-          <span>Tarlalarım</span>
-        </button>
-
-        <button
-          type="button"
-          className="tp-producer-market-bottom-ai"
-          onClick={() => navigate('aiAnalysis')}
-        >
-          <b><Icon name="ai" size={19} /></b>
-          <span>AI Analiz</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('calendar')}
-        >
-          <Icon name="calendar" size={18} />
-          <span>Takvim</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSideMenuOpen(true)}
-        >
-          <Icon name="more" size={18} />
-          <span>Daha Fazla</span>
-        </button>
-      </nav>
+      <ClassicBottomNav
+        activeScreen={String(screen)}
+        setScreen={setScreen}
+      />
 
       {sideMenuOpen && (
         <div className="tp-producer-market-drawer-layer">

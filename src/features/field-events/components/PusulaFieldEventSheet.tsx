@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
+  ClipboardPlus,
   Droplets,
+  FlaskConical,
+  LandPlot,
   MoreHorizontal,
+  PencilLine,
   Sprout,
   Tractor,
   Wheat,
@@ -14,17 +19,30 @@ import './PusulaFieldEventSheet.css';
 type AnswerOption = {
   type: FieldOperationType;
   label: string;
-  detail: string;
   icon: typeof Tractor;
 };
 
 const ANSWERS: AnswerOption[] = [
-  { type: 'Sürme', label: 'Sürüm / Toprak işleme', detail: 'Sürme, ikileme veya benzeri hazırlık', icon: Tractor },
-  { type: 'Ekim / Dikim', label: 'Ekim / Dikim', detail: 'Tohum veya fide/fidan ekimi', icon: Sprout },
-  { type: 'Hasat', label: 'Hasat', detail: 'Ürünü kaldırdım / biçtim', icon: Wheat },
-  { type: 'Sulama', label: 'Sulama', detail: 'Bu dönemde sulama yaptım', icon: Droplets },
-  { type: 'Diğer', label: 'Başka işlem', detail: 'Listede olmayan bir işlem', icon: MoreHorizontal },
+  { type: 'Sürme', label: 'Sürme', icon: Tractor },
+  { type: 'İkileme', label: 'İkileme', icon: Tractor },
+  { type: 'Ekim / Dikim', label: 'Ekim / Dikim', icon: Sprout },
+  { type: 'Gübreleme', label: 'Gübreleme', icon: FlaskConical },
+  { type: 'İlaçlama', label: 'İlaçlama', icon: FlaskConical },
+  { type: 'Sulama', label: 'Sulama', icon: Droplets },
+  { type: 'Çapalama', label: 'Çapalama', icon: LandPlot },
+  { type: 'Budama', label: 'Budama', icon: PencilLine },
+  { type: 'Hasat', label: 'Hasat', icon: Wheat },
+  { type: 'Saha Kontrolü', label: 'Saha kontrolü', icon: ClipboardPlus },
+  { type: 'Diğer', label: 'Diğer', icon: MoreHorizontal },
 ];
+
+function localToday() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function trDate(value: string) {
   const parsed = new Date(`${value}T12:00:00`);
@@ -35,10 +53,10 @@ function trDate(value: string) {
   }).format(parsed);
 }
 
-function eventHint(event: HybrisFieldEvent) {
-  if (event.type === 'sowing') return 'Ekim dönemine benzeyen bir değişim';
-  if (event.type === 'harvest') return 'Hasat dönemine benzeyen bir değişim';
-  return 'Toprak/yüzey yapısında belirgin bir değişim';
+function eventLabel(event: HybrisFieldEvent) {
+  if (event.type === 'sowing') return 'ekim benzeri bir değişim';
+  if (event.type === 'harvest') return 'hasat benzeri bir değişim';
+  return 'tarla yüzeyinde bir hareketlilik';
 }
 
 export default function PusulaFieldEventSheet({
@@ -61,7 +79,6 @@ export default function PusulaFieldEventSheet({
   }) => Promise<unknown>;
 }) {
   const [selected, setSelected] = useState<AnswerOption | null>(null);
-  const [editingDate, setEditingDate] = useState(false);
   const [date, setDate] = useState('');
   const [otherNote, setOtherNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -70,14 +87,23 @@ export default function PusulaFieldEventSheet({
   useEffect(() => {
     if (!open || !candidate) return;
     setSelected(null);
-    setEditingDate(false);
     setDate(candidate.signalDate);
     setOtherNote('');
     setSaving(false);
     setError(null);
   }, [open, candidate?.signalDate]);
 
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
   const dateLabel = useMemo(() => (date ? trDate(date) : ''), [date]);
+  const SelectedIcon = selected?.icon ?? MoreHorizontal;
 
   if (!open || !candidate) return null;
 
@@ -85,11 +111,12 @@ export default function PusulaFieldEventSheet({
     if (!selected || !date || saving) return;
     setSaving(true);
     setError(null);
+
     try {
       await onConfirm({
         operationType: selected.type,
         date,
-        note: selected.type === 'Diğer' ? otherNote : null,
+        note: selected.type === 'Diğer' ? otherNote.trim() || null : null,
       });
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'İşlem kaydedilemedi.');
@@ -101,6 +128,7 @@ export default function PusulaFieldEventSheet({
     if (saving) return;
     setSaving(true);
     setError(null);
+
     try {
       await onDismiss();
     } catch (dismissError) {
@@ -118,7 +146,7 @@ export default function PusulaFieldEventSheet({
       }}
     >
       <section
-        className="tp-field-event-sheet"
+        className={`tp-field-event-sheet${selected ? ' is-confirming' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tp-field-event-title"
@@ -126,76 +154,104 @@ export default function PusulaFieldEventSheet({
         <div className="tp-field-event-handle" aria-hidden="true" />
 
         <header className="tp-field-event-head">
-          <div className="tp-field-event-compass" aria-hidden="true">
-            <img
-              src="https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/compass-body.webp"
-              alt=""
-              draggable={false}
-            />
-            <img
-              className="tp-field-event-compass-needle"
-              src="https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/compass-needle-centered.webp"
-              alt=""
-              draggable={false}
-            />
+          {selected ? (
+            <button
+              type="button"
+              className="tp-field-event-back"
+              onClick={() => {
+                if (saving) return;
+                setSelected(null);
+                setError(null);
+              }}
+              disabled={saving}
+              aria-label="İşlem seçimine dön"
+            >
+              <ArrowLeft size={19} aria-hidden="true" />
+            </button>
+          ) : (
+            <div className="tp-field-event-head-spacer" aria-hidden="true" />
+          )}
+
+          <div className="tp-field-event-title-copy">
+            <small>PUSULA · {trDate(candidate.signalDate)} CİVARI</small>
+            <h3 id="tp-field-event-title">Tarla işlemini ekle</h3>
+            <p>
+              {fieldName} için {eventLabel(candidate)} fark ettim. Yaptığın işlemi seç.
+            </p>
           </div>
-          <div>
-            <small>PUSULA FARK ETTİ</small>
-            <h3 id="tp-field-event-title">Tarlada bir değişiklik gördüm</h3>
-          </div>
-          <button type="button" className="tp-field-event-close" onClick={onClose} disabled={saving} aria-label="Kapat">
+
+          <button
+            type="button"
+            className="tp-field-event-close"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Kapat"
+          >
             <X aria-hidden="true" size={19} />
           </button>
         </header>
 
-        <div className="tp-field-event-signal">
-          <strong>{fieldName}</strong>
-          <span>{trDate(candidate.signalDate)} civarında</span>
-          <p>{eventHint(candidate)} algılandı. Uydu/radar sinyali tek başına işlemin ne olduğunu söylemez.</p>
-        </div>
-
         {!selected ? (
           <>
-            <div className="tp-field-event-question">Bu günlerde tarlada ne yaptın?</div>
-            <div className="tp-field-event-options">
+            <div className="tp-field-event-operation-grid" aria-label="Tarla işlemi türleri">
               {ANSWERS.map((answer) => {
                 const Icon = answer.icon;
                 return (
-                  <button key={answer.type} type="button" onClick={() => setSelected(answer)} disabled={saving}>
-                    <span className="tp-field-event-option-icon"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span>
-                    <span><strong>{answer.label}</strong><small>{answer.detail}</small></span>
-                    <b aria-hidden="true">›</b>
+                  <button
+                    key={answer.type}
+                    type="button"
+                    className="tp-field-event-operation"
+                    onClick={() => {
+                      setSelected(answer);
+                      setError(null);
+                    }}
+                    disabled={saving}
+                  >
+                    <span className="tp-field-event-operation-icon" aria-hidden="true">
+                      <Icon size={22} strokeWidth={1.8} />
+                    </span>
+                    <span>{answer.label}</span>
                   </button>
                 );
               })}
             </div>
 
-            <button type="button" className="tp-field-event-none" onClick={() => void dismiss()} disabled={saving}>
-              {saving ? 'Kaydediliyor…' : 'Hiçbir şey yapmadım'}
+            {error ? <div className="tp-field-event-error">{error}</div> : null}
+
+            <button
+              type="button"
+              className="tp-field-event-none"
+              onClick={() => void dismiss()}
+              disabled={saving}
+            >
+              {saving ? 'Kaydediliyor…' : 'Bu dönemde tarla işlemi yapmadım'}
             </button>
           </>
         ) : (
           <div className="tp-field-event-confirm">
-            <small>TEYİT</small>
-            <h4>{selected.label}</h4>
-            <p>
-              İşlem tarihi olarak <strong>{dateLabel}</strong> kaydedilsin mi? Uydu sinyal tarihi yaklaşık olduğu için gerekirse tarihi düzelt.
-            </p>
+            <div className="tp-field-event-selected">
+              <span className="tp-field-event-selected-icon" aria-hidden="true">
+                <SelectedIcon size={24} strokeWidth={1.8} />
+              </span>
+              <div>
+                <small>SEÇİLEN İŞLEM</small>
+                <strong>{selected.label}</strong>
+              </div>
+            </div>
 
-            {editingDate && (
-              <label className="tp-field-event-date">
-                <span>İşlem tarihi</span>
-                <input
-                  type="date"
-                  value={date}
-                  max={new Date().toISOString().slice(0, 10)}
-                  onChange={(event) => setDate(event.target.value)}
-                  disabled={saving}
-                />
-              </label>
-            )}
+            <label className="tp-field-event-date">
+              <span>İşlem tarihi</span>
+              <input
+                type="date"
+                value={date}
+                max={localToday()}
+                onChange={(event) => setDate(event.target.value)}
+                disabled={saving}
+              />
+              <small>Uydu/radar tarihi yaklaşık. Gerekirse tarihi düzelt.</small>
+            </label>
 
-            {selected.type === 'Diğer' && (
+            {selected.type === 'Diğer' ? (
               <label className="tp-field-event-date">
                 <span>Ne yaptın?</span>
                 <input
@@ -207,28 +263,38 @@ export default function PusulaFieldEventSheet({
                   disabled={saving}
                 />
               </label>
-            )}
+            ) : null}
 
-            {error && <div className="tp-field-event-error">{error}</div>}
+            {error ? <div className="tp-field-event-error">{error}</div> : null}
 
             <div className="tp-field-event-confirm-actions">
-              <button type="button" className="secondary" onClick={() => setSelected(null)} disabled={saving}>
-                Geri
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  if (saving) return;
+                  setSelected(null);
+                  setError(null);
+                }}
+                disabled={saving}
+              >
+                Başka işlem seç
               </button>
-              {!editingDate ? (
-                <button type="button" className="secondary" onClick={() => setEditingDate(true)} disabled={saving}>
-                  Tarihi değiştir
-                </button>
-              ) : null}
-              <button type="button" className="primary" onClick={() => void save()} disabled={saving || !date || (selected.type === 'Diğer' && !otherNote.trim())}>
-                {saving ? 'Ekleniyor…' : 'Ekle'}
+              <button
+                type="button"
+                className="primary"
+                onClick={() => void save()}
+                disabled={saving || !date || (selected.type === 'Diğer' && !otherNote.trim())}
+              >
+                {saving ? 'Ekleniyor…' : `${selected.label} olarak ekle`}
               </button>
             </div>
+
+            <p className="tp-field-event-confirm-note">
+              {dateLabel} tarihli kayıt yalnız sen onayladığında Tarla Günlüğü'ne eklenir.
+            </p>
           </div>
         )}
-
-        {!selected && error && <div className="tp-field-event-error">{error}</div>}
-        <p className="tp-field-event-footnote">Kayıt yalnız sen teyit edersen İşlemler’e eklenir.</p>
       </section>
     </div>
   );

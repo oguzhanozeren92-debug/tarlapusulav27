@@ -85,8 +85,6 @@ export default function MapDataDate({
     if (!badge) return;
 
     const map = badge.closest('.tp-real-home-map');
-    const shell = badge.closest('.tp-home-map-pusula-shell');
-
     if (!(map instanceof HTMLElement)) return;
 
     let frame = 0;
@@ -107,7 +105,7 @@ export default function MapDataDate({
         const badgeRight = badgeLeft + badgeRect.width;
 
         const obstacles = [
-          shell?.querySelector('.tp-home-map-pusula-strip') ?? null,
+          map.querySelector('.tp-mf-ndvi-strip'),
           map.querySelector('.tp-real-home-legend'),
           map.querySelector('.tp-home-general-metric'),
           map.querySelector('.tp-map-data-badge'),
@@ -156,15 +154,8 @@ export default function MapDataDate({
     resizeObserver.observe(map);
     resizeObserver.observe(badge);
 
-    if (shell instanceof HTMLElement) {
-      resizeObserver.observe(shell);
-    }
-
-    const mutationTarget =
-      shell instanceof HTMLElement ? shell : map;
-
     const mutationObserver = new MutationObserver(updatePosition);
-    mutationObserver.observe(mutationTarget, {
+    mutationObserver.observe(map, {
       subtree: true,
       childList: true,
       attributes: true,

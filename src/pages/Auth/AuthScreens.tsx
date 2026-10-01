@@ -6,6 +6,8 @@ import {
 } from 'react';
 
 import type { Screen } from '../../types';
+import { Button, Card } from '../../ui';
+import PusulaMark from '../../ui/brand/PusulaMark';
 import './Auth.css';
 
 type AuthScreensProps = {
@@ -29,18 +31,6 @@ type AuthScreensProps = {
     e: FormEvent<HTMLFormElement>,
   ) => void | Promise<void>;
 };
-
-function BrandMark() {
-  return (
-    <svg viewBox="0 0 72 72" className="tp-authv2-brand-mark" aria-hidden="true">
-      <circle cx="36" cy="36" r="27" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M46 17L39.5 34L23 40L31.5 31.5L46 17Z" fill="#57b947" />
-      <path d="M26 55L32.5 38L49 32L40.5 40.5L26 55Z" fill="#173b63" />
-      <circle cx="36" cy="36" r="4.2" fill="#edf6ef" />
-      <path d="M25 55C31 50 38 47 47 46C43 53 36 57 27 58" fill="none" stroke="#5f9f31" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function UserIcon() {
   return (
@@ -110,12 +100,19 @@ function WeatherIcon() {
 function BrandHeader() {
   return (
     <header className="tp-authv2-brand">
-      <div className="tp-authv2-brand-row">
-        <BrandMark />
-        <div className="tp-authv2-wordmark">
-          <span>Tarla</span><strong>Pusula</strong>
-        </div>
+      <PusulaMark
+        size={64}
+        animated
+        className="tp-authv2-brand-mark"
+        label="TarlaPusula pusulası"
+      />
+
+      <div className="tp-authv2-wordmark" aria-label="TarlaPusula">
+        <span>Tarla</span>
+        <strong>Pusula</strong>
+        <i className="tp-authv2-wordmark-shine" aria-hidden="true" />
       </div>
+
       <p>
         Tarlanı takip eder,
         <br />
@@ -128,20 +125,23 @@ function BrandHeader() {
 function FeatureCards() {
   return (
     <section className="tp-authv2-features">
-      <article className="tp-authv2-feature">
+      <Card flat className="tp-authv2-feature">
         <span className="tp-authv2-feature-icon"><SatelliteIcon /></span>
         <strong>Tarlayı Uydudan Takip Etme</strong>
-      </article>
+        <span className="tp-authv2-feature-chevron" aria-hidden="true">›</span>
+      </Card>
 
-      <article className="tp-authv2-feature">
+      <Card flat className="tp-authv2-feature">
         <span className="tp-authv2-feature-icon"><AiIcon /></span>
         <strong>Yapay Zeka Entegrasyonu</strong>
-      </article>
+        <span className="tp-authv2-feature-chevron" aria-hidden="true">›</span>
+      </Card>
 
-      <article className="tp-authv2-feature">
+      <Card flat className="tp-authv2-feature">
         <span className="tp-authv2-feature-icon"><WeatherIcon /></span>
         <strong>Hava Durumu ve Uyarılar</strong>
-      </article>
+        <span className="tp-authv2-feature-chevron" aria-hidden="true">›</span>
+      </Card>
     </section>
   );
 }
@@ -211,7 +211,7 @@ export default function AuthScreens({
           <div className="tp-authv2-inner">
             <BrandHeader />
 
-            <section className="tp-authv2-panel">
+            <Card className="tp-authv2-panel">
               <h1>Giriş Yap</h1>
 
               <form onSubmit={onSubmitLogin}>
@@ -292,22 +292,24 @@ export default function AuthScreens({
                   <div className="tp-authv2-message">{authMessage}</div>
                 )}
 
-                <button
+                <Button
                   type="submit"
+                  size="lg"
+                  block
                   className="tp-authv2-primary"
                   disabled={authLoading}
                 >
                   {authLoading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
-                </button>
+                </Button>
               </form>
 
               <div className="tp-authv2-footer">
                 <span>Hesabın yok mu?</span>
-                <button type="button" onClick={openRegister}>
+                <Button type="button" variant="secondary" size="sm" onClick={openRegister}>
                   Ücretsiz Üye Ol
-                </button>
+                </Button>
               </div>
-            </section>
+            </Card>
 
             <FeatureCards />
           </div>
@@ -334,7 +336,7 @@ export default function AuthScreens({
           <div className="tp-authv2-inner tp-authv2-register-inner">
             <BrandHeader />
 
-            <section className="tp-authv2-panel tp-authv2-register-panel">
+            <Card className="tp-authv2-panel tp-authv2-register-panel">
               <h1>Ücretsiz Kaydolun</h1>
 
               <form onSubmit={onSubmitRegister}>
@@ -436,20 +438,22 @@ export default function AuthScreens({
                   <div className="tp-authv2-message">{authMessage}</div>
                 )}
 
-                <button
+                <Button
                   type="submit"
+                  size="lg"
+                  block
                   className="tp-authv2-primary tp-authv2-register-primary"
                   disabled={authLoading}
                 >
                   {authLoading ? 'Kayıt Oluşturuluyor...' : 'Kayıt Ol'}
-                </button>
+                </Button>
               </form>
 
               <div className="tp-authv2-footer">
                 <span>Zaten hesabın var mı?</span>
-                <button type="button" onClick={openLogin}>Oturum Aç</button>
+                <Button type="button" variant="secondary" size="sm" onClick={openLogin}>Oturum Aç</Button>
               </div>
-            </section>
+            </Card>
           </div>
         </main>
       </>
@@ -465,14 +469,16 @@ export default function AuthScreens({
           <div className="tp-authv2-inner tp-authv2-verification-inner">
             <BrandHeader />
 
-            <section className="tp-authv2-panel tp-authv2-verification-panel">
+            <Card className="tp-authv2-panel tp-authv2-verification-panel">
               <div className="tp-authv2-verification-icon"><MailIcon /></div>
               <h1>E-postanı doğrula</h1>
               <p>Hesabını etkinleştirmek için gönderdiğimiz doğrulama bağlantısına tıkla.</p>
               <strong>{verificationEmail || email}</strong>
 
-              <button
+              <Button
                 type="button"
+                size="lg"
+                block
                 className="tp-authv2-primary"
                 onClick={() => {
                   setPassword('');
@@ -481,8 +487,8 @@ export default function AuthScreens({
                 }}
               >
                 Giriş Ekranına Git
-              </button>
-            </section>
+              </Button>
+            </Card>
           </div>
         </main>
       </>

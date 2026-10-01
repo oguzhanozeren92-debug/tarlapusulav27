@@ -22,10 +22,8 @@ import {
 } from '../../home-map/HomeMapEngine';
 import { titleCaseEachWordTr } from '../../home/homeFormatters';
 import type { EarthSearchNdviStats } from '../../home-map/services/earthSearchNdvi.service';
-import {
-  attachKnowledgeEvidenceToObservation,
-  loadMapKnowledgeEvidence,
-} from '../../knowledge/services/mapKnowledgeEvidence';
+import type { PhenologyResult } from '../../phenology/types/phenology';
+import { buildCropModeRuntime } from '../../crop-mode/services/cropMode.service';
 
 type Inputs = {
   field: any | null;
@@ -38,6 +36,7 @@ type Inputs = {
   weather: any;
   satellite: any;
   ndviStats?: EarthSearchNdviStats | null;
+  phenology?: PhenologyResult | null;
 };
 
 export function useHomePusula({
@@ -51,6 +50,7 @@ export function useHomePusula({
   weather,
   satellite,
   ndviStats = null,
+  phenology = null,
 }: Inputs) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -62,6 +62,22 @@ export function useHomePusula({
   const [loadingDots, setLoadingDots] = useState('.');
   const synthesisSeenRef = useRef(new Set<string>());
   const requestRef = useRef(0);
+  const cropMode = useMemo(
+    () => (field ? buildCropModeRuntime(field) : null),
+    [
+      field?.crop,
+      field?.cropName,
+      field?.product,
+      field?.cropCycle,
+      field?.crop_cycle,
+      field?.irrigationStatus,
+      field?.irrigation_status,
+      field?.bearing,
+    ],
+  );
+  const cropModeKey = cropMode
+    ? `${cropMode.modeKey}:${cropMode.subMode}:${cropMode.runtimeTags.join(',')}`
+    : 'no-crop-mode';
   const ndviRelativeKey =
     ndviStats?.relativeZones
       ?.map((zone) =>
@@ -73,7 +89,16 @@ export function useHomePusula({
     layer === 'vegetation' && ndviStats
       ? `${ndviStats.sceneId}:${ndviStats.datetime}:${Number(ndviStats.mean).toFixed(4)}:${Math.round(ndviStats.healthyPercent)}:${Math.round(ndviStats.stressedPercent)}:${ndviRelativeKey}`
       : 'no-geoblaze';
-  const scope = `${fieldKey}:${layer}:${soilProperty}:${soilDepth}:${climateLayer}:${climateDepth}:${ndviStatsKey}`;
+  const phenologyKey =
+    phenology?.dataStatus === 'usable' && phenology.stage
+      ? [
+          phenology.stage,
+          phenology.stageLabel ?? '',
+          phenology.confidence ?? '',
+          ...(phenology.basis ?? []),
+        ].join('|')
+      : 'no-phenology';
+  const scope = `${fieldKey}:${layer}:${soilProperty}:${soilDepth}:${climateLayer}:${climateDepth}:${ndviStatsKey}:${phenologyKey}:${cropModeKey}`;
   const [resultScope, setResultScope] = useState('');
   const [synthesisScope, setSynthesisScope] = useState('');
   const visibleResult = resultScope === scope ? result : null;
@@ -274,7 +299,9 @@ export function useHomePusula({
         fieldId: String(field.id),
         fieldName: field.name ?? undefined,
         crop: field.crop ?? undefined,
+        cropMode,
         weatherContext: weather ?? null,
+        phenologyResult: phenology,
         lifecycleContext: {
           cropCycle: field.cropCycle ?? field.crop_cycle ?? null,
           season: Number(field.season) || null,
@@ -352,46 +379,27 @@ export function useHomePusula({
             ? 7
             : 30;
 
-      const [nextResult, knowledgeSources] = await Promise.all([
-        refreshFieldContextAndInterpret(field, {
-          periodDays: requestedPeriodDays,
-          activeLayer: getActiveLayer(requestedLayer),
-          activeLayerLabel: getLayerLabel(requestedLayer),
-          activeLayerContext: getLayerContext(requestedLayer),
-          forceRefresh,
-        }),
-        loadMapKnowledgeEvidence({
-          activeLayer: requestedLayer,
-          crop: field.crop ?? null,
-          soilProperty,
-          climateLayer,
-        }),
-      ]);
+      const nextResult = await refreshFieldContextAndInterpret(field, {
+        periodDays: requestedPeriodDays,
+        activeLayer: getActiveLayer(requestedLayer),
+        activeLayerLabel: getLayerLabel(requestedLayer),
+        activeLayerContext: getLayerContext(requestedLayer),
+        forceRefresh,
+      });
 
       if (requestId !== requestRef.current) return;
 
-      const enrichedAnalysis = {
-        ...nextResult.analysis,
-        knowledgeSources,
-      };
-
       setResult({
         ...nextResult,
-        analysis: enrichedAnalysis,
         interpretedLayer: requestedLayer,
         interpretedLayerLabel: getLayerLabel(requestedLayer),
       });
       setResultScope(scope);
 
-      void attachKnowledgeEvidenceToObservation(
-        nextResult.analysis?.memoryObservationId ?? null,
-        knowledgeSources,
-      );
-
       void runFieldSynthesis({
         memoryKey:
           nextResult.analysis?.memoryObservationId ?? nextResult.snapshotId ?? null,
-        sourceAnalysis: enrichedAnalysis,
+        sourceAnalysis: nextResult.analysis,
         sourceLayer: requestedLayer,
         sourceLayerLabel: getLayerLabel(requestedLayer),
         originRequestId: requestId,
@@ -424,7 +432,7 @@ export function useHomePusula({
     }, 850);
 
     return () => window.clearTimeout(timer);
-  }, [fieldKey, layer, soilProperty, soilDepth, climateLayer, climateDepth, ndviStatsKey]);
+  }, [fieldKey, layer, soilProperty, soilDepth, climateLayer, climateDepth, ndviStatsKey, phenologyKey, cropModeKey]);
 
   const insight = useMemo<PusulaInsight>(() => {
     const dateKey = String(
@@ -517,6 +525,7 @@ export function useHomePusula({
     result: visibleResult,
     error,
     fieldSynthesis: visibleSynthesis,
+    cropMode,
     arrivalVisible: arrivalVisible && synthesisScope === scope,
     loadingDots,
     setSpatialSummary,

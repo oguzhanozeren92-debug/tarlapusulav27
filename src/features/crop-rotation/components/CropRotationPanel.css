@@ -1,0 +1,308 @@
+.tp-rotation-card {
+  margin-top: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  background: #050505;
+  color: #fff;
+  overflow: hidden;
+}
+
+.tp-rotation-head,
+.tp-rotation-summary,
+.tp-rotation-editor,
+.tp-rotation-footnote,
+.tp-rotation-state,
+.tp-rotation-evidence {
+  padding: 16px;
+}
+
+.tp-rotation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tp-rotation-head > div,
+.tp-rotation-summary > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.tp-rotation-head span,
+.tp-rotation-summary span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.tp-rotation-head strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.tp-rotation-head button,
+.tp-rotation-state button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  min-height: 36px;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tp-rotation-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tp-rotation-summary.is-caution {
+  border-left: 3px solid #fff;
+}
+
+.tp-rotation-summary strong {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.tp-rotation-summary small {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+}
+
+.tp-rotation-years {
+  display: grid;
+  gap: 0;
+}
+
+.tp-rotation-years > article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.tp-rotation-year-index {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #000;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tp-rotation-year-main {
+  min-width: 0;
+}
+
+.tp-rotation-year-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.tp-rotation-year-title > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tp-rotation-year-title span,
+.tp-rotation-year-title small {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+}
+
+.tp-rotation-year-title strong {
+  font-size: 16px;
+}
+
+.tp-rotation-year-main ul {
+  margin: 10px 0 0;
+  padding-left: 17px;
+  display: grid;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.tp-rotation-caution {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tp-rotation-caution p,
+.tp-rotation-state p,
+.tp-rotation-footnote span,
+.tp-rotation-evidence p,
+.tp-rotation-editor small {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.tp-rotation-caution p + p,
+.tp-rotation-evidence p + p {
+  margin-top: 5px;
+}
+
+.tp-rotation-state {
+  display: grid;
+  gap: 7px;
+}
+
+.tp-rotation-state-error {
+  border-left: 3px solid #fff;
+}
+
+.tp-rotation-state button {
+  width: max-content;
+  margin-top: 4px;
+}
+
+.tp-rotation-evidence {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.tp-rotation-evidence summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tp-rotation-evidence > div {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.tp-rotation-evidence p.warning {
+  color: #fff;
+}
+
+.tp-rotation-editor {
+  display: grid;
+  gap: 13px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0b0b0b;
+}
+
+.tp-rotation-editor label {
+  display: grid;
+  gap: 6px;
+}
+
+.tp-rotation-editor label > span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tp-rotation-editor input,
+.tp-rotation-editor select {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 12px;
+  background: #000;
+  color: #fff;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.tp-rotation-editor input:focus,
+.tp-rotation-editor select:focus {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.tp-rotation-editor-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 9px;
+  margin-top: 2px;
+}
+
+.tp-rotation-editor-actions button {
+  min-height: 42px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tp-rotation-editor-actions .secondary {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #fff;
+}
+
+.tp-rotation-editor-actions .primary {
+  border: 1px solid #fff;
+  background: #fff;
+  color: #000;
+}
+
+.tp-rotation-editor-actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tp-rotation-editor-error {
+  margin: 0;
+  font-size: 11px;
+  color: #fff;
+}
+
+.tp-rotation-footnote {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  background: #000;
+}
+
+.tp-rotation-footnote strong {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .tp-rotation-head,
+  .tp-rotation-summary {
+    align-items: stretch;
+  }
+
+  .tp-rotation-summary,
+  .tp-rotation-year-title {
+    flex-direction: column;
+  }
+
+  .tp-rotation-summary small,
+  .tp-rotation-year-title small {
+    align-self: flex-start;
+  }
+}

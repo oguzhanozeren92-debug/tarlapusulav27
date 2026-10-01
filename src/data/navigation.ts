@@ -20,7 +20,7 @@ export const FALLBACK_DESKTOP_MENU_ITEMS: DesktopMenuItem[] = [
   { screen: 'weatherHub', icon: '☀', label: 'Hava Durumu' },
   { screen: 'fieldControlHub', icon: '⌖', label: 'Tarla Kontrolü' },
   { screen: 'soilAnalysisHub', icon: '♧', label: 'Toprak Analizi' },
-  { screen: 'inventoryHub', icon: '▣', label: 'İlaç & Gübre Depom' },
+  { screen: 'inventoryHub', icon: '▣', label: 'Depom' },
   { screen: 'marketHub', icon: '▥', label: 'Piyasa Fiyatları' },
   { screen: 'supportHub', icon: '▤', label: 'Tarımsal Destek' },
   { screen: 'agendaHub', icon: '♧', label: 'Tarım Gündemi', badge: 'YENİ' },
@@ -35,7 +35,7 @@ export const FALLBACK_DESKTOP_MENU_ITEMS: DesktopMenuItem[] = [
 export const BASE_PLACEHOLDER_META: Partial<Record<Screen, PlaceholderMeta>> = {
   weatherHub: { title: 'Hava Durumu', subtitle: 'Tarlalarına özel tahminleri ve üretici özetini tek ekranda takip et.', icon: '☀️', cards: ['5 Günlük Tahmin', 'Yağış & Nem', 'Üretici Özeti'] },
   fieldControlHub: { title: 'Tarla Kontrolü', subtitle: 'Uydu görünümü, saha kayıtları ve gelişim durumunu birlikte değerlendir.', icon: '🛰️', cards: ['Uydu Görünümü', 'Saha Kontrolü', 'Risk Bölgeleri'] },
-  inventoryHub: { title: 'İlaç & Gübre Depom', subtitle: 'Stoklarını, son kullanma tarihlerini ve tarla kullanımını takip et.', icon: '📦', cards: ['Gübre Stoğu', 'İlaç Stoğu', 'Akıllı Hatırlatma'] },
+  inventoryHub: { title: 'Depom', subtitle: 'Stoklarını, son kullanma tarihlerini ve tarla kullanımını takip et.', icon: '📦', cards: ['Gübre Stoğu', 'İlaç Stoğu', 'Akıllı Hatırlatma'] },
   marketHub: { title: 'Piyasa Fiyatları', subtitle: 'Ürün, mazot ve gübre fiyatlarını tek ekranda karşılaştır.', icon: '📈', cards: ['Ürün Fiyatları', 'Mazot Fiyatları', 'Gübre Fiyatları'] },
   supportHub: { title: 'Tarımsal Destek', subtitle: 'Tarlan ve ürününe göre destekleri görüntüle ve tahmini tutarı hesapla.', icon: '🧮', cards: ['Destek Hesapla', '2026 Destekleri', 'Başvuru Koşulları'] },
   agendaHub: { title: 'Tarım Gündemi', subtitle: 'Yeni çeşitler, destekler, hastalık uyarıları ve tarımsal gelişmeler.', icon: '📰', cards: ['Yeni Çeşitler', 'Destek & Mevzuat', 'Tarımsal Gelişmeler'] },

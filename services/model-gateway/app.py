@@ -19,6 +19,9 @@ from dssat_runner import (
     run_dssat_prepared_shadow,
 )
 from engine_registry import ENGINE_REGISTRY
+from rscm_runner import RSCMAssimilationRequest, rscm_runtime_status, run_rscm_assimilation
+from sl2p_runner import SL2PBatchRequest, run_sl2p_batch, sl2p_runtime_status
+from unicrop_runner import UniCropHarmonizeRequest, run_unicrop_harmonizer
 from pcse_runner import PCSEPhenologyPilotRequest, run_pcse_phenology_pilot
 from pyfao56_dual_runner import (
     PyFao56DualKcShadowRequest,
@@ -32,7 +35,7 @@ IS_DEVELOPMENT = os.getenv("MODEL_GATEWAY_ENV", "production").strip().lower() ==
 
 app = FastAPI(
     title="TarlaPusula Model Gateway",
-    version="0.8.0",
+    version="0.9.0",
     docs_url="/docs" if IS_DEVELOPMENT else None,
     redoc_url="/redoc" if IS_DEVELOPMENT else None,
     openapi_url="/openapi.json" if IS_DEVELOPMENT else None,
@@ -252,6 +255,9 @@ def health() -> dict[str, Any]:
         "aquacrop": _module_status("aquacrop"),
         "cropforge": _module_status("cropforge"),
         "dssat": dssat_runtime_status(),
+        "sl2p": sl2p_runtime_status(),
+        "rscm": rscm_runtime_status(),
+        "unicrop": {"available": True, "version": "reference-adapter-v1"},
     }
     enabled_engines = [
         name
@@ -633,3 +639,94 @@ def aquacrop_pilot(
         raise
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"AquaCrop pilot failed: {exc}") from exc
+
+@app.get("/v1/biophysics/sl2p/health")
+def sl2p_health(
+    x_model_gateway_key: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(x_model_gateway_key)
+    status = sl2p_runtime_status()
+    rollout = ENGINE_REGISTRY["sl2p"]["rollout"]
+    ready = bool(status["available"] and rollout in {"shadow", "pilot", "production"})
+    return {
+        "ok": ready,
+        "ready": ready,
+        "engine": "sl2p",
+        "rollout": rollout,
+        "production_authority": False,
+        "runtime": status,
+    }
+
+
+@app.post("/v1/biophysics/sl2p/pilot")
+def sl2p_pilot(
+    payload: SL2PBatchRequest,
+    x_model_gateway_key: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(x_model_gateway_key)
+    if ENGINE_REGISTRY["sl2p"]["rollout"] not in {"pilot", "production"}:
+        raise HTTPException(status_code=409, detail="SL2P pilot rollout is disabled")
+    try:
+        return run_sl2p_batch(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"SL2P pilot failed: {exc}") from exc
+
+
+@app.get("/v1/assimilation/rscm/health")
+def rscm_health(
+    x_model_gateway_key: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(x_model_gateway_key)
+    status = rscm_runtime_status()
+    rollout = ENGINE_REGISTRY["rscm"]["rollout"]
+    ready = bool(status["available"] and rollout in {"shadow", "pilot", "production"})
+    return {
+        "ok": ready,
+        "ready": ready,
+        "engine": "rscm",
+        "rollout": rollout,
+        "production_authority": False,
+        "yield_authority": False,
+        "runtime": status,
+    }
+
+
+@app.post("/v1/assimilation/rscm/shadow")
+def rscm_shadow(
+    payload: RSCMAssimilationRequest,
+    x_model_gateway_key: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(x_model_gateway_key)
+    if ENGINE_REGISTRY["rscm"]["rollout"] not in {"shadow", "pilot", "production"}:
+        raise HTTPException(status_code=409, detail="RSCM rollout is disabled")
+    try:
+        return run_rscm_assimilation(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"RSCM assimilation failed: {exc}") from exc
+
+
+@app.post("/v1/data/unicrop/harmonize")
+def unicrop_harmonize(
+    payload: UniCropHarmonizeRequest,
+    x_model_gateway_key: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(x_model_gateway_key)
+    if ENGINE_REGISTRY["unicrop"]["rollout"] not in {"shadow", "pilot", "production"}:
+        raise HTTPException(status_code=409, detail="UniCrop harmonization rollout is disabled")
+    try:
+        return run_unicrop_harmonizer(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"UniCrop harmonization failed: {exc}") from exc
+

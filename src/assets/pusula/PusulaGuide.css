@@ -120,8 +120,8 @@
   background:
     radial-gradient(
       circle,
-      rgba(100, 255, 181, .22),
-      rgba(72, 221, 154, .08) 38%,
+      rgba(255, 255, 255, .22),
+      rgba(255, 255, 255, .08) 38%,
       transparent 70%
     );
 
@@ -183,6 +183,25 @@
   50% {
     opacity: .18;
     transform: scale(1.04);
+  }
+}
+
+/* Yeni mesaj / öneri varsa logo değişmez; yalnızca çevresindeki
+   nötr ışıltı biraz belirginleşir. İbre normal idle salınımını sürdürür. */
+.pusula-guide--idle.pusula-guide--has-unread .pusula-guide__halo {
+  animation: pgUnreadHalo 2.8s ease-in-out infinite;
+}
+
+@keyframes pgUnreadHalo {
+  0%,
+  100% {
+    opacity: .18;
+    transform: scale(1.02);
+  }
+
+  50% {
+    opacity: .34;
+    transform: scale(1.12);
   }
 }
 

@@ -1,4 +1,5 @@
-import { onboardingStyles } from '../../styles/onboardingStyles';
+import { Button, Card } from '../../ui';
+import './Onboarding.css';
 
 type ReadyScreenProps = {
   cmsRuntimeCss: string;
@@ -11,51 +12,68 @@ export default function ReadyScreen({
 }: ReadyScreenProps) {
   return (
     <>
-      <style>{cmsRuntimeCss + onboardingStyles}</style>
+      <style>{cmsRuntimeCss}</style>
 
-      <div className="tp-onboarding-page">
-        <div className="tp-ready-shell">
-          <div className="tp-ready-circle">
-            <span>✓</span>
+      <main className="tp-ob-page">
+        <div className="tp-ob-pattern" aria-hidden="true" />
+
+        <Card className="tp-ready-shell">
+          <div className="tp-ready-check" aria-hidden="true">
+            ✓
           </div>
+
+          <span className="tp-ob-kicker">BAŞLANGIÇ PROFİLİ</span>
 
           <h1>Hazırsın!</h1>
 
-          <p>TarlaPusula başlangıç profilini oluşturdu.</p>
+          <p className="tp-ready-lead">
+            TarlaPusula başlangıç profilini oluşturdu.
+          </p>
 
-          <div className="tp-profile-progress-card">
-            <div>
+          <Card tone="subtle" flat className="tp-ready-progress-card">
+            <div className="tp-ready-progress-copy">
               <strong>Profilin %30 tamamlandı</strong>
               <span>Seni kullandıkça daha iyi tanıyacağız.</span>
             </div>
 
-            <div className="tp-profile-bar">
+            <div className="tp-ready-progress-bar" aria-hidden="true">
               <span />
             </div>
-          </div>
+          </Card>
 
           <div className="tp-ready-benefits">
-            <div>
-              <span>🌦️</span>
+            <Card flat className="tp-ready-benefit">
+              <span className="tp-ready-benefit-icon" aria-hidden="true">
+                🌦️
+              </span>
               <p>Hava ve risk uyarıları kişiselleşecek.</p>
-            </div>
+            </Card>
 
-            <div>
-              <span>🌱</span>
+            <Card flat className="tp-ready-benefit">
+              <span className="tp-ready-benefit-icon" aria-hidden="true">
+                🌱
+              </span>
               <p>Ürünlerine uygun içerikler gösterilecek.</p>
-            </div>
+            </Card>
 
-            <div>
-              <span>🔔</span>
+            <Card flat className="tp-ready-benefit">
+              <span className="tp-ready-benefit-icon" aria-hidden="true">
+                🔔
+              </span>
               <p>Gereksiz bildirimler azaltılacak.</p>
-            </div>
+            </Card>
           </div>
 
-          <button className="tp-main-button" onClick={onContinue}>
+          <Button
+            size="lg"
+            block
+            onClick={onContinue}
+            className="tp-ready-continue"
+          >
             Ana Sayfaya Geç
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Card>
+      </main>
     </>
   );
 }

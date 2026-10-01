@@ -1,24 +1,529 @@
-import { useMemo, useState } from 'react';
-import { knowledgeSources } from '../data/sources.ts';
+import { useEffect, useMemo, useState } from 'react';
+import { ExternalLink, RefreshCw, Search, Sprout } from 'lucide-react';
+import { supabase } from '../../../supabaseClient';
+import { KNOWLEDGE_GUIDE, type KnowledgeGuideEntry } from '../data/guide.ts';
 import { knowledgeEntries } from '../services/catalog.ts';
+import { knowledgeSources } from '../data/sources.ts';
 import './KnowledgeLibrary.css';
 
-const GUIDE = [
- {id:'ndvi',category:'Uydu ve Tarım Teknolojisi',title:'NDVI Nedir, Nasıl Yorumlanır?',summary:'Bitki örtüsündeki mekânsal ve zamansal değişimi uydu görüntülerinden izlemeye yardımcı olan vejetasyon indeksi.',sections:[['Tek başına teşhis değildir','NDVI değişimi hastalık, su stresi, beslenme, gelişim dönemi, toprak arka planı veya hasat gibi farklı nedenlerden oluşabilir. Hava, fenoloji ve saha gözlemleriyle birlikte değerlendirilmelidir.']]},
- {id:'ph',category:'Toprak',title:'Toprak pH Değeri Ne Anlama Gelir?',summary:'Toprağın asitlik ve alkalilik durumunun besin alınabilirliğiyle ilişkisi.',sections:[['Neden önemli?','pH besin elementlerinin alınabilirliğini ve topraktaki biyolojik süreçleri etkiler. Kesin karar için uygun yöntemle alınmış laboratuvar analizi esas alınmalıdır.']]},
- {id:'organic',category:'Toprak',title:'Toprak Organik Maddesi',summary:'Organik maddenin toprak yapısı, su tutma ve besin döngüsündeki rolü.',sections:[['Görevi','Organik madde agregat yapısını, su tutma kapasitesini, biyolojik faaliyeti ve besin döngüsünü destekler. Sonuçlar toprak bünyesi ve yerel koşullarla birlikte değerlendirilmelidir.']]},
- {id:'nitrogen',category:'Bitki Besleme',title:'Azot: Bitkide Görevi ve Eksiklik Şüphesi',summary:'Azotun büyüme ve klorofil oluşumundaki rolü ile gözlenebilen işaretler.',sections:[['Dikkat','Yaprak rengi tek başına azot eksikliğini kanıtlamaz. Su stresi, kök sorunu ve başka beslenme sorunları benzer belirti oluşturabilir. Fotoğraftan kesin azot miktarı belirlenemez.']]},
- {id:'irrigation',category:'Sulama',title:'Sulama Zamanı Nasıl Belirlenir?',summary:'Hava, toprak, ürün dönemi ve kök bölgesini birlikte değerlendirme.',sections:[['Tek veri yeterli değildir','Sulama zamanı; yağış, evapotranspirasyon, kök bölgesi su durumu, toprağın su tutma kapasitesi, ürünün gelişim dönemi ve son sulama kaydı birlikte değerlendirilerek belirlenir.']]},
- {id:'et',category:'Sulama',title:'Evapotranspirasyon (ET) Nedir?',summary:'Toprak yüzeyinden buharlaşma ve bitkiden terleme yoluyla gerçekleşen toplam su kaybı.',sections:[['ET0 ve ETc','Referans evapotranspirasyon atmosferik su talebini temsil eder. Ürün su tüketimi değerlendirmesinde ürün ve gelişim dönemi gibi ek bilgiler gerekir.']]},
- {id:'sampling',category:'Tarla İşlemleri',title:'Toprak Örneği Nasıl Alınır?',summary:'Laboratuvar sonucunun tarlayı temsil etmesi için doğru örnekleme yaklaşımı.',sections:[['Temsil edici örnek','Benzer özellikteki bölümden birden fazla noktadan alt örnek alınarak karıştırılır. Yol kenarı, yığın ve su birikintisi gibi sıra dışı noktalar genel örneğe dahil edilmemelidir.']]},
- {id:'scouting',category:'Hastalık ve Zararlılar',title:'Tarla Gözlemi Nasıl Yapılır?',summary:'Sorunu erken fark etmek için düzenli ve kayıtlı tarla kontrolünün temelleri.',sections:[['Düzenli izleme','Tarla farklı bölgeleri temsil edecek biçimde gezilmeli; yaprak, gövde, kök ve ürün belirtileri incelenmeli; fotoğraf, tarih ve konum kaydedilmelidir.']]},
- {id:'ipm',category:'Hastalık ve Zararlılar',title:'Entegre Mücadele Nedir?',summary:'Gözlem, kültürel ve biyolojik yöntemleri birlikte ele alan yaklaşım.',sections:[['Temel yaklaşım','Doğru teşhis, düzenli izleme ve uygun yöntemin doğru zamanda seçilmesi esastır. Yerel eşikler ve resmî tavsiyeler dikkate alınmalıdır.']]},
- {id:'phenology',category:'Bitkisel Üretim',title:'Fenoloji: Bitkinin Gelişim Dönemini Bilmek',summary:'Ekim, çıkış, vejetatif gelişim, çiçeklenme ve olgunlaşma dönemlerinin kararlarla ilişkisi.',sections:[['Neden önemli?','Bitkinin su ve besin ihtiyacı ile bazı riskler gelişim dönemine göre değişir. Takvim tarihi tek başına gelişim dönemini kesin olarak göstermez.']]},
- {id:'salinity',category:'Toprak',title:'Toprak Tuzluluğu Nedir?',summary:'Çözünmüş tuzların bitki su alımı ve gelişimi üzerindeki etkisine giriş.',sections:[['Ölçüm önemlidir','Tuzluluk bitkinin su almasını zorlaştırabilir. Kesin değerlendirme için uygun toprak veya sulama suyu analizindeki elektriksel iletkenlik gibi ölçümler kullanılmalıdır.']]},
- {id:'compaction',category:'Toprak',title:'Toprak Sıkışması ve Kök Gelişimi',summary:'Sıkışmış tabakaların köklenme, su hareketi ve havalanma üzerindeki olası etkileri.',sections:[['Saha işaretleri','Köklerin belirli derinlikte yön değiştirmesi, suyun yüzeyde kalması ve teker izlerinde gelişim farkları sıkışma şüphesi oluşturabilir. Tek belirti kesin teşhis değildir.']]},
- {id:'infiltration',category:'Toprak',title:'Su İnfiltrasyonu Nedir?',summary:'Yağış veya sulama suyunun toprak yüzeyinden profile girişini anlamak.',sections:[['Neyi etkiler?','Toprak yapısı, yüzey kabuklaşması, sıkışma, organik madde, bitki örtüsü ve başlangıç nemi suyun toprağa giriş hızını etkileyebilir.']]},
- {id:'erosion',category:'Toprak',title:'Su ve Rüzgâr Erozyonu',summary:'Verimli üst toprağın taşınmasına yol açan süreçleri tanıma.',sections:[['Saha işaretleri','Yüzey akış izleri, küçük yarıntılar, sediment birikimi veya rüzgârla taşınan ince toprak erozyon riskine işaret edebilir.']]},
- {id:'cover',category:'Toprak Sağlığı',title:'Örtü Bitkileri ve Toprak Sağlığı',summary:'Toprağın çıplak kaldığı dönemleri azaltmaya yönelik koruyucu tarım yaklaşımı.',sections:[['Planlama','Örtü bitkisi seçimi iklim, toprak, ana ürün, su durumu ve yönetim hedefine göre yapılmalıdır. Her tür her üretim sistemine uygun değildir.']]}
-] as const;
-const categories=[...new Set(GUIDE.map(x=>x.category))];
-export default function KnowledgeLibrary(){const[q,setQ]=useState('');const[cat,setCat]=useState('Tümü');const[selected,setSelected]=useState<string|null>(null);const labels=knowledgeEntries.filter(e=>e.contentType==='label');const items=useMemo(()=>{const n=q.trim().toLocaleLowerCase('tr-TR');return GUIDE.filter(x=>(cat==='Tümü'||x.category===cat)&&(!n||`${x.title} ${x.summary} ${x.category}`.toLocaleLowerCase('tr-TR').includes(n)))},[q,cat]);const item=GUIDE.find(x=>x.id===selected);return <section className="tp-knowledge" aria-labelledby="knowledge-heading"><header><p className="tp-knowledge-eyebrow">BİLGİ REHBERİ</p><h1 id="knowledge-heading">Türkçe bilgi kütüphanesi</h1><p>Tarla, bitki, toprak, sulama ve tarım teknolojilerini anlaşılır Türkçe ile keşfet.</p></header><div className="tp-knowledge-filters"><label className="tp-knowledge-search">Bilgi ara<input type="search" value={q} onChange={e=>setQ(e.target.value)} placeholder="Örn. azot, NDVI, sulama, pH…"/></label><label>Konu<select value={cat} onChange={e=>setCat(e.target.value)}><option>Tümü</option>{categories.map(c=><option key={c}>{c}</option>)}</select></label></div><p role="status" className="tp-knowledge-count">{items.length} rehber konusu</p>{item?<article className="tp-knowledge-detail"><button type="button" onClick={()=>setSelected(null)}>‹ Bilgi Kütüphanesine Dön</button><small>{item.category}</small><h2>{item.title}</h2><p>{item.summary}</p>{item.sections.map(s=><section key={s[0]}><h3>{s[0]}</h3><p>{s[1]}</p></section>)}<aside><p>Genel bilgilendirme amaçlıdır. Kesin teşhis, doz veya reçete değildir; tarla uygulamalarında analiz, yerel koşullar, yürürlükteki resmî bilgiler ve gerektiğinde yetkili uzman değerlendirmesi esas alınmalıdır.</p></aside></article>:<div className="tp-knowledge-grid">{items.map(x=><article key={x.id}><span className="tp-knowledge-badge">{x.category} · Rehber</span><h2>{x.title}</h2><p>{x.summary}</p><button type="button" onClick={()=>setSelected(x.id)}>Bilgiyi aç</button></article>)}</div>}{!item&&<details className="tp-knowledge-sources"><summary>Hastalık sözlüğü ({labels.length})</summary><p>PlantVillage sınıf adları yalnızca arama ve sınıflandırma sözlüğüdür; teşhis veya mücadele talimatı değildir.</p>{labels.map(e=><article key={e.id}><h2>{e.titleTr}</h2><p>{e.crops.join(' · ')}</p></article>)}</details>}{!item&&<details className="tp-knowledge-sources"><summary>Kaynaklar ve lisans bilgisi</summary>{knowledgeSources.map(s=><article key={s.id}><h2>{s.name}</h2><p>{s.description}</p><small>{s.license} · Kaynak kontrolü: {s.checkedAt}</small></article>)}</details>}</section>}
+type LiveGuideStructuredBody = {
+  channel?: string | null;
+  problem?: string | null;
+  findings?: string[] | null;
+  practical_takeaway?: string | null;
+  crop_matches?: string[] | null;
+  topic?: string | null;
+  guide?: {
+    problem_or_goal?: string | null;
+    when_to_check?: string[] | null;
+    what_to_look_for?: string[] | null;
+    field_check_steps?: string[] | null;
+    management_steps?: string[] | null;
+    prevention?: string[] | null;
+    avoid?: string[] | null;
+    turkey_note?: string | null;
+    source_sufficiency?: 'strong' | 'medium' | 'weak' | string | null;
+    producer_value_score?: number | null;
+  } | null;
+  detail?: {
+    lead?: string | null;
+    background?: string | null;
+    what_happened?: string | null;
+    why_it_matters?: string | null;
+    producer_impact?: string | null;
+    where_when?: string | null;
+    source_note?: string | null;
+  } | null;
+};
+
+type LiveGuideRow = {
+  id: string;
+  title: string;
+  excerpt: string | null;
+  body: string | null;
+  category: string | null;
+  tags: string[] | null;
+  crop_tags: string[] | null;
+  source_refs: Array<Record<string, unknown>> | null;
+  published_at: string | null;
+  updated_at: string | null;
+  content_subtype: string | null;
+  structured_body: LiveGuideStructuredBody | null;
+};
+
+type KnowledgeCard = {
+  key: string;
+  kind: 'static' | 'live';
+  category: string;
+  title: string;
+  summary: string;
+  crops: string[];
+  publishedAt: string | null;
+  sourceName: string;
+  sourceUrl: string;
+  staticEntry?: KnowledgeGuideEntry;
+  liveRow?: LiveGuideRow;
+};
+
+type KnowledgeLibraryProps = {
+  fieldCrops?: string[];
+};
+
+const normalize = (value: unknown) =>
+  String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const uniqueText = (values: Array<string | null | undefined>) =>
+  [...new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean))];
+
+const cropNames = (row: LiveGuideRow) =>
+  uniqueText([
+    ...(row.crop_tags ?? []),
+    ...(row.structured_body?.crop_matches ?? []),
+  ]);
+
+const sourceLabel = (row: LiveGuideRow) => {
+  const first = row.source_refs?.[0];
+  const sourceName = typeof first?.source_name === 'string' ? first.source_name.trim() : '';
+  return sourceName || 'Kaynak';
+};
+
+const sourceUrl = (row: LiveGuideRow) => {
+  const first = row.source_refs?.[0];
+  return typeof first?.url === 'string' ? first.url : '';
+};
+
+const fmtDate = (value: string | null) => {
+  if (!value) return '';
+  try {
+    return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium' }).format(new Date(value));
+  } catch {
+    return '';
+  }
+};
+
+const matchesFieldCrop = (card: KnowledgeCard, fieldCrops: string[]) => {
+  if (!fieldCrops.length) return false;
+  const cardCrops = card.crops.map(normalize);
+  const haystack = normalize(`${card.title} ${card.summary} ${card.category}`);
+
+  return fieldCrops.some((crop) => {
+    const key = normalize(crop);
+    return key.length > 1 && (cardCrops.includes(key) || haystack.includes(key));
+  });
+};
+
+const staticCards = (): KnowledgeCard[] =>
+  KNOWLEDGE_GUIDE.map((entry) => ({
+    key: `static:${entry.id}`,
+    kind: 'static' as const,
+    category: entry.category,
+    title: entry.title,
+    summary: entry.summary,
+    crops: [],
+    publishedAt: null,
+    sourceName: 'TarlaPusula Bilgi Rehberi',
+    sourceUrl: '',
+    staticEntry: entry,
+  }));
+
+const liveCards = (rows: LiveGuideRow[]): KnowledgeCard[] =>
+  rows.map((row) => ({
+    key: `live:${row.id}`,
+    kind: 'live' as const,
+    category: row.category || row.structured_body?.topic || 'Bilgi Rehberi',
+    title: row.title,
+    summary: row.excerpt || row.structured_body?.detail?.lead || row.body?.slice(0, 360) || 'Özet hazırlanıyor.',
+    crops: cropNames(row),
+    publishedAt: row.published_at || row.updated_at,
+    sourceName: sourceLabel(row),
+    sourceUrl: sourceUrl(row),
+    liveRow: row,
+  }));
+
+export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryProps) {
+  const [liveRows, setLiveRows] = useState<LiveGuideRow[]>([]);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('Tümü');
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+
+  const normalizedFieldCrops = useMemo(() => uniqueText(fieldCrops), [fieldCrops]);
+  const labels = useMemo(() => knowledgeEntries.filter((entry) => entry.contentType === 'label'), []);
+
+  const loadLiveGuide = async (manual = false) => {
+    if (manual) setRefreshing(true);
+    else setLoading(true);
+    setError('');
+
+    try {
+      const { data, error: guideError } = await supabase
+        .from('content_items')
+        .select('id,title,excerpt,body,category,tags,crop_tags,source_refs,published_at,updated_at,content_subtype,structured_body')
+        .eq('status', 'published')
+        .eq('content_type', 'knowledge')
+        .eq('content_subtype', 'guide')
+        .order('published_at', { ascending: false })
+        .limit(250);
+
+      if (guideError) throw guideError;
+      setLiveRows((data ?? []) as LiveGuideRow[]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Onaylı Bilgi Rehberi içerikleri yüklenemedi.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadLiveGuide();
+  }, []);
+
+  const cards = useMemo(() => {
+    const live = liveCards(liveRows);
+    const all = [...live, ...staticCards()];
+
+    return all.sort((a, b) => {
+      const aMine = matchesFieldCrop(a, normalizedFieldCrops) ? 1 : 0;
+      const bMine = matchesFieldCrop(b, normalizedFieldCrops) ? 1 : 0;
+      if (aMine !== bMine) return bMine - aMine;
+
+      if (a.kind !== b.kind) return a.kind === 'live' ? -1 : 1;
+
+      const aDate = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const bDate = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return bDate - aDate;
+    });
+  }, [liveRows, normalizedFieldCrops]);
+
+  const categories = useMemo(
+    () => uniqueText(cards.map((card) => card.category)).sort((a, b) => a.localeCompare(b, 'tr')),
+    [cards],
+  );
+
+  const visibleCards = useMemo(() => {
+    const needle = normalize(query);
+
+    return cards.filter((card) => {
+      if (category !== 'Tümü' && card.category !== category) return false;
+      if (!needle) return true;
+
+      const haystack = normalize([
+        card.title,
+        card.summary,
+        card.category,
+        ...card.crops,
+        ...(card.liveRow?.tags ?? []),
+      ].join(' '));
+
+      return haystack.includes(needle);
+    });
+  }, [cards, query, category]);
+
+  const selected = cards.find((card) => card.key === selectedKey) ?? null;
+
+  if (selected?.staticEntry) {
+    const item = selected.staticEntry;
+    return (
+      <section className="tp-knowledge" aria-labelledby="knowledge-detail-heading">
+        <article className="tp-knowledge-detail">
+          <button type="button" className="tp-knowledge-back" onClick={() => setSelectedKey(null)}>
+            ‹ Bilgi Rehberine dön
+          </button>
+          <small>{item.category}</small>
+          <h1 id="knowledge-detail-heading">{item.title}</h1>
+          <p className="tp-knowledge-detail__lead">{item.summary}</p>
+          {item.sections.map(([title, body]) => (
+            <section key={`${item.id}:${title}`}>
+              <h2>{title}</h2>
+              <p>{body}</p>
+            </section>
+          ))}
+          <p className="tp-knowledge-note">
+            Genel bilgilendirme amaçlıdır. Kesin teşhis, doz veya reçete değildir; tarla uygulamalarında analiz, yerel koşullar, yürürlükteki resmî bilgiler ve gerektiğinde yetkili uzman değerlendirmesi esas alınmalıdır.
+          </p>
+        </article>
+      </section>
+    );
+  }
+
+  if (selected?.liveRow) {
+    const row = selected.liveRow;
+    const findings = Array.isArray(row.structured_body?.findings)
+      ? row.structured_body!.findings!.filter(Boolean)
+      : [];
+    const crops = cropNames(row);
+    const url = sourceUrl(row);
+    const detail = row.structured_body?.detail;
+    const guide = row.structured_body?.guide;
+    const guideLists = {
+      when: (guide?.when_to_check ?? []).filter(Boolean),
+      look: (guide?.what_to_look_for ?? []).filter(Boolean),
+      check: (guide?.field_check_steps ?? []).filter(Boolean),
+      manage: (guide?.management_steps ?? []).filter(Boolean),
+      prevent: (guide?.prevention ?? []).filter(Boolean),
+      avoid: (guide?.avoid ?? []).filter(Boolean),
+    };
+    const hasPracticalGuide = Boolean(
+      guide &&
+      (guide.problem_or_goal ||
+        guideLists.when.length ||
+        guideLists.look.length ||
+        guideLists.check.length ||
+        guideLists.manage.length ||
+        guideLists.prevent.length ||
+        guideLists.avoid.length),
+    );
+
+    return (
+      <section className="tp-knowledge" aria-labelledby="knowledge-detail-heading">
+        <article className="tp-knowledge-detail">
+          <button type="button" className="tp-knowledge-back" onClick={() => setSelectedKey(null)}>
+            ‹ Bilgi Rehberine dön
+          </button>
+
+          <div className="tp-knowledge-detail__meta">
+            <span>{row.category || row.structured_body?.topic || 'Bilgi Rehberi'}</span>
+            <span className="is-approved">Admin onaylı</span>
+            {crops.map((crop) => <span key={crop}>{crop}</span>)}
+            {row.published_at ? <span>{fmtDate(row.published_at)}</span> : null}
+          </div>
+
+          <h1 id="knowledge-detail-heading">{row.title}</h1>
+          {row.excerpt ? <p className="tp-knowledge-detail__lead">{row.excerpt}</p> : null}
+
+          {hasPracticalGuide ? (
+            <>
+              {guide?.problem_or_goal ? (
+                <section>
+                  <h2>Bu rehber neyi çözmeye yardım ediyor?</h2>
+                  <p>{guide.problem_or_goal}</p>
+                </section>
+              ) : null}
+
+              {guideLists.when.length ? (
+                <section>
+                  <h2>Ne zaman kontrol et?</h2>
+                  <ul>{guideLists.when.map((item, index) => <li key={`${row.id}-when-${index}`}>{item}</li>)}</ul>
+                </section>
+              ) : null}
+
+              {guideLists.look.length ? (
+                <section>
+                  <h2>Neye bak?</h2>
+                  <ul>{guideLists.look.map((item, index) => <li key={`${row.id}-look-${index}`}>{item}</li>)}</ul>
+                </section>
+              ) : null}
+
+              {guideLists.check.length ? (
+                <section>
+                  <h2>Tarlada nasıl kontrol et?</h2>
+                  <ol>{guideLists.check.map((item, index) => <li key={`${row.id}-check-${index}`}>{item}</li>)}</ol>
+                </section>
+              ) : null}
+
+              {guideLists.manage.length ? (
+                <section>
+                  <h2>Ne yapabilirsin?</h2>
+                  <ul>{guideLists.manage.map((item, index) => <li key={`${row.id}-manage-${index}`}>{item}</li>)}</ul>
+                </section>
+              ) : null}
+
+              {guideLists.prevent.length ? (
+                <section>
+                  <h2>Önleyici adımlar</h2>
+                  <ul>{guideLists.prevent.map((item, index) => <li key={`${row.id}-prevent-${index}`}>{item}</li>)}</ul>
+                </section>
+              ) : null}
+
+              {guideLists.avoid.length ? (
+                <section>
+                  <h2>Ne yapma?</h2>
+                  <ul>{guideLists.avoid.map((item, index) => <li key={`${row.id}-avoid-${index}`}>{item}</li>)}</ul>
+                </section>
+              ) : null}
+
+              {guide?.turkey_note ? (
+                <aside className="tp-knowledge-takeaway">
+                  <strong>Türkiye için not</strong>
+                  <p>{guide.turkey_note}</p>
+                </aside>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {detail?.background ? (
+                <section>
+                  <h2>Arka plan</h2>
+                  <p>{detail.background}</p>
+                </section>
+              ) : null}
+
+              {detail?.what_happened ? (
+                <section>
+                  <h2>Ne anlatıyor?</h2>
+                  <p>{detail.what_happened}</p>
+                </section>
+              ) : null}
+
+              {findings.length ? (
+                <section>
+                  <h2>Öne çıkan bilgiler</h2>
+                  <ul>{findings.map((finding, index) => <li key={`${row.id}-finding-${index}`}>{finding}</li>)}</ul>
+                </section>
+              ) : null}
+
+              {row.body ? (
+                <section>
+                  <h2>Detay</h2>
+                  {row.body.split(/\n{2,}/).map((paragraph, index) => (
+                    <p key={`${row.id}-paragraph-${index}`}>{paragraph}</p>
+                  ))}
+                </section>
+              ) : null}
+            </>
+          )}
+
+          {row.structured_body?.practical_takeaway ? (
+            <aside className="tp-knowledge-takeaway">
+              <strong>Sahada ne anlama geliyor?</strong>
+              <p>{row.structured_body.practical_takeaway}</p>
+            </aside>
+          ) : null}
+
+          <footer className="tp-knowledge-detail__source">
+            <span>Kaynak: {sourceLabel(row)}</span>
+            {url ? <a href={url} target="_blank" rel="noreferrer">Kaynağı aç <ExternalLink size={13} /></a> : null}
+          </footer>
+
+          <p className="tp-knowledge-note">
+            Bu içerik admin onayından geçmiş Bilgi Rehberi içeriğidir. Genel bilgilendirme amaçlıdır; kesin teşhis, reçete veya tek başına uygulama kararı değildir.
+          </p>
+        </article>
+      </section>
+    );
+  }
+
+  return (
+    <section className="tp-knowledge" aria-labelledby="knowledge-heading">
+      <header className="tp-knowledge-head">
+        <div>
+          <p className="tp-knowledge-eyebrow">BİLGİ REHBERİ</p>
+          <h1 id="knowledge-heading">Türkçe bilgi kütüphanesi</h1>
+          <p>Temel rehber kartlarıyla birlikte admin onayından geçen yeni içerikler de burada yayınlanır.</p>
+        </div>
+        <button type="button" className="tp-knowledge-refresh" onClick={() => void loadLiveGuide(true)} disabled={refreshing}>
+          <RefreshCw size={16} className={refreshing ? 'is-spinning' : ''} /> Yenile
+        </button>
+      </header>
+
+      {normalizedFieldCrops.length ? (
+        <div className="tp-knowledge-crop-strip" aria-label="Tarlalarımdaki ürünler">
+          <Sprout size={16} />
+          <span>Tarlalarındaki ürünler:</span>
+          {normalizedFieldCrops.map((crop) => <strong key={crop}>{crop}</strong>)}
+        </div>
+      ) : null}
+
+      <div className="tp-knowledge-filters">
+        <label className="tp-knowledge-search">
+          <Search size={16} />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Örn. badem, azot, NDVI, sulama, pH…"
+          />
+        </label>
+        <label>
+          <span>Konu</span>
+          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <option>Tümü</option>
+            {categories.map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {error ? <div className="tp-knowledge-state is-error">{error}</div> : null}
+      {loading ? <div className="tp-knowledge-state">Onaylı Bilgi Rehberi içerikleri yükleniyor…</div> : null}
+
+      <p role="status" className="tp-knowledge-count">
+        {visibleCards.length} rehber konusu · {liveRows.length} admin onaylı canlı içerik
+      </p>
+
+      <div className="tp-knowledge-grid">
+        {visibleCards.map((card) => {
+          const mine = matchesFieldCrop(card, normalizedFieldCrops);
+          return (
+            <article key={card.key} className={`tp-knowledge-card ${card.kind === 'live' ? 'is-live' : ''}`}>
+              <div className="tp-knowledge-card__meta">
+                <span>{card.category} · Rehber</span>
+                {card.kind === 'live' ? <span className="is-approved">Admin onaylı</span> : null}
+                {mine ? <span className="is-mine">Senin ürünün</span> : null}
+              </div>
+              <h2>{card.title}</h2>
+              <p>{card.summary}</p>
+              {card.crops.length ? (
+                <div className="tp-knowledge-card__crops">
+                  {card.crops.slice(0, 4).map((crop) => <span key={`${card.key}:${crop}`}>{crop}</span>)}
+                </div>
+              ) : null}
+              <footer>
+                <small>
+                  {card.kind === 'live'
+                    ? `${card.sourceName}${card.publishedAt ? ` · ${fmtDate(card.publishedAt)}` : ''}`
+                    : 'TarlaPusula temel rehberi'}
+                </small>
+                <button type="button" onClick={() => setSelectedKey(card.key)}>Bilgiyi aç</button>
+              </footer>
+            </article>
+          );
+        })}
+      </div>
+
+      {!visibleCards.length ? (
+        <div className="tp-knowledge-empty">
+          <strong>Bu filtrede rehber kartı bulunamadı.</strong>
+          <p>Arama veya konu filtresini değiştir.</p>
+        </div>
+      ) : null}
+
+      <details className="tp-knowledge-sources">
+        <summary>Hastalık sözlüğü ({labels.length})</summary>
+        <p>PlantVillage sınıf adları yalnızca arama ve sınıflandırma sözlüğüdür; teşhis veya mücadele talimatı değildir.</p>
+        {labels.map((entry) => (
+          <article key={entry.id}>
+            <h2>{entry.titleTr}</h2>
+            <p>{entry.crops.join(' · ')}</p>
+          </article>
+        ))}
+      </details>
+
+      <details className="tp-knowledge-sources">
+        <summary>Kaynaklar ve lisans bilgisi</summary>
+        {knowledgeSources.map((source) => (
+          <article key={source.id}>
+            <h2>{source.name}</h2>
+            <p>{source.description}</p>
+            <small>{source.license} · Kaynak kontrolü: {source.checkedAt}</small>
+          </article>
+        ))}
+      </details>
+    </section>
+  );
+}

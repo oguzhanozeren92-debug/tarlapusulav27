@@ -715,3 +715,58 @@ html body .tp-v1 .tp-map-first-shell .tp-map-stage {
   padding: 8px 11px !important;
   font-size: 12px !important;
 }
+
+/* Bildirim kutusu: okundu + sola kaydırarak gizleme */
+.tp-home-notification-tools {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 5px 8px;
+  padding: 8px 2px 10px;
+}
+.tp-home-notification-tools > span {
+  color: #68727d;
+  font-size: 10px;
+  font-weight: 750;
+}
+.tp-home-notification-tools > button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #d9dee3;
+  border-radius: 9px;
+  padding: 0 9px;
+  background: #f6f7f8;
+  color: #252b31;
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.tp-home-notification-tools > small {
+  grid-column: 1 / -1;
+  color: #8a929a;
+  font-size: 8.5px;
+}
+.tp-home-quick-list > .tp-notification-swipe { border-radius: 12px; }
+.tp-home-quick-list > .tp-notification-swipe + .tp-notification-swipe { margin-top: 6px; }
+.tp-home-quick-list > .tp-notification-swipe .tp-notification-swipe-content { background: #fff; }
+.tp-home-quick-list > .tp-notification-swipe.is-zebra .tp-notification-swipe-content { background: #f5f6f7; }
+.tp-home-quick-notification.is-read { opacity: .66; }
+
+/* =========================================================
+   2026-10-01 · HARİTA ÜST AKSİYONLARI — DOM SIRASI
+   CSS order kullanılmıyor.
+   Portal ile gelen eski Bugün / Bildirimler / Tarla Durumu
+   kopyaları gizlenir; HomeMapSection içindeki inline sürümler görünür.
+   Son sıra:
+   Görevlerim · Tarla Durumu · Bugün · Bildirimler · Tarla Ekle
+   ========================================================= */
+
+html body .tp-v1 .tp-map-first-shell
+.tp-field-toolbar
+.tp-mf-quick-action:not(.tp-mf-quick-inline) {
+  display: none !important;
+}
+

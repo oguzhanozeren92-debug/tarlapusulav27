@@ -16,6 +16,14 @@ import type {
   Screen,
 } from '../../../types';
 import type { UnifiedClimateContext } from '../../weather/hooks/useAppWeatherData';
+import { linkAiDiagnosisToObservationPoint } from '../../field-observations/services/fieldObservation.service';
+import { notifyFieldOperationImpact } from '../../field-operations/services/fieldOperation.service';
+import { publishWeedVisualObservation } from '../../weed/services/weedIntelligence.service';
+
+type AiObservationContext = {
+  observationPointId?: string | null;
+  source?: 'ndvi-follow-up' | string | null;
+};
 
 type UseFieldActivitiesOptions = {
   selectedField: Field | null;
@@ -58,6 +66,7 @@ export function useFieldActivities({
   const [aiHistorySaveMessage, setAiHistorySaveMessage] = useState('');
   const [aiHistorySavedPoints, setAiHistorySavedPoints] = useState(0);
   const aiHistorySaveLockRef = useRef(false);
+  const aiObservationContextRef = useRef<AiObservationContext | null>(null);
 
   const clearActivityPhoto = () => {
     if (activityPhotoPreview.startsWith('blob:')) {
@@ -132,7 +141,10 @@ export function useFieldActivities({
     }
   };
 
-  const openAiAnalysisScreen = () => {
+  const openAiAnalysisScreen = (
+    field?: Field | null,
+    context?: AiObservationContext | null,
+  ) => {
     setActivityType('Saha Kontrolü');
     setActivityDate(new Date().toISOString().slice(0, 10));
     setActivityNotes('');
@@ -141,7 +153,25 @@ export function useFieldActivities({
     setAiAnalysis(null);
     setAiAnalysisError('');
 
-    if (!selectedField && realFields.length > 0) setSelectedField(realFields[0]);
+    const targetField =
+      field && !field.demo
+        ? field
+        : selectedField && !selectedField.demo
+          ? selectedField
+          : realFields[0] ?? null;
+
+    if (targetField && String(selectedField?.id ?? '') !== String(targetField.id)) {
+      setSelectedField(targetField);
+    }
+
+    const observationPointId = String(context?.observationPointId ?? '').trim();
+    aiObservationContextRef.current = observationPointId
+      ? {
+          observationPointId,
+          source: context?.source ?? 'ndvi-follow-up',
+        }
+      : null;
+
     setScreen('aiAnalysis');
     void loadAiAccessStatus();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -230,10 +260,59 @@ export function useFieldActivities({
       if (data?.limitReached) throw new Error(data?.message ?? 'AI analiz hakkı bulunmuyor.');
       if (!data?.analysis) throw new Error(data?.userMessage ?? 'Pusula AI analiz sonucu alınamadı.');
 
-      const result = data.analysis as AiFieldAnalysis;
+      let result = data.analysis as AiFieldAnalysis;
+
+      // Resmî BKU doğrulama kapısı yalnız hastalık/zararlı analizine uygulanır.
+      // Weed çıktısını bu kapıdan geçirmek yapılandırılmış yabancı ot alanlarını
+      // kaybettirebilir; yabancı ot tarafı zaten kimyasal reçete üretmez.
+      if (result.issueType === 'disease' || result.issueType === 'pest') {
+        try {
+          const guardResponse = await supabase.functions.invoke('official-recommendation-guard', {
+            body: { jobId },
+          });
+
+          if (!guardResponse.error && guardResponse.data?.analysis) {
+            result = guardResponse.data.analysis as AiFieldAnalysis;
+          } else if (guardResponse.error) {
+            console.warn('Resmî doğrulama kapısı yanıt vermedi:', guardResponse.error);
+          }
+        } catch (guardError) {
+          console.warn('Resmî doğrulama kapısı çalıştırılamadı:', guardError);
+        }
+      }
+
+      // BKU kapısı erişilemese bile hastalık/zararlı analizinde güvenlik kapısı açık kalır.
+      // Bu fallback ruhsat doğrulaması yapmaz; tam tersine doğrulama olmadan kimyasal öneriyi engeller.
+      if (
+        (result.issueType === 'disease' || result.issueType === 'pest') &&
+        !result.officialVerification
+      ) {
+        result = {
+          ...result,
+          officialVerification: {
+            domain: 'plant_protection',
+            source: 'BKU',
+            sourceName: 'Tarım ve Orman Bakanlığı · Bitki Koruma Ürünleri Veri Tabanı',
+            status: 'requires_verification',
+            sourceUrl: 'https://bku.tarimorman.gov.tr/Arama/Index',
+            crop: selectedField.crop || null,
+            issue:
+              result.possibleIssue && result.possibleIssue.toLocaleLowerCase('tr-TR') !== 'belirsiz'
+                ? result.possibleIssue
+                : null,
+            officialRecordId: null,
+            verifiedAt: null,
+            guardEvaluatedAt: new Date().toISOString(),
+            sourceMode: 'official_web_check',
+            note:
+              'Pusula AI ürün, etken madde veya doz önermedi. Bitki koruma ürünü kullanılacaksa güncel ruhsat ve bitki-zararlı tavsiyesi resmî BKU kaydından doğrulanmalıdır.',
+          },
+        };
+      }
+
       const analyzedAt = new Date().toISOString();
 
-      setAiAnalysis({
+      const normalizedAnalysis: AiFieldAnalysis = {
         status: result.status ?? 'uncertain',
         issueType: result.issueType ?? 'uncertain',
         severity: result.severity ?? 'unknown',
@@ -246,12 +325,42 @@ export function useFieldActivities({
         followUpPhoto: result.followUpPhoto ?? null,
         comparison: result.comparison ?? null,
         trend: result.trend ?? 'unknown',
+        weedPresence: result.weedPresence ?? 'uncertain',
+        weedCoverPercent: result.weedCoverPercent ?? null,
+        cropCoverPercent: result.cropCoverPercent ?? null,
+        bareSoilPercent: result.bareSoilPercent ?? null,
+        weedDensity: result.weedDensity ?? 'unknown',
+        weedDistribution: result.weedDistribution ?? 'unknown',
+        weedCandidate: result.weedCandidate ?? null,
+        weedEvidence: Array.isArray(result.weedEvidence) ? result.weedEvidence : [],
         disclaimer: result.disclaimer ?? 'Bu sonuç fotoğraf ve tarla bağlamına dayalı ön değerlendirmedir.',
+        officialVerification: result.officialVerification ?? null,
         source: 'gemini_image_analysis',
         provider: typeof data?.provider === 'string' ? data.provider : 'google',
         model: typeof data?.modelUsed === 'string' ? data.modelUsed : null,
         analyzedAt,
-      });
+      };
+
+      setAiAnalysis(normalizedAnalysis);
+
+      const observationPointId = String(
+        aiObservationContextRef.current?.observationPointId ?? '',
+      ).trim();
+      if (observationPointId) {
+        try {
+          await linkAiDiagnosisToObservationPoint({
+            pointId: observationPointId,
+            fieldId: String(selectedField.id),
+            analysis: normalizedAnalysis as unknown as Record<string, unknown>,
+          });
+        } catch (linkError) {
+          console.warn(
+            'AI ön değerlendirmesi analiz sonrası takip noktasına bağlanamadı:',
+            linkError,
+          );
+        }
+      }
+
       void loadAiAccessStatus();
     } catch (error) {
       console.error('Pusula AI görsel teşhis hatası:', error);
@@ -468,6 +577,23 @@ export function useFieldActivities({
         throw error;
       }
 
+      notifyFieldOperationImpact({
+        fieldId: String(selectedField.id),
+        type: activityType,
+        mutation: 'saved',
+        source: 'field-detail-activity-form',
+        operation: {
+          fieldId: String(selectedField.id),
+          type: activityType,
+          date: activityDate,
+          productName: activityProductName.trim() || null,
+          quantity: isDoseActivity ? calculatedTotalQuantity : quantityValue,
+          unit: activityType === 'Sulama' && waterM3Value !== null ? 'm³' : activityUnit.trim() || null,
+          cost: costValue,
+          notes: combinedNotes || null,
+        },
+      });
+
       resetActivityForm();
       setActivityFormOpen(false);
       await loadFieldActivities(selectedField);
@@ -567,9 +693,59 @@ export function useFieldActivities({
         throw saveError;
       }
 
+      notifyFieldOperationImpact({
+        fieldId: String(selectedField.id),
+        type: 'Saha Kontrolü',
+        mutation: 'saved',
+        source: 'pusula-ai-history',
+        operation: {
+          id: String(savedActivity.id),
+          fieldId: String(selectedField.id),
+          type: 'Saha Kontrolü',
+          title: 'Pusula AI Görsel Ön Değerlendirme',
+          date: new Date().toISOString().slice(0, 10),
+          productName: selectedField.crop || null,
+          notes: historyNotes || null,
+        },
+      });
+
       const savedActivityId = String(savedActivity.id);
       let awardedPoints = 0;
       let pointWarning = '';
+
+      const observationPointId = String(
+        aiObservationContextRef.current?.observationPointId ?? '',
+      ).trim();
+
+      try {
+        await publishWeedVisualObservation({
+          fieldId: String(selectedField.id),
+          analysis: aiAnalysis,
+          activityId: savedActivityId,
+          observationPointId: observationPointId || null,
+        });
+      } catch (weedError) {
+        // Ana saha kaydı kaybolmaz; weed omurgası best-effort güncellenir.
+        console.warn('Yabancı ot gözlemi ortak tarla omurgasına yazılamadı:', weedError);
+        pointWarning = ' Yabancı ot karar bağlantısı şu anda güncellenemedi.';
+      }
+
+      if (observationPointId) {
+        try {
+          await linkAiDiagnosisToObservationPoint({
+            pointId: observationPointId,
+            fieldId: String(selectedField.id),
+            analysis: aiAnalysis as unknown as Record<string, unknown>,
+            activityId: savedActivityId,
+          });
+        } catch (linkError) {
+          console.warn(
+            'AI ön değerlendirmesi NDVI takip noktasına bağlanamadı:',
+            linkError,
+          );
+          pointWarning = ' Takip noktası bağlantısı şu anda güncellenemedi.';
+        }
+      }
 
       try {
         const reward = await addPoints('FIELD_OBSERVATION_PHOTO', {
@@ -638,6 +814,22 @@ export function useFieldActivities({
         .eq('id', id)
         .eq('user_id', user.id);
       if (error) throw error;
+
+      if (activityToDelete) {
+        notifyFieldOperationImpact({
+          fieldId: String(selectedField.id),
+          type: String(activityToDelete.type ?? 'Diğer'),
+          mutation: 'deleted',
+          source: 'field-detail-activity-delete',
+          operation: {
+            id: activityToDelete.id,
+            fieldId: String(selectedField.id),
+            type: activityToDelete.type,
+            date: activityToDelete.activityDate,
+            cost: activityToDelete.cost,
+          },
+        });
+      }
 
       if (activityToDelete?.photoPath) {
         await deletePrivateFile(

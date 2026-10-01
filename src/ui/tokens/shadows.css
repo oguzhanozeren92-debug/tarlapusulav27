@@ -1,0 +1,6 @@
+:root {
+  --tp-shadow-none: none;
+  --tp-shadow-sm: 0 1px 2px rgba(17, 18, 20, 0.05);
+  --tp-shadow-md: 0 8px 24px rgba(17, 18, 20, 0.08);
+  --tp-shadow-lg: 0 18px 44px rgba(17, 18, 20, 0.12);
+}

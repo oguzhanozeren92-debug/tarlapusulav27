@@ -6,6 +6,18 @@ import { mirrorLatestAquaCropEvidenceForPdf } from './pusulaPdfAquaCropEvidence.
 import { mirrorLatestPcseEvidenceForPdf } from './pusulaPdfPcseEvidence.service';
 import { mirrorLatestIrrigationSynthesisForPdf } from './pusulaPdfIrrigationSynthesis.service';
 import { mirrorLatestDecisionEvidenceForPdf } from './pusulaPdfDecisionEvidence.service';
+import { mirrorFieldDataBackboneForPdf } from './pusulaPdfBackboneEvidence.service';
+import { mirrorLatestOrchardEvidenceForPdf } from './pusulaPdfOrchardEvidence.service';
+import { mirrorLatestOrchardChillEvidenceForPdf } from './pusulaPdfOrchardChillEvidence.service';
+import { mirrorLatestStorageRiskEvidenceForPdf } from './pusulaPdfStorageRiskEvidence.service';
+import { mirrorLatestIrrigationEconomicsEvidenceForPdf } from './pusulaPdfIrrigationEconomicsEvidence.service';
+import { mirrorLatestFrostPocketEvidenceForPdf } from './pusulaPdfFrostPocketEvidence.service';
+import { mirrorLatestFieldWorkabilityEvidenceForPdf } from './pusulaPdfFieldWorkabilityEvidence.service';
+import { mirrorLatestIrrigationDistributionEvidenceForPdf } from './pusulaPdfIrrigationDistributionEvidence.service';
+import { mirrorLatestWaterScarcityEvidenceForPdf } from './pusulaPdfWaterScarcityEvidence.service';
+import { mirrorLatestMicroclimateEvidenceForPdf } from './pusulaPdfMicroclimateEvidence.service';
+import { mirrorLatestTaskMapEvidenceForPdf } from './pusulaPdfTaskMapEvidence.service';
+import { mirrorLatestMultiStressEvidenceForPdf } from './pusulaPdfMultiStressEvidence.service';
 import { runAquaCropPilotEvidence } from '../../irrigation/services/aquaCropPilotEvidence.service';
 import { runDualKcShadowEvidence } from '../../irrigation/services/dualKcShadow.service';
 
@@ -33,9 +45,28 @@ export async function requestPusulaPdf(fieldId: string) {
       mirrorLatestPcseEvidenceForPdf(fieldId),
       mirrorLatestIrrigationSynthesisForPdf(fieldId),
       mirrorLatestDecisionEvidenceForPdf(fieldId),
+      mirrorFieldDataBackboneForPdf(fieldId),
+      mirrorLatestOrchardEvidenceForPdf(fieldId),
+      mirrorLatestOrchardChillEvidenceForPdf(fieldId),
+      mirrorLatestStorageRiskEvidenceForPdf(fieldId),
+      mirrorLatestIrrigationEconomicsEvidenceForPdf(fieldId),
+      mirrorLatestFrostPocketEvidenceForPdf(fieldId),
+      mirrorLatestFieldWorkabilityEvidenceForPdf(fieldId),
+      mirrorLatestIrrigationDistributionEvidenceForPdf(fieldId),
+      mirrorLatestWaterScarcityEvidenceForPdf(fieldId),
+      mirrorLatestMicroclimateEvidenceForPdf(fieldId),
+      mirrorLatestTaskMapEvidenceForPdf(fieldId),
     ]);
   } catch (error) {
     console.warn('[PUSULAPDF] Rapor öncesi kanıt arşivi tamamlanamadı:', error);
+  }
+
+  // 26: Çoklu stres sentezi bağımsız katmanlar güncellendikten sonra oluşturulur.
+  // Böylece ekran state'ine veya eski bir frontend snapshot'ına bağımlı kalmaz.
+  try {
+    await mirrorLatestMultiStressEvidenceForPdf(fieldId);
+  } catch (error) {
+    console.warn('[PUSULAPDF] Çoklu stres kanıtı hazırlanamadı:', error);
   }
 
   const { data, error } = await supabase.rpc('request_pusulapdf', {

@@ -51,8 +51,7 @@
     .tp-market-ref-page, .tp-support-page, .tp-agri-news-page,
     .tp-nutrition-page, .tp-producer-market-page, .tp-pest-guide-page,
     .tp-desktop-shell, .tp-placeholder-page, .tp-chat-shell,
-    .tp-onboarding-page, .pt-page, .tp-era5-page, .tp-unified-map-page,
-    .tp-authv2, .tp-theme-page) {
+    .tp-onboarding-page, .pt-page, .tp-era5-page, .tp-unified-map-page, .tp-theme-page) {
     background: #fff !important;
     color: #20252b !important;
     color-scheme: light !important;
@@ -216,7 +215,7 @@
   html body .tp-fields-sheet .tp-fields-delete-warning { background: #fff9e9 !important; color: #72511b !important; border-color: #eedfbe !important; }
   html body .tp-fields-sheet .tp-fields-delete-error { color: #a53737 !important; }
   html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-    .tp-wxr-page,.soil-page,.tp-onboarding-page,.tp-chat-shell,.tp-authv2)
+    .tp-wxr-page,.soil-page,.tp-onboarding-page,.tp-chat-shell)
     :is(input,textarea,select) {
     background: #fff !important;
     border-color: #d9dee3 !important;
@@ -224,16 +223,9 @@
     color-scheme: light !important;
   }
   html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-    .tp-wxr-page,.soil-page,.tp-onboarding-page,.tp-chat-shell,.tp-authv2)
+    .tp-wxr-page,.soil-page,.tp-onboarding-page,.tp-chat-shell)
     :is(input,textarea)::placeholder { color: #87919c !important; }
-  
-  /* Login and auxiliary pages use the same uncluttered background. */
-  body .tp-authv2 { background-image: none !important; }
-  body .tp-authv2 :is(.tp-authv2-panel,.tp-authv2-feature,.tp-authv2-input) {
-    background: #fff !important; border-color: #e5e8eb !important;
-    color: #20252b !important; box-shadow: none !important;
-  }
-  body .soil-page :is(.soil-hero,.soil-card,.soil-ai,.soil-history,
+body .soil-page :is(.soil-hero,.soil-card,.soil-ai,.soil-history,
     .soil-sidebar,.soil-topbar,.soil-soilgrids-state,.soil-empty) {
     background: #fff !important; border-color: #e5e8eb !important;
     color: #20252b !important; box-shadow: none !important;
@@ -286,12 +278,7 @@
   html body .tp-premium-drawer-icon img { filter: grayscale(1) saturate(0) !important; }
   html body .tp-v1 .tp-brand-pusula-anchor img,
   html body .tp-premium-drawer-brand-mark { filter: none !important; }
-  html body .tp-authv2-wordmark span,
-  html body .tp-authv2-wordmark strong { color: #20252b !important; text-shadow: none !important; }
-  html body .tp-authv2-primary { background: #303942 !important; border-color: #303942 !important; color: #fff !important; box-shadow: none !important; }
-  html body .tp-authv2 :is(.tp-authv2-features,.tp-authv2-feature) { background: #fff !important; box-shadow: none !important; }
-  
-  /* Home modules rendered from their own CSS/inline style blocks. These are
+/* Home modules rendered from their own CSS/inline style blocks. These are
      outside the shared card selectors above, so explicitly give each a surface. */
   html body .tp-v1 .tp-today { box-shadow: none !important; }
   html body .tp-v1 .tp-today::before,

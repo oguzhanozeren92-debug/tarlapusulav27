@@ -12,96 +12,48 @@ import type {
   FieldObservationPointStatus,
   NdviObservationTarget,
 } from '../types/fieldObservation';
+import type { EarthSearchNdviRelativeZone } from '../../home-map/services/earthSearchNdvi.service';
 
 type Props = {
   open: boolean;
   fieldId: string | null | undefined;
   fieldName: string;
+  relativeZones?: EarthSearchNdviRelativeZone[];
+  satelliteDate?: string | null;
   onClose: () => void;
   onOpenOnMap: (target: NdviObservationTarget) => void;
+  onOpenRelativeArea?: (area: EarthSearchNdviRelativeZone['area']) => void;
   onOpenHistory: (target: NdviObservationTarget) => void;
   onStatusChanged?: (point: FieldObservationPoint) => void;
 };
 
 const CSS = String.raw`
-.tp-field-tracking-portal{
-  position:fixed!important;
-  inset:0!important;
-  z-index:2147483632!important;
-  width:100vw!important;
-  height:100dvh!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom))!important;
-  box-sizing:border-box!important;
-  isolation:isolate!important;
-}
-.tp-field-tracking-backdrop{
-  position:absolute!important;inset:0!important;z-index:0!important;border:0!important;
-  background:rgba(0,0,0,.66)!important;backdrop-filter:blur(5px)!important;-webkit-backdrop-filter:blur(5px)!important;
-}
-.tp-field-tracking-sheet{
-  position:relative!important;z-index:1!important;width:min(94vw,620px)!important;max-height:min(88dvh,780px)!important;
-  display:flex!important;flex-direction:column!important;overflow:hidden!important;
-  border:1px solid #d8dee5!important;border-radius:22px!important;
-  background:#fff!important;
-  box-shadow:0 30px 90px rgba(0,0,0,.70)!important;
-}
-.tp-field-tracking-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px;border-bottom:1px solid rgba(255,255,255,.055)}
-.tp-field-tracking-kicker{color:#475569;font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
-.tp-field-tracking-head h3{margin:5px 0 0;color:#20252b;font-size:18px;line-height:1.3}
-.tp-field-tracking-head p{margin:7px 0 0;color:#536170;font-size:12px;line-height:1.45}
-.tp-field-tracking-close{width:36px;height:36px;flex:0 0 36px;border:1px solid #d7dfe7;border-radius:10px;background:#f1f3f5;color:#20252b;font-size:22px;cursor:pointer}
-.tp-field-tracking-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:12px 14px 14px}
+.tp-field-tracking-portal{position:fixed!important;inset:0!important;z-index:2147483632!important;width:100vw!important;height:100dvh!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom))!important;box-sizing:border-box!important;isolation:isolate!important}
+.tp-field-tracking-backdrop{position:absolute!important;inset:0!important;z-index:0!important;border:0!important;background:rgba(0,0,0,.62)!important;backdrop-filter:blur(5px)!important;-webkit-backdrop-filter:blur(5px)!important}
+.tp-field-tracking-sheet{position:relative!important;z-index:1!important;width:min(94vw,620px)!important;max-height:min(88dvh,780px)!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border:1px solid #d8d8d8!important;border-radius:22px!important;background:#fff!important;color:#111!important;box-shadow:0 30px 90px rgba(0,0,0,.35)!important}
+.tp-field-tracking-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #e8e8e8;background:#fff}
+.tp-field-tracking-kicker{color:#111;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.tp-field-tracking-head h3{margin:5px 0 0;color:#111;font-size:15px}
+.tp-field-tracking-head p{margin:6px 0 0;color:#555;font-size:9px;line-height:1.45}
+.tp-field-tracking-close{width:32px;height:32px;flex:0 0 32px;border:1px solid #ddd;border-radius:10px;background:#f7f7f7;color:#111;font-size:19px;cursor:pointer}
+.tp-field-tracking-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 16px 16px;background:#fff}
+.tp-relative-zone-title{margin:0 0 8px;color:#111;font-size:10px;font-weight:900}
+.tp-relative-zone-list{display:grid;gap:8px;margin-bottom:12px}
+.tp-relative-zone-card{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid #dedede;border-radius:13px;background:#fafafa;color:#111;text-align:left;cursor:pointer}
+.tp-relative-zone-card:hover{background:#f3f3f3}
+.tp-relative-zone-copy{min-width:0;display:grid;gap:3px}
+.tp-relative-zone-copy strong{color:#111;font-size:11px}
+.tp-relative-zone-copy span{color:#555;font-size:8px;line-height:1.35}
+.tp-relative-zone-action{flex:0 0 auto;color:#111;font-size:8px;font-weight:900}
 .tp-field-tracking-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:11px}
-.tp-field-tracking-tabs{display:flex;gap:6px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none}
-.tp-field-tracking-tabs::-webkit-scrollbar{display:none}
-.tp-field-tracking-tab{min-height:36px;padding:0 11px;border:1px solid #d8dee5;border-radius:999px;background:#f5f7f9;color:#3c4855;font-size:11px;font-weight:750;white-space:nowrap;cursor:pointer}
-.tp-field-tracking-tab.active{border-color:#374151;background:#26313c;color:#fff}
-.tp-field-tracking-card.paused{opacity:.78;border-color:rgba(245,158,11,.12)}
-.tp-field-tracking-card.resolved{opacity:.68;border-color:rgba(148,163,184,.10)}
-.tp-field-tracking-state.paused{border-color:rgba(245,158,11,.17);background:rgba(245,158,11,.04);color:#fde68a}
-.tp-field-tracking-state.resolved{border-color:rgba(148,163,184,.14);background:rgba(148,163,184,.035);color:#cbd5e1}
-.tp-field-tracking-stat{padding:10px;border:1px solid #d8dee5;border-radius:11px;background:#f7f8fa}
-.tp-field-tracking-stat small{display:block;color:#536170;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
-.tp-field-tracking-stat strong{display:block;margin-top:4px;color:#20252b;font-size:17px}
-.tp-field-tracking-list{display:grid;gap:8px}
-.tp-field-tracking-card{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;padding:11px;border:1px solid #d8dee5;border-radius:14px;background:#fff}
-.tp-field-tracking-thumb{width:84px;height:82px;overflow:hidden;border-radius:10px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.018)}
-.tp-field-tracking-thumb img{width:100%;height:100%;display:block;object-fit:cover}
-.tp-field-tracking-thumb-empty{width:100%;height:100%;display:grid;place-items:center;padding:8px;box-sizing:border-box;background:#f1f3f5;color:#475569;font-size:11px;text-align:center}
-.tp-field-tracking-copy{min-width:0}
-.tp-field-tracking-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.tp-field-tracking-title{color:#20252b;font-size:15px;font-weight:850}
-.tp-field-tracking-state{min-height:23px;display:inline-flex;align-items:center;padding:0 7px;border:1px solid #d8dee5;border-radius:999px;color:#354353;font-size:10px;font-weight:750;white-space:nowrap}
-.tp-field-tracking-state.due{border-color:rgba(239,68,68,.18);background:rgba(239,68,68,.045);color:#fecaca}
-.tp-field-tracking-state.improving{border-color:rgba(34,197,94,.17);background:rgba(34,197,94,.04);color:#bbf7d0}
-.tp-field-tracking-state.worsening{border-color:rgba(239,68,68,.18);background:rgba(239,68,68,.045);color:#fecaca}
-.tp-field-tracking-state.stable{border-color:rgba(6,182,212,.15);background:rgba(6,182,212,.035);color:#a5f3fc}
-.tp-field-tracking-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-.tp-field-tracking-chip{min-height:23px;display:inline-flex;align-items:center;padding:0 7px;border:1px solid #d8dee5;border-radius:999px;color:#485665;font-size:10px;font-weight:700}
-.tp-field-tracking-summary{margin:8px 0 0;color:#485665;font-size:12px;line-height:1.45}
-.tp-field-tracking-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:7px;margin-top:10px}
-.tp-field-tracking-actions button{min-height:35px;padding:0 10px;border-radius:9px;font-size:11px;font-weight:750;cursor:pointer}
-.tp-field-tracking-map{border:1px solid rgba(34,197,94,.15);background:rgba(34,197,94,.04);color:#bbf7d0}
-.tp-field-tracking-history{border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.018);color:rgba(220,231,222,.72)}
-.tp-field-tracking-pause{border:1px solid rgba(245,158,11,.14);background:rgba(245,158,11,.035);color:#fde68a}
-.tp-field-tracking-resolve{border:1px solid rgba(148,163,184,.13);background:rgba(148,163,184,.03);color:#cbd5e1}
-.tp-field-tracking-reactivate{border:1px solid rgba(34,197,94,.16);background:rgba(34,197,94,.045);color:#bbf7d0}
-.tp-field-tracking-actions button:disabled{opacity:.45;cursor:default}
-.tp-field-tracking-loading,.tp-field-tracking-empty,.tp-field-tracking-error{min-height:140px;display:grid;place-items:center;padding:20px;border:1px dashed rgba(105,139,114,.11);border-radius:12px;color:rgba(198,212,201,.58);font-size:8.5px;text-align:center}
-.tp-field-tracking-error{color:#fca5a5}
-/* Statuses and actions must remain legible on the light mobile sheet. */
-.tp-field-tracking-head{border-bottom-color:#d8dee5}
-.tp-field-tracking-card.paused,.tp-field-tracking-card.resolved{opacity:1;border-color:#d8dee5}
-.tp-field-tracking-state:is(.paused,.resolved,.due,.improving,.worsening,.stable){background:#eef1f4;border-color:#cbd3dc;color:#26313c}
-.tp-field-tracking-actions button:is(.tp-field-tracking-map,.tp-field-tracking-history,.tp-field-tracking-pause,.tp-field-tracking-resolve,.tp-field-tracking-reactivate){background:#eef1f4;border-color:#cbd3dc;color:#26313c}
-.tp-field-tracking-actions button:disabled{color:#637182;opacity:.7}
-.tp-field-tracking-loading,.tp-field-tracking-empty{border-color:#cbd3dc;color:#475569;font-size:12px}
-.tp-field-tracking-error{color:#a52626;font-size:12px}
+.tp-field-tracking-stat{padding:8px;border:1px solid #e3e3e3;border-radius:11px;background:#fafafa}.tp-field-tracking-stat small{display:block;color:#666;font-size:6.5px;font-weight:850;text-transform:uppercase;letter-spacing:.04em}.tp-field-tracking-stat strong{display:block;margin-top:4px;color:#111;font-size:10px}
+.tp-field-tracking-tabs{display:flex;gap:6px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none}.tp-field-tracking-tabs::-webkit-scrollbar{display:none}.tp-field-tracking-tab{min-height:29px;padding:0 9px;border:1px solid #ddd;border-radius:999px;background:#fff;color:#555;font-size:6.8px;font-weight:850;white-space:nowrap;cursor:pointer}.tp-field-tracking-tab.active{border-color:#111;background:#111;color:#fff}
+.tp-field-tracking-list{display:grid;gap:8px}.tp-field-tracking-card{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;padding:9px;border:1px solid #e1e1e1;border-radius:14px;background:#fff;color:#111}.tp-field-tracking-card.paused{opacity:.82}.tp-field-tracking-card.resolved{opacity:.72}
+.tp-field-tracking-thumb{width:84px;height:82px;overflow:hidden;border-radius:10px;border:1px solid #e1e1e1;background:#f5f5f5}.tp-field-tracking-thumb img{width:100%;height:100%;display:block;object-fit:cover}.tp-field-tracking-thumb-empty{width:100%;height:100%;display:grid;place-items:center;padding:8px;box-sizing:border-box;color:#777;font-size:7px;text-align:center}.tp-field-tracking-copy{min-width:0}.tp-field-tracking-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.tp-field-tracking-title{color:#111;font-size:10px;font-weight:900}.tp-field-tracking-state{min-height:18px;display:inline-flex;align-items:center;padding:0 6px;border:1px solid #ddd;border-radius:999px;color:#444;background:#fafafa;font-size:6px;font-weight:850;white-space:nowrap}.tp-field-tracking-state.due,.tp-field-tracking-state.worsening{border-color:#f0b4b4;background:#fff2f2;color:#8f1f1f}.tp-field-tracking-state.improving{border-color:#a8d5b2;background:#f1faf3;color:#1e6a31}.tp-field-tracking-state.stable{border-color:#b8d8df;background:#f3fbfc;color:#225f69}
+.tp-field-tracking-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.tp-field-tracking-chip{min-height:18px;display:inline-flex;align-items:center;padding:0 6px;border:1px solid #e0e0e0;border-radius:999px;color:#555;background:#fafafa;font-size:6.4px;font-weight:800}.tp-field-tracking-summary{margin:7px 0 0;color:#444;font-size:7.5px;line-height:1.38}.tp-field-tracking-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:8px}.tp-field-tracking-actions button{min-height:29px;padding:0 8px;border-radius:9px;font-size:7px;font-weight:850;cursor:pointer}.tp-field-tracking-map{border:1px solid #111;background:#111;color:#fff}.tp-field-tracking-history{border:1px solid #ccc;background:#fff;color:#111}.tp-field-tracking-pause{border:1px solid #d7b06f;background:#fff9ef;color:#6f4a0c}.tp-field-tracking-resolve{border:1px solid #ccc;background:#f7f7f7;color:#222}.tp-field-tracking-reactivate{border:1px solid #111;background:#111;color:#fff}.tp-field-tracking-actions button:disabled{opacity:.45;cursor:default}
+.tp-field-tracking-loading,.tp-field-tracking-empty,.tp-field-tracking-error{min-height:90px;display:grid;place-items:center;padding:20px;border:1px dashed #d5d5d5;border-radius:12px;color:#555;background:#fafafa;font-size:8.5px;text-align:center}.tp-field-tracking-error{color:#a11}
 @media(max-width:520px){.tp-field-tracking-stats{grid-template-columns:1fr 1fr}.tp-field-tracking-card{grid-template-columns:72px minmax(0,1fr)}.tp-field-tracking-thumb{width:72px;height:74px}}
-`;
+`
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '—';
@@ -114,6 +66,13 @@ function directionLabel(value: string | null | undefined) {
   const text = String(value ?? '').trim();
   if (!text) return 'Takip noktası';
   return text.charAt(0).toLocaleUpperCase('tr-TR') + text.slice(1);
+}
+
+function normalizeAreaKey(value: unknown) {
+  return String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .replace(/\s+/g, '-');
 }
 
 function healthText(value: number | null | undefined) {
@@ -158,8 +117,11 @@ export default function FieldObservationPointsModal({
   open,
   fieldId,
   fieldName,
+  relativeZones = [],
+  satelliteDate = null,
   onClose,
   onOpenOnMap,
+  onOpenRelativeArea,
   onOpenHistory,
   onStatusChanged,
 }: Props) {
@@ -192,13 +154,42 @@ export default function FieldObservationPointsModal({
     return () => { document.body.style.overflow = previous; };
   }, [open]);
 
+  const weakerZones = useMemo(
+    () => relativeZones.filter((zone) => zone?.status === 'weaker'),
+    [relativeZones],
+  );
+
+  const weakerAreaKeys = useMemo(
+    () =>
+      new Set(
+        relativeZones
+          .filter((zone) => zone?.status === 'weaker')
+          .map((zone) => normalizeAreaKey(zone?.area))
+          .filter(Boolean),
+      ),
+    [relativeZones],
+  );
+
+  /*
+   * Bu ekranın aktif noktaları artık veritabanındaki eski aday listesinden
+   * değil, güncel "Göreli fark" analizindeki weaker alanlardan seçilir.
+   * Böylece haritada 1 göreli alan varsa burada da 1 alan; hiç yoksa 0 alan görünür.
+   */
+  const currentRelativeItems = useMemo(
+    () =>
+      items.filter((item) =>
+        weakerAreaKeys.has(normalizeAreaKey(item.point.direction)),
+      ),
+    [items, weakerAreaKeys],
+  );
+
   const stats = useMemo(() => {
     let active = 0;
     let paused = 0;
     let resolved = 0;
     let due = 0;
 
-    for (const item of items) {
+    for (const item of currentRelativeItems) {
       if (item.point.status === 'active') active += 1;
       if (item.point.status === 'paused') paused += 1;
       if (item.point.status === 'resolved') resolved += 1;
@@ -206,11 +197,11 @@ export default function FieldObservationPointsModal({
     }
 
     return { active, paused, resolved, due };
-  }, [items]);
+  }, [currentRelativeItems]);
 
   const filteredItems = useMemo(
-    () => items.filter((item) => item.point.status === filter),
-    [items, filter],
+    () => currentRelativeItems.filter((item) => item.point.status === filter),
+    [currentRelativeItems, filter],
   );
 
   const changeStatus = async (
@@ -263,15 +254,46 @@ export default function FieldObservationPointsModal({
         <section className="tp-field-tracking-sheet" role="dialog" aria-modal="true" aria-label="Tarladaki NDVI takip noktaları">
           <header className="tp-field-tracking-head">
             <div>
-              <div className="tp-field-tracking-kicker">🧭 PUSULA · NDVI TAKİP NOKTALARI</div>
-              <h3>{fieldName} · Saha takipleri</h3>
-              <p>Uydu sinyalinden seçilip fotoğrafla takip edilen zayıf alanların tamamı.</p>
+              <div className="tp-field-tracking-kicker">🧭 PUSULA · GÖRELİ FARK TAKİBİ</div>
+              <h3>{fieldName} · Güncel zayıf alanlar</h3>
+              <p>
+                Güncel uydu görüntüsünde parsel ortalamasından anlamlı derecede düşük ayrışan alanlar.
+                {satelliteDate ? ` · ${formatDate(satelliteDate)}` : ''}
+              </p>
             </div>
             <button type="button" className="tp-field-tracking-close" onClick={onClose} aria-label="Kapat">×</button>
           </header>
 
           <div className="tp-field-tracking-body">
-            {!loading && !error && items.length > 0 ? (
+            {!loading && !error && weakerZones.length > 0 ? (
+              <>
+                <div className="tp-relative-zone-title">Göreli farkta görünen alanlar · {weakerZones.length}</div>
+                <div className="tp-relative-zone-list">
+                  {weakerZones.map((zone) => {
+                    const delta = Number(zone.deltaFromFieldMean);
+                    const deltaText = Number.isFinite(delta)
+                      ? `Parsel ortalamasından ${Math.abs(delta).toFixed(2)} NDVI daha düşük.`
+                      : 'Parsel ortalamasından anlamlı derecede düşük.';
+                    return (
+                      <button
+                        key={zone.area}
+                        type="button"
+                        className="tp-relative-zone-card"
+                        onClick={() => onOpenRelativeArea?.(zone.area)}
+                      >
+                        <span className="tp-relative-zone-copy">
+                          <strong>{directionLabel(zone.area)}</strong>
+                          <span>{deltaText}</span>
+                        </span>
+                        <span className="tp-relative-zone-action">Haritada →</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
+
+            {!loading && !error && currentRelativeItems.length > 0 ? (
               <>
                 <div className="tp-field-tracking-stats">
                   <div className="tp-field-tracking-stat"><small>Aktif</small><strong>{stats.active}</strong></div>
@@ -288,7 +310,7 @@ export default function FieldObservationPointsModal({
               </>
             ) : null}
 
-            {loading ? <div className="tp-field-tracking-loading">Takip noktaları hazırlanıyor…</div> : error ? <div className="tp-field-tracking-error">{error}</div> : items.length === 0 ? <div className="tp-field-tracking-empty">Bu tarlada henüz kalıcı NDVI takip noktası yok. Haritada zayıf bir alanı açıp fotoğraf eklediğinde burada görünür.</div> : filteredItems.length === 0 ? <div className="tp-field-tracking-empty">Bu durumda takip noktası yok.</div> : (
+            {loading ? <div className="tp-field-tracking-loading">Takip noktaları hazırlanıyor…</div> : error ? <div className="tp-field-tracking-error">{error}</div> : weakerZones.length > 0 && currentRelativeItems.length === 0 ? <div className="tp-field-tracking-empty">Göreli fark alanları yukarıda gösteriliyor. Bu alanlarda henüz kayıtlı saha fotoğrafı / kalıcı takip noktası yok.</div> : items.length === 0 ? <div className="tp-field-tracking-empty">Güncel göreli fark alanı yok ve kayıtlı kalıcı takip noktası bulunmuyor.</div> : filteredItems.length === 0 ? <div className="tp-field-tracking-empty">Bu durumda kayıtlı takip noktası yok.</div> : (
               <div className="tp-field-tracking-list">
                 {filteredItems.map((item) => {
                   const due = isDue(item);

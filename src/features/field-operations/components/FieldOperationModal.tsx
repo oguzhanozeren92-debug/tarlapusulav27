@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import {
   createFieldOperation,
+  listRecentFieldOperations,
   saveFieldPlantingManagement,
 } from '../services/fieldOperation.service';
 import {
@@ -89,6 +90,56 @@ const CSS = String.raw`
 .tp-field-operation-cancel{border:1px solid rgba(255,255,255,.06);background:transparent;color:rgba(211,225,214,.65)}
 .tp-field-operation-save{border:1px solid rgba(34,197,94,.18);background:rgba(34,197,94,.075);color:#bbf7d0}
 .tp-field-operation-actions button:disabled{opacity:.42;cursor:default}
+
+.tp-field-operation-tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:9px 14px 0
+}
+.tp-field-operation-tab{
+  min-height:34px;border:1px solid rgba(105,139,114,.10);border-radius:10px;
+  background:rgba(255,255,255,.012);color:rgba(201,216,204,.65);
+  font-size:7.4px;font-weight:900;cursor:pointer
+}
+.tp-field-operation-tab.active{
+  border-color:rgba(34,197,94,.24);background:rgba(34,197,94,.07);color:#d7fbe1
+}
+.tp-field-operation-history{
+  min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:12px 14px 14px
+}
+.tp-field-operation-history-head{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:9px
+}
+.tp-field-operation-history-head div{display:grid;gap:2px}
+.tp-field-operation-history-head strong{font-size:9px;color:#e9f4eb}
+.tp-field-operation-history-head small{font-size:6.7px;color:rgba(197,214,201,.56)}
+.tp-field-operation-history-refresh{
+  min-height:28px;padding:0 9px;border:1px solid rgba(105,139,114,.10);border-radius:9px;
+  background:rgba(255,255,255,.012);color:rgba(211,225,214,.67);font-size:6.7px;font-weight:850;cursor:pointer
+}
+.tp-field-operation-history-list{display:grid;gap:7px}
+.tp-field-operation-history-card{
+  display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:9px;align-items:center;
+  padding:9px;border:1px solid rgba(105,139,114,.10);border-radius:12px;background:rgba(255,255,255,.012)
+}
+.tp-field-operation-history-icon{
+  width:34px;height:34px;display:grid;place-items:center;border:1px solid rgba(105,139,114,.10);
+  border-radius:10px;background:rgba(255,255,255,.015);font-size:16px
+}
+.tp-field-operation-history-copy{min-width:0;display:grid;gap:2px}
+.tp-field-operation-history-copy strong{font-size:7.7px;color:rgba(229,239,231,.86)}
+.tp-field-operation-history-copy small{
+  font-size:6.5px;line-height:1.35;color:rgba(188,207,193,.56);white-space:normal;overflow-wrap:anywhere
+}
+.tp-field-operation-history-date{
+  align-self:start;padding:4px 6px;border:1px solid rgba(105,139,114,.10);border-radius:999px;
+  color:rgba(188,207,193,.60);font-size:6.2px;font-weight:850;white-space:nowrap
+}
+.tp-field-operation-history-state{
+  min-height:120px;display:grid;place-items:center;text-align:center;padding:18px;
+  border:1px dashed rgba(105,139,114,.11);border-radius:12px;color:rgba(194,211,199,.60);
+  font-size:7.2px;line-height:1.5
+}
+.tp-field-operation-history-state.error{color:#fca5a5;border-color:rgba(239,68,68,.16)}
+
 @media(max-width:480px){.tp-field-operation-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.tp-field-operation-row{grid-template-columns:1fr}.tp-planting-details-grid{grid-template-columns:1fr}}
 html body .tp-field-operation-sheet{background:#fff!important;border-color:#cbd0d6!important;filter:grayscale(1);box-shadow:0 20px 70px #0003!important}
 html body .tp-field-operation-sheet :is(h3,strong,span,p,label,small,div){color:#242a31!important}
@@ -103,6 +154,25 @@ html body .tp-field-operation-sheet :is(.tp-field-operation-type strong,.tp-irri
 html body .tp-field-operation-sheet :is(.tp-irrigation-calc,.tp-irrigation-warning,.tp-field-operation-error,.tp-field-operation-success,.tp-planting-details){background:#f0f2f4!important;border-color:#cbd0d6!important;font-size:14px!important;line-height:1.5!important}
 html body .tp-field-operation-sheet .tp-field-operation-save{background:#242a31!important;color:#fff!important}
 html body .tp-field-operation-head{border-color:#d4d9df!important}
+
+html body .tp-field-operation-tabs{border-color:#d4d9df!important}
+html body .tp-field-operation-tab{
+  background:#f0f2f4!important;color:#4b5563!important;border-color:#cbd0d6!important;
+  min-height:40px!important;font-size:13px!important
+}
+html body .tp-field-operation-tab.active{background:#242a31!important;color:#fff!important;border-color:#242a31!important}
+html body .tp-field-operation-history-head strong{font-size:15px!important;color:#242a31!important}
+html body .tp-field-operation-history-head small{font-size:12px!important;color:#65707d!important}
+html body .tp-field-operation-history-refresh{
+  background:#f0f2f4!important;color:#242a31!important;border-color:#cbd0d6!important;
+  min-height:36px!important;font-size:12px!important
+}
+html body .tp-field-operation-history-card{background:#f7f8fa!important;border-color:#d7dce2!important}
+html body .tp-field-operation-history-icon{background:#fff!important;border-color:#d7dce2!important;font-size:18px!important}
+html body .tp-field-operation-history-copy strong{font-size:14px!important;color:#242a31!important}
+html body .tp-field-operation-history-copy small{font-size:12px!important;color:#65707d!important}
+html body .tp-field-operation-history-date{font-size:11px!important;color:#4b5563!important;border-color:#d7dce2!important}
+html body .tp-field-operation-history-state{font-size:13px!important;color:#65707d!important;border-color:#cbd0d6!important}
 `;
 
 function localDate(offsetDays = 0) {
@@ -147,6 +217,32 @@ function operationConfig(type: FieldOperationType) {
   return { product: null, productPlaceholder: '', quantity: false, units: [] as string[] };
 }
 
+
+function trOperationDate(value: string) {
+  const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+function operationIcon(type: string) {
+  return FIELD_OPERATION_OPTIONS.find((item) => item.type === type)?.icon ?? '✓';
+}
+
+function operationDetail(operation: FieldOperation) {
+  const parts: string[] = [];
+  if (operation.productName) parts.push(operation.productName);
+  if (operation.quantity != null) {
+    parts.push(
+      `${operation.quantity.toLocaleString('tr-TR')}${operation.unit ? ` ${operation.unit}` : ''}`,
+    );
+  }
+  if (operation.cost != null && operation.cost > 0) {
+    parts.push(`${operation.cost.toLocaleString('tr-TR')} TL`);
+  }
+  if (operation.notes) parts.push(operation.notes);
+  return parts.join(' · ') || 'İşlem kaydı';
+}
+
 export default function FieldOperationModal({
   open,
   fieldId,
@@ -174,6 +270,10 @@ export default function FieldOperationModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'add' | 'history'>('add');
+  const [savedOperations, setSavedOperations] = useState<FieldOperation[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const config = useMemo(() => operationConfig(type), [type]);
 
@@ -196,6 +296,10 @@ export default function FieldOperationModal({
     setError(null);
     setSuccess(null);
     setSaving(false);
+    setActiveTab('add');
+    setSavedOperations([]);
+    setHistoryError(null);
+    setHistoryLoading(false);
   }, [open, fieldId, initialType, initialDate]);
 
   useEffect(() => {
@@ -204,6 +308,32 @@ export default function FieldOperationModal({
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previous; };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || activeTab !== 'history' || !fieldId) return;
+
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    void listRecentFieldOperations(fieldId, 180, 100)
+      .then((items) => {
+        if (!cancelled) setSavedOperations(items);
+      })
+      .catch((value) => {
+        if (!cancelled) {
+          setSavedOperations([]);
+          setHistoryError(value instanceof Error ? value.message : 'Kaydedilen işlemler yüklenemedi.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, activeTab, fieldId]);
 
   useEffect(() => {
     if (!config.quantity) {
@@ -375,6 +505,10 @@ export default function FieldOperationModal({
           ? `${type} kaydedildi · ${operation.cost.toLocaleString('tr-TR')} TL giderlere eklendi.${plantingSuffix}`
           : `${type} kaydedildi.${plantingSuffix}`,
       );
+      setSavedOperations((current) => [
+        operation,
+        ...current.filter((item) => item.id !== operation.id),
+      ]);
       onSaved?.(operation);
       window.setTimeout(onClose, plantingManagement ? 950 : 650);
     } catch (value) {
@@ -401,6 +535,24 @@ export default function FieldOperationModal({
             <button type="button" className="tp-field-operation-close" onClick={onClose} aria-label="Kapat">×</button>
           </header>
 
+          <nav className="tp-field-operation-tabs" aria-label="Tarla günlüğü sekmeleri">
+            <button
+              type="button"
+              className={`tp-field-operation-tab ${activeTab === 'add' ? 'active' : ''}`}
+              onClick={() => setActiveTab('add')}
+            >
+              İşlem ekle
+            </button>
+            <button
+              type="button"
+              className={`tp-field-operation-tab ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => setActiveTab('history')}
+            >
+              Kaydettiğim işlemler
+            </button>
+          </nav>
+
+          {activeTab === 'add' ? (
           <form className="tp-field-operation-body" onSubmit={submit}>
             <span className="tp-field-operation-label">İşlem türü</span>
             <div className="tp-field-operation-grid">
@@ -635,6 +787,62 @@ export default function FieldOperationModal({
               <button type="submit" className="tp-field-operation-save" disabled={!fieldId || saving}>{saving ? 'Kaydediliyor…' : '✓ İşlemi kaydet'}</button>
             </div>
           </form>
+          ) : (
+            <div className="tp-field-operation-history">
+              <div className="tp-field-operation-history-head">
+                <div>
+                  <strong>Kaydettiğim işlemler</strong>
+                  <small>Bu tarlaya daha önce girdiğin son kayıtlar burada.</small>
+                </div>
+                <button
+                  type="button"
+                  className="tp-field-operation-history-refresh"
+                  onClick={() => {
+                    if (!fieldId || historyLoading) return;
+                    setHistoryLoading(true);
+                    setHistoryError(null);
+                    void listRecentFieldOperations(fieldId, 180, 100)
+                      .then(setSavedOperations)
+                      .catch((value) => {
+                        setSavedOperations([]);
+                        setHistoryError(value instanceof Error ? value.message : 'Kaydedilen işlemler yüklenemedi.');
+                      })
+                      .finally(() => setHistoryLoading(false));
+                  }}
+                  disabled={historyLoading}
+                >
+                  {historyLoading ? 'Yenileniyor…' : 'Yenile'}
+                </button>
+              </div>
+
+              {historyLoading && !savedOperations.length ? (
+                <div className="tp-field-operation-history-state">Kayıtlar yükleniyor…</div>
+              ) : historyError ? (
+                <div className="tp-field-operation-history-state error">{historyError}</div>
+              ) : savedOperations.length ? (
+                <div className="tp-field-operation-history-list">
+                  {savedOperations.map((operation) => (
+                    <article className="tp-field-operation-history-card" key={operation.id}>
+                      <span className="tp-field-operation-history-icon" aria-hidden="true">
+                        {operationIcon(operation.type)}
+                      </span>
+                      <div className="tp-field-operation-history-copy">
+                        <strong>{operation.type || operation.title}</strong>
+                        <small>{operationDetail(operation)}</small>
+                      </div>
+                      <span className="tp-field-operation-history-date">
+                        {trOperationDate(operation.date)}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="tp-field-operation-history-state">
+                  Bu tarla için henüz kaydedilmiş işlem yok.
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </>,

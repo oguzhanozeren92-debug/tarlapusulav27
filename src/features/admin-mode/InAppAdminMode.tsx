@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdminRole } from '../app-shell/hooks/useAdminRole';
 import ContentAdminPanel from '../content-admin/ContentAdminPanel';
+import SystemHealthPanel from '../system-health/SystemHealthPanel';
 import {
   deleteAdminUiOverride,
   fetchAdminAudit,
@@ -17,7 +18,7 @@ import {
 } from './adminControl.service';
 import './InAppAdminMode.css';
 
-type Panel = 'overview' | 'edit' | 'content' | 'users' | 'broadcast' | 'audit';
+type Panel = 'overview' | 'edit' | 'content' | 'system' | 'users' | 'broadcast' | 'audit';
 type Preset = 'same' | 'white' | 'black' | 'transparent';
 type TextPreset = 'same' | 'black' | 'white';
 type SizePreset = 'same' | 'small' | 'normal' | 'large';
@@ -224,6 +225,7 @@ export default function InAppAdminMode() {
   const isAdmin = useAdminRole();
   const [modeOpen, setModeOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>('overview');
+  const [sheetCollapsed, setSheetCollapsed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<SelectedElement | null>(null);
   const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT);
@@ -479,6 +481,7 @@ export default function InAppAdminMode() {
 
   const changePanel = (next: Panel) => {
     setPanel(next);
+    setSheetCollapsed(false);
     setMessage('');
     if (next === 'audit') void loadAudit();
     if (next === 'users' && !overview) void loadOverview();
@@ -537,6 +540,7 @@ export default function InAppAdminMode() {
         <button className={panel === 'overview' ? 'active' : ''} onClick={() => changePanel('overview')}><b>◆</b><span>Özet</span></button>
         <button className={panel === 'edit' ? 'active' : ''} onClick={() => { changePanel('edit'); setEditing((value) => !value); }}><b>{editing ? '●' : '✦'}</b><span>{editing ? 'Seçiliyor' : 'Düzenle'}</span></button>
         <button className={panel === 'content' ? 'active' : ''} onClick={() => changePanel('content')}><b>▤</b><span>Haber</span></button>
+        <button className={panel === 'system' ? 'active' : ''} onClick={() => changePanel('system')}><b>⌁</b><span>Sistem</span></button>
         <button className={panel === 'users' ? 'active' : ''} onClick={() => changePanel('users')}><b>◎</b><span>Kullanıcı</span></button>
         <button className={panel === 'broadcast' ? 'active' : ''} onClick={() => changePanel('broadcast')}><b>⌁</b><span>Bildirim</span></button>
         <button className={panel === 'audit' ? 'active' : ''} onClick={() => changePanel('audit')}><b>↺</b><span>Geçmiş</span></button>
@@ -545,13 +549,13 @@ export default function InAppAdminMode() {
 
       {editing && <div className="tp-admin-pick-banner">DÜZENLEME AÇIK · Değiştirmek istediğin öğeye dokun</div>}
 
-      <section className={`tp-admin-sheet tp-admin-sheet--${panel}`}>
+      <section className={`tp-admin-sheet tp-admin-sheet--${panel}${sheetCollapsed ? ' is-collapsed' : ''}`}>
         <header className="tp-admin-sheet-head">
           <div>
             <small>TarlaPusula · ADMIN MODU</small>
             <h2>{panel === 'overview' ? 'Yönetim özeti' : panel === 'edit' ? 'Ekranı düzenle' : panel === 'content' ? 'Haber akışı' : panel === 'users' ? 'Kullanıcılar' : panel === 'broadcast' ? 'Bildirim gönder' : 'Değişiklik geçmişi'}</h2>
           </div>
-          <button type="button" onClick={() => setPanel('overview')}>⌄</button>
+          <button type="button" aria-label={sheetCollapsed ? 'Yönetim panelini aç' : 'Yönetim panelini daralt'} title={sheetCollapsed ? 'Paneli aç' : 'Paneli daralt'} onClick={() => setSheetCollapsed((value) => !value)}>{sheetCollapsed ? '⌃' : '⌄'}</button>
         </header>
 
         {message && <div className="tp-admin-message">{message}</div>}
@@ -636,6 +640,8 @@ export default function InAppAdminMode() {
         )}
 
         {panel === 'content' && <div className="tp-admin-content-wrap"><ContentAdminPanel /></div>}
+
+        {panel === 'system' && <div className="tp-admin-content-wrap"><SystemHealthPanel /></div>}
 
         {panel === 'users' && (
           <div className="tp-admin-users">

@@ -154,9 +154,9 @@ const getDeviceWeatherLocation = () =>
 export const resolveHomeWeatherLocation = async (
   field?: Field | null,
 ): Promise<WeatherLocation> => {
-  const deviceLocation = await getDeviceWeatherLocation();
-  if (deviceLocation) return deviceLocation;
-
+  // Otomatik cihaz konumu istemiyoruz.
+  // Hava bilgisi önce kayıtlı tarla koordinatından / adresinden çözülür.
+  // Kullanıcı cihaz konumunu yalnız açıkça "Konumumu kullan" dediğinde paylaşır.
   if (field && !field.demo) {
     const latitude = field.parcelCentroidLat ?? field.latitude;
     const longitude = field.parcelCentroidLng ?? field.longitude;

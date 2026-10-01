@@ -18,14 +18,36 @@ import {
   buildFieldPhenology,
 } from './buildFieldPhenology';
 
+import {
+  estimateNasaHarvestCropStage,
+  fusePhenologyWithNasaHarvest,
+  type NasaHarvestCropStageResult,
+} from './nasaHarvestCropStage.service';
+
+import {
+  fetchPcsePhenologyEvidence,
+  fusePhenologyWithPcse,
+  type PcsePhenologyEvidence,
+} from './pcsePhenologyEvidence.service';
+
+import {
+  fetchLatestFieldGrowthObservation,
+  fieldObservationSignature,
+  fusePhenologyWithFieldObservation,
+  type FieldGrowthObservationEvidence,
+} from './fieldGrowthObservationAuthority.service';
+
 import type {
   PhenologyResult,
 } from '../types/phenology';
 
 const CACHE_PREFIX =
-  'tp_field_phenology_snapshot_v2';
+  'tp_field_phenology_snapshot_v5';
 
 const LEGACY_CACHE_PREFIXES = [
+  'tp_field_phenology_snapshot_v4',
+  'tp_field_phenology_snapshot_v3',
+  'tp_field_phenology_snapshot_v2',
   'tp_field_phenology_snapshot_v1',
 ];
 
@@ -133,6 +155,79 @@ export type FieldPhenologySnapshot = {
     message:
       | string
       | null;
+  };
+
+  nasaHarvest: {
+    status:
+      SourceStatus;
+
+    stageCode:
+      | NasaHarvestCropStageResult['stageCode'];
+
+    stageLabel:
+      string | null;
+
+    confidence:
+      PhenologyResult['confidence'];
+
+    observationCount:
+      number;
+
+    dailyPointCount:
+      number;
+
+    spanDays:
+      number | null;
+
+    peakDate:
+      string | null;
+
+    daysSincePeak:
+      number | null;
+
+    latestDate:
+      string | null;
+
+    message:
+      string | null;
+  };
+
+  pcseWofost: {
+    status:
+      | 'ready'
+      | 'partial'
+      | 'missing'
+      | 'blocked'
+      | 'running'
+      | 'skipped'
+      | 'error';
+
+    stage:
+      string | null;
+
+    canonicalStage:
+      PhenologyResult['stage'] | null;
+
+    dvs:
+      number | null;
+
+    model:
+      string | null;
+
+    completedAt:
+      string | null;
+
+    missingInputs:
+      string[];
+
+    message:
+      string | null;
+  };
+
+  fieldObservation: {
+    status: 'ready' | 'missing' | 'error';
+    evidence: FieldGrowthObservationEvidence | null;
+    message: string | null;
   };
 
   evidence:
@@ -426,6 +521,14 @@ export function clearFieldPhenologySnapshotCache(
   }
 }
 
+function cachedFieldObservationMatches(
+  cached: FieldPhenologySnapshot,
+  current: FieldGrowthObservationEvidence | null,
+) {
+  return fieldObservationSignature(cached.fieldObservation?.evidence ?? null) ===
+    fieldObservationSignature(current);
+}
+
 export async function getFieldPhenologySnapshot(
   field: any,
   options?: {
@@ -460,6 +563,18 @@ export async function getFieldPhenologySnapshot(
       ),
     );
 
+  let fieldObservation: FieldGrowthObservationEvidence | null = null;
+  let fieldObservationError: string | null = null;
+
+  try {
+    fieldObservation = await fetchLatestFieldGrowthObservation(
+      fieldId,
+      options?.currentDate ?? null,
+    );
+  } catch (error) {
+    fieldObservationError = errorMessage(error);
+  }
+
   if (
     !options
       ?.forceRefresh
@@ -469,14 +584,21 @@ export async function getFieldPhenologySnapshot(
         key,
       );
 
-    if (cached) {
+    if (
+      cached &&
+      (
+        fieldObservationError !== null ||
+        cachedFieldObservationMatches(cached, fieldObservation)
+      )
+    ) {
       return cached;
     }
   }
 
   /*
-    Üç kaynak birbirinden bağımsızdır.
-    Birinin hatası tüm fenoloji özetini düşürmez.
+    Bağlam, iklim, NDVI ve PCSE birbirinden bağımsızdır.
+    Saha gözlemi ayrıca her çağrıda hızlıca kontrol edilir; böylece eski 6 saatlik
+    cache yeni bir gerçek saha gözleminin önüne geçemez.
   */
   const contextPromise =
     loadFieldPhenologyContext(
@@ -494,6 +616,17 @@ export async function getFieldPhenologySnapshot(
       },
     );
 
+  const pcsePromise =
+    String(
+      field?.cropCycle ??
+      field?.crop_cycle ??
+      '',
+    )
+      .trim()
+      .toLocaleLowerCase('tr-TR') === 'perennial'
+      ? Promise.resolve(null)
+      : fetchPcsePhenologyEvidence(fieldId);
+
   const ndviPromise =
     field?.parcelGeometry ||
     field?.parcel_geometry
@@ -501,8 +634,12 @@ export async function getFieldPhenologySnapshot(
           field.parcelGeometry ??
           field.parcel_geometry,
           {
+            /*
+             * NASA Harvest A–E modeli sezon eğrisini ve olası geçmiş tepeyi
+             * görmek zorunda. 90 gün birçok yıllık üründe yetersiz kalıyordu.
+             */
             daysBack:
-              90,
+              180,
           },
         )
       : Promise.resolve(
@@ -513,12 +650,14 @@ export async function getFieldPhenologySnapshot(
     contextSettled,
     climateSettled,
     ndviSettled,
+    pcseSettled,
   ] =
     await Promise.allSettled(
       [
         contextPromise,
         climatePromise,
         ndviPromise,
+        pcsePromise,
       ],
     );
 
@@ -538,6 +677,11 @@ export async function getFieldPhenologySnapshot(
     ndviSettled.status ===
     'fulfilled'
       ? ndviSettled.value
+      : null;
+
+  const pcse: PcsePhenologyEvidence | null =
+    pcseSettled.status === 'fulfilled'
+      ? pcseSettled.value
       : null;
 
   const latestObservationDate = ndvi?.points?.at(-1)?.date ?? null;
@@ -638,7 +782,7 @@ export async function getFieldPhenologySnapshot(
       climateShiftDays,
   };
 
-  const phenology =
+  const basePhenology =
     buildFieldPhenology(
       phenologyField,
       ndviTrend,
@@ -646,6 +790,64 @@ export async function getFieldPhenologySnapshot(
         ?.currentDate ??
       null,
     );
+
+  const cropCycle =
+    String(
+      phenologyField?.cropCycle ??
+      phenologyField?.crop_cycle ??
+      '',
+    )
+      .trim()
+      .toLocaleLowerCase('tr-TR');
+
+  const nasaReferenceDate =
+    options?.currentDate
+      ? new Date(options.currentDate)
+      : new Date();
+
+  const nasaHarvest =
+    cropCycle !== 'perennial' &&
+    Array.isArray(ndvi?.points) &&
+    ndvi.points.length
+      ? estimateNasaHarvestCropStage(
+          ndvi.points,
+          nasaReferenceDate,
+        )
+      : null;
+
+  /*
+   * NASA Harvest yalnız gözlenen NDVI sezon eğrisini temsil eder.
+   * Takvim/PCSE/WOFOST gibi kaynaklarla tek başına yarışmaz; fusion katmanı
+   * uyuşmayı güçlendirir, belirgin uyuşmazlıkta güveni düşürür.
+   */
+  const nasaFusedPhenology =
+    fusePhenologyWithNasaHarvest(
+      basePhenology,
+      nasaHarvest,
+    ) ??
+    basePhenology;
+
+  /*
+   * Kanonik fenoloji sonucu:
+   * production authority = TarlaPusula Fenoloji Motoru
+   * supporting = NASA Harvest + PCSE/WOFOST
+   * saha gözlemi = güncelse mevcut evrede son doğrulama otoritesi.
+   * PCSE tek başına evreyi değiştiremez. Saha gözlemi de doğrulanmış hasat
+   * kaydı olmadan sezonu post_harvest durumuna kapatamaz.
+   */
+  const pcseFusedPhenology =
+    fusePhenologyWithPcse(
+      nasaFusedPhenology,
+      pcse,
+    ) ??
+    nasaFusedPhenology;
+
+  const phenology =
+    fusePhenologyWithFieldObservation(
+      pcseFusedPhenology,
+      fieldObservation,
+    ) ??
+    pcseFusedPhenology;
 
   const evidence = [
     ...phenology.basis,
@@ -700,6 +902,23 @@ export async function getFieldPhenologySnapshot(
       `NDVI trendi alınamadı: ${errorMessage(
         ndviSettled.reason,
       )}`,
+    );
+  }
+
+  if (
+    pcseSettled.status ===
+    'rejected'
+  ) {
+    warnings.push(
+      `PCSE/WOFOST destek kanıtı alınamadı: ${errorMessage(
+        pcseSettled.reason,
+      )}`,
+    );
+  }
+
+  if (fieldObservationError) {
+    warnings.push(
+      `Saha gelişim gözlemi okunamadı: ${fieldObservationError}`,
     );
   }
 
@@ -909,6 +1128,129 @@ export async function getFieldPhenologySnapshot(
               contextSettled.reason,
             )
           : null,
+    },
+
+    nasaHarvest: {
+      status:
+        cropCycle === 'perennial'
+          ? 'skipped'
+          : ndviSettled.status === 'rejected'
+            ? 'error'
+            : nasaHarvest
+              ? nasaHarvest.status === 'usable'
+                ? 'ready'
+                : 'skipped'
+              : 'skipped',
+
+      stageCode:
+        nasaHarvest?.stageCode ??
+        null,
+
+      stageLabel:
+        nasaHarvest?.stageLabel ??
+        null,
+
+      confidence:
+        nasaHarvest?.confidence ??
+        'low',
+
+      observationCount:
+        nasaHarvest?.observationCount ??
+        0,
+
+      dailyPointCount:
+        nasaHarvest?.dailyPointCount ??
+        0,
+
+      spanDays:
+        nasaHarvest?.spanDays ??
+        null,
+
+      peakDate:
+        nasaHarvest?.peakDate ??
+        null,
+
+      daysSincePeak:
+        nasaHarvest?.daysSincePeak ??
+        null,
+
+      latestDate:
+        nasaHarvest?.latestDate ??
+        null,
+
+      message:
+        cropCycle === 'perennial'
+          ? 'Çok yıllık ürünlerde NASA Harvest genel A–E yıllık ürün modeli kullanılmadı.'
+          : ndviSettled.status === 'rejected'
+            ? errorMessage(ndviSettled.reason)
+            : nasaHarvest?.status === 'usable'
+              ? `${nasaHarvest.stageCode} · ${nasaHarvest.stageLabel}`
+              : nasaHarvest?.warnings?.[0] ??
+                'NASA Harvest evresi için yeterli güncel NDVI sezon eğrisi yok.',
+    },
+
+    pcseWofost: {
+      status:
+        pcse?.status ??
+        (pcseSettled.status === 'rejected'
+          ? 'error'
+          : cropCycle === 'perennial'
+            ? 'skipped'
+            : 'missing'),
+
+      stage:
+        pcse?.rawStage ??
+        null,
+
+      canonicalStage:
+        pcse?.canonicalStage ??
+        null,
+
+      dvs:
+        pcse?.dvs ??
+        null,
+
+      model:
+        pcse?.model ??
+        null,
+
+      completedAt:
+        pcse?.completedAt ??
+        null,
+
+      missingInputs:
+        pcse?.missingInputs ??
+        [],
+
+      message:
+        pcse?.message ??
+        (pcseSettled.status === 'rejected'
+          ? errorMessage(pcseSettled.reason)
+          : cropCycle === 'perennial'
+            ? 'PCSE/WOFOST yıllık ürün pilotu çok yıllık üründe kullanılmıyor.'
+            : null),
+    },
+
+    fieldObservation: {
+      status: fieldObservationError
+        ? 'error'
+        : fieldObservation
+          ? 'ready'
+          : 'missing',
+      evidence: fieldObservation,
+      message: fieldObservationError ?? (
+        fieldObservation?.authoritative
+          ? `${fieldObservation.observedOn} tarihli saha gözlemi mevcut evrede öncelikli kanıt.`
+          : fieldObservation?.status === 'context'
+            ? 'Saha gözlemi geçmiş bağlam olarak tutuluyor; mevcut evreyi tek başına değiştirmiyor.'
+            : fieldObservation?.status === 'stale'
+              ? 'Saha gözlemi eski; güncel evreyi değiştirmiyor.'
+              : fieldObservation?.status === 'future'
+                ? 'Saha gözleminin tarihi gelecekte görünüyor.'
+                : fieldObservation?.status === 'unsupported'
+                  ? 'Saha gözlemindeki evre ortak fenoloji sözlüğüyle eşleştirilemedi.'
+                  : null
+      ),
     },
 
     evidence,

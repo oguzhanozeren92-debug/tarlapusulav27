@@ -16,7 +16,12 @@ function sourceForPhenology(phenology: PhenologyResult) {
     .map((item) => String(item ?? '').toLocaleLowerCase('tr-TR'))
     .join(' ');
 
+  if (evidence.includes('saha gözlemi')) return 'field-growth-observation';
+  if (evidence.includes('nasa harvest') && /pcse|wofost/.test(evidence)) {
+    return 'phenology-fusion';
+  }
   if (evidence.includes('nasa harvest')) return 'nasa-harvest-crop-stage';
+  if (/pcse|wofost/.test(evidence)) return 'pcse-wofost';
   if (evidence.includes('hr-vpp') || evidence.includes('copernicus')) {
     return 'phenology-fusion';
   }

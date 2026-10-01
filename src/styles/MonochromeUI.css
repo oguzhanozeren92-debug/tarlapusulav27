@@ -14,8 +14,7 @@
 /* The legacy screens own different palettes. Give their actual UI, including
    portals and floating dialogs, one readable light hierarchy. */
 html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,
-  .tp-authv2,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
   .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
   .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page,
   .tp-irrigation-detail-modal,.tp-home-quick-sheet,
@@ -42,8 +41,7 @@ html body :is(.tp-irrigation-detail-modal,.tp-home-quick-sheet,
 
 /* Secondary routes contained their own forest-green hero and sidebar fills. */
 html body :is(.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,
-  .tp-authv2,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
   .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
   .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page)
   :is(section,article,aside,nav,header,footer,[class*='card'],[class*='panel']):not(.maplibregl-map) {
@@ -52,8 +50,7 @@ html body :is(.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
   box-shadow: none !important;
 }
 html body :is(.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,
-  .tp-authv2,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
   .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
   .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page)
   :is(button,[role='button']):not([class*='danger']):not([class*='delete']) {
@@ -61,8 +58,7 @@ html body :is(.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
 }
 
 html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,
-  .tp-authv2,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
   .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
   .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page,
   .tp-irrigation-detail-modal,.tp-home-quick-sheet,
@@ -74,8 +70,7 @@ html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
 }
 
 html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,
-  .tp-authv2,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
   .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
   .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page,
   .tp-irrigation-detail-modal,.tp-home-quick-sheet,
@@ -89,8 +84,7 @@ html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
 /* Remove green on all interactive chrome, even where an old component writes
    its own CSS or inline background. Preserve notification and danger indicators. */
 html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,
-  .tp-authv2,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
   .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
   .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page,
   .tp-irrigation-detail-modal,.tp-home-quick-sheet,
@@ -108,8 +102,7 @@ html body :is(.tp-irrigation-detail-modal,.tp-market-ref-modal,
   background: #f1f3f5 !important;
 }
 html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
-  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,
-  .tp-authv2,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,.pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
   .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
   .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page,
   .tp-irrigation-detail-modal,.tp-home-quick-sheet)
@@ -237,4 +230,77 @@ html body .tp-v1 .tp-home-map-pusula-refresh-error {
   color: #39434e !important;
   font-size: 10px;
   line-height: 1.35;
+}
+
+/* =========================================================
+   STACKED LIST / ZEBRA SURFACES
+   White + very light gray alternation improves scanability.
+   Stateful rows (selected / dragging / danger) keep their own visual state.
+   ========================================================= */
+:root {
+  --tp-list-row-white: #ffffff;
+  --tp-list-row-soft: #f4f5f6;
+  --tp-list-row-hover: #eceff1;
+}
+
+html body :is(
+  .tp-home-quick-item,
+  .tp-home-quick-notification,
+  .tp-home-task-card,
+  .tp-notification-item,
+  .tp-home-data-status-row,
+  .tp-home-notification-row,
+  .tp-growth-observations-list > article,
+  .tp-field-water-measurements-list > article
+):nth-child(odd) {
+  background: var(--tp-list-row-white) !important;
+}
+
+html body :is(
+  .tp-home-quick-item,
+  .tp-home-quick-notification,
+  .tp-home-task-card,
+  .tp-notification-item,
+  .tp-home-data-status-row,
+  .tp-home-notification-row,
+  .tp-growth-observations-list > article,
+  .tp-field-water-measurements-list > article
+):nth-child(even) {
+  background: var(--tp-list-row-soft) !important;
+}
+
+/* Tarlalar / tarih seçiciler gibi seçilebilir listelerde normal satırlar zebra,
+   seçili veya sürüklenen satırlar kendi durum görünümünü korur. */
+html body .tp-fields-sheet-list > .tp-fields-sheet-field:not(.is-selected):not(.is-dragging):nth-child(odd),
+html body .tp-satellite-history-date-list-scroll > .tp-satellite-history-date-row:not(.selected):nth-child(odd) {
+  background: var(--tp-list-row-white) !important;
+}
+
+html body .tp-fields-sheet-list > .tp-fields-sheet-field:not(.is-selected):not(.is-dragging):nth-child(even),
+html body .tp-satellite-history-date-list-scroll > .tp-satellite-history-date-row:not(.selected):nth-child(even) {
+  background: var(--tp-list-row-soft) !important;
+}
+
+/* Aynı kuralı yeni listelerde tek class ile kullanabilmek için genel yardımcı. */
+html body .tp-zebra-list > :not([hidden]):nth-child(odd) {
+  background: var(--tp-list-row-white) !important;
+}
+
+html body .tp-zebra-list > :not([hidden]):nth-child(even) {
+  background: var(--tp-list-row-soft) !important;
+}
+
+@media (hover: hover) {
+  html body :is(
+    .tp-home-quick-item,
+    .tp-home-quick-notification,
+    .tp-home-task-card,
+    .tp-notification-item,
+    .tp-home-data-status-row,
+    .tp-home-notification-row,
+    .tp-fields-sheet-field:not(.is-selected):not(.is-dragging),
+    .tp-satellite-history-date-row:not(.selected)
+  ):hover {
+    background: var(--tp-list-row-hover) !important;
+  }
 }

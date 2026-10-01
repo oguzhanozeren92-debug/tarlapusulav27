@@ -1,32 +1,40 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, CloudSun, House, MapPinned, Sparkles } from 'lucide-react';
 import './HomeScreen.css';
 import './ClassicPusula.css';
 import { onboardingStyles } from '../../styles/onboardingStyles';
 import { useGamificationStore } from '../../gamification/useGamificationStore';
 import AppDrawer from '../../components/AppDrawer';
 import PusulaPointsModal from '../../components/PusulaPointsModal';
+import ClassicBottomNav from '../../components/ClassicBottomNav';
 import { persistHomeNotifications } from '../../features/notifications/services/notificationQueue';
+import {
+  isNotificationHidden,
+  isNotificationRead,
+  subscribeNotificationInboxState,
+} from '../../features/notifications/services/notificationInboxState.service';
 import { syncNotificationTasks } from '../../features/notifications/services/notificationTaskBridge.service';
 import { usePhenologyStageChangeNotification } from '../../features/notifications/hooks/usePhenologyStageChangeNotification';
 import PusulaFieldEventSheet from '../../features/field-events/components/PusulaFieldEventSheet';
 import { usePusulaFieldEventPrompt } from '../../features/field-events/hooks/usePusulaFieldEventPrompt';
 import HomeQuickSheets from '../../features/home/components/HomeQuickSheets';
 import HomeTasksSheet from '../../features/tasks/components/HomeTasksSheet';
+import FieldStatusCenter from '../../features/field-status/components/FieldStatusCenter';
 import type { FieldTask } from '../../features/tasks/services/fieldTasks.service';
 import { useFieldTasks } from '../../features/tasks/hooks/useFieldTasks';
 import { useHomeFieldSelection } from '../../features/fields/hooks/useHomeFieldSelection';
 import HomeFieldsSheet from '../../features/fields/components/HomeFieldsSheet';
 import { useHomeWeatherSignals } from '../../features/weather/hooks/useHomeWeatherSignals';
 import { buildHourlySprayPlan, formatForecastHour, isHourlySprayForecastFresh } from '../../features/weather/services/hourlySprayForecast';
-import HomeFiveDayForecast from '../../features/weather/components/HomeFiveDayForecast';
 import { useNextCalendarItem } from '../../features/calendar/hooks/useNextCalendarItem';
 import { useHomeIrrigationDecision } from '../../features/irrigation/hooks/useHomeIrrigationDecision';
 import { useHomePhenologyInsight } from '../../features/phenology/hooks/useHomePhenologyInsight';
 import { useHomeNutrientContext } from '../../features/nutrition/hooks/useHomeNutrientContext';
-import IrrigationDecisionDetailModal from '../../features/irrigation/components/IrrigationDecisionDetailModal';
 import FieldOperationModal from '../../features/field-operations/components/FieldOperationModal';
 import { useHomeDecisionEngine } from '../../features/decision/hooks/useHomeDecisionEngine';
+import {
+  applyNutrientGuardToFieldSynthesis,
+  applyNutrientGuardToMapResult,
+} from '../../features/nutrition/services/nutrientPusulaGuard.service';
 import type { HomeTodayDecision } from '../../features/decision/types/homeDecision';
 import HomeFieldDataStatus from '../../features/decision/components/HomeFieldDataStatus';
 import { buildHomeFieldDataStatuses, hasUsableFieldWeatherForecast } from '../../features/decision/services/homeFieldDataStatus.service';
@@ -169,13 +177,13 @@ export default function HomeScreen(props: HomeScreenProps) {
     openAddField,
     openAiAnalysisScreen,
     openCalendarScreen,
-    openSoilAnalysisForField,
     openFieldDetail,
     handleDeleteField,
     setFieldControlFieldId,
     setScreen,
     setSideMenuOpen,
     sideMenuOpen,
+    fieldStatusRequest,
   } = props;
 
   const gamification = useGamificationStore();
@@ -186,11 +194,15 @@ export default function HomeScreen(props: HomeScreenProps) {
     remainingPoints?: number;
     reason?: string;
   } | null>(null);
-  const [irrigationDetailOpen, setIrrigationDetailOpen] = useState(false);
   const [irrigationRecordOpen, setIrrigationRecordOpen] = useState(false);
   const [fieldsSheetOpen, setFieldsSheetOpen] = useState(false);
   const [quickSheet, setQuickSheet] = useState<'today' | 'notifications' | null>(null);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const [fieldStatusOpen, setFieldStatusOpen] = useState(false);
+  const [fieldStatusInitialTab, setFieldStatusInitialTab] = useState<'summary' | 'plant' | 'crop' | 'soil' | 'irrigation' | 'risk' | 'data' | 'input'>('summary');
+  const [fieldStatusInitialActionTarget, setFieldStatusInitialActionTarget] = useState<string | null>(null);
+  const [fieldStatusRecordsNonce, setFieldStatusRecordsNonce] = useState(0);
+  const [notificationInboxRevision, setNotificationInboxRevision] = useState(0);
   const [pointsOpen, setPointsOpen] = useState(false);
   const [taskQuestionTarget, setTaskQuestionTarget] =
     useState<PusulaFieldQuestionTarget>(null);
@@ -216,6 +228,35 @@ export default function HomeScreen(props: HomeScreenProps) {
     fields: realFields,
     favoriteFieldId,
   });
+
+  useEffect(() => {
+    const requestedFieldId = String(fieldStatusRequest?.fieldId ?? '').trim();
+    if (!requestedFieldId || !fieldStatusRequest?.nonce) return;
+    setHomeFieldId(requestedFieldId);
+    setFieldStatusInitialTab(fieldStatusRequest.initialTab ?? 'summary');
+    setFieldStatusInitialActionTarget(fieldStatusRequest.actionTarget ?? null);
+    setFieldStatusOpen(true);
+  }, [fieldStatusRequest?.nonce, fieldStatusRequest?.fieldId, fieldStatusRequest?.initialTab, fieldStatusRequest?.actionTarget, setHomeFieldId]);
+
+  useEffect(() => subscribeNotificationInboxState(() => {
+    setNotificationInboxRevision((value) => value + 1);
+  }), []);
+
+  useEffect(() => {
+    const openFieldStatusFromEvent = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail ?? {};
+      const requestedFieldId = String(detail.fieldId ?? '').trim();
+      if (requestedFieldId) setHomeFieldId(requestedFieldId);
+      const tab = String(detail.initialTab ?? 'summary') as typeof fieldStatusInitialTab;
+      setQuickSheet(null);
+      setTasksOpen(false);
+      setFieldStatusInitialTab(tab);
+      setFieldStatusInitialActionTarget(String(detail.actionTarget ?? '').trim() || null);
+      setFieldStatusOpen(true);
+    };
+    window.addEventListener('tp:open-field-status', openFieldStatusFromEvent);
+    return () => window.removeEventListener('tp:open-field-status', openFieldStatusFromEvent);
+  }, [setHomeFieldId]);
 
   useEffect(() => {
     setHomeNdviStats(null);
@@ -248,15 +289,69 @@ export default function HomeScreen(props: HomeScreenProps) {
   const homeIrrigation = useHomeIrrigationDecision(homeField);
   const homeNutrient = useHomeNutrientContext(homeField);
   const homePhenology = useHomePhenologyInsight(homeField);
-  const hasObservedPhenology =
-    homePhenology.nasaHarvestStage?.status === 'usable' &&
-    homePhenology.phenology?.dataStatus === 'usable';
   const decisionPhenology =
-    (homePhenology.phenologyContextStatus === 'ready' &&
-      homePhenology.phenologyContext?.fieldId === fieldKey) ||
-    hasObservedPhenology
+    homePhenology.phenology?.dataStatus === 'usable' &&
+    homePhenology.phenology.stage &&
+    homePhenology.phenology.stage !== 'unknown'
       ? homePhenology.phenology
       : null;
+
+  const sharedPhenologySignatureRef = useRef('');
+  const sharedPhenologySignature =
+    decisionPhenology?.dataStatus === 'usable' &&
+    decisionPhenology.stage &&
+    decisionPhenology.stage !== 'unknown'
+      ? [
+          fieldKey,
+          decisionPhenology.stage,
+          decisionPhenology.stageLabel ?? '',
+          decisionPhenology.confidence ?? '',
+          ...(decisionPhenology.basis ?? []),
+        ].join('|')
+      : '';
+
+  useEffect(() => {
+    if (
+      !fieldKey ||
+      homeField?.demo ||
+      !decisionPhenology ||
+      !sharedPhenologySignature
+    ) {
+      sharedPhenologySignatureRef.current = '';
+      return;
+    }
+
+    if (sharedPhenologySignatureRef.current === sharedPhenologySignature) {
+      return;
+    }
+
+    sharedPhenologySignatureRef.current = sharedPhenologySignature;
+
+    window.dispatchEvent(
+      new CustomEvent('tp:field-context-updated', {
+        detail: {
+          fieldId: fieldKey,
+          changedFields: ['phenology_context'],
+          source: 'home-phenology-fusion',
+          phenology: {
+            stage: decisionPhenology.stage,
+            stageLabel: decisionPhenology.stageLabel,
+            confidence: decisionPhenology.confidence,
+            dataStatus: decisionPhenology.dataStatus,
+            basis: decisionPhenology.basis,
+          },
+        },
+      }),
+    );
+  }, [
+    fieldKey,
+    homeField?.demo,
+    sharedPhenologySignature,
+    decisionPhenology?.stage,
+    decisionPhenology?.stageLabel,
+    decisionPhenology?.confidence,
+    decisionPhenology?.dataStatus,
+  ]);
 
   const phenologyStageChangeNotification = usePhenologyStageChangeNotification({
     fieldId: fieldKey,
@@ -366,18 +461,19 @@ export default function HomeScreen(props: HomeScreenProps) {
     weather,
     satellite: sat,
     ndviStats: homeNdviStats,
+    phenology: decisionPhenology,
   });
 
   const {
     loading: homePusulaLoading,
-    result: homePusulaResult,
+    result: rawHomePusulaResult,
     error: homePusulaError,
-    fieldSynthesis,
+    fieldSynthesis: rawFieldSynthesis,
     setSpatialSummary: setHomeLayerSpatialSummary,
     run: runHomePusula,
     layerLabel: activeHomeLayerLabel,
-    headline: displayHeadline,
-    summary: displaySummary,
+    headline: rawDisplayHeadline,
+    summary: rawDisplaySummary,
   } = homePusula;
 
   const {
@@ -389,7 +485,7 @@ export default function HomeScreen(props: HomeScreenProps) {
   } = useNdviObservationFollowUp({
     fieldId: homeField?.id,
     satelliteDate: resolvedHomeSatelliteDate,
-    pusulaResult: homePusulaResult,
+    pusulaResult: rawHomePusulaResult,
   });
 
   // Alt katman veya derinlik değişirken önce önceki seçime ait uzamsal özeti
@@ -435,6 +531,7 @@ export default function HomeScreen(props: HomeScreenProps) {
     todayDecisions: todayDecisionCards,
     notifications: homeSystemNotifications,
     pusulaDecision,
+    nutrientProductionGuard,
     events: homeDecisionEvents,
     recentFieldOperations,
     recentFieldOperationsReady,
@@ -449,8 +546,9 @@ export default function HomeScreen(props: HomeScreenProps) {
     quickRainChance,
     quickRainMm,
     nextCalendarItem,
-    fieldSynthesis,
-    homePusulaResult,
+    fieldSynthesis: rawFieldSynthesis,
+    homePusulaResult: rawHomePusulaResult,
+    homeNdviStats,
     irrigationDecision: homeIrrigation.decision,
     irrigationLoading: homeIrrigation.loading,
     irrigationError: homeIrrigation.error,
@@ -506,6 +604,36 @@ export default function HomeScreen(props: HomeScreenProps) {
       : null,
   });
 
+  // 14.4: Pusula'nın ham harita ve field-synthesis yorumları kullanıcıya
+  // gösterilmeden önce HomeDecisionEngine'in ürettiği aynı production
+  // besin guard sonucundan geçirilir. Böylece ikinci bir besin otoritesi yoktur.
+  const homePusulaResult = useMemo(
+    () =>
+      applyNutrientGuardToMapResult(
+        rawHomePusulaResult,
+        nutrientProductionGuard,
+      ),
+    [rawHomePusulaResult, nutrientProductionGuard],
+  );
+
+  const fieldSynthesis = useMemo(
+    () =>
+      applyNutrientGuardToFieldSynthesis(
+        rawFieldSynthesis,
+        nutrientProductionGuard,
+      ),
+    [rawFieldSynthesis, nutrientProductionGuard],
+  );
+
+  const displayHeadline =
+    fieldSynthesis?.headline ??
+    homePusulaResult?.analysis?.headline ??
+    rawDisplayHeadline;
+  const displaySummary =
+    fieldSynthesis?.summary ??
+    homePusulaResult?.analysis?.summary ??
+    rawDisplaySummary;
+
   const visibleHomeSystemNotifications = useMemo(() => {
     const merged = phenologyStageChangeNotification
       ? [
@@ -517,15 +645,14 @@ export default function HomeScreen(props: HomeScreenProps) {
       : homeSystemNotifications;
 
     return [...merged]
+      .filter((item) => !isNotificationHidden(item.id))
       .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))
       .slice(0, 12);
-  }, [homeSystemNotifications, phenologyStageChangeNotification]);
+  }, [homeSystemNotifications, phenologyStageChangeNotification, notificationInboxRevision]);
 
-  const informationNotificationCount = visibleHomeSystemNotifications.filter(
-    (item) => !item.task,
+  const homeNotificationCount = visibleHomeSystemNotifications.filter(
+    (item) => !item.task && !isNotificationRead(item.id),
   ).length;
-  const homeNotificationCount =
-    informationNotificationCount + homeTasks.tasks.length;
 
   const notificationTaskSyncKey = visibleHomeSystemNotifications
     .map((item: any) => [
@@ -536,18 +663,31 @@ export default function HomeScreen(props: HomeScreenProps) {
     ].join(':'))
     .sort()
     .join('|');
+
+  const ndviTaskAuthorityKey = [
+    String(homeNdviStats?.sceneId ?? ''),
+    String(homeNdviStats?.datetime ?? ''),
+    ...(homeNdviStats?.relativeZones ?? [])
+      .filter((zone) => zone?.status === 'weaker')
+      .map((zone) => `${zone.area}:${Number(zone.deltaFromFieldMean).toFixed(4)}`)
+      .sort(),
+  ].join('|');
   const lastNotificationTaskSyncRef = useRef('');
 
   useEffect(() => {
     if (!fieldKey || homeField?.demo) return;
 
-    const syncKey = `${fieldKey}::${notificationTaskSyncKey}`;
+    const syncKey = `${fieldKey}::${notificationTaskSyncKey}::${ndviTaskAuthorityKey}`;
     if (lastNotificationTaskSyncRef.current === syncKey) return;
     lastNotificationTaskSyncRef.current = syncKey;
 
     let cancelled = false;
 
-    void syncNotificationTasks(fieldKey, visibleHomeSystemNotifications)
+    void syncNotificationTasks(
+      fieldKey,
+      visibleHomeSystemNotifications,
+      homeNdviStats,
+    )
       .then(() => {
         if (!cancelled) return homeTasks.refresh();
       })
@@ -565,6 +705,8 @@ export default function HomeScreen(props: HomeScreenProps) {
     fieldKey,
     homeField?.demo,
     notificationTaskSyncKey,
+    ndviTaskAuthorityKey,
+    homeNdviStats,
     homeTasks.refresh,
   ]);
 
@@ -604,8 +746,11 @@ export default function HomeScreen(props: HomeScreenProps) {
     context?: { observationPointId?: string | null; source?: string | null },
   ) => {
     if (target === 'field_growth') {
-      if (homeField && typeof openFieldDetail === 'function') {
-        openFieldDetail(homeField, { actionTarget: 'field-growth' });
+      if (homeField) {
+        setQuickSheet(null);
+        setTasksOpen(false);
+        setFieldStatusInitialTab('plant');
+        setFieldStatusOpen(true);
       } else {
         setScreen?.('home');
       }
@@ -621,20 +766,18 @@ export default function HomeScreen(props: HomeScreenProps) {
     }
 
     if (target === 'irrigation_detail') {
-      if (homeIrrigation.decision) {
-        setIrrigationDetailOpen(true);
-      } else {
-        setScreen?.('weatherHub');
-      }
+      setQuickSheet(null);
+      setTasksOpen(false);
+      setFieldStatusInitialTab('irrigation');
+      setFieldStatusOpen(true);
       return;
     }
 
     if (target === 'soil') {
-      if (typeof openSoilAnalysisForField === 'function') {
-        openSoilAnalysisForField(homeField);
-      } else {
-        setScreen?.('soilAnalysisHub');
-      }
+      setQuickSheet(null);
+      setTasksOpen(false);
+      setFieldStatusInitialTab('soil');
+      setFieldStatusOpen(true);
       return;
     }
 
@@ -671,10 +814,6 @@ export default function HomeScreen(props: HomeScreenProps) {
 
     setScreen?.('home');
   };
-
-  useEffect(() => {
-    setIrrigationDetailOpen(false);
-  }, [fieldKey]);
 
   useEffect(() => {
     persistHomeNotifications({
@@ -744,9 +883,28 @@ export default function HomeScreen(props: HomeScreenProps) {
     }
 
     /*
-     * Ekim / dikim tarihi:
-     * Tarla Detayı > Üretim > Yeni Sezon > Ekim tarihi.
+     * Gelişim / toprak / sulama gibi durum hedefleri artık eski Tarla Detayı'na
+     * değil doğrudan yeni Tarla Durumu merkezinin ilgili sekmesine gider.
      */
+    if (target === 'field-growth' && homeField) {
+      setFieldStatusInitialTab('plant');
+      setFieldStatusOpen(true);
+      return;
+    }
+
+    if ((target === 'field-soil' || target === 'field-soil-profile') && homeField) {
+      setFieldStatusInitialTab('soil');
+      setFieldStatusOpen(true);
+      return;
+    }
+
+    if ((target === 'field-irrigation' || target === 'field-water') && homeField) {
+      setFieldStatusInitialTab('irrigation');
+      setFieldStatusOpen(true);
+      return;
+    }
+
+    /* Ekim / dikim tarihi doğrudan veri giriş formuna gider. */
     if (target === 'field-season' && homeField) {
       openFieldDetail(homeField, {
         actionTarget: 'field-season',
@@ -774,11 +932,10 @@ export default function HomeScreen(props: HomeScreenProps) {
       target === 'soil-analysis' ||
       target === 'field-soil-analysis'
     ) {
-      if (typeof openSoilAnalysisForField === 'function') {
-        openSoilAnalysisForField(homeField);
-      } else {
-        setScreen?.('soilAnalysisHub');
-      }
+      setQuickSheet(null);
+      setTasksOpen(false);
+      setFieldStatusInitialTab('soil');
+      setFieldStatusOpen(true);
       return;
     }
 
@@ -1156,6 +1313,13 @@ export default function HomeScreen(props: HomeScreenProps) {
               onOpenToday={() => setQuickSheet('today')}
               onOpenNotifications={() => setQuickSheet('notifications')}
               onOpenTasks={() => setTasksOpen(true)}
+              onOpenFieldStatus={() => {
+                setQuickSheet(null);
+                setTasksOpen(false);
+                setFieldStatusInitialTab('summary');
+                setFieldStatusInitialActionTarget(null);
+                setFieldStatusOpen(true);
+              }}
               notificationCount={homeNotificationCount}
               homeField={homeField}
               realFields={realFields}
@@ -1189,7 +1353,14 @@ export default function HomeScreen(props: HomeScreenProps) {
               activeLayer={activeHomeLayer}
               soilProperty={homeSoilProperty}
               climateLayer={homeClimateLayer}
-              loading={homePusulaLoading || (activeHomeLayer === 'vegetation' && satState?.status === 'loading' && !sat?.ndviImage)}
+              loading={
+                homePusulaLoading ||
+                (
+                  activeHomeLayer === 'vegetation' &&
+                  satState?.status === 'loading' &&
+                  !sat?.ndviImage
+                )
+              }
               headline={displayHeadline}
               summary={displaySummary}
               result={homePusulaResult}
@@ -1200,12 +1371,19 @@ export default function HomeScreen(props: HomeScreenProps) {
                 activeHomeLayer === 'vegetation' &&
                 Boolean(sat?.ndviImage)
               }
-              onRefresh={homeField?.id ? async () => {
-                if (activeHomeLayer === 'vegetation' && typeof loadFieldSatellite === 'function') {
-                  await loadFieldSatellite(homeField, true);
-                }
-                await runHomePusula(activeHomeLayer, true);
-              } : undefined}
+              onRefresh={
+                homeField?.id
+                  ? async () => {
+                      if (
+                        activeHomeLayer === 'vegetation' &&
+                        typeof loadFieldSatellite === 'function'
+                      ) {
+                        await loadFieldSatellite(homeField, true);
+                      }
+                      await runHomePusula(activeHomeLayer, true);
+                    }
+                  : undefined
+              }
               onOpenLayer={(layer) => {
                 openMapLayer(layer as HomeLayer);
 
@@ -1256,6 +1434,36 @@ export default function HomeScreen(props: HomeScreenProps) {
             />
           </div>
 
+          <FieldStatusCenter
+            open={fieldStatusOpen}
+            field={homeField}
+            initialTab={fieldStatusInitialTab}
+            initialActionTarget={fieldStatusInitialActionTarget}
+            notifications={visibleHomeSystemNotifications}
+            decisions={todayDecisionCards}
+            irrigation={homeIrrigation}
+            phenology={decisionPhenology}
+            onClose={() => {
+              setFieldStatusOpen(false);
+              setFieldStatusInitialActionTarget(null);
+            }}
+            onOpenTarget={(target, context) => {
+              setFieldStatusOpen(false);
+              openHomeInsightTarget(target, context);
+            }}
+            onOpenIrrigationRecord={homeField && !homeField.demo ? () => {
+              setIrrigationRecordOpen(true);
+            } : undefined}
+            onFieldPatch={homeField ? (patch) => {
+              setRealFields((current: any[]) => current.map((item: any) =>
+                String(item.id) === String(homeField.id) ? { ...item, ...patch } : item,
+              ));
+            } : undefined}
+            recordsRefreshNonce={fieldStatusRecordsNonce}
+            fieldEventCandidate={fieldEventPrompt.candidate}
+            onOpenFieldEvent={fieldEventPrompt.candidate ? fieldEventPrompt.openPrompt : undefined}
+          />
+
           <HomeTasksSheet
             open={tasksOpen}
             fieldId={homeField?.demo ? '' : fieldKey}
@@ -1298,8 +1506,6 @@ export default function HomeScreen(props: HomeScreenProps) {
                 }
               }}
           />
-
-          <HomeFiveDayForecast weather={weather} onOpen={() => setScreen?.('weatherHub')} />
 
           {!realFields?.length && (
             <button
@@ -1385,29 +1591,16 @@ export default function HomeScreen(props: HomeScreenProps) {
           </div>
         )}
 
-        <IrrigationDecisionDetailModal
-          open={irrigationDetailOpen}
-          decision={homeIrrigation.decision}
-          whatIf={homeIrrigation.whatIf}
-          fallbackFieldName={String(homeField?.name ?? 'Tarlan')}
-          onClose={() => setIrrigationDetailOpen(false)}
-          onOpenWeather={() => {
-            setIrrigationDetailOpen(false);
-            setScreen?.('weatherHub');
-          }}
-          onAddIrrigationRecord={() => {
-            setIrrigationDetailOpen(false);
-            setIrrigationRecordOpen(true);
-          }}
-        />
-
         <FieldOperationModal
           open={irrigationRecordOpen && Boolean(fieldKey) && !homeField?.demo}
           fieldId={fieldKey || null}
           fieldName={String(homeField?.name ?? 'Tarlan')}
           initialType="Sulama"
           onClose={() => setIrrigationRecordOpen(false)}
-          onSaved={() => homeIrrigation.refresh()}
+          onSaved={() => {
+            homeIrrigation.refresh();
+            setFieldStatusRecordsNonce(Date.now());
+          }}
         />
 
         <HomeFieldsSheet
@@ -1427,7 +1620,9 @@ export default function HomeScreen(props: HomeScreenProps) {
             setFieldsSheetOpen(false);
             setHomeFieldId(id);
             setFieldControlFieldId?.(id);
-            openFieldDetail(field);
+            setFieldStatusInitialTab('summary');
+            setFieldStatusInitialActionTarget(null);
+            window.setTimeout(() => setFieldStatusOpen(true), 40);
           }}
           onDelete={async (id) => {
             const field = (realFields ?? []).find((item: { id: string | number }) => String(item.id) === id);
@@ -1468,46 +1663,13 @@ export default function HomeScreen(props: HomeScreenProps) {
           }}
         />
 
-        <nav className="tp-bottom" aria-label="Ana menü">
-          <button className="active" type="button">
-            <span className="tp-bottom-icon-shell">
-              <House className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Ana Sayfa
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setScreen('weatherHub')}
-            aria-label="Hava Durumu"
-          >
-            <span className="tp-bottom-icon-shell">
-              <CloudSun className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Hava Durumu
-          </button>
-
-          <button className="ai" type="button" onClick={openAiAnalysisScreen}>
-            <span className="tp-bottom-ai-shell">
-              <Sparkles className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Pusula AI
-          </button>
-
-          <button type="button" onClick={openCalendarScreen}>
-            <span className="tp-bottom-icon-shell">
-              <CalendarDays className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Takvim
-          </button>
-
-          <button type="button" onClick={() => setFieldsSheetOpen(true)} aria-label="Tarlalarım listesini aç">
-            <span className="tp-bottom-icon-shell">
-              <MapPinned className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Tarlalarım
-          </button>
-        </nav>
+        <ClassicBottomNav
+          activeScreen={fieldsSheetOpen ? 'fields' : 'home'}
+          setScreen={setScreen}
+          onOpenAi={openAiAnalysisScreen}
+          onOpenCalendar={openCalendarScreen}
+          onOpenFields={() => setFieldsSheetOpen(true)}
+        />
       </div>
     </>
   );

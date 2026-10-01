@@ -1,17 +1,118 @@
-import type { SoilAnalysisRecord } from '../../../lib/soilAnalysisService';
 import type { HomeDecisionEvent } from '../../decision/types/homeDecision';
-import type { SoilIntelligenceResult } from './soilIntelligence.service';
 
-export type HomeNutrientSignal = {
-  fieldId: string;
-  status: 'idle' | 'loading' | 'ready' | 'error';
-  latestAnalysis: SoilAnalysisRecord | null;
-  soilIntelligence?: SoilIntelligenceResult | null;
-};
+import type { HomeNutrientSignal } from '../types/homeNutrientSignal';
+
+export type { HomeNutrientSignal } from '../types/homeNutrientSignal';
+
+function serverDecisionEvent(
+  fieldId: string,
+  signal: HomeNutrientSignal,
+): HomeDecisionEvent | null {
+  const intelligence = signal.soilIntelligence;
+  const decision = intelligence?.serverDecision;
+  if (!decision || intelligence?.productionAuthority !== true) return null;
+
+  const evidence = [
+    ...(intelligence.evidence ?? []),
+    ...(intelligence.warnings ?? []),
+  ].slice(0, 7);
+
+  if (
+    decision.decision_status === 'needs_analysis' ||
+    decision.decision_status === 'context_only'
+  ) {
+    return {
+      id: `nutrition:${fieldId}:server:soil-analysis-needed`,
+      group: 'nutrition',
+      source: 'nutrition',
+      sourceModel: intelligence.sourceModel,
+      confidence: 'preliminary',
+      kind: 'data',
+      missingInfoKind: 'soil-analysis',
+      priority: 42,
+      severity: 'info',
+      target: 'soil',
+      channels: ['notification'],
+      label: 'TOPRAK ANALİZİ',
+      title: decision.headline || 'Toprak Analizini Ekle',
+      detail: decision.action || decision.summary,
+      evidence,
+      task: {
+        taskKey: 'notification:soil-analysis',
+        actionTarget: 'soil-analysis',
+        rewardPoints: 150,
+        rewardRuleKey: null,
+        metadata: {
+          pointRuleKey: 'ADD_SOIL_ANALYSIS',
+          pointMode: 'existing-action',
+          soilGridsContextAvailable: intelligence.soilGridsContextAvailable,
+          serverAuthority: true,
+        },
+      },
+      notification: { iconKey: 'document', iconTone: 'green', dotTone: 'info' },
+    };
+  }
+
+  if (decision.decision_status === 'crop_context_changed') {
+    return {
+      id: `nutrition:${fieldId}:server:crop-context-changed`,
+      group: 'nutrition',
+      source: 'nutrition',
+      sourceModel: intelligence.sourceModel,
+      confidence: 'medium',
+      kind: 'check',
+      priority: 58,
+      severity: 'warning',
+      target: 'soil',
+      channels: ['today', 'notification', 'pusula'],
+      label: 'TOPRAK & BESİN',
+      title: decision.headline,
+      detail: decision.action || decision.summary,
+      evidence,
+      today: {
+        tone: 'amber',
+        visual: 'spraying',
+        iconKey: 'document',
+        iconClass: 'leaf',
+      },
+      notification: { iconKey: 'document', iconTone: 'gold', dotTone: 'warning' },
+    };
+  }
+
+  if (decision.decision_status === 'lab_attention') {
+    return {
+      id: `nutrition:${fieldId}:server:lab-attention`,
+      group: 'nutrition',
+      source: 'nutrition',
+      sourceModel: intelligence.sourceModel,
+      confidence: decision.confidence === 'high' ? 'strong' : 'medium',
+      kind: 'check',
+      priority: 72,
+      severity: 'warning',
+      target: 'soil',
+      channels: ['today', 'notification', 'pusula'],
+      label: 'TOPRAK & BESİN',
+      title: decision.headline,
+      detail: decision.action || decision.summary,
+      evidence,
+      today: {
+        tone: 'amber',
+        visual: 'spraying',
+        iconKey: 'document',
+        iconClass: 'leaf',
+      },
+      notification: { iconKey: 'document', iconTone: 'gold', dotTone: 'warning' },
+    };
+  }
+
+  // lab_ready normal durumda gereksiz görev/bildirim üretmez. Veri yine Pusula AI,
+  // sulama bağlamı ve PDF tarafından kullanılmaya devam eder.
+  return null;
+}
 
 /**
- * Laboratuvar raporu besin/gübreleme kararının ölçüm dayanağıdır. SoilGrids
- * yalnız model tahmini arka planı olarak kanıt listesine eklenir.
+ * Server-side soil-nutrition-engine varsa tek production otoritesidir. Eski
+ * istemci sentezi yalnız güvenli fallback olarak korunur.
  */
 export function buildNutrientDecision(
   fieldId: string,
@@ -19,7 +120,19 @@ export function buildNutrientDecision(
   signal: HomeNutrientSignal | null | undefined,
   recentFertilization: boolean,
 ): HomeDecisionEvent | null {
-  if (!fieldId || !crop?.trim() || signal?.fieldId !== fieldId || signal.status !== 'ready') return null;
+  if (
+    !fieldId ||
+    !crop?.trim() ||
+    signal?.fieldId !== fieldId ||
+    signal.status !== 'ready'
+  ) {
+    return null;
+  }
+
+  const authoritative = serverDecisionEvent(fieldId, signal);
+  if (signal.soilIntelligence?.productionAuthority === true) {
+    return authoritative;
+  }
 
   const analysis = signal.latestAnalysis;
   const intelligence = signal.soilIntelligence ?? null;
@@ -112,9 +225,16 @@ export function buildNutrientDecision(
       'Bu tarlaya ait laboratuvar raporu mevcut ve ölçüm dayanağı olarak önceliklidir.',
       `Rapor durumu: ${analysis.status === 'alert' ? 'uyarı' : 'kontrol'}.`,
       ...(recentFertilization ? ['Son gübreleme kaydı da mevcut.'] : []),
-      ...intelligenceEvidence.filter((item) => !item.startsWith('Bu tarlaya ait laboratuvar')),
+      ...intelligenceEvidence.filter(
+        (item) => !item.startsWith('Bu tarlaya ait laboratuvar'),
+      ),
     ].slice(0, 6),
-    today: { tone: 'amber', visual: 'spraying', iconKey: 'document', iconClass: 'leaf' },
+    today: {
+      tone: 'amber',
+      visual: 'spraying',
+      iconKey: 'document',
+      iconClass: 'leaf',
+    },
     notification: { iconKey: 'document', iconTone: 'gold', dotTone: 'warning' },
   };
 }

@@ -7,7 +7,7 @@ services:
     plan: free
     region: frankfurt
     autoDeployTrigger: off
-    buildCommand: cd services/model-gateway && pip install -r requirements.txt
+    buildCommand: cd services/model-gateway && pip install -r requirements.txt && python vendor_bootstrap.py
     startCommand: cd services/model-gateway && uvicorn dual_app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

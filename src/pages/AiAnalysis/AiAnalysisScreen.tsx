@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, CloudSun, House, MapPinned, Sparkles } from 'lucide-react';
 import MobileWheelPicker from '../../components/MobileWheelPicker';
+import ClassicBottomNav from '../../components/ClassicBottomNav';
 import {
   synthesizeFieldObservations,
   type FieldSynthesisResult,
@@ -299,6 +299,10 @@ const PUSULA_HUB_FINAL_STYLES = String.raw`
 .tp-ai-page .tp-premium-info p{margin:5px 0 0!important;color:#626d77!important;font-size:10px!important;line-height:1.4!important}
 .tp-ai-page .tp-premium-info button,.tp-ai-page .tp-pusula-pdf{appearance:none!important;border:1px solid #111820!important;border-radius:9px!important;background:#111820!important;color:#fff!important;padding:8px 10px!important;font-size:9px!important;font-weight:800!important;white-space:nowrap!important}
 .tp-ai-page .tp-pusula-synthesis-footer{flex-wrap:wrap!important}
+.tp-ai-page .tp-pusula-hub-field{margin-top:12px!important;padding:10px!important;border:1px solid #e1e5e8!important;border-radius:13px!important;background:#f6f7f8!important}
+.tp-ai-page .tp-pusula-hub-field>span{display:block!important;margin:0 0 7px!important;color:#7a848e!important;font-size:8px!important;font-weight:900!important;letter-spacing:.12em!important}
+.tp-ai-page .tp-pusula-hub-field .tp-ai-field-select{margin:0!important;width:100%!important}
+.tp-ai-page .tp-pusula-hub-field .tp-ai-empty-field{margin:0!important}
 
 /* PUSULAPDF — snapshot durum kartı */
 .tp-ai-page .tp-pusula-pdf-ready{margin-top:10px!important;padding:13px!important;border:1px solid #dfe3e7!important;border-radius:14px!important;background:#f7f8f9!important;display:grid!important;gap:10px!important}
@@ -1079,6 +1083,36 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
             <h1>{synthesisField ? synthesisField.name : 'Tarlanı seç'}</h1>
             <p>Uydu, hava ve tarla kayıtlarını tek yerde değerlendir.</p>
 
+            <div className="tp-pusula-hub-field">
+              <span>ANALİZ EDİLECEK TARLA</span>
+              {realFields.length > 0 ? (
+                <MobileWheelPicker
+                  className="tp-ai-field-select"
+                  title="Analiz edilecek tarla"
+                  value={selectedField ? String(selectedField.id) : ''}
+                  placeholder="Tarla seç"
+                  searchable
+                  options={realFields.map((field) => ({
+                    value: String(field.id),
+                    label: field.name,
+                    subtitle: `${field.crop} • ${field.area.toLocaleString('tr-TR')} da`,
+                  }))}
+                  onChange={(value) => {
+                    const field = realFields.find(
+                      (item) => String(item.id) === value,
+                    );
+                    setSelectedField(field ?? null);
+                    clearActivityPhoto();
+                  }}
+                />
+              ) : (
+                <div className="tp-ai-empty-field">
+                  <strong>Önce bir tarla eklemelisin.</strong>
+                  <button onClick={openAddField}>+ Tarla Ekle</button>
+                </div>
+              )}
+            </div>
+
             <div className="tp-pusula-hub-actions">
               <button
                 type="button"
@@ -1413,42 +1447,6 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
 
 
           <section className="tp-ai-workspace">
-            <div className="tp-ai-workspace-head">
-              <div>
-                <span>{aiFieldStepBlock?.icon || '1. TARLAYI SEÇ'}</span>
-                <strong>
-                  {cmsText(aiFieldStepBlock, 'Analizin hangi tarlaya ait?')}
-                </strong>
-              </div>
-            </div>
-
-            {realFields.length > 0 ? (
-              <MobileWheelPicker
-                className="tp-ai-field-select"
-                title="Analiz edilecek tarla"
-                value={selectedField ? String(selectedField.id) : ''}
-                placeholder="Tarla seç"
-                searchable
-                options={realFields.map((field) => ({
-                  value: String(field.id),
-                  label: field.name,
-                  subtitle: `${field.crop} • ${field.area.toLocaleString('tr-TR')} da`,
-                }))}
-                onChange={(value) => {
-                  const field = realFields.find(
-                    (item) => String(item.id) === value,
-                  );
-                  setSelectedField(field ?? null);
-                  clearActivityPhoto();
-                }}
-              />
-            ) : (
-              <div className="tp-ai-empty-field">
-                <strong>Önce bir tarla eklemelisin.</strong>
-                <button onClick={openAddField}>+ Tarla Ekle</button>
-              </div>
-            )}
-
             <div className="tp-ai-workspace-head tp-ai-step-two">
               <div>
                 <span>{aiPhotoStepBlock?.icon || '2. FOTOĞRAF'}</span>
@@ -1670,58 +1668,11 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
           </section>
         </main>
 
-        <nav className="tp-bottom" aria-label="Ana menü">
-          <button type="button" onClick={() => setScreen('home')}>
-            <span className="tp-bottom-icon-shell">
-              <House className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Ana Sayfa
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setScreen('weatherHub')}
-            aria-label="Hava Durumu"
-          >
-            <span className="tp-bottom-icon-shell">
-              <CloudSun className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Hava Durumu
-          </button>
-
-          <button className="ai" type="button" aria-current="page">
-            <span className="tp-bottom-ai-shell">
-              <Sparkles className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Pusula AI
-          </button>
-
-          <button type="button" onClick={openCalendarScreen}>
-            <span className="tp-bottom-icon-shell">
-              <CalendarDays className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Takvim
-          </button>
-
-          <button
-            type="button"
-            aria-label="Tarlalarım listesini aç"
-            onClick={() => {
-              setScreen('home');
-              window.setTimeout(() => {
-                const target = document.querySelector(
-                  'button[aria-label="Tarlalarım listesini aç"]',
-                ) as HTMLButtonElement | null;
-                target?.click();
-              }, 80);
-            }}
-          >
-            <span className="tp-bottom-icon-shell">
-              <MapPinned className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-            </span>
-            Tarlalarım
-          </button>
-        </nav>
+        <ClassicBottomNav
+          activeScreen="aiAnalysis"
+          setScreen={setScreen}
+          onOpenCalendar={openCalendarScreen}
+        />
       </div>
     </>
   );

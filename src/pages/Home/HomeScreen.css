@@ -4953,3 +4953,21 @@ body .tp-v1 .tp-map-first-shell .tp-map-stage .tp-home-general-metric.is-climate
     max-width: none !important;
   }
 }
+
+
+/* =========================================================
+   V20 — HEADER → HARİTA BOŞLUĞUNU YARIYA İNDİR
+   2026-10-01
+   YALNIZ mobil ana sayfa üst boşluğu.
+   Harita kartı, NDVI, Pusula bilgi altlığı ve diğer yerleşimler değişmez.
+   ========================================================= */
+@media(max-width:560px){
+  .tp-v1-header{
+    height:92px!important;
+    min-height:92px!important;
+  }
+
+  .tp-main{
+    padding-top:5px!important;
+  }
+}

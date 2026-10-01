@@ -1,12 +1,12 @@
 import MobileWheelPicker from '../components/MobileWheelPicker';
-import PcsePilotReadiness from '../features/field-detail/components/PcsePilotReadiness';
-import FieldGrowthObservations from '../features/field-detail/components/FieldGrowthObservations';
-import FieldGrowthStatus from '../features/field-detail/components/FieldGrowthStatus';
-import SeasonModelInputs from '../features/field-detail/components/SeasonModelInputs';
+import { MapPinned, Pencil } from 'lucide-react';
 import FieldCostSummary from '../features/field-detail/components/FieldCostSummary';
 import FieldSeasonSummary from '../features/field-detail/components/FieldSeasonSummary';
-import FieldIrrigationMethod from '../features/field-detail/components/FieldIrrigationMethod';
-import { useEffect, useState } from 'react';
+import PlantingWindowPanel from '../features/planting-window/components/PlantingWindowPanel';
+import CropRotationPanel from '../features/crop-rotation/components/CropRotationPanel';
+import OrchardChillPanel from '../features/orchard-chill/components/OrchardChillPanel';
+import { useEffect, useRef, useState } from 'react';
+import PusulaLoadingOverlay from '../components/PusulaLoadingOverlay';
 import './FieldDetailLayout.css';
 import { getEntitlementSnapshot } from '../entitlements/useEntitlementStore';
 import { onboardingStyles } from '../styles/onboardingStyles';
@@ -119,7 +119,6 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
     setYieldKg,
     setYieldNotes,
     setYieldYear,
-    statusInfo,
     yieldFormLoading,
     yieldFormOpen,
     yieldHarvestDate,
@@ -128,20 +127,19 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
     yieldYear,
   } = props;
 
-  const opensSeasonTask =
-    fieldDetailEntry?.actionTarget === 'field-season' &&
-    String(fieldDetailEntry?.fieldId ?? '') === String(selectedField?.id ?? '');
-  const opensGrowthTarget =
-    fieldDetailEntry?.actionTarget === 'field-growth' &&
-    String(fieldDetailEntry?.fieldId ?? '') === String(selectedField?.id ?? '');
+  const entryTarget =
+    String(fieldDetailEntry?.fieldId ?? '') === String(selectedField?.id ?? '')
+      ? String(fieldDetailEntry?.actionTarget ?? '')
+      : '';
 
   const [activeDetailTab, setActiveDetailTab] =
     useState<'overview' | 'production' | 'history'>(
-      opensSeasonTask || opensGrowthTarget ? 'production' : 'overview',
+      entryTarget ? (entryTarget === 'field-history' || entryTarget.startsWith('field-activity') || entryTarget.startsWith('field-operation:') ? 'history' : 'production') : 'overview',
     );
   const [deleteFieldOpen, setDeleteFieldOpen] = useState(false);
   const [deleteFieldLoading, setDeleteFieldLoading] = useState(false);
   const [deleteFieldError, setDeleteFieldError] = useState('');
+  const handledEntryRef = useRef('');
   const isPremiumFieldPlan = getEntitlementSnapshot().isPremium;
 
   const confirmDeleteField = async () => {
@@ -158,57 +156,127 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
   };
 
   useEffect(() => {
-    if (opensGrowthTarget) {
-      setActiveDetailTab('production');
+    const entryNonce = String(fieldDetailEntry?.nonce ?? '');
+    const entryKey = `${String(selectedField?.id ?? '')}:${entryNonce}:${entryTarget}`;
 
-      window.setTimeout(() => {
-        const details = document.getElementById(
-          'tp-field-growth-detail',
-        ) as HTMLDetailsElement | null;
-
-        if (details) details.open = true;
-        details?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      }, 260);
-
+    if (!entryTarget) {
+      handledEntryRef.current = '';
+      setActiveDetailTab('overview');
       return;
     }
 
-    if (opensSeasonTask) {
+    // Veri Girişi / görev hedefleri bir kez tüketilir.
+    // Form kapatıldığında parent'taki actionTarget aynı kalsa bile modal yeniden açılmaz.
+    if (handledEntryRef.current === entryKey) return;
+    handledEntryRef.current = entryKey;
+
+    if (entryTarget === 'field-history') {
+      setActiveDetailTab('history');
+      return;
+    }
+
+    if (entryTarget === 'field-production-profile') {
       setActiveDetailTab('production');
+      setProductionProfileMessage('');
+      setProductionProfileOpen(true);
+      return;
+    }
+
+    if (entryTarget === 'field-section') {
+      setActiveDetailTab('production');
+      resetSectionForm();
+      setSectionFormMessage('');
+      setSectionFormOpen(true);
+      return;
+    }
+
+    if (entryTarget === 'field-season') {
+      setActiveDetailTab('production');
+      resetAnnualForm();
       setAnnualFormOpen(true);
-
+      setYieldFormOpen(false);
       window.setTimeout(() => {
-        const input = document.getElementById(
-          'tp-field-season-planting-date',
-        ) as HTMLInputElement | null;
-
-        input?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
+        const input = document.getElementById('tp-field-season-planting-date') as HTMLInputElement | null;
+        input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         input?.focus();
-      }, 260);
-
+      }, 220);
       return;
     }
 
-    setActiveDetailTab('overview');
-  }, [
-    selectedField.id,
-    fieldDetailEntry?.nonce,
-    opensSeasonTask,
-    opensGrowthTarget,
-    setAnnualFormOpen,
-  ]);
+    if (entryTarget === 'field-yield') {
+      setActiveDetailTab('production');
+      resetYieldForm();
+      setYieldFormOpen(true);
+      setAnnualFormOpen(false);
+      return;
+    }
+
+    if (entryTarget === 'field-activity' || entryTarget.startsWith('field-operation:')) {
+      setActiveDetailTab('history');
+      const requestedType = entryTarget.startsWith('field-operation:')
+        ? entryTarget.split(':').slice(1).join(':').trim()
+        : 'Saha Kontrolü';
+      openActivityForm(requestedType || 'Saha Kontrolü');
+      return;
+    }
+
+    setActiveDetailTab('production');
+    // Intentionally keyed only by the navigation payload. Callback identities from App
+    // must not re-consume the same entry and reopen a modal after the user closes it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedField?.id, fieldDetailEntry?.nonce, entryTarget]);
+
 
   useEffect(() => {
     if (activityFormOpen) setActiveDetailTab('history');
   }, [activityFormOpen]);
 
-  const detailInfo = statusInfo[selectedField.status];
+  useEffect(() => {
+    const anyModalOpen =
+      productionProfileOpen ||
+      annualFormOpen ||
+      yieldFormOpen ||
+      sectionFormOpen ||
+      activityFormOpen;
+
+    if (!anyModalOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      if (yieldFormOpen) {
+        setYieldFormOpen(false);
+        return;
+      }
+      if (annualFormOpen) {
+        setAnnualFormOpen(false);
+        return;
+      }
+      if (sectionFormOpen) {
+        setSectionFormOpen(false);
+        return;
+      }
+      if (productionProfileOpen) {
+        setProductionProfileOpen(false);
+        return;
+      }
+      if (activityFormOpen) setActivityFormOpen(false);
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [
+    activityFormOpen,
+    annualFormOpen,
+    productionProfileOpen,
+    sectionFormOpen,
+    yieldFormOpen,
+    setActivityFormOpen,
+    setAnnualFormOpen,
+    setProductionProfileOpen,
+    setSectionFormOpen,
+    setYieldFormOpen,
+  ]);
 
     const scrollFieldDetailTo = (id: string) => {
       setFieldFabOpen(false);
@@ -235,7 +303,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
             </button>
 
             <div>
-              <span>Tarla Detayları</span>
+              <span>Tarla Kayıtları</span>
               <strong>{selectedField.name}</strong>
             </div>
 
@@ -243,9 +311,11 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
           </header>
 
           <main className="tp-field-detail-content">
-            <section id="field-info" className="tp-field-hero-card">
+            <section id="field-info" className="tp-field-hero-card tp-field-hero-card-compact">
               <div className="tp-field-hero-top">
-                <div className="tp-field-hero-icon">🌾</div>
+                <div className="tp-field-hero-icon" aria-hidden="true">
+                  <MapPinned size={20} strokeWidth={1.8} />
+                </div>
 
                 <div className="tp-field-hero-copy">
                   <div className="tp-field-hero-name-row">
@@ -253,43 +323,19 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                     {selectedField.demo && <span className="demoBadge">ÖRNEK</span>}
                   </div>
 
-                  <p>
-                    {selectedField.ada} Ada • {selectedField.parsel} Parsel
-                  </p>
-
+                  <p>{selectedField.ada} Ada · {selectedField.parsel} Parsel</p>
                   <span>
                     {[selectedField.village, selectedField.district, selectedField.city]
                       .filter(Boolean)
                       .join(' / ') || 'Konum bilgisi henüz eklenmedi'}
                   </span>
                 </div>
-
-                <span
-                  className="statusPill"
-                  style={{
-                    color: detailInfo.color,
-                    backgroundColor: detailInfo.bg,
-                  }}
-                >
-                  {detailInfo.label}
-                </span>
               </div>
 
               <div className="tp-field-hero-stats">
-                <div>
-                  <span>Alan</span>
-                  <strong>{selectedField.area.toLocaleString('tr-TR')} da</strong>
-                </div>
-
-                <div>
-                  <span>Ürün</span>
-                  <strong>{selectedField.crop}</strong>
-                </div>
-
-                <div>
-                  <span>Sezon</span>
-                  <strong>{selectedField.season}</strong>
-                </div>
+                <div><span>Alan</span><strong>{selectedField.area.toLocaleString('tr-TR')} da</strong></div>
+                <div><span>Ürün</span><strong>{selectedField.crop}</strong></div>
+                <div><span>Sezon</span><strong>{selectedField.season}</strong></div>
               </div>
             </section>
 
@@ -304,8 +350,8 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
 
             {activeDetailTab === 'overview' && (
               <section className="tp-field-detail-overview" aria-label="Tarla kayıtları özeti">
-                <h2>Bu tarlada neler var?</h2>
-                <p>Gerçek kayıtlarına buradan ulaşabilirsin.</p>
+                <h2>Kayıt ve veri girişi</h2>
+                <p>Tarla Durumu sonuç ekranıdır; burada üretim ve işlem kayıtlarını düzenlersin.</p>
                 <button type="button" onClick={() => setActiveDetailTab('production')}>
                   <span><strong>Ürün ve bölümler</strong><small>{historyLoading || sectionsLoading ? 'Kayıtlar yükleniyor…' : `${(selectedField.cropCycle ?? 'annual') === 'perennial' ? perennialYields.length : annualSeasons.length} sezon/verim · ${fieldSections.length} bölüm`}</small></span>
                   <span aria-hidden="true">›</span>
@@ -332,7 +378,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                 </div>
               </div>
 
-              <div className="tp-field-production-card">
+              <div className="tp-field-production-card tp-field-production-card-compact">
                 <div className="tp-field-production-main">
                   <div className="tp-detail-icon">
                     {(selectedField.cropCycle ?? 'annual') === 'perennial' ? '🌳' : '🌱'}
@@ -343,64 +389,55 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                     <p>
                       {(selectedField.cropCycle ?? 'annual') === 'perennial'
                         ? 'Çok yıllık ürün'
-                        : `${selectedField.season} üretim sezonu • Tek yıllık ürün`}
+                        : `${selectedField.season} üretim sezonu · Tek yıllık ürün`}
                     </p>
                   </div>
-                </div>
-
-                <div className="tp-production-profile-summary">
-                  <div>
-                    <span>Ürün tipi</span>
-                    <strong>
-                      {(selectedField.cropCycle ?? 'annual') === 'perennial'
-                        ? 'Çok yıllık'
-                        : 'Tek yıllık'}
-                    </strong>
-                  </div>
-
-                  {(selectedField.cropCycle ?? 'annual') === 'perennial' && (
-                    <>
-                      <div>
-                        <span>Dikim yılı</span>
-                        <strong>{selectedField.plantingYear ?? '—'}</strong>
-                      </div>
-
-                      <div>
-                        <span>Bahçe yaşı</span>
-                        <strong>
-                          {selectedField.plantingYear
-                            ? `${Math.max(
-                                0,
-                                new Date().getFullYear() - selectedField.plantingYear,
-                              )} yaş`
-                            : '—'}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>Ürün veriyor</span>
-                        <strong>
-                          {selectedField.bearing === null ||
-                          selectedField.bearing === undefined
-                            ? '—'
-                            : selectedField.bearing
-                              ? 'Evet'
-                              : 'Henüz değil'}
-                        </strong>
-                      </div>
-                    </>
-                  )}
-
                   {!selectedField.demo && (
                     <button
                       type="button"
+                      className="tp-production-edit-button"
                       onClick={() => {
                         setProductionProfileOpen(true);
                         setProductionProfileMessage('');
                       }}
                     >
-                      ✎ Düzenle
+                      <Pencil size={14} aria-hidden="true" />
+                      Düzenle
                     </button>
+                  )}
+                </div>
+
+                <div className="tp-production-profile-summary tp-production-profile-summary-compact">
+                  {(selectedField.cropCycle ?? 'annual') === 'perennial' ? (
+                    <>
+                      <div>
+                        <span>Dikim yılı</span>
+                        <strong>{selectedField.plantingYear ?? '—'}</strong>
+                      </div>
+                      <div>
+                        <span>Bahçe yaşı</span>
+                        <strong>
+                          {selectedField.plantingYear
+                            ? `${Math.max(0, new Date().getFullYear() - selectedField.plantingYear)} yaş`
+                            : '—'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Verim durumu</span>
+                        <strong>
+                          {selectedField.bearing === null || selectedField.bearing === undefined
+                            ? '—'
+                            : selectedField.bearing
+                              ? 'Ürün veriyor'
+                              : 'Henüz değil'}
+                        </strong>
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <span>Sezon</span>
+                      <strong>{selectedField.season}</strong>
+                    </div>
                   )}
                 </div>
 
@@ -547,32 +584,28 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                   </button>
                 </div>
 
-                {!selectedField.demo && (<details id="tp-field-growth-detail" className="tp-field-detail-deep">
-                  <summary>Gelişim takibi ve sezon verileri <span aria-hidden="true">⌄</span></summary>
-                  <FieldGrowthStatus field={selectedField} />
-                {(selectedField.cropCycle ?? 'annual') === 'annual' && (
-                  <PcsePilotReadiness
-                    field={selectedField}
-                    seasons={annualSeasons}
-                    loading={historyLoading}
-                    onAddSeason={() => {
-                      resetAnnualForm();
-                      setAnnualFormOpen(true);
-                    }}
-                    onEditCropType={() => {
-                      setProductionProfileMessage('');
-                      setProductionProfileOpen(true);
-                    }}
-                  />
+                {!selectedField.demo &&
+                  (selectedField.cropCycle ?? 'annual') === 'annual' && (
+                    <PlantingWindowPanel
+                      fieldId={selectedField.id}
+                      crop={selectedField.crop}
+                    />
+                  )}
+
+                {!selectedField.demo && (
+                  <CropRotationPanel field={selectedField} />
                 )}
 
-                {(selectedField.cropCycle ?? 'annual') === 'annual' && (
-                  <FieldGrowthObservations fieldId={String(selectedField.id)} seasons={annualSeasons} />
+                {!selectedField.demo && (selectedField.cropCycle ?? 'annual') === 'perennial' && (
+                  <OrchardChillPanel field={selectedField} />
                 )}
 
-                <FieldIrrigationMethod fieldId={String(selectedField.id)} />
-                <SeasonModelInputs field={selectedField} seasons={annualSeasons} seasonsLoading={historyLoading} />
-                </details>)}
+                {!selectedField.demo && (
+                  <div className="tp-field-detail-moved-note">
+                    <strong>Gelişim, toprak ve sulama yorumları Tarla Durumu'na taşındı.</strong>
+                    <span>Bu ekran artık üretim ve işlem kayıtlarını düzenlemek için kullanılıyor.</span>
+                  </div>
+                )}
 
                 {!selectedField.demo && (
                   <div className="tp-production-history-block">
@@ -1731,6 +1764,12 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
               </section>
             </div>
           )}
+
+          <PusulaLoadingOverlay
+            open={deleteFieldLoading}
+            label="Tarla siliniyor…"
+            hint="Tarla ve bağlı kayıtlar kaldırılıyor."
+          />
 
           <nav className="tp-field-detail-bottom">
             <button onClick={() => setScreen('home')}>

@@ -3,9 +3,9 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { CalendarDays, CloudSun, House, MapPinned, Sparkles } from 'lucide-react';
 import type { Field, Screen } from '../types';
 import { supabase } from '../supabaseClient';
+import ClassicBottomNav from './ClassicBottomNav';
 import './AgriculturalSupportScreen.css';
 
 type MenuItem = {
@@ -57,7 +57,7 @@ interface ConditionalSupports {
 type CertificateMode = 'individual' | 'group';
 type SupportProductGroup = 'group1' | 'group2' | 'group3';
 type GoodFarmingMode = 'open' | 'covered';
-type FeedTab = 'all' | 'varieties' | 'support' | 'disease' | 'food';
+type FeedTab = 'all' | 'varieties' | 'support' | 'disease';
 
 type IconName =
   | 'brand'
@@ -76,7 +76,6 @@ type IconName =
   | 'weather'
   | 'crop'
   | 'calculator'
-  | 'food'
   | 'plus'
   | 'trash'
   | 'check'
@@ -305,7 +304,7 @@ interface AgriNewsRow {
   id: string;
   title: string;
   summary: string | null;
-  category: 'support' | 'varieties' | 'disease' | 'food' | 'general';
+  category: 'support' | 'varieties' | 'disease' | 'general';
   source_name: string;
   source_url: string;
   image_url: string | null;
@@ -318,7 +317,6 @@ function dbCategoryToFeedTab(category: AgriNewsRow['category']): FeedTab {
   if (category === 'support') return 'support';
   if (category === 'varieties') return 'varieties';
   if (category === 'disease') return 'disease';
-  if (category === 'food') return 'food';
   return 'all';
 }
 
@@ -342,7 +340,6 @@ const FEED_TABS: Array<{
   { id: 'varieties', label: 'Yeni Çeşitler', icon: 'crop' },
   { id: 'support', label: 'Destek & Mevzuat', icon: 'document' },
   { id: 'disease', label: 'Hastalık Uyarısı', icon: 'alert' },
-  { id: 'food', label: 'Gıda', icon: 'food' },
   { id: 'calculator', label: 'Destek Hesapla', icon: 'calculator' },
 ];
 
@@ -407,14 +404,6 @@ function Icon({
         <svg {...common}>
           <path d="M10.3 4.2 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z" />
           <path d="M12 9v4M12 17h.01" />
-        </svg>
-      );
-    case 'food':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="6.5" />
-          <path d="M12 5.5v13M5.5 12h13" opacity=".25" />
-          <path d="M4 4v6a2 2 0 0 0 2 2V4M8 4v8M19 4v16M16.5 4v5.5a2.5 2.5 0 0 0 2.5 2.5" />
         </svg>
       );
     case 'field':
@@ -658,8 +647,27 @@ export default function AgriculturalSupportScreen({
   const [liveNews, setLiveNews] = useState<AgriNewsRow[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [newsError, setNewsError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'feed' | 'calculator'>('feed');
+  const [activeView, setActiveView] = useState<'feed' | 'calculator'>(() => screen === 'supportHub' ? 'calculator' : 'feed');
   const [selectedStory, setSelectedStory] = useState<any>(null);
+
+  useEffect(() => {
+    let requestedCalculator = screen === 'supportHub';
+    try {
+      if (window.sessionStorage.getItem('tp-open-support-calculator') === '1') {
+        requestedCalculator = true;
+        window.sessionStorage.removeItem('tp-open-support-calculator');
+      }
+    } catch {
+      // sessionStorage kapalıysa screen değeri yeterli.
+    }
+
+    if (requestedCalculator) {
+      setActiveView('calculator');
+      setActiveFeedTab('all');
+      setSelectedStory(null);
+      window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
+    }
+  }, [screen]);
   const [items, setItems] = useState<SupportCalculationItem[]>([
     {
       id: 'support-row-1',
@@ -900,9 +908,7 @@ export default function AgriculturalSupportScreen({
             ? 'Yeni Çeşitler'
             : item.category === 'disease'
               ? 'Hastalık Uyarısı'
-              : item.category === 'food'
-                ? 'Gıda'
-                : item.source_name || 'Tarım Gündemi',
+              : item.source_name || 'Tarım Gündemi',
       tab: dbCategoryToFeedTab(item.category),
       date: formatNewsDate(item.published_at),
       title: item.title,
@@ -910,7 +916,7 @@ export default function AgriculturalSupportScreen({
       visual:
         item.category === 'disease'
           ? ('alert' as const)
-          : item.category === 'support' || item.category === 'food'
+          : item.category === 'support'
             ? ('note' as const)
             : ('field' as const),
       sourceUrl: item.source_url,
@@ -929,6 +935,8 @@ export default function AgriculturalSupportScreen({
     return liveStories.filter((story) => story.tab === activeFeedTab);
   }, [activeFeedTab, liveStories]);
 
+  const featuredStory = filteredStories[0] ?? null;
+  const storyList = featuredStory ? filteredStories.slice(1) : [];
 
   const importFields = () => {
     if (!realFields.length) {
@@ -1078,17 +1086,28 @@ export default function AgriculturalSupportScreen({
             {activeView === 'feed' && (
             <div className="tp-support-feed-column">
               <section className="tp-support-page-intro">
+                <button
+                  type="button"
+                  className="tp-support-clean-menu"
+                  onClick={() => setSideMenuOpen(true)}
+                  aria-label="Menüyü aç"
+                >
+                  <Icon name="menu" size={18} />
+                </button>
+
                 <div className="tp-support-hero-head tp-support-hero-head--compact">
                   <small>TARIMSAL GÜNDEM</small>
                   <h1>Tarım Gündemi</h1>
-                  <p>Gündem · Uyarılar · Mevzuat · Gıda</p>
+                  <p>Gündem · Uyarılar · Mevzuat</p>
                 </div>
               </section>
 
               <section className="tp-support-filter-row tp-support-global-tabs">
                 {FEED_TABS.map((tab) => {
                   const active =
-                    tab.id !== 'calculator' && activeFeedTab === tab.id;
+                    tab.id === 'calculator'
+                      ? activeView === 'calculator'
+                      : activeView === 'feed' && activeFeedTab === tab.id;
 
                   return (
                     <button
@@ -1112,50 +1131,55 @@ export default function AgriculturalSupportScreen({
                 </div>
               )}
 
-              {filteredStories.length > 0 ? (
-                <section className="tp-support-news-rail" aria-label="Tarım Gündemi haberleri">
-                  <div className="tp-support-news-rail-head">
-                    <div>
-                      <small>SON PAYLAŞIMLAR</small>
-                      <strong>{activeFeedTab === 'all' ? 'Tarım Gündemi' : FEED_TABS.find((item) => item.id === activeFeedTab)?.label}</strong>
-                    </div>
-                    <span>Kaydırarak diğer haberlere geç</span>
-                  </div>
+              {featuredStory ? (
+              <article className="tp-support-feature-card">
+                <div className="tp-support-feature-copy">
+                  <span className="tp-support-story-tag">
+                    {featuredStory.tag}
+                  </span>
+                  <small>{featuredStory.date}</small>
+                  <h2>{featuredStory.title}</h2>
+                  <p>{featuredStory.excerpt}</p>
 
-                  <div className="tp-support-news-carousel">
-                    {filteredStories.map((story) => (
-                      <button
-                        key={story.id}
-                        type="button"
-                        className="tp-support-news-card"
-                        onClick={() => setSelectedStory(story)}
-                        aria-label={`${story.title} haberini aç`}
-                      >
-                        <div className={`tp-support-news-card-media ${visualClass(story.visual)} ${story.imageUrl ? 'has-real-image' : ''}`}>
-                          {story.imageUrl ? (
-                            <img
-                              src={story.imageUrl}
-                              alt=""
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="tp-support-news-card-placeholder">
-                              <Icon name={visualIcon(story.visual)} size={34} />
-                            </div>
-                          )}
-
-                          <div className="tp-support-news-card-shade" />
-                          <div className="tp-support-news-card-copy">
-                            <span className="tp-support-story-tag">{story.tag}</span>
-                            <h2>{story.title}</h2>
-                            <small>{story.date}</small>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                  <div className="tp-support-feature-actions">
+                    <button type="button" onClick={focusCalculator}>
+                      <Icon name="calculator" size={15} />
+                      Bana Etkisini Hesapla
+                    </button>
+                    <button
+                      type="button"
+                      className="tp-support-round-arrow"
+                      aria-label="Detayı aç"
+                      onClick={() => setSelectedStory(featuredStory)}
+                    >
+                      <Icon name="chevron" size={16} />
+                    </button>
                   </div>
-                </section>
+                </div>
+
+                <div className={`tp-support-feature-visual ${'imageUrl' in featuredStory && featuredStory.imageUrl ? 'has-real-image' : ''}`}>
+                  {'imageUrl' in featuredStory && featuredStory.imageUrl ? (
+                    <img
+                      src={featuredStory.imageUrl}
+                      alt=""
+                      loading="eager"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <>
+                      <div className="tp-support-feature-glow" />
+                      <div className="tp-support-feature-stems">
+                        <i />
+                        <i />
+                        <i />
+                        <i />
+                        <i />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </article>
+
               ) : !newsLoading ? (
                 <section className="tp-support-empty-feed">
                   <div className="tp-support-empty-feed-icon">
@@ -1163,9 +1187,45 @@ export default function AgriculturalSupportScreen({
                   </div>
                   <small>TARIM GÜNDEMİ</small>
                   <h2>Henüz paylaşım yok</h2>
-                  <p>Burada admin tarafından yayınlanan TarlaPusula içerikleri gösterilecek.</p>
+                  <p>Burada yalnızca senin TarlaPusula'ya eklediğin içerikler yayınlanacak.</p>
                 </section>
               ) : null}
+
+              <section className="tp-support-story-list">
+                {storyList.map((story) => (
+                  <article className="tp-support-story-item" key={story.id}>
+                    <div className={`tp-support-story-thumb ${visualClass(story.visual)} ${'imageUrl' in story && story.imageUrl ? 'has-real-image' : ''}`}>
+                      {'imageUrl' in story && story.imageUrl ? (
+                        <img
+                          src={story.imageUrl}
+                          alt=""
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <Icon name={visualIcon(story.visual)} size={24} />
+                      )}
+                    </div>
+
+                    <div className="tp-support-story-copy">
+                      <span className="tp-support-story-tag subtle">
+                        {story.tag}
+                      </span>
+                      <h3>{story.title}</h3>
+                      <small>{story.date}</small>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="tp-support-round-arrow small"
+                      aria-label="Haberi aç"
+                      onClick={() => setSelectedStory(story)}
+                    >
+                      <Icon name="chevron" size={15} />
+                    </button>
+                  </article>
+                ))}
+              </section>
             </div>
             )}
 
@@ -1176,12 +1236,12 @@ export default function AgriculturalSupportScreen({
             >
               <div className="tp-support-sticky-stack">
                 <div className="tp-support-calculator-head">
-                  <button type="button" onClick={() => setActiveView('feed')}>
+                  <button type="button" onClick={() => setScreen?.('agendaHub' as Screen)}>
                     <Icon name="back" size={16} />
                     Tarım Gündemine Dön
                   </button>
                   <div>
-                    <small>TARIMSAL DESTEK</small>
+                    <small>AYRI ARAÇ</small>
                     <h1>Destek Hesapla</h1>
                     <p>Ürün ve alan bilgilerini gir; tahmini temel ve ilave destekleri hesapla.</p>
                   </div>
@@ -1702,18 +1762,10 @@ export default function AgriculturalSupportScreen({
                   {String(selectedStory.detailText)
                     .split(/\n{2,}/)
                     .filter(Boolean)
-                    .slice(0, 30)
-                    .map((paragraph: string, index: number) => {
-                      const trimmed = paragraph.trim();
-                      const emphasized = trimmed.startsWith('**') && trimmed.endsWith('**');
-                      const text = emphasized ? trimmed.slice(2, -2).trim() : trimmed;
-
-                      return emphasized ? (
-                        <h3 key={`detail-${index}`}>{text}</h3>
-                      ) : (
-                        <p key={`detail-${index}`}>{text}</p>
-                      );
-                    })}
+                    .slice(0, 20)
+                    .map((paragraph: string, index: number) => (
+                      <p key={`detail-${index}`}>{paragraph}</p>
+                    ))}
                 </div>
               )}
 
@@ -1736,63 +1788,10 @@ export default function AgriculturalSupportScreen({
         </div>
       )}
 
-      <nav className="tp-bottom" aria-label="Ana menü">
-        <button type="button" onClick={() => navigate('home')}>
-          <span className="tp-bottom-icon-shell">
-            <House className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-          </span>
-          Ana Sayfa
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('weatherHub')}
-          aria-label="Hava Durumu"
-        >
-          <span className="tp-bottom-icon-shell">
-            <CloudSun className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-          </span>
-          Hava Durumu
-        </button>
-
-        <button
-          className="ai"
-          type="button"
-          onClick={() => navigate('aiAnalysis')}
-        >
-          <span className="tp-bottom-ai-shell">
-            <Sparkles className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-          </span>
-          Pusula AI
-        </button>
-
-        <button type="button" onClick={() => navigate('calendar')}>
-          <span className="tp-bottom-icon-shell">
-            <CalendarDays className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-          </span>
-          Takvim
-        </button>
-
-        <button
-          type="button"
-          aria-label="Tarlalarım listesini aç"
-          onClick={() => {
-            setScreen?.('home');
-            setSideMenuOpen(false);
-            window.setTimeout(() => {
-              const target = document.querySelector(
-                'button[aria-label="Tarlalarım listesini aç"]',
-              ) as HTMLButtonElement | null;
-              target?.click();
-            }, 80);
-          }}
-        >
-          <span className="tp-bottom-icon-shell">
-            <MapPinned className="tp-bottom-line-icon" aria-hidden="true" strokeWidth={1.8} />
-          </span>
-          Tarlalarım
-        </button>
-      </nav>
+      <ClassicBottomNav
+        activeScreen={String(screen)}
+        setScreen={setScreen}
+      />
 
       {sideMenuOpen && (
         <div className="tp-support-drawer-layer">

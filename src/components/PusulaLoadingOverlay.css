@@ -1,0 +1,118 @@
+.tp-pusula-loading-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  color: #fff;
+  z-index: 2147483647 !important;
+}
+
+.tp-pusula-loading-dialog[open] {
+  display: grid;
+  place-items: center;
+}
+
+.tp-pusula-loading-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.46);
+  -webkit-backdrop-filter: blur(12px) saturate(0.78) brightness(0.62);
+  backdrop-filter: blur(12px) saturate(0.78) brightness(0.62);
+  animation: tpPusulaOverlayFadeIn 180ms ease-out both;
+}
+
+.tp-pusula-loading-window {
+  position: relative;
+  width: min(78vw, 286px);
+  min-height: 274px;
+  display: grid;
+  place-items: center;
+  padding: 30px 24px 28px;
+  border-radius: 30px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 4%, rgba(255, 255, 255, 0.075), transparent 34%),
+    linear-gradient(180deg, rgba(14, 14, 15, 0.97), rgba(3, 3, 4, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 34px 100px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+  animation: tpPusulaOverlayWindowIn 260ms cubic-bezier(.2, .82, .25, 1) both;
+}
+
+.tp-pusula-loading-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.07), transparent 36%),
+    linear-gradient(135deg, rgba(255,255,255,0.025), transparent 34% 66%, rgba(255,255,255,0.018));
+}
+
+.tp-pusula-loading-window-glow {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: 168px;
+  height: 168px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  filter: blur(36px);
+  pointer-events: none;
+  animation: tpPusulaWindowBreath 2s ease-in-out infinite;
+}
+
+.tp-pusula-loading-window .tp-pusula-loader {
+  position: relative;
+  z-index: 2;
+}
+
+.tp-pusula-loading-window .tp-pusula-loader-copy strong {
+  color: #fff;
+  font-size: 1.02rem;
+}
+
+.tp-pusula-loading-window .tp-pusula-loader-copy small {
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 220px;
+  margin-inline: auto;
+}
+
+@keyframes tpPusulaOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tpPusulaOverlayWindowIn {
+  from { opacity: 0; transform: translateY(12px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes tpPusulaWindowBreath {
+  0%, 100% { opacity: .55; transform: translate(-50%, -50%) scale(.94); }
+  50% { opacity: .9; transform: translate(-50%, -50%) scale(1.06); }
+}
+
+@media (max-width: 480px) {
+  .tp-pusula-loading-window {
+    width: min(74vw, 268px);
+    min-height: 258px;
+    border-radius: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-pusula-loading-dialog::backdrop,
+  .tp-pusula-loading-window,
+  .tp-pusula-loading-window-glow {
+    animation: none !important;
+  }
+}

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { PUSULA_BODY_SRC } from '../../home/homeAssets';
 import type { HomeDecisionEvent, HomeDecisionTarget } from '../../decision/types/homeDecision';
 import type { EarthSearchNdviStats } from '../../home-map/services/earthSearchNdvi.service';
 import { getNdviDisplayPercentages } from '../../home-map/utils/ndviPercentages';
 import KnowledgeQuickView from '../../knowledge/components/KnowledgeQuickView';
 import KnowledgeEvidenceSources from '../../knowledge/components/KnowledgeEvidenceSources';
+
+const PUSULA_INLINE_SRC = 'data:image/webp;base64,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';
 
 type Props = {
   fieldName: string;
@@ -608,6 +609,604 @@ html body .tp-v1 .tp-home-map-pusula-metric.source {
     font-size: 7.8px;
   }
 }
+
+/* =========================================================
+   V10-WHITE — PUSULA AÇIKLAMA KARTI
+   - Kart kaldırılmaz; ana haritanın içinde alt overlay olarak kalır.
+   - Eski yeşil/obsidian yüzey geri dönmez.
+   - Yükseklik içerikten gelir; aşağıda ayrı boş stats alanı kullanılmaz.
+   ========================================================= */
+.tp-home-map-pusula-strip{
+  min-height:0!important;
+  height:auto!important;
+  padding:9px 11px 9px!important;
+  border:1px solid rgba(15,23,42,.14)!important;
+  border-radius:16px!important;
+  background:rgba(255,255,255,.97)!important;
+  box-shadow:0 7px 22px rgba(15,23,42,.14)!important;
+  backdrop-filter:blur(10px)!important;
+  -webkit-backdrop-filter:blur(10px)!important;
+  color:#111827!important;
+}
+
+.tp-home-map-pusula-strip::before{
+  display:none!important;
+}
+
+.tp-home-map-pusula-logo{
+  opacity:1!important;
+}
+
+.tp-home-map-pusula-logo img{
+  filter:none!important;
+}
+
+.tp-home-map-pusula-kicker{
+  color:#111827!important;
+}
+
+.tp-home-map-pusula-kicker span{
+  color:#687386!important;
+}
+
+.tp-home-map-pusula-kicker::after{
+  background:#d4d9df!important;
+}
+
+.tp-home-map-pusula-text{
+  color:#151b24!important;
+  font-size:10px!important;
+  line-height:1.28!important;
+  font-weight:690!important;
+  margin-top:4px!important;
+}
+
+.tp-home-map-pusula-strip.is-loading .tp-home-map-pusula-text,
+.tp-home-map-pusula-strip.has-error .tp-home-map-pusula-text{
+  color:#667085!important;
+}
+
+.tp-home-map-pusula-metrics{
+  gap:4px!important;
+  margin-top:5px!important;
+}
+
+.tp-home-map-pusula-metric{
+  min-height:17px!important;
+  padding:0 6px!important;
+  border-color:#d8dde3!important;
+  background:#edf0f3!important;
+  color:#344054!important;
+  font-size:6.8px!important;
+}
+
+.tp-home-map-pusula-metric.source{
+  color:#596574!important;
+}
+
+.tp-home-map-pusula-signal{
+  border-color:#d8dde3!important;
+  background:#f1f3f5!important;
+  color:#4b5563!important;
+}
+
+.tp-home-map-pusula-signal.positive{
+  border-color:#cbd2d9!important;
+  background:#e8ebee!important;
+  color:#303942!important;
+}
+
+.tp-home-map-pusula-actions{
+  gap:2px!important;
+}
+
+.tp-home-map-pusula-actions button{
+  color:#4b5563!important;
+}
+
+.tp-home-map-pusula-actions button:hover{
+  color:#111827!important;
+  background:#f1f3f5!important;
+}
+
+.tp-home-map-pusula-refresh{
+  border-color:#d8dde3!important;
+  background:#f4f5f6!important;
+  color:#374151!important;
+}
+
+.tp-home-map-pusula-refresh-error{
+  color:#7a4650!important;
+}
+
+@media(max-width:560px){
+  .tp-home-map-pusula-strip{
+    grid-template-columns:26px minmax(0,1fr)!important;
+    gap:7px!important;
+    padding:8px 10px 8px!important;
+  }
+
+  .tp-home-map-pusula-copy{
+    padding-bottom:22px!important;
+  }
+
+  .tp-home-map-pusula-actions{
+    right:7px!important;
+    bottom:4px!important;
+  }
+}
+
+
+/* =========================================================
+   V11-COMPACT-MAP-INTEGRATED
+   2026-10-01
+   - Alt NDVI yüzde/source chip satırı kaldırıldı.
+   - Pusula bilgi kartı artık ayrı yüzen kart değil:
+     harita kartının alt parçası gibi sıfır boşlukla oturur.
+   - Mobilde aksiyonlar normal akışta kompakt durur.
+   ========================================================= */
+.tp-home-map-pusula-strip{
+  min-height:0!important;
+  height:auto!important;
+  padding:7px 10px 7px!important;
+  border:0!important;
+  border-top:1px solid #d8dde3!important;
+  border-radius:0 0 18px 18px!important;
+  background:rgba(255,255,255,.985)!important;
+  box-shadow:none!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+}
+
+.tp-home-map-pusula-strip::before{
+  display:none!important;
+}
+
+.tp-home-map-pusula-logo{
+  width:24px!important;
+  height:24px!important;
+}
+
+.tp-home-map-pusula-logo img{
+  width:22px!important;
+  height:22px!important;
+}
+
+.tp-home-map-pusula-copy{
+  min-width:0!important;
+  padding:0!important;
+}
+
+.tp-home-map-pusula-kicker{
+  gap:5px!important;
+  font-size:7px!important;
+}
+
+.tp-home-map-pusula-text{
+  margin:3px 0 0!important;
+  font-size:9.8px!important;
+  line-height:1.24!important;
+  font-weight:690!important;
+}
+
+.tp-home-map-pusula-metrics{
+  display:none!important;
+}
+
+.tp-home-map-pusula-actions{
+  position:static!important;
+  grid-column:2 / -1!important;
+  display:flex!important;
+  justify-content:flex-end!important;
+  align-items:center!important;
+  gap:2px!important;
+  margin-top:3px!important;
+  white-space:nowrap!important;
+}
+
+.tp-home-map-pusula-actions button{
+  min-height:21px!important;
+  padding:0 5px!important;
+  font-size:7px!important;
+  border-radius:6px!important;
+}
+
+.tp-home-map-pusula-refresh{
+  width:22px!important;
+  min-width:22px!important;
+  height:22px!important;
+  min-height:22px!important;
+}
+
+@media(max-width:560px){
+  .tp-home-map-pusula-strip{
+    min-height:0!important;
+    grid-template-columns:24px minmax(0,1fr)!important;
+    gap:6px!important;
+    padding:7px 9px 6px!important;
+  }
+
+  .tp-home-map-pusula-copy{
+    padding:0!important;
+  }
+
+  .tp-home-map-pusula-actions{
+    position:static!important;
+    right:auto!important;
+    bottom:auto!important;
+    grid-column:2!important;
+    margin-top:3px!important;
+  }
+
+  .tp-home-map-pusula-actions button{
+    min-height:20px!important;
+    font-size:6.8px!important;
+  }
+}
+
+
+/* =========================================================
+   V12 — FINAL ENTEGRE PUSULA ALTLIĞI
+   2026-10-01
+   - NDVI yüzde/source chip satırı yok.
+   - Ayrı yüzen kart görünümü yok.
+   - Harita kartının alt gövdesi gibi kompakt.
+   ========================================================= */
+.tp-home-map-pusula-strip{
+  position:relative!important;
+  min-height:0!important;
+  height:auto!important;
+  display:grid!important;
+  grid-template-columns:24px minmax(0,1fr) auto!important;
+  align-items:center!important;
+  column-gap:7px!important;
+  row-gap:0!important;
+
+  padding:7px 9px 7px!important;
+  margin:0!important;
+
+  border:1px solid #20262e!important;
+  border-top:1px solid #d8dde3!important;
+  border-radius:0 0 18px 18px!important;
+
+  background:#f8f9fa!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  color:#111827!important;
+}
+
+.tp-home-map-pusula-strip::before{
+  display:none!important;
+}
+
+.tp-home-map-pusula-logo{
+  width:24px!important;
+  height:24px!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+.tp-home-map-pusula-logo img{
+  width:21px!important;
+  height:21px!important;
+  filter:none!important;
+}
+
+.tp-home-map-pusula-copy{
+  min-width:0!important;
+  padding:0!important;
+}
+
+.tp-home-map-pusula-kicker{
+  min-height:14px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  color:#111827!important;
+  font-size:6.7px!important;
+  line-height:1!important;
+  font-weight:900!important;
+}
+
+.tp-home-map-pusula-kicker span{
+  color:#697586!important;
+}
+
+.tp-home-map-pusula-kicker::after{
+  display:none!important;
+}
+
+.tp-home-map-pusula-signal{
+  min-height:14px!important;
+  margin-left:0!important;
+  padding:0 4px!important;
+  font-size:6px!important;
+  border-color:#d7dce2!important;
+  background:#eef1f3!important;
+  color:#4b5563!important;
+}
+
+.tp-home-map-pusula-text{
+  margin:3px 0 0!important;
+  max-width:100%!important;
+  color:#171c24!important;
+  font-size:9.4px!important;
+  line-height:1.22!important;
+  font-weight:680!important;
+}
+
+.tp-home-map-pusula-metrics{
+  display:none!important;
+}
+
+.tp-home-map-pusula-actions{
+  position:static!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:start!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:2px!important;
+  margin:0!important;
+  white-space:nowrap!important;
+}
+
+.tp-home-map-pusula-actions button{
+  min-height:20px!important;
+  height:20px!important;
+  padding:0 5px!important;
+  border:0!important;
+  border-radius:6px!important;
+  background:transparent!important;
+  color:#4b5563!important;
+  font-size:6.8px!important;
+  line-height:1!important;
+  box-shadow:none!important;
+}
+
+.tp-home-map-pusula-actions button:hover{
+  background:#eceff2!important;
+  color:#111827!important;
+}
+
+.tp-home-map-pusula-refresh{
+  width:20px!important;
+  min-width:20px!important;
+  height:20px!important;
+  min-height:20px!important;
+  padding:0!important;
+  border:1px solid #dde1e6!important;
+  background:#f2f4f6!important;
+}
+
+.tp-home-map-pusula-refresh-error{
+  display:block!important;
+  margin-top:3px!important;
+  color:#7b4a52!important;
+  font-size:7px!important;
+  line-height:1.2!important;
+}
+
+@media(max-width:560px){
+  .tp-home-map-pusula-strip{
+    grid-template-columns:23px minmax(0,1fr) auto!important;
+    column-gap:6px!important;
+    padding:6px 8px 6px!important;
+  }
+
+  .tp-home-map-pusula-logo{
+    width:23px!important;
+    height:23px!important;
+  }
+
+  .tp-home-map-pusula-logo img{
+    width:20px!important;
+    height:20px!important;
+  }
+
+  .tp-home-map-pusula-text{
+    font-size:9.2px!important;
+    line-height:1.2!important;
+  }
+
+  .tp-home-map-pusula-actions{
+    position:static!important;
+    grid-column:3!important;
+    grid-row:1!important;
+    right:auto!important;
+    bottom:auto!important;
+    margin:0!important;
+  }
+
+  .tp-home-map-pusula-actions button{
+    min-height:19px!important;
+    height:19px!important;
+    padding:0 4px!important;
+    font-size:6.5px!important;
+  }
+
+  .tp-home-map-pusula-refresh{
+    width:19px!important;
+    min-width:19px!important;
+    height:19px!important;
+    min-height:19px!important;
+  }
+}
+
+
+/* =========================================================
+   V14 — PUSULA AKSİYON BUTONLARI / KALICI
+   2026-10-01
+   Yalnız sağ aksiyon grubu.
+   Harita, NDVI, tarih ve Pusula kart geometrisine dokunmaz.
+   ========================================================= */
+
+/* Sağ sütuna gerçek buton genişliği ayır. */
+.tp-home-map-pusula-strip{
+  grid-template-columns:23px minmax(0,1fr) 90px!important;
+  column-gap:7px!important;
+}
+
+/* Üç buton kesin olarak ALT ALTA. */
+.tp-home-map-pusula-actions{
+  position:static!important;
+  grid-column:3!important;
+  grid-row:1!important;
+  align-self:center!important;
+  justify-self:stretch!important;
+
+  width:90px!important;
+  min-width:90px!important;
+  margin:0!important;
+
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  grid-auto-flow:row!important;
+  gap:4px!important;
+
+  white-space:normal!important;
+}
+
+/* Yazı değil, BASILABİLİR BUTON olduğu açıkça belli olsun. */
+.tp-home-map-pusula-actions button{
+  position:relative!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:25px!important;
+  height:auto!important;
+
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:4px!important;
+
+  margin:0!important;
+  padding:5px 6px!important;
+
+  border:1px solid #cfd5dc!important;
+  border-radius:7px!important;
+  background:#ffffff!important;
+  box-shadow:
+    0 1px 2px rgba(15,23,42,.08),
+    inset 0 -1px 0 rgba(15,23,42,.04)!important;
+
+  color:#293340!important;
+  font-size:8.6px!important;
+  line-height:1.12!important;
+  font-weight:800!important;
+  text-align:center!important;
+  white-space:normal!important;
+
+  cursor:pointer!important;
+}
+
+.tp-home-map-pusula-actions button:hover{
+  border-color:#aeb7c1!important;
+  background:#f2f4f6!important;
+  color:#111827!important;
+}
+
+.tp-home-map-pusula-actions button:active{
+  transform:translateY(1px)!important;
+  background:#e9edf1!important;
+}
+
+.tp-home-map-pusula-actions button:disabled{
+  display:flex!important;
+  opacity:.48!important;
+  cursor:not-allowed!important;
+}
+
+/* Yenile artık ikon + metin olan gerçek buton. */
+.tp-home-map-pusula-refresh{
+  width:100%!important;
+  min-width:0!important;
+  min-height:25px!important;
+  height:auto!important;
+  padding:5px 6px!important;
+
+  border:1px solid #cfd5dc!important;
+  background:#f5f7f8!important;
+}
+
+.tp-home-map-pusula-refresh > span:first-child{
+  display:inline-block!important;
+  width:11px!important;
+  flex:0 0 11px!important;
+  font-size:11px!important;
+  line-height:1!important;
+}
+
+.tp-home-map-pusula-refresh-label{
+  display:inline!important;
+  font-size:8.6px!important;
+  line-height:1!important;
+  font-weight:850!important;
+}
+
+/* "Neden?" ve "Göreli farkı göster" de aynı buton ailesi. */
+.tp-home-map-pusula-why,
+.tp-home-map-pusula-show{
+  border:1px solid #cfd5dc!important;
+  background:#fff!important;
+  color:#293340!important;
+}
+
+.tp-home-map-pusula-show{
+  min-height:30px!important;
+}
+
+/* Mobilde de kesinlikle tek satıra dönmesin. */
+@media(max-width:560px){
+  .tp-home-map-pusula-strip{
+    grid-template-columns:22px minmax(0,1fr) 88px!important;
+    column-gap:6px!important;
+  }
+
+  .tp-home-map-pusula-actions{
+    position:static!important;
+    grid-column:3!important;
+    grid-row:1!important;
+    align-self:center!important;
+
+    width:88px!important;
+    min-width:88px!important;
+
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    grid-auto-flow:row!important;
+    gap:4px!important;
+
+    right:auto!important;
+    bottom:auto!important;
+  }
+
+  .tp-home-map-pusula-actions button{
+    width:100%!important;
+    min-height:24px!important;
+    padding:5px 5px!important;
+    font-size:8.3px!important;
+    line-height:1.1!important;
+  }
+
+  .tp-home-map-pusula-refresh{
+    width:100%!important;
+    min-width:0!important;
+    min-height:24px!important;
+  }
+
+  .tp-home-map-pusula-refresh-label{
+    font-size:8.3px!important;
+  }
+
+  .tp-home-map-pusula-show{
+    min-height:30px!important;
+  }
+}
+
 `
 
 function cleanText(value: unknown) {
@@ -1296,7 +1895,7 @@ export default function HomeMapPusulaStrip({
         aria-label="Pusula harita yorumu"
       >
         <span className="tp-home-map-pusula-logo" aria-hidden="true">
-          <img src={PUSULA_BODY_SRC} alt="" draggable={false} />
+          <img src={PUSULA_INLINE_SRC} alt="" draggable={false} />
         </span>
 
         <div className="tp-home-map-pusula-copy">
@@ -1318,17 +1917,6 @@ export default function HomeMapPusulaStrip({
           </div>
 
           <p className="tp-home-map-pusula-text" role="status">{result ? compactText : dataStatusMessage || compactText}</p>
-          {ndviMetricsVisible && ndviStats ? (
-            <div className="tp-home-map-pusula-metrics" aria-label="Mutlak NDVI parsel dağılımı">
-              <span className="tp-home-map-pusula-metric">NDVI {ndviStats.mean.toFixed(2)}</span>
-              <span className="tp-home-map-pusula-metric">Yüksek %{ndviDisplayPercentages?.healthy ?? 0}</span>
-              <span className="tp-home-map-pusula-metric">Orta %{ndviDisplayPercentages?.moderate ?? 0}</span>
-              <span className="tp-home-map-pusula-metric">Düşük %{ndviDisplayPercentages?.stressed ?? 0}</span>
-              <span className="tp-home-map-pusula-metric source">
-                {ndviStats.engine === 'geoblaze' ? 'Mutlak NDVI · GeoBlaze · Sentinel-2' : 'Mutlak NDVI · Sentinel-2'}
-              </span>
-            </div>
-          ) : null}
           {error && result ? (
             <small className="tp-home-map-pusula-refresh-error" role="status">
               Yeni yorum alınamadı; önceki yorum gösteriliyor. Tekrar deneyebilirsin.
@@ -1347,6 +1935,9 @@ export default function HomeMapPusulaStrip({
               onClick={() => void handleRefresh()}
             >
               <span className={refreshBusy ? 'is-spinning' : ''} aria-hidden="true">↻</span>
+              <span className="tp-home-map-pusula-refresh-label">
+                {refreshBusy ? 'Yenileniyor' : 'Yenile'}
+              </span>
             </button>
           ) : null}
           <button

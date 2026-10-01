@@ -15,10 +15,6 @@ type TkgmLocationResponse = {
   message?: string;
 };
 
-const TKGM_LOCATION_BASE_URLS = [
-  'https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api/idariYapi',
-  'https://cbsapi.tkgm.gov.tr/megsiswebapi.v3/api/idariYapi',
-] as const;
 
 let locationSourceMode: LocationSourceMode = null;
 
@@ -62,57 +58,6 @@ const normalizeTkgmPayload = (payload: any): LocationOption[] => {
   );
 };
 
-const getTkgmPath = (level: LocationLevel, parentId?: number) => {
-  if (level === 'province') return 'ilListe';
-
-  if (!Number.isFinite(parentId)) {
-    throw new Error('İlçe veya köy / mahalle listesi için üst kayıt kimliği gerekli.');
-  }
-
-  if (level === 'district') return `ilceListe/${parentId}`;
-  return `mahalleListe/${parentId}`;
-};
-
-async function fetchTkgmDirectOptions(
-  level: LocationLevel,
-  parentId?: number,
-): Promise<LocationOption[]> {
-  const path = getTkgmPath(level, parentId);
-  let lastError: unknown = null;
-
-  for (const baseUrl of TKGM_LOCATION_BASE_URLS) {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 10000);
-
-    try {
-      const response = await fetch(`${baseUrl}/${path}`, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json, text/plain, */*',
-        },
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        lastError = new Error(`TKGM HTTP ${response.status}`);
-        continue;
-      }
-
-      const options = normalizeTkgmPayload(await response.json());
-      if (options.length) return options;
-
-      lastError = new Error('TKGM boş konum listesi döndürdü.');
-    } catch (error) {
-      lastError = error;
-    } finally {
-      window.clearTimeout(timer);
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('TKGM konum servisine doğrudan ulaşılamadı.');
-}
 
 async function fetchTkgmProxyOptions(
   level: LocationLevel,
@@ -145,12 +90,10 @@ async function fetchTkgmOptions(
   level: LocationLevel,
   parentId?: number,
 ): Promise<LocationOption[]> {
-  try {
-    return await fetchTkgmDirectOptions(level, parentId);
-  } catch (directError) {
-    console.warn('TKGM doğrudan konum isteği başarısız oldu; proxy deneniyor:', directError);
-    return fetchTkgmProxyOptions(level, parentId);
-  }
+  // Tarayıcıdan TKGM'ye doğrudan istek YOK.
+  // CORS / 403 gürültüsünü ve istemci tarafı erişim sorunlarını önlemek için
+  // yalnız mevcut Supabase proxy fonksiyonu kullanılır.
+  return fetchTkgmProxyOptions(level, parentId);
 }
 
 async function fetchSupabaseProvinceOptions(): Promise<LocationOption[]> {

@@ -18,6 +18,7 @@ type ThreatShape = {
 };
 
 type RadarShape = {
+  intelligence?: unknown;
   topThreats?: ThreatShape[];
 };
 
@@ -38,7 +39,11 @@ function normalize(value: unknown) {
 function meaningfulTokens(value: unknown) {
   return normalize(value)
     .split(' ')
-    .filter((token) => token.length >= 4 && !['hastalik', 'zararli', 'riski', 'bitki'].includes(token));
+    .filter(
+      (token) =>
+        token.length >= 4 &&
+        !['hastalik', 'zararli', 'riski', 'bitki'].includes(token),
+    );
 }
 
 function labelsMatch(left: unknown, right: unknown) {
@@ -51,21 +56,35 @@ function labelsMatch(left: unknown, right: unknown) {
   const bTokens = meaningfulTokens(b);
   if (!aTokens.length || !bTokens.length) return false;
 
-  const shorter = aTokens.length <= bTokens.length ? aTokens : bTokens;
-  const longer = aTokens.length <= bTokens.length ? bTokens : aTokens;
-  const overlap = shorter.filter((token) => longer.includes(token)).length;
+  const shorter =
+    aTokens.length <= bTokens.length ? aTokens : bTokens;
+  const longer =
+    aTokens.length <= bTokens.length ? bTokens : aTokens;
+  const overlap = shorter.filter((token) =>
+    longer.includes(token),
+  ).length;
+
   return overlap >= Math.max(1, Math.ceil(shorter.length * 0.5));
 }
 
-function compactUnique(values: Array<string | null | undefined>, limit = 8) {
-  return [...new Set(values.map((value) => text(value)).filter(Boolean))].slice(0, limit);
+function compactUnique(
+  values: Array<string | null | undefined>,
+  limit = 8,
+) {
+  return [
+    ...new Set(
+      values.map((value) => text(value)).filter(Boolean),
+    ),
+  ].slice(0, limit);
 }
 
 /**
- * Risk Radar'ın gerçek iklim/ürün/fenoloji riskini, mevcut saha fotoğrafı
- * takibi ve doğrulanmış gelişim evresiyle tek açıklanabilir sağlık olayında
- * birleştirir. Yeni bir risk skoru hesaplamaz ve fotoğraf ön değerlendirmesini
- * kesin teşhis olarak kullanmaz.
+ * Madde 7 sonrası asıl bitki sağlığı sentezi sunucuda Risk Intelligence
+ * tarafından yapılıyor. Bu adaptör, yeni `intelligence` alanı varsa aynı
+ * fotoğraf/fenoloji sinyalini ikinci kez skora sokmaz.
+ *
+ * Eski cached/backend yanıtlarında intelligence yoksa önceki istemci
+ * sentezi geriye dönük uyumluluk için çalışmaya devam eder.
  */
 export function buildPlantHealthSynthesisDecision({
   fieldId,
@@ -79,18 +98,31 @@ export function buildPlantHealthSynthesisDecision({
     radar as Parameters<typeof buildRiskRadarDecision>[1],
     now,
   );
+
   if (!base) return null;
 
-  const radarShape = radar && typeof radar === 'object'
-    ? radar as RadarShape
-    : null;
-  const threatName = text(radarShape?.topThreats?.[0]?.name);
-  const trackedIssue = text(observation?.trackedIssueLabel);
+  const radarShape =
+    radar && typeof radar === 'object'
+      ? (radar as RadarShape)
+      : null;
+
+  if (radarShape?.intelligence) {
+    return base;
+  }
+
+  const threatName = text(
+    radarShape?.topThreats?.[0]?.name,
+  );
+  const trackedIssue = text(
+    observation?.trackedIssueLabel,
+  );
+
   const photoMatched = Boolean(
     threatName &&
-    trackedIssue &&
-    labelsMatch(threatName, trackedIssue),
+      trackedIssue &&
+      labelsMatch(threatName, trackedIssue),
   );
+
   const phenologyUsable = Boolean(
     phenology?.dataStatus === 'usable' &&
       phenology.stage &&
@@ -101,33 +133,49 @@ export function buildPlantHealthSynthesisDecision({
     ? [
         `Saha fotoğrafı Pusula AI ön değerlendirmesinde aynı veya benzer etiket izleniyor: ${trackedIssue}.`,
         observation?.trackedIssueSummary
-          ? `Son saha takibi: ${text(observation.trackedIssueSummary)}`
+          ? `Son saha takibi: ${text(
+              observation.trackedIssueSummary,
+            )}`
           : null,
         'Fotoğraf eşleşmesi ön değerlendirmedir; kesin hastalık veya zararlı teşhisi değildir.',
       ]
     : [];
+
   const phenologyEvidence = phenologyUsable
-    ? [`Gelişim evresi: ${text(phenology?.stageLabel) || text(phenology?.stage)}.`]
+    ? [
+        `Gelişim evresi: ${
+          text(phenology?.stageLabel) ||
+          text(phenology?.stage)
+        }.`,
+      ]
     : [];
 
-  const sourceModel = compactUnique([
-    'risk-radar',
-    photoMatched ? 'field-photo' : null,
-    phenologyUsable ? 'phenology' : null,
-  ], 3).join('+');
+  const sourceModel = compactUnique(
+    [
+      'risk-radar',
+      photoMatched ? 'field-photo' : null,
+      phenologyUsable ? 'phenology' : null,
+    ],
+    3,
+  ).join('+');
 
   return {
     ...base,
     group: 'plant-health-risk',
     sourceModel,
-    confidence: photoMatched ? 'medium' : 'preliminary',
+    confidence: photoMatched
+      ? 'medium'
+      : 'preliminary',
     kind: 'check',
-    detail: compactUnique([
-      base.detail,
-      photoMatched
-        ? 'Risk Radar iklimsel risk bağlamı ile saha fotoğrafındaki ön değerlendirme aynı yönde; sahada belirti kontrolüyle doğrula.'
-        : 'Risk Radar iklimsel risk bağlamıdır; tek başına hastalık veya zararlı teşhisi değildir.',
-    ], 2).join(' '),
+    detail: compactUnique(
+      [
+        base.detail,
+        photoMatched
+          ? 'Risk Radar iklimsel risk bağlamı ile saha fotoğrafındaki ön değerlendirme aynı yönde; sahada belirti kontrolüyle doğrula.'
+          : 'Risk Radar iklimsel risk bağlamıdır; tek başına hastalık veya zararlı teşhisi değildir.',
+      ],
+      2,
+    ).join(' '),
     evidence: compactUnique([
       ...(base.evidence ?? []),
       ...phenologyEvidence,

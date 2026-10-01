@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   completeFieldTask,
   dismissFieldTask,
@@ -11,10 +11,15 @@ export function useFieldTasks(fieldId: string, open: boolean) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!fieldId || !open) {
-      setTasks([]);
+    const requestedFieldId = String(fieldId ?? '').trim();
+    const requestId = ++requestIdRef.current;
+
+    if (!requestedFieldId || !open) {
+      if (!requestedFieldId) setTasks([]);
+      setLoading(false);
       return;
     }
 
@@ -22,17 +27,35 @@ export function useFieldTasks(fieldId: string, open: boolean) {
     setError(null);
 
     try {
-      setTasks(await getFieldTasks(fieldId));
+      const nextTasks = await getFieldTasks(requestedFieldId);
+      if (requestId !== requestIdRef.current) return;
+
+      setTasks(
+        nextTasks.filter(
+          (task) => String(task.fieldId ?? '').trim() === requestedFieldId,
+        ),
+      );
     } catch (caught) {
+      if (requestId !== requestIdRef.current) return;
       setError(caught instanceof Error ? caught.message : 'Görevler yüklenemedi.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [fieldId, open]);
 
   useEffect(() => {
+    // Yalnız tarla değişince eski listenin ekranda kalmasını engelle. Sheet'i
+    // kapatıp açmak aynı veriyi silmesin; böylece tekrar açılış anlık olur.
+    requestIdRef.current += 1;
+    setTasks([]);
+    setMessage(null);
+    setError(null);
+  }, [fieldId]);
+
+  useEffect(() => {
+    if (!open) return;
     void refresh();
-  }, [refresh]);
+  }, [open, refresh]);
 
   useEffect(() => {
     if (!open || typeof window === 'undefined') return;

@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import type { IrrigationDecisionResult } from '../types/irrigationDecision';
 import type { IrrigationWhatIfResult } from '../services/irrigationWhatIf.service';
+import IrrigationEconomicsPanel from '../../irrigation-economics/components/IrrigationEconomicsPanel';
+import WaterScarcityPlanPanel from '../../water-scarcity/components/WaterScarcityPlanPanel';
 
 const IRRIGATION_DECISION_DETAIL_MODAL_CSS = String.raw`
 .tp-irrigation-detail-backdrop{
@@ -654,6 +656,14 @@ export default function IrrigationDecisionDetailModal({
             </p>
           )}
         </div>
+
+        {decision.irrigationStatus !== 'rainfed' ? (
+          <IrrigationEconomicsPanel fieldId={decision.fieldId} decision={decision} />
+        ) : null}
+
+        {decision.irrigationStatus !== 'rainfed' ? (
+          <WaterScarcityPlanPanel fieldId={decision.fieldId} decision={decision} />
+        ) : null}
 
         {decision.irrigationStatus !== 'rainfed' ? (
           <div className="tp-irrigation-detail-model">

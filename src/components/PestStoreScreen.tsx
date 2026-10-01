@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
 } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Field, Screen } from '../types';
@@ -25,6 +26,13 @@ import {
 } from '../services/pestStoreService';
 import './PestStoreScreen.css';
 import ClassicBottomNav from './ClassicBottomNav';
+import StorageRiskPanel from '../features/storage-risk/components/StorageRiskPanel';
+import {
+  createStorageLot,
+} from '../features/storage-risk/services/storageRisk.service';
+import {
+  loadFieldYieldHarvestQualitySnapshot,
+} from '../features/yield-quality/services/fieldYieldHarvestQuality.service';
 import {
   addPoints,
   useGamificationStore,
@@ -40,6 +48,16 @@ type MenuItem = {
   label: string;
   badge?: string;
   icon?: string;
+};
+
+type AddDepotMode = 'chooser' | 'manual' | 'harvest';
+
+type HarvestCandidate = {
+  fieldId: string;
+  fieldName: string;
+  crop: string;
+  harvestDate: string | null;
+  quantityKg: number | null;
 };
 
 export interface PestStoreScreenProps {
@@ -279,6 +297,16 @@ function formatAmount(value: number) {
   }).format(value);
 }
 
+function parseLocalizedNumber(value: string) {
+  const clean = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(',', '.');
+
+  if (!clean) return Number.NaN;
+  return Number(clean);
+}
+
 function stockPercent(product: InventoryProduct) {
   if (!Number.isFinite(product.totalAmount) || product.totalAmount <= 0) {
     return 0;
@@ -307,7 +335,6 @@ export default function PestStoreScreen({
   onNavigateToField,
   user,
   setScreen,
-  setSideMenuOpen = () => undefined,
 }: PestStoreScreenProps) {
   const realFields = useMemo(
     () => fields.filter((field) => !field.demo),
@@ -348,6 +375,28 @@ export default function PestStoreScreen({
   const [editDraft, setEditDraft] =
     useState<InventoryProductInput | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [addDepotMode, setAddDepotMode] =
+    useState<AddDepotMode>('chooser');
+  const [scanPanelOpen, setScanPanelOpen] = useState(false);
+
+  const [manualProductName, setManualProductName] = useState('');
+  const [manualCategory, setManualCategory] =
+    useState<InventoryCategory>('gubre');
+  const [manualTotal, setManualTotal] = useState('');
+  const [manualRemaining, setManualRemaining] = useState('');
+  const [manualUnit, setManualUnit] = useState<InventoryUnit>('kg');
+  const [manualFieldIds, setManualFieldIds] = useState<string[]>([]);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualMessage, setManualMessage] = useState('');
+
+  const [harvestCandidates, setHarvestCandidates] =
+    useState<HarvestCandidate[]>([]);
+  const [harvestLoading, setHarvestLoading] = useState(false);
+  const [harvestMessage, setHarvestMessage] = useState('');
+  const [importingHarvestFieldId, setImportingHarvestFieldId] =
+    useState<string | null>(null);
 
   const resultRef = useRef<HTMLDivElement | null>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
@@ -540,11 +589,6 @@ export default function PestStoreScreen({
       );
     };
   }, []);
-
-  const navigate = (next: Screen) => {
-    setScreen?.(next);
-    setSideMenuOpen(false);
-  };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
@@ -840,6 +884,226 @@ export default function PestStoreScreen({
     }
   };
 
+  const resetManualDraft = () => {
+    setManualProductName('');
+    setManualCategory('gubre');
+    setManualTotal('');
+    setManualRemaining('');
+    setManualUnit('kg');
+    setManualFieldIds([]);
+    setManualMessage('');
+  };
+
+  const openAddSheet = (mode: AddDepotMode = 'chooser') => {
+    setAddDepotMode(mode);
+    setAddSheetOpen(true);
+    if (mode === 'manual') setManualMessage('');
+  };
+
+  const toggleManualField = (fieldId: string) => {
+    setManualFieldIds((current) =>
+      current.includes(fieldId)
+        ? current.filter((id) => id !== fieldId)
+        : [...current, fieldId],
+    );
+  };
+
+  const handleManualSave = async () => {
+    const productName = manualProductName.trim();
+    const total = parseLocalizedNumber(manualTotal);
+    const remaining = manualRemaining.trim()
+      ? parseLocalizedNumber(manualRemaining)
+      : total;
+
+    if (!productName) {
+      setManualMessage('Ürün adını yaz.');
+      return;
+    }
+
+    if (!Number.isFinite(total) || total <= 0) {
+      setManualMessage('Toplam miktarı doğru gir.');
+      return;
+    }
+
+    if (!Number.isFinite(remaining) || remaining < 0 || remaining > total) {
+      setManualMessage('Kalan miktar 0 ile toplam miktar arasında olmalı.');
+      return;
+    }
+
+    let currentUser = resolvedUser;
+    if (!currentUser) {
+      try {
+        currentUser = await resolveInventoryUser(user);
+        setResolvedUser(currentUser);
+      } catch (error) {
+        setManualMessage(
+          error instanceof Error
+            ? error.message
+            : 'Ürün eklemek için giriş yapmalısın.',
+        );
+        return;
+      }
+    }
+
+    const input: InventoryProductInput = {
+      productName,
+      category: manualCategory,
+      activeIngredients: null,
+      registrationNumber: null,
+      formulation: null,
+      manufacturer: null,
+      totalAmount: total,
+      remainingAmount: remaining,
+      unit: manualUnit,
+      fieldIds: manualFieldIds,
+      photoUrl: null,
+    };
+
+    try {
+      setManualSaving(true);
+      setManualMessage('Ürün depoya ekleniyor...');
+
+      try {
+        const saved = await createInventoryProduct(currentUser.id, input);
+        upsertProductState(saved, currentUser.id);
+
+        try {
+          await addPoints('ADD_INVENTORY', {
+            dedupeKey: `inventory:${saved.id}`,
+            metadata: {
+              source: 'pest_store_manual',
+              productId: saved.id,
+              productName: saved.productName,
+            },
+            toastTitle: 'Depoya ürün ekleme ödülü',
+          });
+        } catch (pointError) {
+          console.warn('Manuel depo puanı verilemedi:', pointError);
+        }
+      } catch (remoteError) {
+        const now = new Date().toISOString();
+        const localProduct: InventoryProduct = {
+          id:
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? `local-${crypto.randomUUID()}`
+              : `local-${Date.now()}`,
+          userId: currentUser.id,
+          ...input,
+          createdAt: now,
+          updatedAt: now,
+        };
+        upsertProductState(localProduct, currentUser.id);
+        console.warn('Manuel ürün yalnız cihaz önbelleğine kaydedildi:', remoteError);
+      }
+
+      setInventoryMessage(`${productName} depoya eklendi.`);
+      resetManualDraft();
+      setAddSheetOpen(false);
+      window.setTimeout(() => {
+        document
+          .querySelector('.tp-peststore-stock-panel')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+    } catch (error) {
+      setManualMessage(
+        error instanceof Error ? error.message : 'Ürün eklenemedi.',
+      );
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
+  const loadHarvestCandidates = async () => {
+    setHarvestLoading(true);
+    setHarvestMessage('Hasat kayıtların kontrol ediliyor...');
+
+    try {
+      const settled = await Promise.allSettled(
+        realFields.map(async (field) => {
+          const live = await loadFieldYieldHarvestQualitySnapshot(field);
+          const observed = live.snapshot.observed;
+          const harvestDate =
+            live.snapshot.harvest.actualDate ?? observed.harvestDate ?? null;
+
+          if (!harvestDate && live.snapshot.status !== 'harvested') {
+            return null;
+          }
+
+          return {
+            fieldId: String(field.id),
+            fieldName: field.name || 'Tarla',
+            crop: live.snapshot.crop || field.crop || 'Ürün',
+            harvestDate,
+            quantityKg:
+              Number.isFinite(Number(observed.yieldKg)) &&
+              Number(observed.yieldKg) > 0
+                ? Number(observed.yieldKg)
+                : null,
+          } satisfies HarvestCandidate;
+        }),
+      );
+
+      const candidates = settled
+        .filter(
+          (item): item is PromiseFulfilledResult<HarvestCandidate | null> =>
+            item.status === 'fulfilled',
+        )
+        .map((item) => item.value)
+        .filter((item): item is HarvestCandidate => Boolean(item));
+
+      setHarvestCandidates(candidates);
+      setHarvestMessage(
+        candidates.length
+          ? `${candidates.length} hasat kaydı depoya aktarılabilir.`
+          : 'Aktarılabilir gerçek hasat kaydı bulunamadı.',
+      );
+    } catch (error) {
+      setHarvestCandidates([]);
+      setHarvestMessage(
+        error instanceof Error
+          ? error.message
+          : 'Hasat kayıtları okunamadı.',
+      );
+    } finally {
+      setHarvestLoading(false);
+    }
+  };
+
+  const openHarvestImport = () => {
+    setAddDepotMode('harvest');
+    setAddSheetOpen(true);
+    setHarvestCandidates([]);
+    setHarvestMessage('');
+    void loadHarvestCandidates();
+  };
+
+  const handleImportHarvest = async (candidate: HarvestCandidate) => {
+    try {
+      setImportingHarvestFieldId(candidate.fieldId);
+      setHarvestMessage(`${candidate.fieldName} hasadı depoya aktarılıyor...`);
+
+      await createStorageLot({
+        fieldId: candidate.fieldId,
+        crop: candidate.crop,
+        harvestDate: candidate.harvestDate,
+        storedAt: new Date().toISOString().slice(0, 10),
+        quantityKg: candidate.quantityKg,
+        notes: 'TarlaPusula gerçek hasat kaydından Depom bölümüne aktarıldı.',
+      });
+
+      setHarvestCandidates((current) =>
+        current.filter((item) => item.fieldId !== candidate.fieldId),
+      );
+      setHarvestMessage(`${candidate.crop} depoya aktarıldı.`);
+    } catch (error) {
+      setHarvestMessage(
+        error instanceof Error ? error.message : 'Hasat depoya aktarılamadı.',
+      );
+    } finally {
+      setImportingHarvestFieldId(null);
+    }
+  };
+
   const openEdit = (product: InventoryProduct) => {
     setEditingProduct(product);
     setEditDraft({
@@ -999,12 +1263,16 @@ export default function PestStoreScreen({
     (product) => (product.fieldIds?.length ?? 0) > 1,
   ).length;
 
-  const stockHealthText =
-    totalProducts === 0
-      ? 'Henüz kayıtlı ürün yok'
-      : lowStockProducts === 0
-        ? 'Stokların dengeli'
-        : `${lowStockProducts} ürün azalıyor`;
+  const fieldMatchGap = Math.max(0, totalProducts - products.filter((product) => product.fieldIds.length > 0).length);
+  const stockHealthScore = totalProducts
+    ? Math.max(35, Math.min(100, 100 - lowStockProducts * 18 - fieldMatchGap * 5))
+    : 0;
+  const stockHealthLabel =
+    stockHealthScore >= 85
+      ? 'İyi'
+      : stockHealthScore >= 65
+        ? 'Dikkat'
+        : 'Kontrol gerekli';
 
   const pusulaDashboardText =
     totalProducts === 0
@@ -1018,17 +1286,19 @@ export default function PestStoreScreen({
           : `${realFields.length} tarlan ve ${totalProducts} depo ürünün birlikte değerlendirildi. ${fieldsWithProducts.length} tarlada ürün eşleşmesi var; stokların şu an dengeli.`;
 
   const openScanner = () => {
-    document
-      .querySelector('.tp-peststore-dropzone')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setAddSheetOpen(false);
+    setAddDepotMode('chooser');
+    setScanPanelOpen(true);
+
+    // Dosya seçiciyi kullanıcının tıklama zincirinde hemen aç.
+    // Kart bir sonraki render'da görünür hale gelir.
+    scanInputRef.current?.click();
 
     window.setTimeout(() => {
-      const input = document.querySelector(
-        '.tp-peststore-dropzone input[type="file"]',
-      ) as HTMLInputElement | null;
-
-      input?.click();
-    }, 350);
+      document
+        .querySelector('.tp-peststore-scan-card')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
   };
 
   return (
@@ -1070,182 +1340,61 @@ export default function PestStoreScreen({
       <div className="tp-peststore-content">
         <main className="tp-peststore-main">
           
-          <section className="tp-depot-dashboard-head">
-            <div className="tp-depot-dashboard-copy">
+          <section className="tp-depot-v4-head">
+            <div className="tp-depot-v4-title">
               <span>DEPO YÖNETİMİ</span>
-              <h1>İlaç & Gübre Depom</h1>
+              <h1>Depom</h1>
               <p>
-                Tek deponu tüm tarlalarınla birlikte yönet; ürün, stok ve tarla
-                uyumunu tek yerden takip et.
+                {totalProducts} girdi ürünü · {realFields.length} kayıtlı tarla
               </p>
             </div>
 
-            <button
-              type="button"
-              className="tp-depot-report-btn tp-depot-scan-top-btn"
-              onClick={openScanner}
-            >
-              <img
-                src={depotIcon('photo-add.webp')}
-                alt=""
-                crossOrigin="anonymous"
-              />
-              <span>Etiketi Tara</span>
-              <Icon name="chevron" size={14} />
-            </button>
+            <div className="tp-depot-v4-head-actions">
+              <button type="button" onClick={() => openAddSheet()}>
+                <span><Icon name="plus" size={22} /></span>
+                <small>Ürün Ekle</small>
+              </button>
+              <button type="button" onClick={openScanner}>
+                <span><Icon name="scan" size={21} /></span>
+                <small>Tara</small>
+              </button>
+            </div>
           </section>
 
-          <section className="tp-depot-stat-grid">
+          <section className="tp-depot-v4-metrics" aria-label="Depo özeti">
             <button type="button" onClick={() => setFilter('all')}>
-              <img
-                className="tp-depot-stat-icon"
-                src={depotIcon('total-products.webp')}
-                alt=""
-                crossOrigin="anonymous"
-              />
-              <small>Toplam Ürün</small>
               <strong>{totalProducts}</strong>
-              <span>ürün</span>
-              <i>Tümünü Gör</i>
+              <span>Ürün</span>
             </button>
-
             <button type="button" onClick={() => setFilter('ilac')}>
-              <img
-                className="tp-depot-stat-icon"
-                src={depotIcon('pesticide.webp')}
-                alt=""
-                crossOrigin="anonymous"
-              />
-              <small>İlaç</small>
               <strong>{pesticideCount}</strong>
-              <span>ürün</span>
-              <i>Listeyi Gör</i>
+              <span>İlaç</span>
             </button>
-
-            <button type="button" onClick={() => setFilter('low')}>
-              <img
-                className="tp-depot-stat-icon"
-                src={depotIcon('low-stock.webp')}
-                alt=""
-                crossOrigin="anonymous"
-              />
-              <small>Azalan Stok</small>
-              <strong>{lowStockProducts}</strong>
-              <span>ürün</span>
-              <i>Kontrol Et</i>
-            </button>
-
-            <button type="button">
-              <img
-                className="tp-depot-stat-icon"
-                src={depotIcon('linked-fields.webp')}
-                alt=""
-                crossOrigin="anonymous"
-              />
-              <small>Bağlı Tarlalar</small>
-              <strong>{linkedFieldIds.size}</strong>
-              <span>tarla</span>
-              <i>{realFields.length} tarla kayıtlı</i>
-            </button>
-          </section>
-
-          <section className="tp-depot-status-card">
-            <div className="tp-depot-status-copy">
-              <span>DEPO DURUMU</span>
-              <strong>
-                {totalProducts ? `${totalProducts} ürün kayıtlı` : 'Depo boş'}
-              </strong>
-
-              <p>
-                {totalProducts
-                  ? `${fertilizerCount} gübre · ${pesticideCount} ilaç · ${lowStockProducts} azalan stok`
-                  : 'İlk ürününü fotoğrafla veya elle ekleyebilirsin.'}
-              </p>
-
-              <div className="tp-depot-status-bar">
-                <i
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      Math.max(8, totalProducts ? 100 - lowStockProducts * 18 : 8),
-                    )}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="tp-depot-status-visual">
-              <img
-                className="tp-depot-status-image"
-                src={depotIcon('warehouse.webp')}
-                alt="Depo"
-                crossOrigin="anonymous"
-              />
-
-              <div className="tp-depot-health-copy">
-                <span>STOK SAĞLIĞI</span>
-                <b>{stockHealthText}</b>
-
-                <ul>
-                  <li>
-                    <i className="good" />
-                    <span>
-                      {Math.max(0, totalProducts - lowStockProducts)} ürün yeterli
-                    </span>
-                  </li>
-                  <li>
-                    <i className="warning" />
-                    <span>{lowStockProducts} ürün azalıyor</span>
-                  </li>
-                  <li>
-                    <i className="field" />
-                    <span>
-                      {fieldsWithProducts.length}/{realFields.length} tarlada ürün
-                      eşleşmesi
-                    </span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </section>
-
-          <section className="tp-depot-tabs">
-            <button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tümü</button>
-            <button type="button" className={filter === 'gubre' ? 'active' : ''} onClick={() => setFilter('gubre')}>Gübre</button>
-            <button type="button" className={filter === 'ilac' ? 'active' : ''} onClick={() => setFilter('ilac')}>İlaç</button>
-            <button type="button" className={filter === 'low' ? 'active' : ''} onClick={() => setFilter('low')}>Azalan</button>
-          </section>
-
-          <section className="tp-depot-toolbar">
-            <label>
-              <Icon name="search" size={15} />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Ürün ara..."
-              />
-            </label>
-
-            <button type="button" onClick={() => setFilter(filter === 'low' ? 'all' : 'low')}>
-              <Icon name="filter" size={15} />
-              Filtrele
-            </button>
-
             <button
               type="button"
-              onClick={() => setStockSort((current) => current === 'name' ? 'stock' : 'name')}
+              className={lowStockProducts ? 'attention' : ''}
+              onClick={() => setFilter('low')}
             >
-              ↕ Sırala
+              <strong>{lowStockProducts}</strong>
+              <span>Azalan stok</span>
+            </button>
+            <button type="button">
+              <strong>{linkedFieldIds.size}</strong>
+              <span>Bağlı tarla</span>
             </button>
           </section>
 
-          <section className="tp-depot-pusula-note" data-pusula-depot-target>
+          <section className="tp-depot-v4-pusula" data-pusula-depot-target>
+            <div className="tp-depot-v4-pusula-icon">
+              <Icon name="brand" size={20} />
+            </div>
             <div>
-              <span>PUSULA'DAN ÖNERİ</span>
+              <span>PUSULA</span>
               <strong>{pusulaDashboardText}</strong>
             </div>
             <button
               type="button"
+              aria-label="Pusula depo önerilerini aç"
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent('tp:pusula-depot-open', {
@@ -1263,104 +1412,175 @@ export default function PestStoreScreen({
                 )
               }
             >
-              Detaylı Öneriler
+              <Icon name="chevron" size={18} />
             </button>
           </section>
 
-          <section className="tp-depot-action-row">
-            <button
-              type="button"
-              className="primary"
-              onClick={openScanner}
-            >
+          {totalProducts === 0 ? (
+            <section className="tp-depot-v4-empty-card">
               <img
-                className="tp-depot-action-icon"
-                src={depotIcon('photo-add.webp')}
-                alt=""
+                src={depotIcon('warehouse.webp')}
+                alt="Depo"
                 crossOrigin="anonymous"
               />
-              <span>
-                <strong>Etiketi Tara</strong>
-                <small>Fotoğraf çekerek ürün ekle</small>
-              </span>
-            </button>
+              <div className="tp-depot-v4-empty-copy">
+                <span>DEPON HAZIR</span>
+                <h2>İlk ürününü ekle</h2>
+                <p>
+                  Etiketi tarat, bilgileri kendin gir veya kayıtlı hasadını
+                  depoya aktar. TarlaPusula stok ve depolama riskini birlikte
+                  takip etsin.
+                </p>
+              </div>
+              <div className="tp-depot-v4-empty-actions">
+                <button type="button" className="primary" onClick={openScanner}>
+                  <Icon name="camera" size={18} />
+                  Etiketi Tara
+                </button>
+                <button type="button" onClick={() => openAddSheet('manual')}>
+                  <Icon name="edit" size={18} />
+                  Elle Ürün Ekle
+                </button>
+                <button type="button" onClick={openHarvestImport}>
+                  <Icon name="leaf" size={18} />
+                  Hasattan Getir
+                </button>
+              </div>
+              {realFields.length > 0 && (
+                <small className="tp-depot-v4-field-hint">
+                  {realFields.length} tarlan, ekleyeceğin ürünlerle eşleştirilebilir.
+                </small>
+              )}
+            </section>
+          ) : (
+            <section className="tp-depot-v4-health-card">
+              <div className="tp-depot-v4-health-score">
+                <span>DEPO SAĞLIĞI</span>
+                <div className="tp-depot-v4-score-row">
+                  <div
+                    className="tp-depot-v4-score-ring"
+                    style={{ '--score': `${stockHealthScore * 3.6}deg` } as CSSProperties}
+                  >
+                    <strong>{stockHealthScore}</strong>
+                    <small>/ 100</small>
+                  </div>
+                  <div>
+                    <h2>{stockHealthLabel}</h2>
+                    <p>{totalProducts - lowStockProducts} ürün normal stokta</p>
+                  </div>
+                </div>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => document.querySelector('.tp-peststore-analysis')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <img
-                className="tp-depot-action-icon"
-                src={depotIcon('total-products.webp')}
-                alt=""
-                crossOrigin="anonymous"
-              />
-              <span>
-                <strong>Elle Ürün Ekle</strong>
-                <small>Ürün bilgilerini kendin gir</small>
-              </span>
-            </button>
+              <div className="tp-depot-v4-health-list">
+                <div>
+                  <span className="dot good" />
+                  <small>Stok durumu</small>
+                  <strong>{lowStockProducts ? `${lowStockProducts} ürün azalıyor` : 'Normal'}</strong>
+                </div>
+                <div>
+                  <span className={`dot ${fieldsWithoutProducts.length ? 'warning' : 'good'}`} />
+                  <small>Tarla eşleşmesi</small>
+                  <strong>{fieldsWithProducts.length}/{realFields.length || 0}</strong>
+                </div>
+                <div>
+                  <span className="dot neutral" />
+                  <small>İlaç / gübre</small>
+                  <strong>{pesticideCount} / {fertilizerCount}</strong>
+                </div>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => document.querySelector('.tp-peststore-stock-list')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <img
-                className="tp-depot-action-icon"
-                src={depotIcon('low-stock.webp')}
-                alt=""
-                crossOrigin="anonymous"
-              />
-              <span>
-                <strong>Stok Güncelle</strong>
-                <small>Mevcut ürünü düzenle</small>
-              </span>
+              <button
+                type="button"
+                className="tp-depot-v4-health-detail"
+                onClick={() =>
+                  document
+                    .querySelector('.tp-peststore-stock-panel')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+              >
+                Stokları Gör <Icon name="chevron" size={15} />
+              </button>
+            </section>
+          )}
+
+          <StorageRiskPanel fields={realFields} />
+
+          <section className="tp-depot-v4-inventory-head">
+            <div>
+              <span>GİRDİ STOKLARI</span>
+              <h2>Ürünlerim</h2>
+            </div>
+            <button type="button" onClick={() => openAddSheet()}>
+              <Icon name="plus" size={17} /> Ürün Ekle
             </button>
           </section>
 
-          <section className="tp-peststore-top-grid">
-            <article className="tp-peststore-card tp-peststore-scan-card">
+          <section className="tp-depot-tabs tp-depot-v4-tabs">
+            <button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tümü</button>
+            <button type="button" className={filter === 'gubre' ? 'active' : ''} onClick={() => setFilter('gubre')}>Gübre</button>
+            <button type="button" className={filter === 'ilac' ? 'active' : ''} onClick={() => setFilter('ilac')}>İlaç</button>
+            <button type="button" className={filter === 'low' ? 'active' : ''} onClick={() => setFilter('low')}>Azalan</button>
+          </section>
+
+          <section className="tp-depot-toolbar tp-depot-v4-toolbar">
+            <label>
+              <Icon name="search" size={15} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Ürün ara..."
+              />
+            </label>
+            <button type="button" onClick={() => setFilter(filter === 'low' ? 'all' : 'low')}>
+              <Icon name="filter" size={15} /> Filtrele
+            </button>
+            <button
+              type="button"
+              onClick={() => setStockSort((current) => current === 'name' ? 'stock' : 'name')}
+            >
+              ↕ Sırala
+            </button>
+          </section>
+
+          <section className="tp-peststore-top-grid tp-depot-v4-grid">
+            <article
+              className={`tp-peststore-card tp-peststore-scan-card ${
+                scanPanelOpen || labelFile || analysisLoading ? 'is-open' : ''
+              }`}
+            >
               <div className="tp-peststore-card-head">
-                <span>
-                  <Icon name="camera" size={19} />
-                </span>
+                <span><Icon name="camera" size={19} /></span>
                 <div>
                   <small>AI ETİKET OKUMA</small>
                   <h2>Ürün Etiketi Tarama</h2>
                 </div>
+                <button
+                  type="button"
+                  className="tp-depot-v4-scan-close"
+                  onClick={() => setScanPanelOpen(false)}
+                  aria-label="Etiket taramayı kapat"
+                >
+                  <Icon name="close" size={16} />
+                </button>
               </div>
 
-              <label
-                className={`tp-peststore-dropzone ${
-                  labelFile ? 'has-file' : ''
-                }`}
-              >
+              <label className={`tp-peststore-dropzone ${labelFile ? 'has-file' : ''}`}>
                 <input
                   ref={scanInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  onChange={handleFileChange}
+                  onChange={(event) => {
+                    handleFileChange(event);
+                    setScanPanelOpen(true);
+                  }}
                 />
-
                 {labelPreview ? (
-                  <img
-                    src={labelPreview}
-                    alt="Yüklenen ürün etiketi önizlemesi"
-                  />
+                  <img src={labelPreview} alt="Yüklenen ürün etiketi önizlemesi" />
                 ) : (
-                  <span>
-                    <Icon name="scan" size={26} />
-                  </span>
+                  <span><Icon name="scan" size={26} /></span>
                 )}
-
-                <strong>
-                  {labelFile?.name ??
-                    'İlaç veya gübre etiketinin net fotoğrafını yükle'}
-                </strong>
-                <p>
-                  Ürün adı, ruhsat/tescil no, etken madde ve dozaj tablosu
-                  mümkün olduğunca net görünmeli.
-                </p>
+                <strong>{labelFile?.name ?? 'İlaç veya gübre etiketinin net fotoğrafını yükle'}</strong>
+                <p>Ürün adı, ruhsat/tescil no, etken madde ve dozaj tablosu mümkün olduğunca net görünmeli.</p>
               </label>
 
               <button
@@ -1370,67 +1590,17 @@ export default function PestStoreScreen({
                 onClick={() => void handleAnalyze()}
               >
                 {analysisLoading ? (
-                  <>
-                    <span className="tp-peststore-spinner" />
-                    BKÜ Etiketi AI ile Analiz Ediliyor...
-                  </>
+                  <><span className="tp-peststore-spinner" /> Etiket analiz ediliyor...</>
                 ) : (
-                  <>
-                    <Icon name="scan" size={16} />
-                    BKÜ Verisi İçin Etiketi Tara & Analiz Et
-                  </>
+                  <><Icon name="scan" size={16} /> Etiketi Tara & Analiz Et</>
                 )}
               </button>
-
-              {analysisMessage && (
-                <div className="tp-peststore-inline-message">
-                  {analysisMessage}
-                </div>
-              )}
+              {analysisMessage && <div className="tp-peststore-inline-message">{analysisMessage}</div>}
             </article>
 
             <article className="tp-peststore-card tp-peststore-stock-panel">
-              <div className="tp-peststore-card-head">
-                <span>
-                  <Icon name="box" size={19} />
-                </span>
-                <div>
-                  <small>STOK TAKİBİ</small>
-                  <h2>Depom</h2>
-                </div>
-                <b>{products.length} ürün</b>
-              </div>
-
-              <div className="tp-peststore-toolbar">
-                <label>
-                  <Icon name="search" size={15} />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Depoda ürün ara..."
-                  />
-                </label>
-
-                <label>
-                  <Icon name="filter" size={15} />
-                  <select
-                    value={filter}
-                    onChange={(event) =>
-                      setFilter(event.target.value as typeof filter)
-                    }
-                  >
-                    <option value="all">Tüm Ürünler</option>
-                    <option value="ilac">İlaçlar</option>
-                    <option value="gubre">Gübreler</option>
-                    <option value="low">Azalanlar</option>
-                  </select>
-                </label>
-              </div>
-
               {inventoryMessage && (
-                <div className="tp-peststore-inline-message">
-                  {inventoryMessage}
-                </div>
+                <div className="tp-peststore-inline-message">{inventoryMessage}</div>
               )}
 
               {loadingProducts && products.length === 0 ? (
@@ -1439,38 +1609,26 @@ export default function PestStoreScreen({
                   <strong>Depo yükleniyor...</strong>
                 </div>
               ) : filteredProducts.length === 0 ? (
-                <div className="tp-peststore-empty">
-                  <Icon name="box" size={24} />
-                  <strong>
-                    {products.length
-                      ? 'Bu filtrede ürün bulunamadı.'
-                      : 'Deponuzda henüz kayıtlı ürün bulunmuyor.'}
-                  </strong>
-                  <p>
-                    Etiket taratarak ilk ilaç veya gübre kaydını
-                    oluşturabilirsin.
-                  </p>
+                <div className="tp-peststore-empty tp-depot-v4-list-empty">
+                  <Icon name="package" size={24} />
+                  <strong>{products.length ? 'Bu filtrede ürün bulunamadı.' : 'Henüz girdi ürünü yok.'}</strong>
+                  <p>Etiket taratabilir veya ürün bilgilerini elle ekleyebilirsin.</p>
+                  {!products.length && (
+                    <button type="button" onClick={() => openAddSheet()}>İlk ürünü ekle</button>
+                  )}
                 </div>
               ) : (
                 <div className="tp-peststore-stock-list">
                   {dashboardProducts.map((product) => {
                     const percent = stockPercent(product);
                     const tone = stockTone(percent);
-
                     return (
-                      <article
-                        className="tp-peststore-stock-item"
-                        key={product.id}
-                      >
+                      <article className="tp-peststore-stock-item" key={product.id}>
                         <div className="tp-peststore-stock-title">
                           <div className="tp-peststore-product-main">
                             <div className="tp-peststore-product-visual" aria-hidden="true">
                               <img
-                                src={depotIcon(
-                                  product.category === 'ilac'
-                                    ? 'pesticide.webp'
-                                    : 'fertilizer.webp',
-                                )}
+                                src={depotIcon(product.category === 'ilac' ? 'pesticide.webp' : 'fertilizer.webp')}
                                 alt=""
                                 crossOrigin="anonymous"
                               />
@@ -1478,131 +1636,51 @@ export default function PestStoreScreen({
                                 <i style={{ height: `${percent}%` }} />
                               </span>
                             </div>
-
                             <div>
-                            <span
-                              className={`tp-peststore-kind ${product.category}`}
-                            >
-                              {product.category === 'ilac'
-                                ? 'İLAÇ'
-                                : 'GÜBRE'}
-                            </span>
-                            <strong>{product.productName}</strong>
-                            <small>
-                              {product.activeIngredients ||
-                                product.manufacturer ||
-                                'Etken madde / üretici bilgisi yok'}
-                            </small>
+                              <span className={`tp-peststore-kind ${product.category}`}>
+                                {product.category === 'ilac' ? 'İLAÇ' : 'GÜBRE'}
+                              </span>
+                              <strong>{product.productName}</strong>
+                              <small>{product.activeIngredients || product.manufacturer || 'Ürün bilgisi'}</small>
                             </div>
                           </div>
-
                           <div className="tp-peststore-stock-actions">
-                            <button
-                              type="button"
-                              onClick={() => openEdit(product)}
-                              aria-label="Ürünü düzenle"
-                            >
+                            <button type="button" onClick={() => openEdit(product)} aria-label="Ürünü düzenle">
                               <Icon name="edit" size={14} />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(product)}
-                              aria-label="Ürünü sil"
-                            >
+                            <button type="button" onClick={() => void handleDelete(product)} aria-label="Ürünü sil">
                               <Icon name="trash" size={14} />
                             </button>
                           </div>
                         </div>
 
                         <div className="tp-peststore-stock-numbers">
-                          <strong>
-                            {formatAmount(product.remainingAmount)}{' '}
-                            {product.unit}
-                          </strong>
-                          <span>
-                            / {formatAmount(product.totalAmount)}{' '}
-                            {product.unit}
-                          </span>
+                          <strong>{formatAmount(product.remainingAmount)} {product.unit}</strong>
+                          <span>/ {formatAmount(product.totalAmount)} {product.unit}</span>
                           <i className={tone}>
-                            {tone === 'critical'
-                              ? 'Kritik stok'
-                              : tone === 'low'
-                                ? 'Azalıyor'
-                                : `%${Math.round(percent)}`}
+                            {tone === 'critical' ? 'Kritik stok' : tone === 'low' ? 'Azalıyor' : `%${Math.round(percent)}`}
                           </i>
                         </div>
-
                         <div className="tp-peststore-progress">
-                          <span
-                            className={tone}
-                            style={{ width: `${percent}%` }}
-                          />
+                          <span className={tone} style={{ width: `${percent}%` }} />
                         </div>
-
-                        <div className="tp-peststore-registration">
-                          {product.category === 'ilac' ? (
-                            <>
-                              <Icon
-                                name={
-                                  product.registrationNumber
-                                    ? 'check'
-                                    : 'warning'
-                                }
-                                size={13}
-                              />
-                              <span>
-                                {product.registrationNumber
-                                  ? `Etiketten ruhsat no: ${product.registrationNumber}`
-                                  : 'Ruhsat no etiketten okunamadı'}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Icon
-                                name={
-                                  product.registrationNumber
-                                    ? 'check'
-                                    : 'warning'
-                                }
-                                size={13}
-                              />
-                              <span>
-                                {product.registrationNumber
-                                  ? `Gübre tescil/beyan no: ${product.registrationNumber}`
-                                  : 'Gübre tescil/beyan no okunamadı'}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
                         <div className="tp-peststore-field-relevance">
-                          <span>TARLA UYUMU</span>
+                          <span>TARLA</span>
                           <strong>
                             {product.fieldIds.length > 1
-                              ? `${product.fieldIds.length} tarlada geçerli`
+                              ? `${product.fieldIds.length} tarlayla eşleşiyor`
                               : product.fieldIds.length === 1
-                                ? '1 tarlada geçerli'
-                                : 'Henüz tarla ile eşleşmedi'}
+                                ? '1 tarlayla eşleşiyor'
+                                : 'Henüz eşleşmedi'}
                           </strong>
                         </div>
-
                         {product.fieldIds.length > 0 && (
                           <div className="tp-peststore-field-chips">
                             {product.fieldIds.map((fieldId) => {
-                              const field = realFields.find(
-                                (item) => String(item.id) === fieldId,
-                              );
-
+                              const field = realFields.find((item) => String(item.id) === fieldId);
                               if (!field) return null;
-
                               return (
-                                <button
-                                  key={fieldId}
-                                  type="button"
-                                  onClick={() =>
-                                    onNavigateToField?.(fieldId)
-                                  }
-                                >
+                                <button key={fieldId} type="button" onClick={() => onNavigateToField?.(fieldId)}>
                                   {field.name} · {field.crop}
                                 </button>
                               );
@@ -2321,6 +2399,160 @@ export default function PestStoreScreen({
           )}
         </main>
       </div>
+
+      {addSheetOpen && (
+        <div className="tp-depot-v4-sheet-layer">
+          <button
+            type="button"
+            className="tp-depot-v4-sheet-backdrop"
+            aria-label="Ürün ekleme penceresini kapat"
+            onClick={() => setAddSheetOpen(false)}
+          />
+          <section className="tp-depot-v4-sheet" role="dialog" aria-modal="true">
+            <div className="tp-depot-v4-sheet-grab" />
+            <div className="tp-depot-v4-sheet-head">
+              <div>
+                <span>{addDepotMode === 'chooser' ? 'DEPOM' : addDepotMode === 'manual' ? 'ELLE EKLE' : 'HASATTAN GETİR'}</span>
+                <h2>
+                  {addDepotMode === 'chooser'
+                    ? 'Ürün nasıl eklensin?'
+                    : addDepotMode === 'manual'
+                      ? 'Ürün bilgilerini gir'
+                      : 'Kayıtlı hasatlardan seç'}
+                </h2>
+              </div>
+              <button type="button" onClick={() => setAddSheetOpen(false)} aria-label="Kapat">
+                <Icon name="close" size={19} />
+              </button>
+            </div>
+
+            {addDepotMode === 'chooser' && (
+              <div className="tp-depot-v4-sheet-choices">
+                <button type="button" onClick={openScanner}>
+                  <span><Icon name="camera" size={21} /></span>
+                  <div><strong>Etiketi Tara</strong><small>Fotoğraf çek, bilgileri otomatik dolduralım.</small></div>
+                  <Icon name="chevron" size={18} />
+                </button>
+                <button type="button" onClick={() => setAddDepotMode('manual')}>
+                  <span><Icon name="edit" size={21} /></span>
+                  <div><strong>Elle Ekle</strong><small>İlaç veya gübre bilgisini kendin gir.</small></div>
+                  <Icon name="chevron" size={18} />
+                </button>
+                <button type="button" onClick={openHarvestImport}>
+                  <span><Icon name="leaf" size={21} /></span>
+                  <div><strong>Hasattan Getir</strong><small>Kayıtlı gerçek hasadı yeni depo partisine aktar.</small></div>
+                  <Icon name="chevron" size={18} />
+                </button>
+              </div>
+            )}
+
+            {addDepotMode === 'manual' && (
+              <div className="tp-depot-v4-manual-form">
+                <label className="wide">
+                  <span>Ürün adı</span>
+                  <input value={manualProductName} onChange={(event) => setManualProductName(event.target.value)} placeholder="Örn. 20-20-0 Gübre" />
+                </label>
+                <label>
+                  <span>Tür</span>
+                  <select value={manualCategory} onChange={(event) => setManualCategory(event.target.value as InventoryCategory)}>
+                    <option value="gubre">Gübre</option>
+                    <option value="ilac">İlaç / BKÜ</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Birim</span>
+                  <select value={manualUnit} onChange={(event) => setManualUnit(event.target.value as InventoryUnit)}>
+                    <option value="kg">kg</option>
+                    <option value="lt">lt</option>
+                    <option value="gr">gr</option>
+                    <option value="ml">ml</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Toplam miktar</span>
+                  <input inputMode="decimal" value={manualTotal} onChange={(event) => setManualTotal(event.target.value)} placeholder="Örn. 50" />
+                </label>
+                <label>
+                  <span>Kalan miktar</span>
+                  <input inputMode="decimal" value={manualRemaining} onChange={(event) => setManualRemaining(event.target.value)} placeholder="Boşsa toplamla aynı" />
+                </label>
+
+                {realFields.length > 0 && (
+                  <div className="tp-depot-v4-manual-fields wide">
+                    <span>Hangi tarlalarla ilişkili?</span>
+                    <div>
+                      {realFields.map((field) => {
+                        const fieldId = String(field.id);
+                        const checked = manualFieldIds.includes(fieldId);
+                        return (
+                          <button
+                            type="button"
+                            key={fieldId}
+                            className={checked ? 'selected' : ''}
+                            onClick={() => toggleManualField(fieldId)}
+                          >
+                            {field.name}<small>{field.crop}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {manualMessage && <p className="tp-depot-v4-sheet-message">{manualMessage}</p>}
+                <div className="tp-depot-v4-sheet-actions wide">
+                  <button type="button" onClick={() => setAddDepotMode('chooser')}>Geri</button>
+                  <button type="button" className="primary" disabled={manualSaving} onClick={() => void handleManualSave()}>
+                    {manualSaving ? 'Kaydediliyor...' : 'Depoya Ekle'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {addDepotMode === 'harvest' && (
+              <div className="tp-depot-v4-harvest-list">
+                <p className="tp-depot-v4-harvest-info">
+                  Burada yalnız TarlaPusula'da gerçek hasat tarihi kaydı bulunan tarlalar gösterilir.
+                </p>
+                {harvestLoading ? (
+                  <div className="tp-depot-v4-harvest-loading"><span className="tp-peststore-spinner" /> Hasatlar okunuyor...</div>
+                ) : harvestCandidates.length ? (
+                  harvestCandidates.map((candidate) => (
+                    <article key={candidate.fieldId}>
+                      <div>
+                        <small>{candidate.fieldName}</small>
+                        <strong>{candidate.crop}</strong>
+                        <span>
+                          {candidate.harvestDate ? `Hasat ${candidate.harvestDate}` : 'Hasat kaydı'}
+                          {candidate.quantityKg != null ? ` · ${formatAmount(candidate.quantityKg)} kg` : ' · miktar yok'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={importingHarvestFieldId === candidate.fieldId}
+                        onClick={() => void handleImportHarvest(candidate)}
+                      >
+                        {importingHarvestFieldId === candidate.fieldId ? 'Aktarılıyor' : 'Depoya aktar'}
+                      </button>
+                    </article>
+                  ))
+                ) : (
+                  <div className="tp-depot-v4-harvest-empty">
+                    <Icon name="leaf" size={24} />
+                    <strong>Aktarılabilir hasat yok</strong>
+                    <span>Hasat kaydı oluştuğunda burada otomatik görünür.</span>
+                  </div>
+                )}
+                {harvestMessage && <p className="tp-depot-v4-sheet-message">{harvestMessage}</p>}
+                <div className="tp-depot-v4-sheet-actions">
+                  <button type="button" onClick={() => setAddDepotMode('chooser')}>Geri</button>
+                  <button type="button" className="primary" onClick={() => setAddSheetOpen(false)}>Tamam</button>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       <ClassicBottomNav
         activeScreen="inventoryHub"

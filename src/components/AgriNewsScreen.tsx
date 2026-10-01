@@ -29,8 +29,8 @@ export default function AgriNewsScreen({ setScreen, setSideMenuOpen }: AgriNewsS
           <ArrowLeft size={18} />
         </button>
         <div>
-          <strong>Tarım Gündemi</strong>
-          <small>Türkiye · Dünya · Üretici Makaleleri · Destek</small>
+          <strong>Pusula Gündem</strong>
+          <small>Üretici için seçilmiş gelişmeler</small>
         </div>
         <button type="button" onClick={() => setSideMenuOpen?.(true)} aria-label="Menüyü aç">
           <Menu size={18} />
@@ -38,13 +38,6 @@ export default function AgriNewsScreen({ setScreen, setSideMenuOpen }: AgriNewsS
       </header>
 
       <main className="tp-agri-news-main tp-agri-news-main--live">
-        <section className="tp-agri-news-heading tp-agri-news-heading--live">
-          <div>
-            <span>TARIMSAL GÜNDEM</span>
-            <h1>Tarım Gündemi</h1>
-            <p>Üreticiye fayda sağlayan içerikler admin onayından sonra kaynak, tarih ve konum bilgileriyle yayınlanır.</p>
-          </div>
-        </section>
         <PublishedAgriNewsBridge onOpenSupport={openSupportCalculator} />
       </main>
     </div>

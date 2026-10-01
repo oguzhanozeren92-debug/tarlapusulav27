@@ -2,7 +2,7 @@ import { shouldPlayMapOpening, openMapAtField } from '../map-opening/mapOpening'
 import { resolveOpeningTarget } from '../map-opening/openingTarget';
 import { mapRuntime } from '../../lib/mapRuntime';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, Crosshair, History, Minus, Plus, Satellite } from 'lucide-react';
+import { CalendarClock, Check, Crosshair, History, Minus, Pentagon, Plus, Satellite, Undo2, X } from 'lucide-react';
 import * as maplibregl from 'maplibre-gl';
 import MapDataDate from '../map-data/components/MapDataDate';
 import SatelliteHistorySheet from '../map-data/components/SatelliteHistorySheet';
@@ -33,6 +33,22 @@ import { addTarlaCompass } from '../../components/MapCompass';
 import NdviObservationPhotoModal from '../field-observations/components/NdviObservationPhotoModal';
 import NdviObservationTimelineModal from '../field-observations/components/NdviObservationTimelineModal';
 import FieldObservationPointsModal from '../field-observations/components/FieldObservationPointsModal';
+import type { EarthSearchNdviStats } from './services/earthSearchNdvi.service';
+import type { OrchardTrackingZonePolygon, OrchardTrackingZoneRecord } from '../orchard-tracking-zones/types/orchardTrackingZone';
+import {
+  buildTrackingZonePolygon,
+  dispatchOrchardTrackingZonesChanged,
+  estimateTreeCountFromSpacing,
+  isTrackingZonePointInsideField,
+  isTrackingZonePolygonInsideField,
+  listOrchardTrackingZones,
+  ORCHARD_TRACKING_ZONE_START_DRAW_EVENT,
+  ORCHARD_TRACKING_ZONE_SELECT_EVENT,
+  ORCHARD_TRACKING_ZONES_CHANGED_EVENT,
+  saveOrchardTrackingZone,
+  trackingZoneAreaM2,
+} from '../orchard-tracking-zones/services/orchardTrackingZone.service';
+import '../orchard-tracking-zones/components/OrchardTrackingZoneMapUi.css';
 import FieldOperationModal from '../field-operations/components/FieldOperationModal';
 import { ensureNdviObservationPoint, listFieldObservationPoints } from '../field-observations/services/fieldObservation.service';
 import type {
@@ -94,6 +110,12 @@ const HOME_MAP_SOIL_CLIPPED_CACHE = new Map<
   { url: string; bbox: HomeBBox }
 >();
 const HOME_MAP_NDVI_CACHE = new Map<string, string>();
+type HomeMapNdviLatestSnapshot = {
+  image: string;
+  latestImageDate: string | null;
+  ndviAverage: number | null;
+};
+const HOME_MAP_NDVI_LATEST_CACHE = new Map<string, HomeMapNdviLatestSnapshot>();
 
 /**
  * Harita katmanları için üç seviyeli cache:
@@ -2300,7 +2322,7 @@ function InteractiveHomeHealthMap({
       {
         // Bilinçli olarak geniş boşluk: tarlanın çevresi de ilk karede görünür.
         padding: { top: 18, right: 18, bottom: 30, left: 18 },
-        maxZoom: 18.35,
+        maxZoom: 17.2,
         pitch: bbox ? 55 : 0,
         bearing: bbox ? -14 : 0,
         duration: 650,
@@ -2393,7 +2415,7 @@ function InteractiveHomeHealthMap({
           ],
           {
             padding: { top: 18, right: 18, bottom: 30, left: 18 },
-            maxZoom: 18.35,
+            maxZoom: 17.2,
             pitch: 55,
             bearing: -14,
             duration: 0,
@@ -4886,6 +4908,7 @@ export function HomeInlineLayerMap({
   soilDepth,
   climateLayer,
   climateDepth,
+  ndviStats = null,
   height = 390,
   onSpatialSummary,
 }: {
@@ -4896,6 +4919,7 @@ export function HomeInlineLayerMap({
   soilDepth: HomeSoilDepth;
   climateLayer: HomeClimateLayer;
   climateDepth: HomeClimateDepth;
+  ndviStats?: EarthSearchNdviStats | null;
   height?: number;
   onSpatialSummary?: (
     summary: HomeLayerSpatialSummary | null,
@@ -4914,7 +4938,15 @@ export function HomeInlineLayerMap({
   const trackingPointMarkersRef = useRef<maplibregl.Marker[]>([]);
   const pusulaFocusTimersRef = useRef<number[]>([]);
   const pusulaFocusItemsRef = useRef<HomePusulaFocusItem[]>([]);
+  const pusulaFocusNavRef = useRef<{
+    prev: () => void;
+    next: () => void;
+    all: () => void;
+    exit: () => void;
+  } | null>(null);
+  const taskPhotoOpenRef = useRef<(() => void) | null>(null);
   const ndviObservationRequestRef = useRef(0);
+  const ndviObservationTimerRef = useRef<number | null>(null);
   const [pusulaFocusUi, setPusulaFocusUi] =
     useState<HomePusulaFocusUi | null>(null);
   const [ndviObservationTarget, setNdviObservationTarget] =
@@ -4924,20 +4956,36 @@ export function HomeInlineLayerMap({
   const [fieldTrackingOpen, setFieldTrackingOpen] = useState(false);
   const [fieldOperationOpen, setFieldOperationOpen] = useState(false);
   const [fieldOperationToast, setFieldOperationToast] = useState<string | null>(null);
+  const fieldOperationLaunchRef = useRef<{
+    source: string;
+    fieldId: string;
+    candidateKey: string | null;
+  } | null>(null);
 
 
   useEffect(() => {
-    const openFieldOperation = () => setFieldOperationOpen(true);
+    const openFieldOperation = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail ?? {};
+      fieldOperationLaunchRef.current =
+        detail?.source === 'pusula-field-event'
+          ? {
+              source: 'pusula-field-event',
+              fieldId: String(detail?.fieldId ?? ''),
+              candidateKey: detail?.candidateKey ? String(detail.candidateKey) : null,
+            }
+          : null;
+      setFieldOperationOpen(true);
+    };
 
     window.addEventListener(
       'tp:home-map-open-field-operation',
-      openFieldOperation,
+      openFieldOperation as EventListener,
     );
 
     return () => {
       window.removeEventListener(
         'tp:home-map-open-field-operation',
-        openFieldOperation,
+        openFieldOperation as EventListener,
       );
     };
   }, []);
@@ -4976,12 +5024,34 @@ export function HomeInlineLayerMap({
   const [agroCellsKey, setAgroCellsKey] = useState('');
   const [smoothNdvi, setSmoothNdvi] = useState<string | null>(null);
   const [smoothNdviKey, setSmoothNdviKey] = useState('');
+  const [cachedNdviSnapshot, setCachedNdviSnapshot] =
+    useState<HomeMapNdviLatestSnapshot | null>(null);
   const [soilLoadError, setSoilLoadError] = useState<string | null>(null);
   const [soilProfile, setSoilProfile] = useState<SoilGridsProfile | null>(null);
   const [soilProfileKey, setSoilProfileKey] = useState('');
   const [soilProfileLoading, setSoilProfileLoading] = useState(false);
   const [soilProfileError, setSoilProfileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [orchardTrackingZones, setOrchardTrackingZones] =
+    useState<OrchardTrackingZoneRecord[]>([]);
+  const [orchardZoneDrawActive, setOrchardZoneDrawActive] = useState(false);
+  const [orchardZoneDraftPoints, setOrchardZoneDraftPoints] =
+    useState<Array<[number, number]>>([]);
+  const [orchardZoneSaveGeometry, setOrchardZoneSaveGeometry] =
+    useState<OrchardTrackingZonePolygon | null>(null);
+  const [orchardZoneSaveOpen, setOrchardZoneSaveOpen] = useState(false);
+  const [orchardZoneName, setOrchardZoneName] = useState('');
+  const [orchardZoneTreeMode, setOrchardZoneTreeMode] =
+    useState<'manual' | 'spacing' | 'unknown'>('unknown');
+  const [orchardZoneManualTreeCount, setOrchardZoneManualTreeCount] =
+    useState('');
+  const [orchardZoneRowSpacing, setOrchardZoneRowSpacing] = useState('');
+  const [orchardZoneTreeSpacing, setOrchardZoneTreeSpacing] = useState('');
+  const [orchardZoneNotes, setOrchardZoneNotes] = useState('');
+  const [orchardZoneSaving, setOrchardZoneSaving] = useState(false);
+  const [orchardZoneMessage, setOrchardZoneMessage] =
+    useState<string | null>(null);
 
   useEffect(() => {
     void requestMapLayerPersistentStorage();
@@ -4992,6 +5062,105 @@ export function HomeInlineLayerMap({
     () => homeFieldCenter(parcelGeometry, field),
     [parcelGeometry, field?.id]
   );
+
+  const orchardZoneFieldId = String(field?.id ?? '').trim();
+  const orchardZoneEnabled = Boolean(
+    orchardZoneFieldId &&
+    parcelGeometry &&
+    !field?.demo &&
+    (field?.cropCycle ?? 'annual') === 'perennial',
+  );
+
+  const orchardZoneDraftGeometry = useMemo(
+    () => buildTrackingZonePolygon(orchardZoneDraftPoints),
+    [orchardZoneDraftPoints],
+  );
+  const orchardZoneDraftAreaM2 = useMemo(
+    () => trackingZoneAreaM2(orchardZoneSaveGeometry ?? orchardZoneDraftGeometry),
+    [orchardZoneSaveGeometry, orchardZoneDraftGeometry],
+  );
+  const orchardZoneSpacingEstimate = useMemo(
+    () => estimateTreeCountFromSpacing({
+      areaM2: orchardZoneDraftAreaM2,
+      rowSpacingM: Number(orchardZoneRowSpacing),
+      treeSpacingM: Number(orchardZoneTreeSpacing),
+    }),
+    [orchardZoneDraftAreaM2, orchardZoneRowSpacing, orchardZoneTreeSpacing],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadZones = async () => {
+      if (!orchardZoneEnabled) {
+        setOrchardTrackingZones([]);
+        return;
+      }
+      try {
+        const zones = await listOrchardTrackingZones(orchardZoneFieldId);
+        if (!cancelled) setOrchardTrackingZones(zones);
+      } catch (error) {
+        console.warn('Bahçe takip alanları alınamadı:', error);
+        if (!cancelled) setOrchardTrackingZones([]);
+      }
+    };
+
+    void loadZones();
+
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail ?? {};
+      const changedFieldId = String(detail.fieldId ?? '').trim();
+      if (!changedFieldId || changedFieldId === orchardZoneFieldId) {
+        void loadZones();
+      }
+    };
+
+    window.addEventListener(
+      ORCHARD_TRACKING_ZONES_CHANGED_EVENT,
+      onChanged as EventListener,
+    );
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(
+        ORCHARD_TRACKING_ZONES_CHANGED_EVENT,
+        onChanged as EventListener,
+      );
+    };
+  }, [orchardZoneEnabled, orchardZoneFieldId]);
+
+  useEffect(() => {
+    const onStart = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail ?? {};
+      const requestedFieldId = String(detail.fieldId ?? '').trim();
+      if (requestedFieldId && requestedFieldId !== orchardZoneFieldId) return;
+      if (!orchardZoneEnabled) return;
+      setOrchardZoneDraftPoints([]);
+      setOrchardZoneSaveGeometry(null);
+      setOrchardZoneSaveOpen(false);
+      setOrchardZoneMessage(null);
+      setOrchardZoneDrawActive(true);
+    };
+
+    window.addEventListener(
+      ORCHARD_TRACKING_ZONE_START_DRAW_EVENT,
+      onStart as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        ORCHARD_TRACKING_ZONE_START_DRAW_EVENT,
+        onStart as EventListener,
+      );
+    };
+  }, [orchardZoneEnabled, orchardZoneFieldId]);
+
+  useEffect(() => {
+    setOrchardZoneDrawActive(false);
+    setOrchardZoneDraftPoints([]);
+    setOrchardZoneSaveGeometry(null);
+    setOrchardZoneSaveOpen(false);
+    setOrchardZoneMessage(null);
+  }, [orchardZoneFieldId]);
 
   const radarMode: 'vv' | 'vh' | 'water' | null =
     layer === 'radar-vv'
@@ -5089,6 +5258,12 @@ export function HomeInlineLayerMap({
       ? `${homeMapFieldKey}:ndvi-overlay-v5-absolute:${ndviVersion}:${bbox.join(',')}`
       : `${homeMapFieldKey}:ndvi-overlay-v5-absolute:${ndviVersion}:no-bbox`;
 
+  // Signed Sentinel URL'leri değişse veya canlı sorgu geçici olarak boş dönse bile
+  // son başarıyla üretilmiş NDVI rasterı tarla+bbox anahtarında kalıcı tutulur.
+  const ndviLatestCacheKey = bbox
+    ? `${homeMapFieldKey}:ndvi-latest-v1:${bbox.join(',')}`
+    : `${homeMapFieldKey}:ndvi-latest-v1:no-bbox`;
+
   // Her görünür katman/alt-katman kendi request kimliğine sahiptir. Böylece
   // örneğin Yağış isteği geç cevap verse bile kullanıcı o sırada ET₀'ya
   // geçtiyse eski sonuç yeni ekrana yazılamaz.
@@ -5133,16 +5308,87 @@ export function HomeInlineLayerMap({
     let cancelled = false;
     const requestKey = activeLayerRequestKey;
 
-    if (!satelliteData?.ndviImage || !bbox) {
-      setSmoothNdvi(null);
-      setSmoothNdviKey('');
+    const applyLatestSnapshot = (snapshot: HomeMapNdviLatestSnapshot) => {
+      if (cancelled || activeLayerRequestKeyRef.current !== requestKey) return;
+      if (!snapshot?.image?.startsWith('data:image/')) return;
+
+      HOME_MAP_NDVI_LATEST_CACHE.set(ndviLatestCacheKey, snapshot);
+      setCachedNdviSnapshot(snapshot);
+      setSmoothNdvi(snapshot.image);
+      // Canlı Sentinel verisi o anda yoksa bile bu tarla için son başarılı
+      // NDVI'yı mevcut vegetation request'inin görseli olarak kabul et.
+      setSmoothNdviKey(ndviCacheKey);
+    };
+
+    const persistLatestSnapshot = (image: string) => {
+      if (!image?.startsWith('data:image/')) return;
+
+      const average = Number(satelliteData?.ndviAverage);
+      const snapshot: HomeMapNdviLatestSnapshot = {
+        image,
+        latestImageDate:
+          String(satelliteData?.latestImageDate ?? '').trim() || null,
+        ndviAverage: Number.isFinite(average) ? average : null,
+      };
+
+      HOME_MAP_NDVI_LATEST_CACHE.set(ndviLatestCacheKey, snapshot);
+      setCachedNdviSnapshot(snapshot);
+      void writeHomeMapPersistentCache(
+        'ndvi-latest',
+        ndviLatestCacheKey,
+        snapshot,
+        30 * 24 * 60 * 60 * 1000,
+      );
+    };
+
+    const restoreLatestSnapshot = async () => {
+      if (!bbox) return null;
+
+      const memoryLatest = HOME_MAP_NDVI_LATEST_CACHE.get(ndviLatestCacheKey);
+      if (memoryLatest?.image?.startsWith('data:image/')) {
+        applyLatestSnapshot(memoryLatest);
+        return memoryLatest;
+      }
+
+      const persistedLatest = await readHomeMapPersistentCache<HomeMapNdviLatestSnapshot>(
+        'ndvi-latest',
+        ndviLatestCacheKey,
+        30 * 24 * 60 * 60 * 1000,
+      );
+
+      if (persistedLatest?.image?.startsWith('data:image/')) {
+        applyLatestSnapshot(persistedLatest);
+        return persistedLatest;
+      }
+
+      return null;
+    };
+
+    if (!bbox) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!satelliteData?.ndviImage) {
+      // Canlı istek geçici olarak boşsa görüntüyü silme; son başarılı NDVI'yı
+      // IndexedDB/Supabase cache'den geri yükle.
+      void restoreLatestSnapshot().then((restored) => {
+        if (
+          !restored &&
+          !cancelled &&
+          activeLayerRequestKeyRef.current === requestKey
+        ) {
+          setSmoothNdviKey('');
+        }
+      });
 
       return () => {
         cancelled = true;
       };
     }
 
-    // Render the available observation immediately; cache/smoothing is optional.
+    // Yeni canlı gözlem varsa önce onu göster; data-uri cache hazırlanması arkada sürer.
     setSmoothNdvi(satelliteData.ndviImage);
     setSmoothNdviKey(ndviCacheKey);
 
@@ -5151,6 +5397,7 @@ export function HomeInlineLayerMap({
     if (memoryCached?.startsWith('data:image/')) {
       setSmoothNdvi(memoryCached);
       setSmoothNdviKey(ndviCacheKey);
+      persistLatestSnapshot(memoryCached);
 
       return () => {
         cancelled = true;
@@ -5164,9 +5411,10 @@ export function HomeInlineLayerMap({
         HOME_MAP_CACHE_TTL.ndvi,
       );
 
-      // Signed URLs stored in browser cache may have expired; regenerate instead.
+      // Signed URL saklama; yalnız tarayıcıdan bağımsız data-uri rasterını kullan.
       if (persisted?.startsWith('data:image/')) {
         HOME_MAP_NDVI_CACHE.set(ndviCacheKey, persisted);
+        persistLatestSnapshot(persisted);
 
         if (!cancelled && activeLayerRequestKeyRef.current === requestKey) {
           setSmoothNdvi(persisted);
@@ -5194,22 +5442,23 @@ export function HomeInlineLayerMap({
 
       const finalImage = await pending;
 
-      // Kullanıcı başka katmana geçmiş olsa bile sonuç cache'e yazılır.
       HOME_MAP_NDVI_CACHE.set(ndviCacheKey, finalImage);
-
-      void writeHomeMapPersistentCache(
-        'ndvi',
-        ndviCacheKey,
-        finalImage,
-      );
+      void writeHomeMapPersistentCache('ndvi', ndviCacheKey, finalImage);
+      persistLatestSnapshot(finalImage);
 
       if (!cancelled && activeLayerRequestKeyRef.current === requestKey) {
         setSmoothNdvi(finalImage);
         setSmoothNdviKey(ndviCacheKey);
       }
-    })().catch((error) => {
+    })().catch(async (error) => {
       console.warn('Ana ekran NDVI cache/görsel hazırlama hatası:', error);
-      if (!cancelled && activeLayerRequestKeyRef.current === requestKey) {
+
+      const restored = await restoreLatestSnapshot();
+      if (
+        !restored &&
+        !cancelled &&
+        activeLayerRequestKeyRef.current === requestKey
+      ) {
         setSmoothNdvi(satelliteData.ndviImage);
         setSmoothNdviKey(ndviCacheKey);
       }
@@ -5220,12 +5469,15 @@ export function HomeInlineLayerMap({
     };
   }, [
     satelliteData?.ndviImage,
+    satelliteData?.latestImageDate,
+    satelliteData?.ndviAverage,
     bbox?.[0],
     bbox?.[1],
     bbox?.[2],
     bbox?.[3],
     parcelGeometry,
     ndviCacheKey,
+    ndviLatestCacheKey,
   ]);
 
   useEffect(() => {
@@ -5897,6 +6149,221 @@ export function HomeInlineLayerMap({
     };
   }, [field?.id, bbox?.[0], bbox?.[1], bbox?.[2], bbox?.[3], parcelGeometry]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const savedSourceId = 'home-orchard-tracking-zones';
+    const savedFillId = 'home-orchard-tracking-zones-fill';
+    const savedLineId = 'home-orchard-tracking-zones-line';
+    const draftSourceId = 'home-orchard-tracking-zone-draft';
+    const draftFillId = 'home-orchard-tracking-zone-draft-fill';
+    const draftLineId = 'home-orchard-tracking-zone-draft-line';
+    const draftPointId = 'home-orchard-tracking-zone-draft-points';
+
+    const onSavedZoneClick = (event: any) => {
+      const zoneId = String(event?.features?.[0]?.properties?.zoneId ?? '').trim();
+      if (!zoneId || orchardZoneDrawActive) return;
+      window.dispatchEvent(
+        new CustomEvent('tp:open-field-status', {
+          detail: {
+            fieldId: orchardZoneFieldId,
+            initialTab: 'plant',
+            actionTarget: `orchard-zone:${zoneId}`,
+          },
+        }),
+      );
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent(ORCHARD_TRACKING_ZONE_SELECT_EVENT, {
+            detail: { fieldId: orchardZoneFieldId, zoneId },
+          }),
+        );
+      }, 120);
+    };
+
+    const install = () => {
+      if (!mapRef.current || mapRef.current !== map) return;
+
+      const savedData = {
+        type: 'FeatureCollection',
+        features: orchardTrackingZones.map((zone) => ({
+          type: 'Feature',
+          properties: { zoneId: zone.id, name: zone.name },
+          geometry: zone.geometry,
+        })),
+      } as any;
+
+      const savedSource = map.getSource(savedSourceId) as any;
+      if (savedSource?.setData) savedSource.setData(savedData);
+      else {
+        map.addSource(savedSourceId, { type: 'geojson', data: savedData });
+      }
+
+      if (!map.getLayer(savedFillId)) {
+        map.addLayer({
+          id: savedFillId,
+          type: 'fill',
+          source: savedSourceId,
+          paint: {
+            'fill-color': '#ffffff',
+            'fill-opacity': 0.08,
+          },
+        });
+      }
+      if (!map.getLayer(savedLineId)) {
+        map.addLayer({
+          id: savedLineId,
+          type: 'line',
+          source: savedSourceId,
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 2,
+            'line-opacity': 0.92,
+            'line-dasharray': [2, 1.4],
+          },
+        });
+      }
+
+      try {
+        map.off('click', savedFillId, onSavedZoneClick);
+      } catch {
+        // no-op
+      }
+      map.on('click', savedFillId, onSavedZoneClick);
+
+      const draftFeatures: any[] = [];
+      if (orchardZoneDraftPoints.length >= 3 && orchardZoneDraftGeometry) {
+        draftFeatures.push({
+          type: 'Feature',
+          properties: { kind: 'polygon' },
+          geometry: orchardZoneDraftGeometry,
+        });
+      }
+      if (orchardZoneDraftPoints.length >= 2) {
+        draftFeatures.push({
+          type: 'Feature',
+          properties: { kind: 'line' },
+          geometry: {
+            type: 'LineString',
+            coordinates: orchardZoneDraftPoints,
+          },
+        });
+      }
+      for (const coordinate of orchardZoneDraftPoints) {
+        draftFeatures.push({
+          type: 'Feature',
+          properties: { kind: 'point' },
+          geometry: { type: 'Point', coordinates: coordinate },
+        });
+      }
+
+      const draftData = {
+        type: 'FeatureCollection',
+        features: draftFeatures,
+      } as any;
+      const draftSource = map.getSource(draftSourceId) as any;
+      if (draftSource?.setData) draftSource.setData(draftData);
+      else {
+        map.addSource(draftSourceId, { type: 'geojson', data: draftData });
+      }
+
+      if (!map.getLayer(draftFillId)) {
+        map.addLayer({
+          id: draftFillId,
+          type: 'fill',
+          source: draftSourceId,
+          filter: ['==', ['geometry-type'], 'Polygon'],
+          paint: {
+            'fill-color': '#ffffff',
+            'fill-opacity': 0.18,
+          },
+        });
+      }
+      if (!map.getLayer(draftLineId)) {
+        map.addLayer({
+          id: draftLineId,
+          type: 'line',
+          source: draftSourceId,
+          filter: ['any', ['==', ['geometry-type'], 'LineString'], ['==', ['geometry-type'], 'Polygon']],
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 3,
+            'line-opacity': 1,
+          },
+        });
+      }
+      if (!map.getLayer(draftPointId)) {
+        map.addLayer({
+          id: draftPointId,
+          type: 'circle',
+          source: draftSourceId,
+          filter: ['==', ['geometry-type'], 'Point'],
+          paint: {
+            'circle-radius': 5,
+            'circle-color': '#000000',
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2,
+          },
+        });
+      }
+    };
+
+    if (map.isStyleLoaded()) install();
+    else map.once('load', install);
+
+    return () => {
+      try {
+        map.off('load', install);
+      } catch {
+        // no-op
+      }
+      try {
+        map.off('click', savedFillId, onSavedZoneClick);
+      } catch {
+        // no-op
+      }
+    };
+  }, [orchardTrackingZones, orchardZoneDraftPoints, orchardZoneDraftGeometry, orchardZoneFieldId, orchardZoneDrawActive]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !orchardZoneDrawActive) return;
+
+    const canvas = map.getCanvas();
+    const previousCursor = canvas.style.cursor;
+    canvas.style.cursor = 'crosshair';
+    try {
+      map.doubleClickZoom.disable();
+    } catch {
+      // no-op
+    }
+
+    const onMapClick = (event: any) => {
+      const coordinate: [number, number] = [
+        Number(event?.lngLat?.lng),
+        Number(event?.lngLat?.lat),
+      ];
+      if (!Number.isFinite(coordinate[0]) || !Number.isFinite(coordinate[1])) return;
+      if (!isTrackingZonePointInsideField(parcelGeometry, coordinate)) {
+        setOrchardZoneMessage('Takip alanının köşelerini tarla sınırının içinde seç.');
+        return;
+      }
+      setOrchardZoneMessage(null);
+      setOrchardZoneDraftPoints((current) => [...current, coordinate]);
+    };
+
+    map.on('click', onMapClick);
+    return () => {
+      map.off('click', onMapClick);
+      canvas.style.cursor = previousCursor;
+      try {
+        map.doubleClickZoom.enable();
+      } catch {
+        // no-op
+      }
+    };
+  }, [orchardZoneDrawActive, parcelGeometry]);
 
   useEffect(() => {
     let cancelled = false;
@@ -6086,6 +6553,11 @@ export function HomeInlineLayerMap({
       if (!map) return;
 
       pusulaFocusItemsRef.current = [];
+      pusulaFocusNavRef.current = null;
+      if (ndviObservationTimerRef.current != null) {
+        window.clearTimeout(ndviObservationTimerRef.current);
+        ndviObservationTimerRef.current = null;
+      }
       ndviObservationRequestRef.current += 1;
       setPusulaFocusUi(null);
       setNdviObservationTarget(null);
@@ -6691,15 +7163,20 @@ export function HomeInlineLayerMap({
                 bottom: 112,
                 left: 82,
               },
-              maxZoom: 19.0,
+              maxZoom: 17.6,
               pitch: 0,
               bearing: 0,
-              duration: animate ? 760 : 0,
+              duration: animate ? 280 : 0,
             },
           );
 
           const center: [number, number] =
             item.center;
+
+          if (ndviObservationTimerRef.current != null) {
+            window.clearTimeout(ndviObservationTimerRef.current);
+            ndviObservationTimerRef.current = null;
+          }
 
           if (layer === 'vegetation' && field?.id) {
             const requestId = ++ndviObservationRequestRef.current;
@@ -6712,38 +7189,44 @@ export function HomeInlineLayerMap({
               direction,
             );
 
-            void ensureNdviObservationPoint({
-              fieldId: String(field.id),
-              direction,
-              centroid: center,
-              areaGeometry: item.feature?.geometry ?? null,
-              ndviValue: null,
-              relativeHealth,
-              satelliteDate: satelliteData?.latestImageDate ?? null,
-            })
-              .then((point) => {
-                if (requestId !== ndviObservationRequestRef.current) return;
+            // Oklarla hızlı gezinirken her ara noktada DB/cache yazma işini
+            // çalıştırma. Kullanıcı bir noktada kısa süre durunca hazırla.
+            ndviObservationTimerRef.current = window.setTimeout(() => {
+              ndviObservationTimerRef.current = null;
 
-                setNdviObservationTarget({
-                  point,
-                  fieldName: String(field?.name ?? 'Tarlan'),
-                  direction,
-                  centroid: center,
-                  relativeHealth,
-                  ndviValue: null,
-                  satelliteDate:
-                    String(satelliteData?.latestImageDate ?? '').trim() || null,
-                });
-
-                if (detail?.openPhoto) {
-                  window.setTimeout(() => {
-                    setNdviPhotoModalOpen(true);
-                  }, 180);
-                }
+              void ensureNdviObservationPoint({
+                fieldId: String(field.id),
+                direction,
+                centroid: center,
+                areaGeometry: item.feature?.geometry ?? null,
+                ndviValue: null,
+                relativeHealth,
+                satelliteDate: satelliteData?.latestImageDate ?? null,
               })
-              .catch((error) => {
-                console.warn('NDVI takip noktası kaydedilemedi:', error);
-              });
+                .then((point) => {
+                  if (requestId !== ndviObservationRequestRef.current) return;
+
+                  setNdviObservationTarget({
+                    point,
+                    fieldName: String(field?.name ?? 'Tarlan'),
+                    direction,
+                    centroid: center,
+                    relativeHealth,
+                    ndviValue: null,
+                    satelliteDate:
+                      String(satelliteData?.latestImageDate ?? '').trim() || null,
+                  });
+
+                  if (detail?.openPhoto) {
+                    window.setTimeout(() => {
+                      setNdviPhotoModalOpen(true);
+                    }, 120);
+                  }
+                })
+                .catch((error) => {
+                  console.warn('NDVI takip noktası kaydedilemedi:', error);
+                });
+            }, animate ? 220 : 0);
           } else {
             setNdviObservationTarget(null);
           }
@@ -6758,9 +7241,9 @@ export function HomeInlineLayerMap({
           title.textContent =
             layerFocusLabel;
 
-          const detail =
+          const detailText =
             document.createElement('span');
-          detail.textContent =
+          detailText.textContent =
             layer === 'vegetation'
               ? 'Parsel ortalamasına göre daha düşük NDVI.'
               : layer === 'radar-water'
@@ -6809,7 +7292,7 @@ export function HomeInlineLayerMap({
             'color:#fff',
           ].join(';');
 
-          detail.style.cssText = [
+          detailText.style.cssText = [
             'font:780 8px/1.25 Inter,system-ui,sans-serif',
             'color:#fff',
             'opacity:1',
@@ -6819,7 +7302,7 @@ export function HomeInlineLayerMap({
 
           label.appendChild(actionHint);
           label.appendChild(title);
-          label.appendChild(detail);
+          label.appendChild(detailText);
 
           try {
             actionHint.animate(
@@ -6856,7 +7339,11 @@ export function HomeInlineLayerMap({
             tone: focusTone,
           });
 
-          pulseSelected();
+          if (!animate) {
+            pulseSelected();
+          } else {
+            clearFocusTimers();
+          }
         };
 
         const showAllFocusAreas = () => {
@@ -6886,7 +7373,7 @@ export function HomeInlineLayerMap({
                 bottom: 100,
                 left: 68,
               },
-              maxZoom: 18.5,
+              maxZoom: 17.2,
               pitch: 0,
               bearing: 0,
               duration: 650,
@@ -6926,13 +7413,20 @@ export function HomeInlineLayerMap({
                   bottom: 30,
                   left: 18,
                 },
-                maxZoom: 18.35,
+                maxZoom: 17.2,
                 pitch: 0,
                 bearing: 0,
                 duration: 650,
               },
             );
           }
+        };
+
+        pusulaFocusNavRef.current = {
+          prev: onPrevious,
+          next: onNext,
+          all: onShowAll,
+          exit: onExit,
         };
 
         window.addEventListener(
@@ -6958,6 +7452,13 @@ export function HomeInlineLayerMap({
          * da DOM'da kalmasın.
          */
         const navigationCleanup = () => {
+          if (
+            pusulaFocusNavRef.current?.prev === onPrevious &&
+            pusulaFocusNavRef.current?.next === onNext
+          ) {
+            pusulaFocusNavRef.current = null;
+          }
+
           window.removeEventListener(
             'tp:home-map-pusula-focus-prev',
             onPrevious,
@@ -7021,6 +7522,368 @@ export function HomeInlineLayerMap({
     bbox?.[1],
     bbox?.[2],
     bbox?.[3],
+  ]);
+
+  useEffect(() => {
+    const sourceId = 'home-task-map-zones';
+    const fillLayerId = 'home-task-map-fill';
+    const lineLayerId = 'home-task-map-line';
+
+    const clearTaskMap = (map: any) => {
+      if (!map) return;
+      try {
+        if (map.getLayer(lineLayerId)) map.removeLayer(lineLayerId);
+        if (map.getLayer(fillLayerId)) map.removeLayer(fillLayerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      } catch {
+        // Harita katmanı yeniden kurulurken kaynak daha önce temizlenmiş olabilir.
+      }
+    };
+
+    const onShowTaskZones = (event: Event) => {
+      const detail = (event as CustomEvent<any>)?.detail ?? {};
+      const requestedFieldId = String(detail?.fieldId ?? '').trim();
+      const currentFieldId = String(field?.id ?? '').trim();
+      // Görev alanı olayı yalnız aktif tarlaya aitse kabul edilir.
+      // fieldId eksik veya farklıysa eski tarlanın geometrisini asla haritaya taşıma.
+      if (!requestedFieldId || !currentFieldId || requestedFieldId !== currentFieldId) return;
+
+      const zones = Array.isArray(detail?.zones) ? detail.zones : [];
+      const map = mapRef.current as any;
+      if (!map || !zones.length) return;
+
+      const install = () => {
+        clearTaskMap(map);
+
+        const analysisBounds =
+          homeBboxFromGeometry(parcelGeometry) ??
+          (bbox ? normalizeHomeBbox(bbox) : null);
+
+        const features = zones
+          .map((zone: any) => {
+            let feature = homePusulaFeatureFromGeometry(zone?.geometry);
+            const direction = normalizeHomePusulaDirection(zone?.direction);
+            const zoneBounds = normalizeHomeBbox(zone?.bounds);
+
+            // Görevde kayıtlı geometri başka bir tarladan kalmışsa kamerayı oraya
+            // götürmemeliyiz. Gerçek geometriyi yalnız aktif parsel ile kesişen
+            // bölümüne indir; hiç kesişmiyorsa yön bilgisinden bu parsel içinde
+            // yeniden üret.
+            if (feature && analysisBounds) {
+              const rawBounds = homeBboxFromGeometry(feature);
+              if (rawBounds) {
+                const clippedBounds: HomeBBox = [
+                  Math.max(rawBounds[0], analysisBounds[0]),
+                  Math.max(rawBounds[1], analysisBounds[1]),
+                  Math.min(rawBounds[2], analysisBounds[2]),
+                  Math.min(rawBounds[3], analysisBounds[3]),
+                ];
+
+                feature =
+                  clippedBounds[0] < clippedBounds[2] &&
+                  clippedBounds[1] < clippedBounds[3]
+                    ? homePusulaFocusFeature(parcelGeometry, clippedBounds)
+                    : null;
+              } else {
+                feature = null;
+              }
+            }
+
+            if (!feature && direction && analysisBounds) {
+              feature = homePusulaFocusFeature(
+                parcelGeometry,
+                homePusulaGridBounds(analysisBounds, direction),
+              );
+            }
+
+            if (!feature && zoneBounds && analysisBounds) {
+              const clippedBounds: HomeBBox = [
+                Math.max(zoneBounds[0], analysisBounds[0]),
+                Math.max(zoneBounds[1], analysisBounds[1]),
+                Math.min(zoneBounds[2], analysisBounds[2]),
+                Math.min(zoneBounds[3], analysisBounds[3]),
+              ];
+
+              if (
+                clippedBounds[0] < clippedBounds[2] &&
+                clippedBounds[1] < clippedBounds[3]
+              ) {
+                feature = homePusulaFocusFeature(parcelGeometry, clippedBounds);
+              }
+            }
+
+            if (!feature) return null;
+
+            return {
+              ...feature,
+              properties: {
+                ...(feature.properties ?? {}),
+                taskId: String(zone?.taskId ?? ''),
+                title: String(zone?.title ?? 'Görev'),
+                priority: Number(zone?.priority ?? 0),
+                kind: String(zone?.kind ?? 'field-check'),
+                prescriptionState: String(zone?.prescriptionState ?? 'none'),
+                direction: String(zone?.direction ?? ''),
+              },
+            };
+          })
+          .filter(Boolean);
+
+        if (!features.length) return;
+
+        let selectedTaskZoneIndex = 0;
+        let taskPhotoRequestId = 0;
+
+        const featureBounds = features
+          .map((feature: any) => homeBboxFromGeometry(feature))
+          .filter(Boolean) as HomeBBox[];
+
+        const taskMapGeoJson = {
+          type: 'FeatureCollection' as const,
+          features: features.map((feature: any, index: number) => ({
+            ...feature,
+            properties: {
+              ...(feature.properties ?? {}),
+              taskZoneIndex: index,
+              selected: index === 0 ? 1 : 0,
+            },
+          })),
+        };
+
+        map.addSource(sourceId, {
+          type: 'geojson',
+          data: taskMapGeoJson,
+        });
+
+        map.addLayer({
+          id: fillLayerId,
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': [
+              'case',
+              ['==', ['get', 'selected'], 1],
+              '#ffb020',
+              '#ffffff',
+            ],
+            'fill-opacity': [
+              'case',
+              ['==', ['get', 'selected'], 1],
+              0.20,
+              0.06,
+            ],
+          },
+        });
+
+        map.addLayer({
+          id: lineLayerId,
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': [
+              'case',
+              ['==', ['get', 'selected'], 1],
+              '#ffb020',
+              '#ffffff',
+            ],
+            'line-width': [
+              'case',
+              ['==', ['get', 'selected'], 1],
+              4,
+              2,
+            ],
+            'line-opacity': [
+              'case',
+              ['==', ['get', 'selected'], 1],
+              1,
+              0.72,
+            ],
+          },
+        });
+
+        const syncSelectedTaskZone = (selectedIndex: number | null) => {
+          taskMapGeoJson.features = taskMapGeoJson.features.map(
+            (feature: any, index: number) => ({
+              ...feature,
+              properties: {
+                ...(feature.properties ?? {}),
+                selected: selectedIndex === null || index === selectedIndex ? 1 : 0,
+              },
+            }),
+          );
+
+          const source = map.getSource(sourceId) as any;
+          source?.setData?.(taskMapGeoJson);
+        };
+
+        const prepareTaskPhotoTarget = (index: number, openAfterReady = false) => {
+          const zone = zones[index];
+          const feature = features[index] as any;
+
+          // Görev Haritasındaki her seçili alan saha kanıtı toplayabilsin.
+          // Fotoğraf butonunu yalnız `photo-check` türüne bağlamak bazı 1/5, 2/5…
+          // geçişlerinde butonun kaybolmasına neden oluyordu.
+          if (!zone || !currentFieldId) {
+            taskPhotoRequestId += 1;
+            setNdviObservationTarget(null);
+            return;
+          }
+
+          const resolvedBounds =
+            homeBboxFromGeometry(feature) ??
+            normalizeHomeBbox(zone?.bounds) ??
+            analysisBounds;
+
+          if (!feature || !resolvedBounds) {
+            taskPhotoRequestId += 1;
+            setNdviObservationTarget(null);
+            return;
+          }
+
+          const centroid = homeInteriorPointFromFeature(feature, resolvedBounds);
+          const direction =
+            String(zone?.direction ?? '').trim() ||
+            normalizeHomePusulaDirection(zone?.direction) ||
+            'görev alanı';
+          const requestId = ++taskPhotoRequestId;
+
+          void ensureNdviObservationPoint({
+            fieldId: currentFieldId,
+            direction,
+            centroid,
+            areaGeometry: feature?.geometry ?? null,
+            ndviValue: null,
+            relativeHealth: null,
+            satelliteDate: satelliteData?.latestImageDate ?? null,
+          })
+            .then((point) => {
+              if (requestId !== taskPhotoRequestId) return;
+
+              setNdviObservationTarget({
+                point,
+                fieldName: String(field?.name ?? 'Tarlan'),
+                direction,
+                centroid,
+                relativeHealth: null,
+                ndviValue: null,
+                satelliteDate:
+                  String(satelliteData?.latestImageDate ?? '').trim() || null,
+              });
+
+              if (openAfterReady) {
+                setNdviPhotoModalOpen(true);
+              }
+            })
+            .catch((error) => {
+              if (requestId !== taskPhotoRequestId) return;
+              console.warn('Görev Haritası fotoğraf noktası hazırlanamadı:', error);
+              setNdviObservationTarget(null);
+            });
+        };
+
+        const showTaskZone = (index: number, animate = true) => {
+          if (!features.length) return;
+
+          selectedTaskZoneIndex =
+            ((index % features.length) + features.length) % features.length;
+
+          setPusulaFocusUi({
+            count: features.length,
+            index: selectedTaskZoneIndex,
+            label: features.length === 1 ? 'Görev alanı' : 'Görev alanları',
+            tone: zones.some((zone: any) => Number(zone?.priority ?? 0) >= 90)
+              ? 'danger'
+              : 'attention',
+          });
+
+          syncSelectedTaskZone(selectedTaskZoneIndex);
+
+          const selectedBounds = featureBounds[selectedTaskZoneIndex];
+          if (selectedBounds) {
+            const [west, south, east, north] = selectedBounds;
+            map.fitBounds(
+              [[west, south], [east, north]],
+              {
+                padding: { top: 82, right: 76, bottom: 104, left: 76 },
+                duration: animate ? 260 : 0,
+                maxZoom: 19,
+                pitch: 0,
+                bearing: 0,
+              },
+            );
+          }
+
+          taskPhotoOpenRef.current = () =>
+            prepareTaskPhotoTarget(selectedTaskZoneIndex, true);
+          prepareTaskPhotoTarget(selectedTaskZoneIndex);
+        };
+
+        const showAllTaskZones = () => {
+          if (!featureBounds.length) return;
+          syncSelectedTaskZone(null);
+          const west = Math.min(...featureBounds.map((item) => item[0]));
+          const south = Math.min(...featureBounds.map((item) => item[1]));
+          const east = Math.max(...featureBounds.map((item) => item[2]));
+          const north = Math.max(...featureBounds.map((item) => item[3]));
+          map.fitBounds(
+            [[west, south], [east, north]],
+            { padding: 72, duration: 320, maxZoom: 18, pitch: 0, bearing: 0 },
+          );
+        };
+
+        const previousTaskZone = () => showTaskZone(selectedTaskZoneIndex - 1);
+        const nextTaskZone = () => showTaskZone(selectedTaskZoneIndex + 1);
+        const exitTaskZones = () => {
+          taskPhotoRequestId += 1;
+          clearTaskMap(map);
+          setPusulaFocusUi(null);
+          setNdviObservationTarget(null);
+          setNdviPhotoModalOpen(false);
+          setNdviHistoryOpen(false);
+          pusulaFocusNavRef.current = null;
+          taskPhotoOpenRef.current = null;
+
+          if (bbox) {
+            map.fitBounds(
+              [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
+              { padding: 24, duration: 320, maxZoom: 17.2, pitch: 0, bearing: 0 },
+            );
+          }
+        };
+
+        pusulaFocusNavRef.current = {
+          prev: previousTaskZone,
+          next: nextTaskZone,
+          all: showAllTaskZones,
+          exit: exitTaskZones,
+        };
+
+        showTaskZone(0, false);
+      };
+
+      if (map.loaded()) install();
+      else map.once('load', install);
+    };
+
+    window.addEventListener('tp:home-map-show-task-zones', onShowTaskZones);
+    return () => {
+      window.removeEventListener('tp:home-map-show-task-zones', onShowTaskZones);
+      clearTaskMap(mapRef.current);
+      pusulaFocusNavRef.current = null;
+      taskPhotoOpenRef.current = null;
+      setPusulaFocusUi(null);
+      setNdviObservationTarget(null);
+      setNdviPhotoModalOpen(false);
+    };
+  }, [
+    field?.id,
+    field?.name,
+    parcelGeometry,
+    bbox?.[0],
+    bbox?.[1],
+    bbox?.[2],
+    bbox?.[3],
+    satelliteData?.latestImageDate,
   ]);
 
   useEffect(() => {
@@ -7942,7 +8805,7 @@ export function HomeInlineLayerMap({
       ],
       {
         padding: { top: 18, right: 18, bottom: 30, left: 18 },
-        maxZoom: 18.35,
+        maxZoom: 17.2,
         pitch: 0,
         bearing: 0,
         duration: 500,
@@ -7956,6 +8819,128 @@ export function HomeInlineLayerMap({
 
   const zoomOutMap = () => {
     mapRef.current?.zoomOut({ duration: 180 });
+  };
+
+  const startOrchardZoneDraw = () => {
+    if (!orchardZoneEnabled || !parcelGeometry) {
+      setOrchardZoneMessage('Takip alanı çizmek için kayıtlı tarla sınırı gerekli.');
+      return;
+    }
+    setOrchardZoneDraftPoints([]);
+    setOrchardZoneSaveGeometry(null);
+    setOrchardZoneSaveOpen(false);
+    setOrchardZoneMessage(null);
+    setOrchardZoneDrawActive(true);
+  };
+
+  const cancelOrchardZoneDraw = () => {
+    setOrchardZoneDrawActive(false);
+    setOrchardZoneDraftPoints([]);
+    setOrchardZoneSaveGeometry(null);
+    setOrchardZoneSaveOpen(false);
+    setOrchardZoneMessage(null);
+  };
+
+  const undoOrchardZonePoint = () => {
+    setOrchardZoneDraftPoints((current) => current.slice(0, -1));
+    setOrchardZoneMessage(null);
+  };
+
+  const finishOrchardZoneDraw = () => {
+    const geometry = buildTrackingZonePolygon(orchardZoneDraftPoints);
+    if (!geometry) {
+      setOrchardZoneMessage('Alanı tamamlamak için en az 3 köşe seç.');
+      return;
+    }
+    if (!isTrackingZonePolygonInsideField(geometry, parcelGeometry)) {
+      setOrchardZoneMessage('Çizdiğin alan tarla sınırının dışına taşıyor. Köşeleri biraz içeri al.');
+      return;
+    }
+
+    setOrchardZoneSaveGeometry(geometry);
+    setOrchardZoneName('');
+    setOrchardZoneTreeMode('unknown');
+    setOrchardZoneManualTreeCount('');
+    setOrchardZoneRowSpacing('');
+    setOrchardZoneTreeSpacing('');
+    setOrchardZoneNotes('');
+    setOrchardZoneMessage(null);
+    setOrchardZoneSaveOpen(true);
+  };
+
+  const saveOrchardZone = async () => {
+    if (!orchardZoneSaveGeometry || !orchardZoneFieldId) return;
+    const name = orchardZoneName.trim() || `Takip Alanı ${orchardTrackingZones.length + 1}`;
+
+    const manualCount = Number(orchardZoneManualTreeCount);
+    if (
+      orchardZoneTreeMode === 'manual' &&
+      (!Number.isFinite(manualCount) || manualCount <= 0)
+    ) {
+      setOrchardZoneMessage('Tahmini ağaç sayısını gir veya “Bilmiyorum” seç.');
+      return;
+    }
+    if (orchardZoneTreeMode === 'spacing' && orchardZoneSpacingEstimate === null) {
+      setOrchardZoneMessage('Pusula tahmini için sıra arası ve ağaç arası mesafeyi gir.');
+      return;
+    }
+
+    setOrchardZoneSaving(true);
+    setOrchardZoneMessage(null);
+    try {
+      const record = await saveOrchardTrackingZone({
+        fieldId: orchardZoneFieldId,
+        name,
+        geometry: orchardZoneSaveGeometry,
+        estimatedTreeCount:
+          orchardZoneTreeMode === 'manual' ? Math.round(manualCount) : null,
+        treeCountSource: orchardZoneTreeMode,
+        rowSpacingM:
+          orchardZoneTreeMode === 'spacing'
+            ? Number(orchardZoneRowSpacing)
+            : null,
+        treeSpacingM:
+          orchardZoneTreeMode === 'spacing'
+            ? Number(orchardZoneTreeSpacing)
+            : null,
+        notes: orchardZoneNotes,
+      });
+
+      const refreshed = await listOrchardTrackingZones(orchardZoneFieldId);
+      setOrchardTrackingZones(refreshed);
+      dispatchOrchardTrackingZonesChanged(orchardZoneFieldId);
+      setOrchardZoneDrawActive(false);
+      setOrchardZoneDraftPoints([]);
+      setOrchardZoneSaveGeometry(null);
+      setOrchardZoneSaveOpen(false);
+      setOrchardZoneMessage(
+        record.storageMode === 'local'
+          ? 'Takip alanı bu cihazda kaydedildi. Supabase migration uygulanınca bulut kaydı kullanılacak.'
+          : `${record.name} takibe alındı.`,
+      );
+
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('tp:home-map-show-pusula-area', {
+            detail: {
+              fieldId: orchardZoneFieldId,
+              layer: 'vegetation',
+              importantArea: {
+                area: record.name,
+                geometry: record.geometry,
+              },
+              spatial: null,
+            },
+          }),
+        );
+      }, 100);
+    } catch (error) {
+      setOrchardZoneMessage(
+        error instanceof Error ? error.message : 'Takip alanı kaydedilemedi.',
+      );
+    } finally {
+      setOrchardZoneSaving(false);
+    }
   };
 
   const spatialSummary = useMemo<HomeLayerSpatialSummary | null>(() => {
@@ -8106,7 +9091,9 @@ export function HomeInlineLayerMap({
     'rainfall-history': 'Open-Meteo',
   };
 
-  const ndviAverageValue = Number(satelliteData?.ndviAverage);
+  const ndviAverageValue = Number(
+    satelliteData?.ndviAverage ?? cachedNdviSnapshot?.ndviAverage,
+  );
   const hasNdviAverage = Number.isFinite(ndviAverageValue);
 
   return (
@@ -8114,7 +9101,7 @@ export function HomeInlineLayerMap({
       <div ref={containerRef} className="tp-real-home-map-canvas" />
       <MapDataDate
         layer={layer}
-        latestDate={satelliteData?.latestImageDate}
+        latestDate={satelliteData?.latestImageDate ?? cachedNdviSnapshot?.latestImageDate}
         radarRange={activeRadarImage?.timeRange}
         hasData={Boolean(
           layer === 'vegetation'
@@ -8298,6 +9285,7 @@ export function HomeInlineLayerMap({
 
       {pusulaFocusUi && (
         <div
+          className="tp-pusula-focus-toolbar"
           aria-label="Pusula odak modu"
           style={{
             position: 'absolute',
@@ -8308,6 +9296,7 @@ export function HomeInlineLayerMap({
             transform: 'translateX(-50%)',
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
             gap: 5,
             maxWidth: 'calc(100% - 28px)',
             minHeight: 38,
@@ -8372,13 +9361,7 @@ export function HomeInlineLayerMap({
             <>
               <button
                 type="button"
-                onClick={() =>
-                  window.dispatchEvent(
-                    new CustomEvent(
-                      'tp:home-map-pusula-focus-prev',
-                    ),
-                  )
-                }
+                onClick={() => pusulaFocusNavRef.current?.prev()}
                 aria-label="Önceki Pusula alanı"
                 style={{
                   width: 28,
@@ -8408,13 +9391,7 @@ export function HomeInlineLayerMap({
 
               <button
                 type="button"
-                onClick={() =>
-                  window.dispatchEvent(
-                    new CustomEvent(
-                      'tp:home-map-pusula-focus-next',
-                    ),
-                  )
-                }
+                onClick={() => pusulaFocusNavRef.current?.next()}
                 aria-label="Sonraki Pusula alanı"
                 style={{
                   width: 28,
@@ -8432,13 +9409,7 @@ export function HomeInlineLayerMap({
 
               <button
                 type="button"
-                onClick={() =>
-                  window.dispatchEvent(
-                    new CustomEvent(
-                      'tp:home-map-pusula-focus-all',
-                    ),
-                  )
-                }
+                onClick={() => pusulaFocusNavRef.current?.all()}
                 title="Tüm tespitleri göster"
                 style={{
                   minHeight: 28,
@@ -8458,8 +9429,17 @@ export function HomeInlineLayerMap({
             </>
           )}
 
-          {layer === 'vegetation' &&
-          ndviObservationTarget?.point.lastPhotoAt ? (
+          <div
+            className="tp-pusula-focus-actions"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 5,
+              minWidth: 0,
+            }}
+          >
+          {ndviObservationTarget?.point.lastPhotoAt ? (
             <button
               type="button"
               onClick={() => setNdviHistoryOpen(true)}
@@ -8481,14 +9461,20 @@ export function HomeInlineLayerMap({
             </button>
           ) : null}
 
-          {layer === 'vegetation' && ndviObservationTarget ? (
+          {ndviObservationTarget || taskPhotoOpenRef.current ? (
             <button
               type="button"
-              onClick={() => setNdviPhotoModalOpen(true)}
+              onClick={() => {
+                if (taskPhotoOpenRef.current) {
+                  taskPhotoOpenRef.current();
+                  return;
+                }
+                setNdviPhotoModalOpen(true);
+              }}
               title={
-                ndviObservationTarget.point.lastPhotoAt
-                  ? `Son fotoğraf: ${formatHomeSatelliteDate(ndviObservationTarget.point.lastPhotoAt)}`
-                  : 'Bu noktadan fotoğraf ekle'
+                ndviObservationTarget?.point.lastPhotoAt
+                  ? `Son fotoğraf: ${formatHomeSatelliteDate(ndviObservationTarget.point.lastPhotoAt)} · Yeni fotoğraf saha takibini günceller`
+                  : 'Uygun saha fotoğrafını kaydet · +30 Pusula Puanı'
               }
               style={{
                 minHeight: 28,
@@ -8503,19 +9489,13 @@ export function HomeInlineLayerMap({
                 whiteSpace: 'nowrap',
               }}
             >
-              📷 {ndviObservationTarget.point.lastPhotoAt ? 'Yeni foto' : 'Fotoğraf ekle'}
+              📷 {ndviObservationTarget?.point.lastPhotoAt ? 'Yeni foto' : 'Fotoğraf ekle · +30 P'}
             </button>
           ) : null}
 
           <button
             type="button"
-            onClick={() =>
-              window.dispatchEvent(
-                new CustomEvent(
-                  'tp:home-map-pusula-focus-exit',
-                ),
-              )
-            }
+            onClick={() => pusulaFocusNavRef.current?.exit()}
             style={{
               minHeight: 28,
               padding: '0 8px',
@@ -8531,21 +9511,80 @@ export function HomeInlineLayerMap({
           >
             Tarlaya dön
           </button>
+          </div>
         </div>
       )}
+
+      <style>{`
+        @media (max-width: 430px) {
+          .tp-pusula-focus-toolbar {
+            left: 8px !important;
+            right: 58px !important;
+            width: auto !important;
+            max-width: none !important;
+            transform: none !important;
+            justify-content: center;
+            gap: 4px !important;
+            padding: 5px 6px !important;
+            border-radius: 16px !important;
+          }
+
+          .tp-pusula-focus-toolbar > span {
+            display: none !important;
+          }
+
+          .tp-pusula-focus-toolbar > button {
+            flex: 0 0 auto;
+          }
+
+          .tp-pusula-focus-actions {
+            flex: 0 0 100%;
+            width: 100%;
+            min-width: 100%;
+            justify-content: center !important;
+            gap: 6px !important;
+            padding-top: 2px;
+          }
+
+          .tp-pusula-focus-actions > button {
+            min-height: 30px !important;
+          }
+        }
+      `}</style>
 
       <FieldOperationModal
         open={fieldOperationOpen}
         fieldId={field?.id ? String(field.id) : null}
         fieldName={String(field?.name ?? 'Tarlan')}
-        onClose={() => setFieldOperationOpen(false)}
+        onClose={() => {
+          setFieldOperationOpen(false);
+          fieldOperationLaunchRef.current = null;
+        }}
         onSaved={(operation) => {
+          const launch = fieldOperationLaunchRef.current;
           const costText =
             operation.cost != null && operation.cost > 0
               ? ` · ${operation.cost.toLocaleString('tr-TR')} TL gider kaydı`
               : '';
           setFieldOperationToast(`${operation.type} kaydedildi${costText}`);
           window.setTimeout(() => setFieldOperationToast(null), 2600);
+
+          if (
+            launch?.source === 'pusula-field-event' &&
+            (!launch.fieldId || String(operation.fieldId) === launch.fieldId)
+          ) {
+            window.dispatchEvent(
+              new CustomEvent('tp:pusula-field-event-operation-saved', {
+                detail: {
+                  fieldId: operation.fieldId,
+                  candidateKey: launch.candidateKey,
+                  operation,
+                },
+              }),
+            );
+          }
+
+          fieldOperationLaunchRef.current = null;
         }}
       />
 
@@ -8577,6 +9616,8 @@ export function HomeInlineLayerMap({
         open={fieldTrackingOpen}
         fieldId={field?.id ? String(field.id) : null}
         fieldName={String(field?.name ?? 'Tarlan')}
+        relativeZones={ndviStats?.relativeZones ?? []}
+        satelliteDate={ndviStats?.datetime ?? null}
         onClose={() => setFieldTrackingOpen(false)}
         onStatusChanged={(point) => {
           setTrackingRefreshKey((value) => value + 1);
@@ -8667,6 +9708,61 @@ export function HomeInlineLayerMap({
           <Minus size={24} strokeWidth={2.1} />
         </button>
 
+        {orchardZoneEnabled ? (
+          <button
+            type="button"
+            className="tp-map-control-btn tp-map-zone-draw-control"
+            onClick={() =>
+              orchardZoneDrawActive
+                ? cancelOrchardZoneDraw()
+                : startOrchardZoneDraw()
+            }
+            aria-label={orchardZoneDrawActive ? 'Bölge çizimini iptal et' : 'Bahçede takip bölgesi çiz'}
+            title={orchardZoneDrawActive ? 'Çizimi iptal et' : 'Takip bölgesi çiz'}
+            aria-pressed={orchardZoneDrawActive}
+          >
+            <Pentagon size={22} strokeWidth={1.9} />
+          </button>
+        ) : null}
+
+        {orchardZoneDrawActive ? (
+          <>
+            <button
+              type="button"
+              className="tp-map-control-btn tp-map-zone-undo-control"
+              onClick={undoOrchardZonePoint}
+              disabled={!orchardZoneDraftPoints.length}
+              aria-label="Son köşeyi geri al"
+              title="Son köşeyi geri al"
+            >
+              <Undo2 size={20} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className="tp-map-control-btn tp-map-zone-finish-control"
+              onClick={finishOrchardZoneDraw}
+              disabled={orchardZoneDraftPoints.length < 3}
+              aria-label="Bölgeyi bitir"
+              title={
+                orchardZoneDraftPoints.length < 3
+                  ? 'Bölgeyi bitirmek için en az 3 köşe seç'
+                  : 'Bölgeyi bitir'
+              }
+            >
+              <Check size={21} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              className="tp-map-control-btn tp-map-zone-cancel-control"
+              onClick={cancelOrchardZoneDraw}
+              aria-label="Bölge çizimini iptal et"
+              title="Çizimi iptal et"
+            >
+              <X size={21} strokeWidth={2.15} />
+            </button>
+          </>
+        ) : null}
+
         {(layer === 'vegetation' || radarMode) && (
           <button
             type="button"
@@ -8693,6 +9789,88 @@ export function HomeInlineLayerMap({
         )}
 
       </div>
+
+      {orchardZoneDrawActive && !orchardZoneSaveOpen ? (
+        <div className="tp-orchard-zone-draw-hud" role="status">
+          <div>
+            <span>BAHÇE TAKİP ALANI</span>
+            <strong>Haritada köşelere dokun · {orchardZoneDraftPoints.length} nokta</strong>
+            <small>
+              {orchardZoneDraftPoints.length < 3
+                ? 'En az 3 köşe seç. Alan tarla sınırının içinde kalmalı.'
+                : `Önizleme ≈ ${(orchardZoneDraftAreaM2 / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} da`}
+            </small>
+            {orchardZoneMessage ? <small>{orchardZoneMessage}</small> : null}
+          </div>
+          <div className="tp-orchard-zone-draw-actions">
+            <button type="button" onClick={undoOrchardZonePoint} disabled={!orchardZoneDraftPoints.length} title="Son köşeyi geri al"><Undo2 size={17} /></button>
+            <button type="button" onClick={cancelOrchardZoneDraw} title="İptal"><X size={18} /></button>
+            <button type="button" className="primary" onClick={finishOrchardZoneDraw} disabled={orchardZoneDraftPoints.length < 3} title="Alanı tamamla"><Check size={18} /></button>
+          </div>
+        </div>
+      ) : null}
+
+      {orchardZoneSaveOpen && orchardZoneSaveGeometry ? (
+        <div className="tp-orchard-zone-save-backdrop">
+          <div className="tp-orchard-zone-save-sheet" role="dialog" aria-modal="true" aria-label="Takip alanını kaydet">
+            <div className="tp-orchard-zone-save-head">
+              <div>
+                <span>TAKİP ALANI OLUŞTUR</span>
+                <strong>Bu bölgeye bir isim ver</strong>
+                <small>Alan ≈ {(orchardZoneDraftAreaM2 / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} da</small>
+              </div>
+              <button type="button" onClick={() => setOrchardZoneSaveOpen(false)} aria-label="Kaydetme penceresini kapat"><X size={17} /></button>
+            </div>
+
+            <label>
+              <span>BÖLGE ADI</span>
+              <input value={orchardZoneName} onChange={(event) => setOrchardZoneName(event.target.value)} placeholder="Örn. Dere Kenarı" maxLength={60} />
+            </label>
+
+            <label>
+              <span>TAHMİNİ AĞAÇ SAYISI</span>
+              <div className="tp-orchard-zone-tree-mode">
+                <button type="button" className={orchardZoneTreeMode === 'manual' ? 'active' : ''} onClick={() => setOrchardZoneTreeMode('manual')}>Ben gireyim</button>
+                <button type="button" className={orchardZoneTreeMode === 'spacing' ? 'active' : ''} onClick={() => setOrchardZoneTreeMode('spacing')}>Pusula tahmin etsin</button>
+                <button type="button" className={orchardZoneTreeMode === 'unknown' ? 'active' : ''} onClick={() => setOrchardZoneTreeMode('unknown')}>Bilmiyorum</button>
+              </div>
+            </label>
+
+            {orchardZoneTreeMode === 'manual' ? (
+              <label>
+                <span>YAKLAŞIK AĞAÇ SAYISI</span>
+                <input type="number" min="1" step="1" inputMode="numeric" value={orchardZoneManualTreeCount} onChange={(event) => setOrchardZoneManualTreeCount(event.target.value)} placeholder="Örn. 120" />
+              </label>
+            ) : null}
+
+            {orchardZoneTreeMode === 'spacing' ? (
+              <>
+                <div className="tp-orchard-zone-spacing-grid">
+                  <label><span>SIRA ARASI (m)</span><input type="number" min="0.1" step="0.1" inputMode="decimal" value={orchardZoneRowSpacing} onChange={(event) => setOrchardZoneRowSpacing(event.target.value)} placeholder="Örn. 6" /></label>
+                  <label><span>AĞAÇ ARASI (m)</span><input type="number" min="0.1" step="0.1" inputMode="decimal" value={orchardZoneTreeSpacing} onChange={(event) => setOrchardZoneTreeSpacing(event.target.value)} placeholder="Örn. 5" /></label>
+                </div>
+                <div className="tp-orchard-zone-estimate">
+                  {orchardZoneSpacingEstimate == null
+                    ? 'Dikim aralıklarını girince Pusula poligon alanından teorik ağaç sayısını hesaplar.'
+                    : `Pusula tahmini ≈ ${orchardZoneSpacingEstimate.toLocaleString('tr-TR')} ağaç. Bu sayı alan + dikim aralığı hesabıdır; yol ve boşluklar nedeniyle saha sayımıyla farklı olabilir.`}
+                </div>
+              </>
+            ) : null}
+
+            <label>
+              <span>NOT · İSTEĞE BAĞLI</span>
+              <textarea value={orchardZoneNotes} onChange={(event) => setOrchardZoneNotes(event.target.value)} placeholder="Örn. Dere kenarı, geçmişte gelişim zayıftı" maxLength={300} />
+            </label>
+
+            {orchardZoneMessage ? <div className="tp-orchard-zone-save-message">{orchardZoneMessage}</div> : null}
+
+            <div className="tp-orchard-zone-save-actions">
+              <button type="button" onClick={() => setOrchardZoneSaveOpen(false)} disabled={orchardZoneSaving}>Çizime dön</button>
+              <button type="button" className="primary" onClick={() => void saveOrchardZone()} disabled={orchardZoneSaving}>{orchardZoneSaving ? 'Kaydediliyor…' : 'Bu alanı takibe al'}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <SatelliteHistorySheet
         open={history.open}

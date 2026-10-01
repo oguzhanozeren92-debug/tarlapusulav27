@@ -1,0 +1,1563 @@
+/* Tarla Durumu merkezi — günlük kullanımın ana tarla ekranı. */
+.tp-field-status-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(8, 10, 12, 0.54);
+  backdrop-filter: blur(4px);
+}
+
+.tp-field-status-center {
+  width: min(100%, 540px);
+  max-height: min(94dvh, 900px);
+  overflow: hidden;
+  border: 1px solid #dfe3e7;
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: #fff;
+  color: #171a1f;
+  box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.24);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.tp-field-status-head {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 9px;
+  min-height: 62px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #252a30;
+  background: #0d1013;
+  color: #fff;
+}
+
+.tp-field-status-head-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 11px;
+  background: rgba(255,255,255,.07);
+}
+
+.tp-field-status-head-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.tp-field-status-head-copy > span,
+.tp-field-status-section-head span,
+.tp-field-status-model-card span,
+.tp-field-status-confidence-card span,
+.tp-field-status-hero > div:first-child > span,
+.tp-field-status-suitability-score span,
+.tp-field-status-irrigation-card span {
+  font-size: 8.5px;
+  font-weight: 850;
+  letter-spacing: .12em;
+}
+
+.tp-field-status-head-copy > span { color: #b8c0c8; }
+.tp-field-status-head-copy > strong {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tp-field-status-head-copy > small { color: #b8c0c8; font-size: 10px; }
+
+.tp-field-status-close {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  background: rgba(255,255,255,.05);
+  color: #fff;
+}
+
+.tp-field-status-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 7px 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid #e6e9ec;
+  background: #fff;
+  scrollbar-width: none;
+}
+.tp-field-status-tabs::-webkit-scrollbar { display: none; }
+.tp-field-status-tabs button {
+  flex: 0 0 auto;
+  min-width: 58px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #68727d;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.tp-field-status-tabs button.active {
+  border-color: #171a1f;
+  background: #171a1f;
+  color: #fff;
+}
+
+.tp-field-status-body {
+  max-height: calc(min(94dvh, 900px) - 111px);
+  padding: 10px 10px max(20px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: #f5f6f7;
+}
+
+.tp-field-status-stack { display: grid; gap: 9px; }
+
+.tp-field-status-demo-note,
+.tp-field-status-empty,
+.tp-field-status-message,
+.tp-field-status-note {
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid #e1e5e8;
+  border-radius: 13px;
+  background: #fff;
+  color: #59636e;
+  font-size: 11px;
+  line-height: 1.48;
+}
+.tp-field-status-empty { display: grid; gap: 3px; }
+.tp-field-status-empty strong { color: #242a31; font-size: 12px; }
+.tp-field-status-empty span { color: #68727d; }
+.tp-field-status-demo-note { margin-bottom: 9px; }
+.tp-field-status-empty.error { color: #8f2630; }
+.tp-field-status-empty.good { color: #355c42; }
+.tp-field-status-note b { color: #22282e; }
+
+.tp-field-status-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 74px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #dde1e5;
+  border-radius: 16px;
+  background: #fff;
+}
+.tp-field-status-hero > div:first-child { min-width: 0; }
+.tp-field-status-hero > div:first-child > span { color: #6b747e; }
+.tp-field-status-hero > div:first-child > strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.tp-field-status-hero p {
+  margin: 5px 0 0;
+  color: #68727d;
+  font-size: 10.5px;
+  line-height: 1.42;
+}
+.tp-field-status-score {
+  min-height: 68px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border: 1px solid #d9dde1;
+  border-radius: 14px;
+  background: #f7f8f9;
+}
+.tp-field-status-score small { color: #69737e; font-size: 8px; }
+.tp-field-status-score strong { font-size: 23px; line-height: 1; }
+.tp-field-status-score span { margin-top: 3px; color: #57616c; font-size: 8px; font-weight: 800; }
+
+.tp-field-status-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.tp-field-status-summary-grid button {
+  min-width: 0;
+  min-height: 60px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid #dfe3e7;
+  border-radius: 13px;
+  background: #fff;
+  color: #1b2025;
+  text-align: left;
+}
+.tp-field-status-summary-grid button:nth-child(even) { background: #f3f4f5; }
+.tp-field-status-summary-grid button > span { min-width: 0; display: grid; gap: 2px; }
+.tp-field-status-summary-grid small { color: #76808a; font-size: 8.5px; }
+.tp-field-status-summary-grid strong { overflow: hidden; font-size: 10.5px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.tp-field-status-summary-grid .tp-field-status-yield-summary { min-height: 68px; }
+.tp-field-status-summary-grid .tp-field-status-yield-summary strong { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tp-field-status-summary-grid .tp-field-status-yield-summary em {
+  overflow: hidden;
+  color: #69737d;
+  font-size: 8px;
+  font-style: normal;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tp-field-status-yield-harvest {
+  padding: 12px;
+  border: 1px solid #dfe3e7;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #f7f8f9);
+}
+.tp-field-status-yield-harvest > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tp-field-status-yield-harvest > header > div { min-width: 0; }
+.tp-field-status-yield-harvest > header span {
+  color: #737d87;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.tp-field-status-yield-harvest > header strong {
+  display: block;
+  margin-top: 2px;
+  color: #1c2228;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.tp-field-status-yield-harvest > header p {
+  margin: 4px 0 0;
+  color: #68727d;
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+.tp-field-status-yield-harvest > header > button {
+  flex: 0 0 auto;
+  min-height: 31px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid #d8dde1;
+  border-radius: 9px;
+  background: #fff;
+  color: #2d343b;
+  font-size: 9px;
+  font-weight: 850;
+}
+.tp-field-status-yield-harvest > header > button:disabled { opacity: .52; }
+.tp-field-status-yield-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+.tp-field-status-yield-metrics > div {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid #e0e4e7;
+  border-radius: 11px;
+  background: #fff;
+}
+.tp-field-status-yield-metrics > div:nth-child(even) { background: #f2f4f5; }
+.tp-field-status-yield-metrics small { color: #747e88; font-size: 8px; }
+.tp-field-status-yield-metrics strong { color: #20262c; font-size: 10.5px; line-height: 1.25; }
+.tp-field-status-yield-note {
+  margin: 9px 1px 0;
+  color: #6d7781;
+  font-size: 8.8px;
+  line-height: 1.4;
+}
+
+.tp-field-status-highlight {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid #dfe3e7;
+  border-left-width: 4px;
+  border-radius: 13px;
+  background: #fff;
+  color: #1a1f24;
+  text-align: left;
+}
+.tp-field-status-highlight.info { border-left-color: #6d7782; }
+.tp-field-status-highlight.warning { border-left-color: #b7791f; }
+.tp-field-status-highlight.danger { border-left-color: #b53a45; }
+.tp-field-status-highlight span { color: #747e88; font-size: 8px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.tp-field-status-highlight strong { display: block; margin-top: 2px; font-size: 12px; }
+.tp-field-status-highlight p { margin: 3px 0 0; color: #65707a; font-size: 10px; line-height: 1.4; }
+
+.tp-field-status-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid #dfe3e7;
+  border-radius: 14px;
+  background: #fff;
+}
+.tp-field-status-section-head.simple { display: block; }
+.tp-field-status-section-head > div { min-width: 0; }
+.tp-field-status-section-head span { color: #737d87; }
+.tp-field-status-section-head strong { display: block; margin-top: 2px; font-size: 14px; }
+.tp-field-status-section-head p { margin: 4px 0 0; color: #6b7580; font-size: 10px; line-height: 1.4; }
+.tp-field-status-section-head > button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid #d8dde1;
+  border-radius: 9px;
+  background: #f7f8f9;
+  color: #2d343b;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+.tp-field-status-section-head > button:disabled { opacity: .52; }
+
+.tp-field-status-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #e0e4e7;
+  border-radius: 11px;
+  background: #fff;
+  color: #5e6974;
+  font-size: 10px;
+}
+.tp-field-status-source span { flex: 1; min-width: 0; }
+.tp-field-status-source b { color: #1f262d; font-size: 9.5px; }
+
+.tp-field-status-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.tp-field-status-metrics article {
+  min-width: 0;
+  min-height: 68px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 9px;
+  border: 1px solid #dfe3e7;
+  border-radius: 12px;
+  background: #fff;
+}
+.tp-field-status-metrics article:nth-child(even) { background: #f3f4f5; }
+.tp-field-status-metrics article span { color: #69747e; font-size: 9px; }
+.tp-field-status-metrics article strong { font-size: 17px; line-height: 1.15; }
+.tp-field-status-metrics article small { color: #89919a; font-size: 8px; }
+
+.tp-field-status-model-card,
+.tp-field-status-confidence-card,
+.tp-field-status-irrigation-card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid #dfe3e7;
+  border-radius: 13px;
+  background: #fff;
+}
+.tp-field-status-model-card span,
+.tp-field-status-confidence-card span,
+.tp-field-status-irrigation-card span { color: #707a84; }
+.tp-field-status-model-card strong,
+.tp-field-status-confidence-card strong,
+.tp-field-status-irrigation-card strong { display: block; margin-top: 2px; font-size: 12px; }
+.tp-field-status-model-card p,
+.tp-field-status-confidence-card p,
+.tp-field-status-irrigation-card p { margin: 3px 0 0; color: #69747e; font-size: 9.8px; line-height: 1.4; }
+.tp-field-status-irrigation-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #f2f4f5;
+}
+.tp-field-status-irrigation-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.tp-field-status-irrigation-meta span { padding: 4px 6px; border-radius: 999px; background: #f1f3f4; color: #4f5963; font-size: 8.5px; letter-spacing: 0; }
+
+.tp-field-status-suitability-score {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid #dfe3e7;
+  border-radius: 14px;
+  background: #fff;
+}
+.tp-field-status-suitability-score > div:first-child {
+  min-height: 68px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border-radius: 12px;
+  background: #111418;
+  color: #fff;
+}
+.tp-field-status-suitability-score > div:first-child span { color: #bfc5cb; }
+.tp-field-status-suitability-score > div:first-child strong { font-size: 25px; line-height: 1; }
+.tp-field-status-suitability-score b { font-size: 13px; }
+.tp-field-status-suitability-score p { margin: 3px 0 2px; color: #6e7882; font-size: 10px; }
+.tp-field-status-suitability-score small { color: #6e7882; font-size: 9px; }
+
+.tp-field-status-factor-list,
+.tp-field-status-data-list,
+.tp-field-status-risk-list,
+.tp-field-status-soil-profile {
+  overflow: hidden;
+  border: 1px solid #dde2e6;
+  border-radius: 13px;
+  background: #fff;
+}
+.tp-field-status-factor-list article,
+.tp-field-status-data-list article {
+  min-height: 49px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border-bottom: 1px solid #e7eaed;
+}
+.tp-field-status-factor-list article:last-child,
+.tp-field-status-data-list article:last-child { border-bottom: 0; }
+.tp-field-status-factor-list article:nth-child(even),
+.tp-field-status-data-list article:nth-child(even),
+.tp-field-status-risk-list button:nth-child(even),
+.tp-field-status-soil-profile article:nth-child(even) { background: #f3f4f5; }
+.tp-field-status-factor-list article > div { display: grid; gap: 2px; }
+.tp-field-status-factor-list span,
+.tp-field-status-data-list span { color: #4e5964; font-size: 10px; }
+.tp-field-status-factor-list small { color: #7b858f; font-size: 9px; }
+.tp-field-status-factor-list strong,
+.tp-field-status-data-list strong { max-width: 62%; color: #1d2329; font-size: 10px; line-height: 1.3; text-align: right; }
+
+.tp-field-status-risk-list button {
+  width: 100%;
+  min-height: 60px;
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 0;
+  border-bottom: 1px solid #e7eaed;
+  background: #fff;
+  color: #1e242a;
+  text-align: left;
+}
+.tp-field-status-risk-list button:last-child { border-bottom: 0; }
+.tp-field-status-risk-dot { width: 7px; height: 7px; border-radius: 50%; background: #7f8993; }
+.tp-field-status-risk-dot.warning { background: #b7791f; }
+.tp-field-status-risk-dot.danger { background: #b53a45; }
+.tp-field-status-risk-list div { min-width: 0; }
+.tp-field-status-risk-list small { color: #7a848e; font-size: 8.5px; }
+.tp-field-status-risk-list strong { display: block; margin-top: 1px; font-size: 11.5px; }
+.tp-field-status-risk-list p { margin: 3px 0 0; color: #68727d; font-size: 9.5px; line-height: 1.35; }
+
+.tp-field-status-records {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid #dfe3e7;
+  border-radius: 13px;
+  background: #fff;
+  color: #1c2228;
+  text-align: left;
+}
+.tp-field-status-records.primary { background: #171a1f; color: #fff; border-color: #171a1f; }
+.tp-field-status-records div { display: grid; gap: 2px; }
+.tp-field-status-records span { color: #737d87; font-size: 8.5px; font-weight: 850; letter-spacing: .08em; }
+.tp-field-status-records.primary span { color: #bfc5cb; }
+.tp-field-status-records strong { font-size: 11px; line-height: 1.3; }
+
+/* Toprak profili */
+.tp-field-status-soil-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.tp-field-status-soil-summary > div {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid #dde2e6;
+  border-radius: 12px;
+  background: #fff;
+}
+.tp-field-status-soil-summary > div:nth-child(even) { background: #f3f4f5; }
+.tp-field-status-soil-summary small { color: #747e88; font-size: 8.5px; }
+.tp-field-status-soil-summary strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.tp-field-status-texture-bar {
+  display: flex;
+  min-height: 34px;
+  overflow: hidden;
+  border: 1px solid #dde2e6;
+  border-radius: 11px;
+  background: #fff;
+}
+.tp-field-status-texture-bar span {
+  min-width: 64px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border-right: 1px solid #dde2e6;
+  color: #444d56;
+  font-size: 8.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.tp-field-status-texture-bar span:nth-child(2) { background: #f4f5f6; }
+.tp-field-status-texture-bar span:last-child { border-right: 0; }
+.tp-field-status-soil-profile article {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 78px repeat(3, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e7eaed;
+}
+.tp-field-status-soil-profile article:last-child { border-bottom: 0; }
+.tp-field-status-soil-profile strong { font-size: 10px; }
+.tp-field-status-soil-profile span { color: #606b75; font-size: 9px; text-align: right; }
+
+/* Veri girişi */
+.tp-field-status-input-grid { display: grid; gap: 7px; }
+.tp-field-status-input-grid button {
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid #dde2e6;
+  border-radius: 13px;
+  background: #fff;
+  color: #20262c;
+  text-align: left;
+}
+.tp-field-status-input-grid button:nth-child(even) { background: #f3f4f5; }
+.tp-field-status-input-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dfe3e7;
+  border-radius: 10px;
+  background: #fff;
+}
+.tp-field-status-input-copy { min-width: 0; display: grid; gap: 2px; }
+.tp-field-status-input-copy strong { font-size: 11px; }
+.tp-field-status-input-copy small { color: #707a84; font-size: 9px; line-height: 1.3; }
+
+/* Açılır saha gözlemi; form yalnız kullanıcı istediğinde alan kaplar. */
+.tp-field-status-fold {
+  overflow: hidden;
+  border: 1px solid #dde2e6;
+  border-radius: 13px;
+  background: #fff;
+}
+.tp-field-status-fold > summary {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.tp-field-status-fold > summary::-webkit-details-marker { display: none; }
+.tp-field-status-fold > summary span { display: grid; gap: 2px; }
+.tp-field-status-fold > summary small { color: #737d87; font-size: 8.5px; font-weight: 850; letter-spacing: .1em; }
+.tp-field-status-fold > summary strong { font-size: 11.5px; }
+.tp-field-status-fold > summary svg { transition: transform .18s ease; }
+.tp-field-status-fold[open] > summary svg { transform: rotate(90deg); }
+.tp-field-status-fold-body { padding: 0 8px 8px; }
+
+/* Eski bileşenler yeni merkezde kompakt ve açık tema görünür. */
+.tp-field-status-center .tp-field-growth-status {
+  margin: 0 !important;
+  padding: 11px !important;
+  border: 1px solid #dde2e6 !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.tp-field-status-center .tp-field-growth-status-copy > span { font-size: 8px !important; }
+.tp-field-status-center .tp-field-growth-status-copy > strong { font-size: 13px !important; }
+.tp-field-status-center .tp-field-growth-status-copy > p { margin-top: 4px !important; font-size: 9.8px !important; line-height: 1.4 !important; }
+.tp-field-status-center .tp-field-growth-status-meta { margin-top: 6px !important; }
+
+.tp-field-status-center .tp-field-growth-observations {
+  margin: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.tp-field-status-center .tp-irrigation-method-card {
+  margin: 0;
+  padding: 11px;
+  border: 1px solid #dde2e6;
+  border-radius: 13px;
+  background: #fff;
+  color: #1e242a;
+}
+.tp-field-status-center .tp-irrigation-method-card small { display:block; color:#747e88; font-size:8.5px; font-weight:850; letter-spacing:.1em; }
+.tp-field-status-center .tp-irrigation-method-card strong { display:block; margin-top:3px; font-size:12.5px; }
+.tp-field-status-center .tp-irrigation-method-card p { margin:4px 0 8px; color:#68727d; font-size:9.5px; line-height:1.4; }
+.tp-field-status-center .tp-irrigation-method-card select { width:100%; min-height:38px; padding:0 10px; border:1px solid #d8dde1; border-radius:10px; background:#f7f8f9; color:#1e242a; font-size:11px; }
+.tp-field-status-center .tp-irrigation-method-card em { display:block; margin-top:6px; color:#68727d; font-size:8.5px; font-style:normal; }
+
+.is-spinning { animation: tp-field-status-spin .85s linear infinite; }
+@keyframes tp-field-status-spin { to { transform: rotate(360deg); } }
+
+/* Harita araç çubuğunda Tarla Durumu dahil aksiyonlar. */
+html body .tp-v1 .tp-map-first-shell .tp-field-toolbar.tp-field-toolbar {
+  grid-template-columns: 38px minmax(0, 1fr) repeat(5, 38px) !important;
+  gap: 5px !important;
+}
+
+@media (max-width: 390px) {
+  .tp-field-status-tabs button { min-width: 54px; padding-inline: 9px; font-size: 10.5px; }
+  .tp-field-status-body { padding-inline: 8px; }
+  .tp-field-status-summary-grid { gap: 6px; }
+  .tp-field-status-metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .tp-field-status-soil-profile article { grid-template-columns: 68px repeat(3, 1fr); gap: 4px; }
+  .tp-field-status-soil-profile span { font-size: 8.2px; }
+
+  html body .tp-v1 .tp-map-first-shell .tp-field-toolbar.tp-field-toolbar {
+    grid-template-columns: 34px minmax(0, 1fr) repeat(5, 34px) !important;
+    gap: 3px !important;
+  }
+  html body .tp-v1 .tp-map-first-shell .tp-field-toolbar .tp-mf-quick-action,
+  html body .tp-v1 .tp-map-first-shell .tp-field-toolbar .tp-mf-operation-toolbar,
+  html body .tp-v1 .tp-map-first-shell .tp-field-toolbar .tp-add-field-3d {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+  }
+}
+
+@media (min-width: 541px) {
+  .tp-field-status-layer { align-items: center; padding: 18px; }
+  .tp-field-status-center { border-bottom: 1px solid #dfe3e7; border-radius: 24px; }
+}
+
+/* Tarla Durumu v3: tek merkez, eksik veri yönlendirme ve gerçek toprak analizi */
+.tp-field-status-score {
+  appearance: none;
+  font: inherit;
+  cursor: pointer;
+}
+.tp-field-status-missing-banner {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid #d9dee3;
+  border-radius: 14px;
+  background: #f5f6f7;
+  color: #20262c;
+  text-align: left;
+}
+.tp-field-status-missing-banner > div { min-width: 0; display: grid; gap: 3px; }
+.tp-field-status-missing-banner span,
+.tp-field-status-subhead span {
+  color: #747e88;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .11em;
+}
+.tp-field-status-missing-banner strong { font-size: 11.5px; line-height: 1.3; }
+.tp-field-status-missing-banner p { margin: 0; color: #69737d; font-size: 9px; line-height: 1.4; }
+
+.tp-field-status-soil-real,
+.tp-field-status-missing-panel,
+.tp-field-status-waiting-panel,
+.tp-field-status-recent-records {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid #dde2e6;
+  border-radius: 14px;
+  background: #fff;
+}
+.tp-field-status-soil-real-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  gap: 10px;
+  align-items: start;
+}
+.tp-field-status-soil-real-head > div { display: grid; gap: 3px; }
+.tp-field-status-soil-real-head span { color: #747e88; font-size: 8px; font-weight: 850; letter-spacing: .1em; }
+.tp-field-status-soil-real-head strong { font-size: 12.5px; }
+.tp-field-status-soil-real-head p { margin: 0; color: #69737d; font-size: 9.5px; line-height: 1.4; }
+.tp-field-status-soil-actions {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1.3fr;
+  gap: 6px;
+}
+.tp-field-status-soil-actions > button,
+.tp-field-status-soil-actions > label {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid #d9dee3;
+  border-radius: 11px;
+  background: #f5f6f7;
+  color: #20262c;
+  font-size: 8.8px;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+}
+.tp-field-status-soil-actions > label:first-child {
+  background: #15191d;
+  border-color: #15191d;
+  color: #fff;
+}
+.tp-field-status-soil-actions > label.disabled,
+.tp-field-status-soil-actions > button:disabled { opacity: .48; cursor: default; }
+.tp-field-status-soil-actions input { display: none; }
+.tp-field-status-inline-message {
+  margin: 0;
+  padding: 8px 9px;
+  border-radius: 10px;
+  background: #f3f4f5;
+  color: #4f5963;
+  font-size: 9px;
+  line-height: 1.4;
+}
+.tp-field-status-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tp-field-status-subhead strong { font-size: 9.5px; color: #30373e; }
+.tp-field-status-soil-history { display: grid; gap: 6px; }
+.tp-field-status-soil-history > button {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e1e5e8;
+  border-radius: 11px;
+  background: #fff;
+  color: #20262c;
+  text-align: left;
+}
+.tp-field-status-soil-history > button:nth-of-type(even) { background: #f5f6f7; }
+.tp-field-status-soil-history > button div { min-width: 0; display: grid; gap: 2px; }
+.tp-field-status-soil-history > button strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.tp-field-status-soil-history > button small { color: #727c85; font-size: 8.5px; }
+
+.tp-field-status-missing-list,
+.tp-field-status-waiting-list,
+.tp-field-status-activity-list { display: grid; gap: 6px; }
+.tp-field-status-missing-list button {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #dfe3e7;
+  border-radius: 11px;
+  background: #f6f7f8;
+  color: #20262c;
+  text-align: left;
+}
+.tp-field-status-missing-list button > div,
+.tp-field-status-waiting-list article > div { display: grid; gap: 2px; }
+.tp-field-status-missing-list strong,
+.tp-field-status-waiting-list strong { font-size: 10px; }
+.tp-field-status-missing-list small,
+.tp-field-status-waiting-list small { color: #727c85; font-size: 8.5px; line-height: 1.35; }
+.tp-field-status-waiting-list article {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 18px minmax(0,1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e6e9ec;
+}
+.tp-field-status-waiting-list article:last-child { border-bottom: 0; }
+
+.tp-field-status-record-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 6px;
+}
+.tp-field-status-record-summary-grid > button,
+.tp-field-status-record-summary-grid > div {
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #dfe3e7;
+  border-radius: 11px;
+  background: #f6f7f8;
+  color: #20262c;
+  text-align: left;
+}
+.tp-field-status-record-summary-grid span { color: #727c85; font-size: 8px; }
+.tp-field-status-record-summary-grid strong { font-size: 15px; }
+.tp-field-status-activity-list article {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-bottom: 1px solid #e6e9ec;
+}
+.tp-field-status-activity-list article:last-child { border-bottom: 0; }
+.tp-field-status-activity-list article > div { min-width: 0; display: grid; gap: 2px; }
+.tp-field-status-activity-list strong { overflow: hidden; font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.tp-field-status-activity-list small,
+.tp-field-status-activity-list article > span { color: #6d7780; font-size: 8.5px; }
+
+.tp-field-status-nested-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100002;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 14px;
+  background: rgba(0,0,0,.42);
+}
+.tp-field-status-nested-dialog {
+  width: min(100%, 480px);
+  max-height: min(82dvh, 720px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0,1fr);
+  border: 1px solid #d9dee3;
+  border-radius: 20px;
+  background: #fff;
+  color: #20262c;
+  box-shadow: 0 18px 60px rgba(0,0,0,.22);
+}
+.tp-field-status-nested-dialog > header {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e4e7ea;
+}
+.tp-field-status-nested-dialog > header > div { display: grid; gap: 2px; }
+.tp-field-status-nested-dialog > header span { color: #747e88; font-size: 8px; font-weight: 850; letter-spacing: .11em; }
+.tp-field-status-nested-dialog > header strong { font-size: 13px; }
+.tp-field-status-nested-dialog > header button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dce1e5;
+  border-radius: 10px;
+  background: #f5f6f7;
+  color: #20262c;
+}
+.tp-field-status-nested-body { overflow-y: auto; display: grid; gap: 10px; padding: 12px; }
+.tp-field-status-nested-intro { margin: 0; color: #626d77; font-size: 9.5px; line-height: 1.5; }
+.tp-field-status-sample-steps { display: grid; gap: 7px; }
+.tp-field-status-sample-steps article {
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr);
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #e0e4e7;
+  border-radius: 12px;
+  background: #f7f8f9;
+}
+.tp-field-status-sample-steps article > span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #15191d;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+}
+.tp-field-status-sample-steps article > div { display: grid; gap: 3px; }
+.tp-field-status-sample-steps strong { font-size: 10px; }
+.tp-field-status-sample-steps p { margin: 0; color: #68727c; font-size: 9px; line-height: 1.45; }
+.tp-field-status-guide-note {
+  display: grid;
+  grid-template-columns: 20px minmax(0,1fr);
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed #cfd5da;
+  border-radius: 11px;
+  background: #fff;
+}
+.tp-field-status-guide-note p { margin: 0; color: #5e6872; font-size: 9px; line-height: 1.45; }
+
+.tp-field-status-lab-list { display: grid; gap: 7px; }
+.tp-field-status-lab-list article {
+  display: grid;
+  grid-template-columns: 22px minmax(0,1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dfe3e7;
+  border-radius: 12px;
+  background: #f7f8f9;
+}
+.tp-field-status-lab-list article > div { min-width: 0; display: grid; gap: 3px; }
+.tp-field-status-lab-list strong { font-size: 10px; }
+.tp-field-status-lab-list small { color: #6d7780; font-size: 8.5px; line-height: 1.35; }
+.tp-field-status-lab-list article > div a { color: #20262c; font-size: 8.5px; font-weight: 800; }
+.tp-field-status-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #20262c;
+  font-size: 8.5px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+@media (max-width: 390px) {
+  .tp-field-status-soil-actions { grid-template-columns: 1fr 1fr; }
+  .tp-field-status-soil-actions > label:first-child { grid-column: 1 / -1; }
+  .tp-field-status-record-summary-grid { grid-template-columns: 1fr 1fr 1fr; }
+  .tp-field-status-nested-layer { padding: 8px; }
+}
+
+.tp-field-status-inline-form { display: grid; gap: 9px; }
+.tp-field-status-inline-form label { display: grid; gap: 5px; }
+.tp-field-status-inline-form label > span {
+  color: #66717b;
+  font-size: 8.5px;
+  font-weight: 800;
+}
+.tp-field-status-inline-form input,
+.tp-field-status-inline-form select,
+.tp-field-status-inline-form textarea {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid #d8dde1;
+  border-radius: 10px;
+  outline: none;
+  background: #f7f8f9;
+  color: #20262c;
+  font: inherit;
+  font-size: 10px;
+}
+.tp-field-status-inline-form textarea { min-height: 78px; resize: vertical; }
+.tp-field-status-inline-form input:focus,
+.tp-field-status-inline-form select:focus,
+.tp-field-status-inline-form textarea:focus { border-color: #929ca5; background: #fff; }
+.tp-field-status-form-grid { display: grid; gap: 7px; }
+.tp-field-status-form-grid.two { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.tp-field-status-check-row {
+  min-height: 42px;
+  grid-template-columns: 22px minmax(0,1fr) !important;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid #dfe3e7;
+  border-radius: 10px;
+  background: #f7f8f9;
+}
+.tp-field-status-check-row input { width: 18px; min-height: 18px; margin: 0; }
+.tp-field-status-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 7px;
+  padding-top: 2px;
+}
+.tp-field-status-form-actions button {
+  min-height: 42px;
+  border: 1px solid #d8dde1;
+  border-radius: 11px;
+  background: #f4f5f6;
+  color: #20262c;
+  font-size: 10px;
+  font-weight: 850;
+}
+.tp-field-status-form-actions button.primary { border-color: #15191d; background: #15191d; color: #fff; }
+.tp-field-status-form-actions button:disabled { opacity: .5; }
+.tp-field-status-record-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+
+/* 2026-09-24 · Tarla Durumu tek merkez düzeni */
+.tp-field-status-soil-quick{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+}
+.tp-field-status-soil-quick button,
+.tp-field-status-soil-quick label{
+  min-width:0;
+  min-height:42px;
+  padding:8px 7px;
+  border:1px solid #dde2e6;
+  border-radius:12px;
+  background:#fff;
+  color:#1f252b;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  text-align:center;
+  font:800 9px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  cursor:pointer;
+}
+.tp-field-status-soil-quick label{position:relative;overflow:hidden}
+.tp-field-status-soil-quick input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.tp-field-status-soil-quick .disabled{opacity:.5;pointer-events:none}
+.tp-field-status-soil-quick svg{flex:0 0 auto}
+
+.tp-field-status-irrigation-tools{
+  padding:11px;
+  border:1px solid #dfe4e8;
+  border-radius:15px;
+  background:#fff;
+  display:grid;
+  gap:9px;
+}
+.tp-field-status-irrigation-entry{
+  width:100%;
+  min-height:48px;
+  padding:9px 10px;
+  border:1px solid #e0e4e7;
+  border-radius:12px;
+  background:#f7f8f9;
+  color:#20262c;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:9px;
+  text-align:left;
+}
+.tp-field-status-irrigation-entry strong{display:block;font-size:10.5px}
+.tp-field-status-irrigation-entry small{display:block;margin-top:2px;color:#6f7982;font-size:8.6px;line-height:1.35}
+
+/* FieldWaterMeasurements eski geniş ekran kartı yerine Tarla Durumu içinde kompakt çalışır. */
+.tp-field-status-center .tp-field-water-measurements{
+  margin:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+.tp-field-status-center .tp-field-water-measurements > details{
+  border:1px solid #e0e4e7 !important;
+  border-radius:12px !important;
+  background:#f7f8f9 !important;
+  overflow:hidden;
+}
+.tp-field-status-center .tp-field-water-measurements summary{
+  min-height:42px !important;
+  padding:0 10px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  color:#20262c !important;
+  font-size:10.5px !important;
+  font-weight:850 !important;
+}
+.tp-field-status-center .tp-field-water-measurements-body{
+  padding:10px !important;
+  background:#fff !important;
+}
+.tp-field-status-center .tp-field-water-measurements-body h3{font-size:12px !important;margin:3px 0 !important}
+.tp-field-status-center .tp-field-water-measurements-body p,
+.tp-field-status-center .tp-field-water-measurements-body label{font-size:9px !important;line-height:1.4 !important}
+.tp-field-status-center .tp-field-water-measurements-body input,
+.tp-field-status-center .tp-field-water-measurements-body select,
+.tp-field-status-center .tp-field-water-measurements-body textarea{
+  min-height:36px !important;
+  border-radius:9px !important;
+  font-size:10px !important;
+}
+.tp-field-status-center .tp-field-water-measurements-body button[type="submit"]{
+  min-height:38px !important;
+  border-radius:10px !important;
+  font-size:10px !important;
+}
+
+@media(max-width:520px){
+  .tp-field-status-soil-quick{grid-template-columns:1fr}
+  .tp-field-status-soil-quick button,
+  .tp-field-status-soil-quick label{justify-content:flex-start;text-align:left;padding:9px 10px}
+}
+
+.tp-field-status-irrigation-profile{
+  padding:9px;
+  border:1px solid #e0e4e7;
+  border-radius:12px;
+  background:#fbfbfc;
+}
+.tp-field-status-irrigation-profile-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+}
+.tp-field-status-irrigation-profile label{display:grid;gap:4px;min-width:0}
+.tp-field-status-irrigation-profile label span{color:#65707a;font-size:8.5px;font-weight:800}
+.tp-field-status-irrigation-profile input,
+.tp-field-status-irrigation-profile select{
+  width:100%;
+  min-height:36px;
+  padding:0 9px;
+  border:1px solid #d9dee2;
+  border-radius:9px;
+  background:#fff;
+  color:#1f252b;
+  font-size:10px;
+  box-sizing:border-box;
+}
+.tp-field-status-irrigation-profile-save{
+  width:100%;
+  min-height:38px;
+  margin-top:8px;
+  border:0;
+  border-radius:10px;
+  background:#171b1f;
+  color:#fff;
+  font-size:10px;
+  font-weight:850;
+}
+@media(max-width:520px){
+  .tp-field-status-irrigation-profile-grid{grid-template-columns:1fr}
+}
+
+/* 2026-09-24 · Tarla Durumu modal/focus düzeltmeleri */
+.tp-field-status-nested-dialog {
+  margin: auto;
+}
+.tp-field-status-lab-source {
+  width: fit-content;
+  margin-top: 1px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #eef1f3;
+  color: #68737d !important;
+  font-size: 7.8px !important;
+  font-weight: 800;
+}
+.tp-field-status-lab-source.verified {
+  background: #eef5ed;
+  color: #3f6741 !important;
+}
+.tp-field-status-missing-list button {
+  cursor: pointer;
+  scroll-margin-block: 110px;
+}
+.tp-field-status-missing-list button:active {
+  transform: scale(.995);
+}
+.tp-field-status-center [data-irrigation-input] {
+  scroll-margin-block: 120px;
+}
+.tp-field-status-center [data-irrigation-input]:focus,
+.tp-field-status-center [data-irrigation-input] input:focus,
+.tp-field-status-center [data-irrigation-input] select:focus,
+.tp-field-status-center #field-water-measurements input:focus {
+  outline: 2px solid #15191d;
+  outline-offset: 2px;
+}
+
+.tp-field-status-input-help {
+  display: block;
+  margin: -1px 0 2px;
+  color: #7a848e;
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* --- Uydu biyofizik yorum + trend katmanı --- */
+.tp-field-status-metric-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tp-field-status-metric-foot small {
+  margin: 0;
+}
+
+.tp-field-status-metric-foot em {
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: #eef0f2;
+  color: #59636d;
+}
+
+.tp-field-status-metric-foot em.trend-up {
+  background: #edf6ef;
+  color: #315f3d;
+}
+
+.tp-field-status-metric-foot em.trend-down {
+  background: #fbefef;
+  color: #8a343b;
+}
+
+.tp-field-status-metric-foot em.trend-stable {
+  background: #f1f2f3;
+  color: #5f6871;
+}
+
+.tp-field-status-pusula-insight {
+  border: 1px solid #d8dde2;
+  border-radius: 18px;
+  padding: 14px;
+  background: #fff;
+}
+
+.tp-field-status-pusula-insight-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tp-field-status-pusula-insight-head > svg {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: 11px;
+  border: 1px solid #dce1e5;
+  background: #f5f6f7;
+  color: #1f252b;
+}
+
+.tp-field-status-pusula-insight-head div {
+  min-width: 0;
+}
+
+.tp-field-status-pusula-insight-head span {
+  display: block;
+  color: #78828c;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .11em;
+}
+
+.tp-field-status-pusula-insight-head strong {
+  display: block;
+  margin-top: 2px;
+  color: #151a1f;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.tp-field-status-pusula-insight > p {
+  margin: 9px 0 0;
+  color: #5f6973;
+  font-size: 10px;
+  line-height: 1.48;
+}
+
+.tp-field-status-pusula-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tp-field-status-pusula-chips span {
+  border: 1px solid #e0e4e7;
+  border-radius: 999px;
+  background: #f6f7f8;
+  padding: 5px 7px;
+  color: #4d5862;
+  font-size: 8px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.tp-field-status-pusula-trends {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.tp-field-status-pusula-trends span {
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: #f6f7f8;
+  color: #4f5963;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.tp-field-status-task-note {
+  display: block;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #e5e8eb;
+  color: #6b5558;
+  font-size: 8.5px;
+  line-height: 1.4;
+}
+
+@media (max-width: 420px) {
+  .tp-field-status-pusula-insight {
+    padding: 12px;
+  }
+
+  .tp-field-status-metric-foot {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
+
+/* Tarla Durumu > Özet: mevcut Pusula tarla-hareketliliği adayını aynı doğrulama akışına bağlar */
+.tp-field-status-field-event {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid #d6dce1;
+  border-left: 4px solid #1b2025;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f6f7 100%);
+  color: #171c21;
+  text-align: left;
+  cursor: pointer;
+}
+.tp-field-status-field-event:disabled {
+  cursor: default;
+  opacity: .72;
+}
+.tp-field-status-field-event-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d8dde1;
+  border-radius: 11px;
+  background: #fff;
+}
+.tp-field-status-field-event-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.tp-field-status-field-event-copy small {
+  color: #69737d;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+.tp-field-status-field-event-copy strong {
+  font-size: 12px;
+  line-height: 1.3;
+}
+.tp-field-status-field-event-copy p {
+  margin: 1px 0 0;
+  color: #66717b;
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+.tp-field-status-field-event-copy em {
+  width: fit-content;
+  margin-top: 4px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #171c21;
+  color: #fff;
+  font-size: 8.5px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+@media (max-width: 420px) {
+  .tp-field-status-field-event {
+    grid-template-columns: 32px minmax(0, 1fr) 16px;
+    gap: 8px;
+    padding: 10px;
+  }
+  .tp-field-status-field-event-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+
+/* Tarla Durumu > Özet: kullanıcının daha önce kaydettiği işlemleri görünür tutar. */
+.tp-field-status-saved-operations {
+  display: grid;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid #dde2e6;
+  border-radius: 14px;
+  background: #fff;
+}
+.tp-field-status-saved-operations-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tp-field-status-saved-operations-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.tp-field-status-saved-operations-head span {
+  color: #747e88;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .1em;
+}
+.tp-field-status-saved-operations-head strong {
+  color: #20262c;
+  font-size: 10.5px;
+}
+.tp-field-status-saved-operations-head button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid #d9dee3;
+  border-radius: 999px;
+  background: #f5f6f7;
+  color: #252b31;
+  font-size: 8.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.tp-field-status-saved-operations-list {
+  display: grid;
+  gap: 5px;
+}
+.tp-field-status-saved-operations-list article {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid #e3e7ea;
+  border-radius: 11px;
+  background: #f7f8f9;
+}
+.tp-field-status-saved-operation-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dde2e6;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 15px;
+}
+.tp-field-status-saved-operations-list article > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.tp-field-status-saved-operations-list article strong {
+  overflow: hidden;
+  color: #20262c;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tp-field-status-saved-operations-list article small {
+  color: #727c85;
+  font-size: 8.5px;
+}
+.tp-field-status-saved-operations-list article em {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #171c21;
+  color: #fff;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .tp-field-status-saved-operations {
+    padding: 9px;
+  }
+  .tp-field-status-saved-operations-list article {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+  .tp-field-status-saved-operation-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+}

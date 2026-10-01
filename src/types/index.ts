@@ -59,6 +59,8 @@ export type Field = {
   parsel: number;
   area: number;
   crop: string;
+  varietyId?: string | null;
+  varietyName?: string | null;
   season: number;
   status: FieldStatus;
   demo?: boolean;
@@ -92,6 +94,7 @@ export type FieldSeason = {
   fieldId: string;
   year: number;
   crop: string;
+  varietyId?: string | null;
   varietyName: string | null;
   plantingDate: string | null;
   harvestDate: string | null;
@@ -106,47 +109,16 @@ export type PerennialYield = {
   notes: string | null;
 };
 
-export type OfficialVerificationSource =
-  | 'BKU'
-  | 'GTS'
-  | 'DATS'
-  | 'TAKIS'
-  | 'TAGEM';
-
-export type OfficialVerificationStatus =
-  | 'verified'
-  | 'requires_verification'
-  | 'unavailable'
-  | 'not_applicable';
-
-export type OfficialVerification = {
-  domain: 'plant_protection' | 'fertilizer' | 'disaster' | 'research' | string;
-  source: OfficialVerificationSource;
-  sourceName: string;
-  status: OfficialVerificationStatus;
-  sourceUrl: string | null;
-  crop: string | null;
-  issue: string | null;
-  officialRecordId: string | null;
-  verifiedAt: string | null;
-  sourceObservedAt?: string | null;
-  matchedRecordCount?: number;
-  verificationBasis?:
-    | 'admin_reviewed_official_snapshot'
-    | 'official_source_reachability_only'
-    | 'not_applicable'
-    | string;
-  guardEvaluatedAt: string;
-  sourceMode: 'official_web_check' | 'official_api' | 'admin_snapshot' | string;
-  sourceAvailability?: 'reachable' | 'unreachable' | 'unchecked';
-  blockedRecommendationCount?: number;
-  guardVersion?: string;
-  note: string;
-};
-
 export type AiFieldAnalysis = {
   status: 'normal' | 'attention' | 'urgent' | 'uncertain';
-  issueType?: 'disease' | 'pest' | 'nutrition' | 'environmental' | 'physical' | 'uncertain';
+  issueType?:
+    | 'disease'
+    | 'pest'
+    | 'weed'
+    | 'nutrition'
+    | 'environmental'
+    | 'physical'
+    | 'uncertain';
   severity?: 'low' | 'medium' | 'high' | 'unknown';
   headline: string;
   possibleIssue: string;
@@ -156,13 +128,42 @@ export type AiFieldAnalysis = {
   needsMoreEvidence?: boolean;
   followUpPhoto?: string | null;
   comparison?: string | null;
-  trend?: 'improving' | 'stable' | 'worsening' | 'unknown';
+  trend?: 'improving' | 'stable' | 'worsening' | 'unknown' | null;
+  /** Madde 8 · Yabancı Ot Zekâsı. Yalnız görsel tahmindir; laboratuvar/uzman teşhisi değildir. */
+  weedPresence?: 'not_visible' | 'possible' | 'visible' | 'uncertain' | null;
+  weedCoverPercent?: number | null;
+  cropCoverPercent?: number | null;
+  bareSoilPercent?: number | null;
+  weedDensity?: 'low' | 'medium' | 'high' | 'unknown' | null;
+  weedDistribution?:
+    | 'scattered'
+    | 'patchy'
+    | 'dense_patch'
+    | 'uniform'
+    | 'row_interference'
+    | 'unknown'
+    | null;
+  weedCandidate?: string | null;
+  weedEvidence?: string[];
   disclaimer: string;
-  source?: string | null;
+  officialVerification?: {
+    domain?: string | null;
+    source?: string | null;
+    sourceName?: string | null;
+    status?: string | null;
+    sourceUrl?: string | null;
+    crop?: string | null;
+    issue?: string | null;
+    officialRecordId?: string | null;
+    verifiedAt?: string | null;
+    guardEvaluatedAt?: string | null;
+    sourceMode?: string | null;
+    note?: string | null;
+  } | null;
+  source?: 'gemini_image_analysis' | string;
   provider?: string | null;
   model?: string | null;
   analyzedAt?: string | null;
-  officialVerification?: OfficialVerification | null;
 };
 
 export type AiAccessStatus = {

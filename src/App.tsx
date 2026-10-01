@@ -24,8 +24,6 @@ import NotificationsHubScreen from './pages/Notifications/NotificationsHubScreen
 import FieldDetailScreen from './pages/FieldDetailScreen';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { FALLBACK_DESKTOP_MENU_ITEMS, BASE_PLACEHOLDER_META, weatherDayLabel, weatherIcon } from './data/navigation';
-import AppDrawer from './components/AppDrawer';
-import GlobalPusulaBand from './components/GlobalPusulaBand';
 import PusulaIntroTrailer from './components/PusulaIntroTrailer';
 import { cmsBlockStyle, cmsText, cmsSub } from './utils/cmsUtils';
 import { useEntitlementStore } from './entitlements/useEntitlementStore';
@@ -40,6 +38,7 @@ import { useFieldRegistryController } from './features/fields/hooks/useFieldRegi
 import { useFieldActivities } from './features/field-detail/hooks/useFieldActivities';
 import { useFieldProductionHistory } from './features/field-detail/hooks/useFieldProductionHistory';
 import { useFieldSections } from './features/field-detail/hooks/useFieldSections';
+import AppShell, { type AppMenuItem } from './app/AppShell';
 import { ensureAgStackGeoId } from './services/agstackGeoId.service';
 import {
   startGamificationSession,
@@ -130,6 +129,15 @@ export default function App() {
   } = useAuthOnboardingController({ isNewUserPreview, setScreen });
   const [era5MapOpen, setEra5MapOpen] = useState(false);
   const [demMapOpen, setDemMapOpen] = useState(false);
+  useEffect(() => {
+    const handleOpenDemMap = (event: Event) => {
+      const fieldId = String((event as CustomEvent)?.detail?.fieldId ?? '').trim();
+      if (fieldId) setMapFieldId(fieldId);
+      setDemMapOpen(true);
+    };
+    window.addEventListener('tp:open-dem-map', handleOpenDemMap as EventListener);
+    return () => window.removeEventListener('tp:open-dem-map', handleOpenDemMap as EventListener);
+  }, []);
   const [sentinel1MapOpen, setSentinel1MapOpen] = useState(false);
   const [unifiedMapOpen, setUnifiedMapOpen] = useState(false);
   const [unifiedMapSection, setUnifiedMapSection] = useState<MapSection>('vegetation');
@@ -229,9 +237,18 @@ export default function App() {
     parcelLookupMessage,
     parcelGeometry,
     parcelLookupSource,
+    mapBoundaryLoading,
+    mapBoundaryMessage,
+    mapBoundaryCandidates,
+    mapBoundarySuggestedCandidateId,
     fieldArea,
     setFieldArea,
     fieldCrop,
+    fieldVarietyId,
+    fieldVarietyName,
+    fieldVarietyOptions,
+    fieldVarietyLoading,
+    fieldVarietyMessage,
     fieldSeason,
     setFieldSeason,
     fieldCropCycle,
@@ -244,10 +261,14 @@ export default function App() {
     handleDistrictSelection,
     handleVillageSelection,
     handleParcelLookup,
+    handleMapBoundaryLookup,
+    handleMapBoundaryAccept,
+    clearMapBoundarySearch,
     openOfficialParcelQuery,
     openAddField,
     resetFieldForm,
     handleFieldCropSelection,
+    handleFieldVarietySelection,
     handleAddField,
     handleDeleteField,
     districtDisplayName,
@@ -482,6 +503,12 @@ export default function App() {
     actionTarget: string | null;
     nonce: number;
   } | null>(null);
+  const [fieldStatusRequest, setFieldStatusRequest] = useState<{
+    fieldId: string;
+    initialTab?: 'summary' | 'plant' | 'crop' | 'soil' | 'irrigation' | 'risk' | 'data' | 'input';
+    actionTarget?: string | null;
+    nonce: number;
+  } | null>(null);
 
   const statusInfo = {
     good: {
@@ -506,22 +533,43 @@ export default function App() {
     entry: { actionTarget?: string | null } = {},
   ) => {
     setFieldFabOpen(false);
-    setFieldDetailEntry(
-      entry.actionTarget
-        ? {
-            fieldId: String(field.id),
-            actionTarget: String(entry.actionTarget),
-            nonce: Date.now(),
-          }
-        : null,
-    );
     setSelectedField(field);
-    resetSectionsUi();
-    resetProductionUi();
-    setActivityFormOpen(false);
-    setActivityMessage('');
-    syncProfileFromField(field);
-    setScreen('fieldDetail');
+
+    // Eski Tarla Detayı sayfası artık kullanıcı akışında yok. Tüm tarla durumu,
+    // kayıt ve veri girişleri tek Tarla Durumu merkezinde açılır.
+    const actionTarget = String(entry.actionTarget ?? '').trim() || null;
+    const targetText = actionTarget ?? '';
+    const initialTab = /soil-analysis|soil/i.test(targetText)
+      ? 'soil'
+      : /irrigation|last-irrigation|soil-water/i.test(targetText)
+        ? 'irrigation'
+        : /field-growth|phenology|observation/i.test(targetText)
+          ? 'plant'
+          : actionTarget
+            ? 'input'
+            : 'summary';
+
+    setFieldDetailEntry(null);
+    setFieldStatusRequest({
+      fieldId: String(field.id),
+      initialTab,
+      actionTarget,
+      nonce: Date.now(),
+    });
+    setScreen('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openFieldStatusFromDetail = () => {
+    if (!selectedField) return;
+    setFieldStatusRequest({
+      fieldId: String(selectedField.id),
+      initialTab: 'summary',
+      actionTarget: null,
+      nonce: Date.now(),
+    });
+    setFieldDetailEntry(null);
+    setScreen('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -789,6 +837,10 @@ export default function App() {
         parcelLookupMessage={parcelLookupMessage}
         parcelGeometry={parcelGeometry}
         parcelLookupSource={parcelLookupSource}
+        mapBoundaryLoading={mapBoundaryLoading}
+        mapBoundaryMessage={mapBoundaryMessage}
+        mapBoundaryCandidates={mapBoundaryCandidates}
+        mapBoundarySuggestedCandidateId={mapBoundarySuggestedCandidateId}
         parcelLocationMessage={parcelLocationMessage}
         fieldLatitude={fieldLatitude}
         fieldLongitude={fieldLongitude}
@@ -797,6 +849,11 @@ export default function App() {
         fieldSeason={fieldSeason}
         setFieldSeason={setFieldSeason}
         fieldCrop={fieldCrop}
+        fieldVarietyId={fieldVarietyId}
+        fieldVarietyName={fieldVarietyName}
+        fieldVarietyOptions={fieldVarietyOptions}
+        fieldVarietyLoading={fieldVarietyLoading}
+        fieldVarietyMessage={fieldVarietyMessage}
         fieldCropCycle={fieldCropCycle}
         fieldPlantingYear={fieldPlantingYear}
         setFieldPlantingYear={setFieldPlantingYear}
@@ -809,8 +866,12 @@ export default function App() {
         handleDistrictSelection={handleDistrictSelection}
         handleVillageSelection={handleVillageSelection}
         handleParcelLookup={handleParcelLookup}
+        handleMapBoundaryLookup={handleMapBoundaryLookup}
+        handleMapBoundaryAccept={handleMapBoundaryAccept}
+        clearMapBoundarySearch={clearMapBoundarySearch}
         openOfficialParcelQuery={openOfficialParcelQuery}
         handleFieldCropSelection={handleFieldCropSelection}
+        handleFieldVarietySelection={handleFieldVarietySelection}
         handleAddField={handleAddField}
       />
     );
@@ -871,6 +932,7 @@ export default function App() {
           detailCropCycle,
           detailPlantingYear,
           fieldDetailEntry,
+          openFieldStatusFromDetail,
           fieldFabOpen,
           fieldSections,
           handleActivityPhotoChange,
@@ -954,14 +1016,20 @@ export default function App() {
   }
 
   const cmsDesktopMenuItems = cmsMenus.filter(item=>item.is_visible && item.show_desktop && (!item.admin_only || isAdmin)).sort((a,b)=>a.position-b.position).map(item=>({screen:((item.page_key || 'home') as Screen),icon:item.icon || '•',label:item.label,badge:item.badge_text || undefined}));
-  const desktopMenuItems: Array<{ screen: Screen; icon: string; label: string; badge?: string }> = [
+  const desktopMenuItems: AppMenuItem[] = [
     ...(cmsDesktopMenuItems.length ? cmsDesktopMenuItems : FALLBACK_DESKTOP_MENU_ITEMS),
     ...(isAdmin && !(cmsDesktopMenuItems.length && cmsDesktopMenuItems.some(item=>item.screen==='adminHub')) ? [{screen:'adminHub' as Screen,icon:'◆',label:'Yönetim',badge:'ADMIN'}] : []),
-  ].map((item) =>
-    String(item.screen) === 'supportHub'
-      ? { ...item, label: 'Tarım Gündemi' }
-      : item,
-  );
+  ].map((item) => {
+    if (String(item.screen) === 'supportHub') {
+      return { ...item, label: 'Tarımsal Destek' };
+    }
+
+    if (String(item.screen) === 'agendaHub') {
+      return { ...item, label: 'Tarım Gündemi' };
+    }
+
+    return item;
+  }).filter((item) => String(item.screen) !== 'soilAnalysisHub');
 
   const placeholderMeta = { ...BASE_PLACEHOLDER_META };
   (Object.keys(BASE_PLACEHOLDER_META) as Screen[]).forEach((pageScreen)=>{
@@ -1041,47 +1109,35 @@ export default function App() {
     content: ReactNode,
     showGlobalBand = true,
   ) => (
-    <>
-      <AppDrawer
-        open={sideMenuOpen}
-        activeScreen={screen}
-        onClose={() => setSideMenuOpen(false)}
-        onNavigate={(target, label) => {
-          setSideMenuOpen(false);
+    <AppShell
+      screen={screen}
+      drawerOpen={sideMenuOpen}
+      menuItems={desktopMenuItems}
+      fields={realFields}
+      favoriteFieldId={favoriteFieldId}
+      showGlobalBand={showGlobalBand}
+      onCloseDrawer={() => setSideMenuOpen(false)}
+      onOpenDrawer={() => setSideMenuOpen(true)}
+      onNavigate={(target, label) => {
+        setSideMenuOpen(false);
 
-          if (label === 'Tarlalarım') {
-            setScreen('home');
-            window.setTimeout(() => {
-              document
-                .querySelector('.tp-home-field')
-                ?.scrollIntoView({ behavior: 'smooth' });
-            }, 80);
-            return;
-          }
+        if (label === 'Tarlalarım') {
+          setScreen('home');
+          window.setTimeout(() => {
+            document
+              .querySelector('.tp-home-field')
+              ?.scrollIntoView({ behavior: 'smooth' });
+          }, 80);
+          return;
+        }
 
-          setScreen(target as Screen);
-        }}
-      />
-      {showGlobalBand && screen !== 'home' && (
-        <GlobalPusulaBand
-          screen={String(screen)}
-          title={
-            desktopMenuItems.find(
-              (item) => String(item.screen) === String(screen),
-            )?.label ?? null
-          }
-          fieldName={
-            realFields.find((field) => String(field.id) === String(favoriteFieldId))?.name ??
-            realFields[0]?.name ??
-            null
-          }
-          onBack={goBackInMenu}
-          onMenu={() => setSideMenuOpen(true)}
-          onOpenAi={() => setScreen('aiAnalysis')}
-        />
-      )}
+        setScreen(target);
+      }}
+      onBack={goBackInMenu}
+      onOpenAi={() => setScreen('aiAnalysis')}
+    >
       {content}
-    </>
+    </AppShell>
   );
 
   if (screen === 'notificationsHub') {
@@ -1116,6 +1172,7 @@ export default function App() {
         }
         onFieldChange={(id) => setSoilFieldId(id)}
         onBack={() => setScreen('home')}
+        onNavigate={(target) => setScreen(target as Screen)}
         onOpenDemMap={() => setDemMapOpen(true)}
         onOpenSentinel1Map={() => setSentinel1MapOpen(true)}
       />
@@ -1348,6 +1405,7 @@ export default function App() {
       setScreen={setScreen}
       setSideMenuOpen={setSideMenuOpen}
       sideMenuOpen={false}
+      fieldStatusRequest={fieldStatusRequest}
     />,
     false,
   );

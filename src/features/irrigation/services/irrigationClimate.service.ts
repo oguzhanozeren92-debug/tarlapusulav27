@@ -15,6 +15,188 @@ const PAST_DAYS = 7;
 const FORECAST_DAYS = 5;
 
 /*
+  Open-Meteo koruması:
+  - aynı URL için eşzamanlı çağrıları tek istekte birleştirir
+  - kısa süreli tarayıcı cache'i kullanır
+  - 429 sonrası Retry-After/backoff uygular
+  - 429 sırasında elde eski ama yakın tarihli veri varsa onu kullanır
+
+  Böylece React render/StrictMode veya birden fazla tüketici aynı tarla için
+  Open-Meteo'yu art arda çağırmaz.
+*/
+const OPEN_METEO_CACHE_TTL_MS = 15 * 60 * 1000;
+const OPEN_METEO_STALE_TTL_MS = 6 * 60 * 60 * 1000;
+const OPEN_METEO_DEFAULT_BACKOFF_MS = 90 * 1000;
+const OPEN_METEO_CACHE_PREFIX = 'tp:irrigation-climate:v2:';
+
+type OpenMeteoCacheEntry = {
+  savedAt: number;
+  payload: any;
+};
+
+const openMeteoInFlight = new Map<string, Promise<any>>();
+let openMeteoBlockedUntil = 0;
+
+function openMeteoStorageKey(url: string) {
+  return `${OPEN_METEO_CACHE_PREFIX}${encodeURIComponent(url)}`;
+}
+
+function readOpenMeteoCache(
+  url: string,
+  maxAgeMs: number,
+): any | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(
+      openMeteoStorageKey(url),
+    );
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as OpenMeteoCacheEntry;
+    if (
+      !parsed ||
+      !Number.isFinite(parsed.savedAt) ||
+      Date.now() - parsed.savedAt > maxAgeMs
+    ) {
+      return null;
+    }
+
+    return parsed.payload ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeOpenMeteoCache(
+  url: string,
+  payload: any,
+) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const entry: OpenMeteoCacheEntry = {
+      savedAt: Date.now(),
+      payload,
+    };
+
+    window.localStorage.setItem(
+      openMeteoStorageKey(url),
+      JSON.stringify(entry),
+    );
+  } catch {
+    // Cache başarısızlığı iklim akışını durdurmamalı.
+  }
+}
+
+function retryAfterMs(
+  value: string | null,
+) {
+  if (!value) {
+    return OPEN_METEO_DEFAULT_BACKOFF_MS;
+  }
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.max(
+      OPEN_METEO_DEFAULT_BACKOFF_MS,
+      seconds * 1000,
+    );
+  }
+
+  const retryAt = Date.parse(value);
+  if (Number.isFinite(retryAt)) {
+    return Math.max(
+      OPEN_METEO_DEFAULT_BACKOFF_MS,
+      retryAt - Date.now(),
+    );
+  }
+
+  return OPEN_METEO_DEFAULT_BACKOFF_MS;
+}
+
+async function fetchOpenMeteoCached(
+  url: string,
+) {
+  const fresh = readOpenMeteoCache(
+    url,
+    OPEN_METEO_CACHE_TTL_MS,
+  );
+  if (fresh) return fresh;
+
+  const existing = openMeteoInFlight.get(url);
+  if (existing) return existing;
+
+  const stale = readOpenMeteoCache(
+    url,
+    OPEN_METEO_STALE_TTL_MS,
+  );
+
+  if (Date.now() < openMeteoBlockedUntil) {
+    if (stale) return stale;
+
+    const waitSeconds = Math.max(
+      1,
+      Math.ceil(
+        (openMeteoBlockedUntil - Date.now()) / 1000,
+      ),
+    );
+
+    throw new Error(
+      `Sulama iklim servisi Open-Meteo istek sınırında. Yaklaşık ${waitSeconds} sn sonra tekrar denenecek.`,
+    );
+  }
+
+  const request = (async () => {
+    const response = await fetch(url);
+
+    if (response.status === 429) {
+      openMeteoBlockedUntil =
+        Date.now() +
+        retryAfterMs(
+          response.headers.get('Retry-After'),
+        );
+
+      if (stale) {
+        console.warn(
+          '[irrigationClimate] Open-Meteo 429; yakın tarihli cache kullanılıyor.',
+        );
+        return stale;
+      }
+
+      throw new Error(
+        'Sulama iklim servisi Open-Meteo istek sınırına ulaştı (429).',
+      );
+    }
+
+    if (!response.ok) {
+      if (stale && response.status >= 500) {
+        console.warn(
+          `[irrigationClimate] Open-Meteo ${response.status}; yakın tarihli cache kullanılıyor.`,
+        );
+        return stale;
+      }
+
+      throw new Error(
+        `Sulama iklim servisi Open-Meteo ${response.status} hatası verdi.`,
+      );
+    }
+
+    const payload = await response.json();
+    writeOpenMeteoCache(url, payload);
+    return payload;
+  })();
+
+  openMeteoInFlight.set(url, request);
+
+  try {
+    return await request;
+  } finally {
+    openMeteoInFlight.delete(url);
+  }
+}
+
+/*
   0.5 mm altındaki çok küçük tahminleri
   operasyonel "yağış geliyor" sinyali
   olarak öne çıkarmıyoruz.
@@ -572,19 +754,13 @@ export async function loadIrrigationClimateContext(
         'UTC',
     });
 
-  const response =
-    await fetch(
-      `${OPEN_METEO_FORECAST}?${params.toString()}`,
-    );
-
-  if (!response.ok) {
-    throw new Error(
-      `Sulama iklim servisi Open-Meteo ${response.status} hatası verdi.`,
-    );
-  }
+  const requestUrl =
+    `${OPEN_METEO_FORECAST}?${params.toString()}`;
 
   const payload =
-    await response.json();
+    await fetchOpenMeteoCached(
+      requestUrl,
+    );
 
   const dates =
     Array.isArray(

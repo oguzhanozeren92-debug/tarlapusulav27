@@ -8,18 +8,17 @@ import {
   FileUp,
   FlaskConical,
   History,
-  Home,
   Info,
   LandPlot,
   LocateFixed,
   MapPin,
-  MoreHorizontal,
   RefreshCw,
   Sparkles,
   Sprout,
   TestTube2,
 } from 'lucide-react';
 import MobileWheelPicker from '../../components/MobileWheelPicker';
+import ClassicBottomNav from '../../components/ClassicBottomNav';
 import {
   analyzeSoilReport,
   findNearbySoilLabs,
@@ -124,7 +123,6 @@ export default function SoilAnalysisPage({
   onFieldChange,
   onBack,
   onNavigate,
-  setSideMenuOpen,
 }: Props) {
   const realFields = fields.filter(
     (field) => !String(field.id).startsWith('demo'),
@@ -1034,23 +1032,10 @@ export default function SoilAnalysisPage({
         </section>
       </main>
 
-      <nav className="soil-app-bottom-nav" aria-label="Ana uygulama menüsü">
-        <button type="button" onClick={() => navigate('home')}>
-          <Home size={18} /><span>Ana Sayfa</span>
-        </button>
-        <button type="button" onClick={() => navigate('home')}>
-          <LandPlot size={18} /><span>Tarlalarım</span>
-        </button>
-        <button type="button" className="soil-bottom-ai" onClick={() => navigate('aiAnalysis')}>
-          <b><Sparkles size={20} /></b><span>AI Analiz</span>
-        </button>
-        <button type="button" onClick={() => navigate('calendar')}>
-          <CalendarDays size={18} /><span>Takvim</span>
-        </button>
-        <button type="button" onClick={() => setSideMenuOpen?.(true)}>
-          <MoreHorizontal size={19} /><span>Daha Fazla</span>
-        </button>
-      </nav>
+      <ClassicBottomNav
+        activeScreen="soilAnalysisHub"
+        setScreen={(next) => navigate(next)}
+      />
     </div>
   );
 }

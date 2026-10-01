@@ -12,6 +12,9 @@ export type SoilLabResult = {
   longitude?: number;
   distanceKm?: number;
   mapUrl?: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
+  verified?: boolean;
 };
 
 export type SoilAIResult = {
@@ -136,6 +139,46 @@ function calculateDistanceKm(
     );
 
   return R * c;
+}
+
+function normalizeLocation(value: unknown) {
+  return String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i');
+}
+
+const OFFICIAL_SOIL_LABS: Array<{
+  city: string;
+  district?: string;
+  result: SoilLabResult;
+}> = [
+  {
+    city: 'elazig',
+    result: {
+      name: 'Elazığ İl Tarım ve Orman Müdürlüğü Toprak Analiz Laboratuvarı',
+      address: 'İl Tarım ve Orman Müdürlüğü, Elazığ Merkez / Elazığ',
+      phone: '0 424 241 16 16',
+      mapUrl: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Elazığ İl Tarım ve Orman Müdürlüğü'),
+      sourceLabel: 'Resmî kurum kaydı',
+      sourceUrl: 'https://elazig.tarimorman.gov.tr/Belgeler/TARIMSAL%20ALTYAPI%20VE%20ARAZ%C4%B0%20DE%C4%9EERLEND%C4%B0RME%20H%C4%B0ZMET%20STANDARTLARI.pdf',
+      verified: true,
+    },
+  },
+];
+
+function officialLabFallbacks(city: string, district: string) {
+  const normalizedCity = normalizeLocation(city);
+  const normalizedDistrict = normalizeLocation(district);
+  return OFFICIAL_SOIL_LABS
+    .filter((item) => {
+      if (normalizeLocation(item.city) !== normalizedCity) return false;
+      if (!item.district) return true;
+      return normalizeLocation(item.district) === normalizedDistrict;
+    })
+    .map((item) => ({ ...item.result }));
 }
 
 /* =========================================================
@@ -372,42 +415,31 @@ export async function findNearbySoilLabs({
   longitude,
   city = '',
   district = '',
-}: FindLabsParams): Promise<
-  SoilLabResult[]
-> {
-  let lat =
-    latitude != null
-      ? Number(latitude)
-      : null;
+}: FindLabsParams): Promise<SoilLabResult[]> {
+  let lat = latitude != null ? Number(latitude) : null;
+  let lng = longitude != null ? Number(longitude) : null;
 
-  let lng =
-    longitude != null
-      ? Number(longitude)
-      : null;
-
-  if (
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lng)
-  ) {
-    const geocoded =
-      await geocodeLocation(
-        city,
-        district,
-      );
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    const geocoded = await geocodeLocation(city, district);
 
     if (!geocoded) {
-      throw new Error(
-        'Seçilen konum haritada bulunamadı.',
-      );
+      const officialOnly = officialLabFallbacks(city, district);
+      if (officialOnly.length) return officialOnly;
+      throw new Error('Seçilen konum haritada bulunamadı.');
     }
 
     lat = geocoded.lat;
     lng = geocoded.lng;
   }
 
-  const radius = 50000;
+  const endpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ];
+  const radii = [50000, 100000, 200000];
 
-  const overpassQuery = `
+  const queryForRadius = (radius: number) => `
 [out:json][timeout:25];
 (
   node["amenity"="laboratory"](around:${radius},${lat},${lng});
@@ -425,154 +457,107 @@ export async function findNearbySoilLabs({
 out center tags;
 `;
 
-  try {
-    const response = await fetch(
-      'https://overpass-api.de/api/interpreter',
-      {
-        method: 'POST',
+  let data: any = null;
+  let lastError: unknown = null;
 
-        headers: {
-          'Content-Type':
-            'application/x-www-form-urlencoded;charset=UTF-8',
-        },
+  for (const radius of radii) {
+    for (const endpoint of endpoints) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 18000);
 
-        body:
-          'data=' +
-          encodeURIComponent(
-            overpassQuery,
-          ),
-      },
-    );
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            Accept: 'application/json',
+          },
+          body: 'data=' + encodeURIComponent(queryForRadius(radius)),
+        });
 
-    if (!response.ok) {
-      throw new Error(
-        'Laboratuvar servisine ulaşılamadı.',
-      );
+        if (!response.ok) {
+          throw new Error(`Overpass HTTP ${response.status}`);
+        }
+
+        const candidate = await response.json();
+        if (!Array.isArray(candidate?.elements)) {
+          throw new Error('Laboratuvar servisi beklenmeyen yanıt döndürdü.');
+        }
+
+        if (candidate.elements.length) {
+          data = candidate;
+          break;
+        }
+      } catch (error) {
+        lastError = error;
+        console.warn('Laboratuvar Overpass uç noktası çalışmadı:', endpoint, error);
+      } finally {
+        clearTimeout(timeout);
+      }
     }
 
-    const data =
-      await response.json();
-
-    const elements =
-      Array.isArray(
-        data?.elements,
-      )
-        ? data.elements
-        : [];
-
-    const results =
-      elements
-        .map((element: any) => {
-          const labLat =
-            Number(
-              element.lat ??
-                element.center?.lat,
-            );
-
-          const labLng =
-            Number(
-              element.lon ??
-                element.center?.lon,
-            );
-
-          if (
-            !Number.isFinite(labLat) ||
-            !Number.isFinite(labLng)
-          ) {
-            return null;
-          }
-
-          const tags =
-            element.tags ?? {};
-
-          const name =
-            tags.name ||
-            tags.operator ||
-            'Analiz Laboratuvarı';
-
-          const addressParts = [
-            tags['addr:street'],
-            tags['addr:housenumber'],
-            tags['addr:suburb'],
-            tags['addr:district'],
-            tags['addr:city'],
-          ].filter(Boolean);
-
-          const address =
-            addressParts.join(' ') ||
-            tags.address ||
-            '';
-
-          const phone =
-            tags.phone ||
-            tags['contact:phone'] ||
-            '';
-
-          const distanceKm =
-            calculateDistanceKm(
-              Number(lat),
-              Number(lng),
-              labLat,
-              labLng,
-            );
-
-          return {
-            name,
-            address,
-            phone,
-            latitude: labLat,
-            longitude: labLng,
-            distanceKm,
-
-            mapUrl:
-              `https://www.google.com/maps/search/?api=1&query=${labLat},${labLng}`,
-          } satisfies SoilLabResult;
-        })
-        .filter(
-          (
-            item: SoilLabResult | null,
-          ): item is SoilLabResult =>
-            item !== null,
-        )
-        .sort(
-          (a, b) =>
-            (a.distanceKm ?? 9999) -
-            (b.distanceKm ?? 9999),
-        );
-
-    const unique =
-      new Map<
-        string,
-        SoilLabResult
-      >();
-
-    results.forEach(
-      (item) => {
-        const key =
-          `${item.name}-${item.latitude}-${item.longitude}`;
-
-        if (!unique.has(key)) {
-          unique.set(
-            key,
-            item,
-          );
-        }
-      },
-    );
-
-    return Array.from(
-      unique.values(),
-    ).slice(0, 12);
-  } catch (error) {
-    console.error(
-      'Laboratuvar arama hatası:',
-      error,
-    );
-
-    throw new Error(
-      'Yakındaki laboratuvarlar şu anda getirilemedi.',
-    );
+    if (data) break;
   }
+
+  const official = officialLabFallbacks(city, district);
+  const elements = Array.isArray(data?.elements) ? data.elements : [];
+
+  const mapResults = elements
+    .map((element: any) => {
+      const labLat = Number(element.lat ?? element.center?.lat);
+      const labLng = Number(element.lon ?? element.center?.lon);
+
+      if (!Number.isFinite(labLat) || !Number.isFinite(labLng)) {
+        return null;
+      }
+
+      const tags = element.tags ?? {};
+      const name = tags.name || tags.operator || 'Analiz Laboratuvarı';
+
+      const addressParts = [
+        tags['addr:street'],
+        tags['addr:housenumber'],
+        tags['addr:suburb'],
+        tags['addr:district'],
+        tags['addr:city'],
+      ].filter(Boolean);
+
+      const address = addressParts.join(' ') || tags.address || '';
+      const phone = tags.phone || tags['contact:phone'] || '';
+      const distanceKm = calculateDistanceKm(Number(lat), Number(lng), labLat, labLng);
+
+      return {
+        name,
+        address,
+        phone,
+        latitude: labLat,
+        longitude: labLng,
+        distanceKm,
+        mapUrl: `https://www.google.com/maps/search/?api=1&query=${labLat},${labLng}`,
+        sourceLabel: 'Açık harita kaydı',
+        verified: false,
+      } satisfies SoilLabResult;
+    })
+    .filter((item: SoilLabResult | null): item is SoilLabResult => item !== null)
+    .sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+
+  const combined = [...official, ...mapResults];
+  const unique = new Map<string, SoilLabResult>();
+
+  combined.forEach((item) => {
+    const key = `${normalizeLocation(item.name)}-${item.latitude ?? ''}-${item.longitude ?? ''}`;
+    if (!unique.has(key)) unique.set(key, item);
+  });
+
+  const results = Array.from(unique.values()).slice(0, 12);
+  if (results.length) return results;
+
+  if (lastError) {
+    console.warn('Laboratuvar araması sonuçsuz kaldı:', lastError);
+  }
+
+  return [];
 }
 
 /* =========================================================

@@ -1,3 +1,4 @@
+import { buildCropModeRuntime } from '../features/crop-mode/services/cropMode.service';
 import { supabase } from '../supabaseClient';
 
 export type PusulaModuleKey =
@@ -38,6 +39,11 @@ export type PusulaDailyRequest = {
     crop?: string | null;
     city?: string | null;
     district?: string | null;
+    cropCycle?: string | null;
+    crop_cycle?: string | null;
+    irrigationStatus?: string | null;
+    irrigation_status?: string | null;
+    bearing?: boolean | null;
   };
   snapshot: {
     market?: unknown;
@@ -144,8 +150,18 @@ export async function getOrCreatePusulaDailyBrief(
   if (existing) return existing;
 
   const task = (async () => {
+    const cropMode = buildCropModeRuntime(input.field as any);
+    const payload = {
+      ...input,
+      cropMode,
+      snapshot: {
+        ...input.snapshot,
+        cropMode,
+      },
+    };
+
     const { data, error } = await supabase.functions.invoke('pusula-intelligence', {
-      body: input,
+      body: payload,
     });
 
     if (error) {

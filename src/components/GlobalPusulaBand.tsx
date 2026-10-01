@@ -74,6 +74,7 @@ type InteractiveGuideStep =
 
 const INTERACTIVE_SNOOZE_KEY = 'tp_pusula_interactive_snooze_v1';
 const INTERACTIVE_SESSION_PREFIX = 'tp_pusula_interactive_seen_v1:';
+const INSIGHT_SESSION_PREFIX = 'tp_pusula_insight_seen_v1:';
 const SOIL_LAB_PREF_KEY = 'tp_pusula_soil_lab_known_v1';
 const HEADER_WEATHER_CACHE_KEY = 'tp_pusula_header_weather_v1';
 const HEADER_WEATHER_CACHE_MS = 15 * 60 * 1000;
@@ -116,6 +117,28 @@ function snoozeNeed(id: string) {
     window.localStorage.setItem(INTERACTIVE_SNOOZE_KEY, JSON.stringify(current));
   } catch {
     // localStorage kapalıysa yalnızca bu oturumda kapanır.
+  }
+}
+
+function insightSessionKey(screen: string, insightId: string) {
+  return `${INSIGHT_SESSION_PREFIX}${screen}:${insightId}`;
+}
+
+function isInsightSeen(screen: string, insightId: string) {
+  if (typeof window === 'undefined' || !insightId) return false;
+  try {
+    return window.sessionStorage.getItem(insightSessionKey(screen, insightId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markInsightSeen(screen: string, insightId: string) {
+  if (typeof window === 'undefined' || !insightId) return;
+  try {
+    window.sessionStorage.setItem(insightSessionKey(screen, insightId), '1');
+  } catch {
+    // sessionStorage kapalıysa yalnızca görsel durum sıfırlanır.
   }
 }
 
@@ -204,20 +227,7 @@ type DepotAssistantState = {
   fields: DepotFieldBrief[];
 };
 
-type DepotStep =
-  | 'welcome'
-  | 'has-products'
-  | 'know-purpose'
-  | 'ready-scan'
-  | 'scan-explain'
-  | 'empty-confirm'
-  | 'stock-home'
-  | 'stock-field'
-  | 'added';
-
 const DEPOT_STATE_CACHE_KEY = 'tp_pusula_depot_state_v1';
-const DEPOT_EMPTY_AUTO_KEY = 'tp_pusula_depot_empty_auto_seen_v1';
-
 
 const WEATHER_PUSULA_CACHE_KEY = 'tp_pusula_weather_latest_v2';
 
@@ -230,6 +240,18 @@ type GuideMessage = {
 };
 
 const PUSULA_GUIDE_MESSAGES: Record<string, GuideMessage[]> = {
+  inventoryHub: [
+    {
+      title: 'Depo kayıtlarını yorumlarken kısa bir ipucu',
+      text:
+        'Stok miktarı, bağlı tarla ve doğrulanmış etiket bilgisi birlikte değerlendirildiğinde depo takibi daha anlamlı olur.',
+    },
+    {
+      title: 'Azalan stokları tek başına değerlendirme',
+      text:
+        'Kalan miktarın yanında ürünün hangi tarlaya bağlı olduğunu ve kullanım kaydını da kontrol et.',
+    },
+  ],
   marketHub: [
     {
       title: 'Piyasa verilerini yorumlarken kısa bir ipucu',
@@ -574,6 +596,9 @@ export default function GlobalPusulaBand({
 }: GlobalPusulaBandProps) {
   const gamification = useGamificationStore();
   const [insight, setInsight] = useState<PusulaInsight | null>(null);
+  const [hasUnreadInsight, setHasUnreadInsight] = useState(false);
+  const [hasInteractiveSignal, setHasInteractiveSignal] = useState(false);
+  const [hasDepotSignal, setHasDepotSignal] = useState(false);
   const latestPageInsightRef = useRef<PusulaInsight | null>(null);
   const latestWeatherInsightRef = useRef<PusulaInsight | null>(null);
   const guideDelayRef = useRef<number | null>(null);
@@ -587,10 +612,7 @@ export default function GlobalPusulaBand({
     products: [],
     fields: [],
   });
-  const [depotOpen, setDepotOpen] = useState(false);
-  const [depotStep, setDepotStep] = useState<DepotStep>('welcome');
   const depotPreviousCountRef = useRef<number | null>(null);
-  const depotAutoTimerRef = useRef<number | null>(null);
 
   const [userGuideContext, setUserGuideContext] = useState<UserGuideContext>({
     loading: true,
@@ -622,9 +644,10 @@ export default function GlobalPusulaBand({
   const [interactiveOpen, setInteractiveOpen] = useState(false);
   const [interactiveStep, setInteractiveStep] =
     useState<InteractiveGuideStep>('main');
-  const interactiveAutoTimerRef = useRef<number | null>(null);
 
   const pageTitle = String(title ?? 'TarlaPusula').trim() || 'TarlaPusula';
+  const hasPusulaSignal =
+    hasUnreadInsight || hasInteractiveSignal || hasDepotSignal;
 
   const fieldSuffix = useMemo(() => {
     const name = String(fieldName ?? '').trim();
@@ -986,42 +1009,30 @@ export default function GlobalPusulaBand({
     return null;
   };
 
-  // Yeni kullanıcı / eksik veri senaryosu: ekrana göre yalnızca EN ÖNEMLİ tek ihtiyacı sor.
-  // Aynı oturumda tekrar açılmaz; "Şimdi değil" denirse 3 gün sessiz kalır.
+  // Yeni kullanıcı / eksik veri senaryosu:
+  // Ekran değişince Pusula artık kendi kendine açılmaz. Yalnızca logoda hafif
+  // bir sinyal bırakır; kullanıcı logoya dokunursa ilgili yardım açılır.
   useEffect(() => {
-    if (interactiveAutoTimerRef.current != null) {
-      window.clearTimeout(interactiveAutoTimerRef.current);
-      interactiveAutoTimerRef.current = null;
-    }
-
     setInteractiveOpen(false);
     setInteractiveStep('main');
 
     const need = getInteractiveNeed();
     setInteractiveNeed(need);
-    if (!need || isNeedSnoozed(need.id)) return;
 
-    try {
-      const sessionKey = `${INTERACTIVE_SESSION_PREFIX}${need.id}`;
-      if (window.sessionStorage.getItem(sessionKey) === '1') return;
-      window.sessionStorage.setItem(sessionKey, '1');
-    } catch {
-      // sessionStorage kapalıysa otomatik açılış yine bir kez denenir.
+    if (!need || isNeedSnoozed(need.id)) {
+      setHasInteractiveSignal(false);
+      return;
     }
 
-    interactiveAutoTimerRef.current = window.setTimeout(() => {
-      setInsight(null);
-      setInteractiveStep('main');
-      setInteractiveOpen(true);
-      interactiveAutoTimerRef.current = null;
-    }, 900);
+    let seenThisSession = false;
+    try {
+      const sessionKey = `${INTERACTIVE_SESSION_PREFIX}${need.id}`;
+      seenThisSession = window.sessionStorage.getItem(sessionKey) === '1';
+    } catch {
+      // sessionStorage kapalıysa bu ihtiyaç yeni kabul edilir.
+    }
 
-    return () => {
-      if (interactiveAutoTimerRef.current != null) {
-        window.clearTimeout(interactiveAutoTimerRef.current);
-        interactiveAutoTimerRef.current = null;
-      }
-    };
+    setHasInteractiveSignal(!seenThisSession);
   }, [
     screen,
     userGuideContext.loading,
@@ -1102,6 +1113,7 @@ export default function GlobalPusulaBand({
     }
     setInteractiveOpen(false);
     setInteractiveStep('main');
+    setHasInteractiveSignal(false);
   };
 
   const stopGuideRotation = () => {
@@ -1120,14 +1132,8 @@ export default function GlobalPusulaBand({
   // Böylece Pusula'nın görseli yalnızca burada, üst bantta tek olarak kalır.
   useEffect(() => {
     if (screen !== 'inventoryHub') {
-      setDepotOpen(false);
       depotPreviousCountRef.current = null;
-
-      if (depotAutoTimerRef.current != null) {
-        window.clearTimeout(depotAutoTimerRef.current);
-        depotAutoTimerRef.current = null;
-      }
-
+      setHasDepotSignal(false);
       return;
     }
 
@@ -1145,8 +1151,7 @@ export default function GlobalPusulaBand({
         previousCount === 0 &&
         next.productCount > 0
       ) {
-        setDepotStep('added');
-        setDepotOpen(true);
+        setHasDepotSignal(true);
         return;
       }
 
@@ -1201,17 +1206,12 @@ export default function GlobalPusulaBand({
         'tp-pusula-depot-state',
         handleDepotState as EventListener,
       );
-
-      if (depotAutoTimerRef.current != null) {
-        window.clearTimeout(depotAutoTimerRef.current);
-        depotAutoTimerRef.current = null;
-      }
     };
   }, [screen]);
 
   // Sayfalar kendi gerçek verilerinden bir Pusula önerisi ürettiğinde
   // mevcut global Pusula animasyonuna aktar. Header yerleşimi değişmez.
-  // Hava Durumu özelinde: otomatik konuşma oturumda yalnızca ilk gerçek veri geldiğinde olur.
+  // Hava Durumu dahil tüm ekranlarda gerçek mesaj yalnızca sinyal üretir; otomatik konuşma yoktur.
   useEffect(() => {
     if (screen === 'weatherHub') {
       // Weather ekranı event'i bu header'dan hemen önce üretmiş olsa bile
@@ -1288,9 +1288,15 @@ export default function GlobalPusulaBand({
         latestWeatherInsightRef.current = pageInsight;
       }
 
-      // Rehber veya gerçek sonuç: bir event = bir gösterim.
-      // Modüle özel ek otomatik tekrar yok.
-      setInsight(pageInsight);
+      // Gerçek yeni sonuç geldiğinde Pusula yerinden oynamaz.
+      // Yalnızca hafif ışıltı verir; mesaj kullanıcı logoya dokununca açılır.
+      if (
+        !guideOnly &&
+        isRealUsableInsight(pageInsight) &&
+        !isInsightSeen(screen, pageInsight.id)
+      ) {
+        setHasUnreadInsight(true);
+      }
     };
 
     window.addEventListener('tp-pusula-insight', handlePageInsight as EventListener);
@@ -1303,21 +1309,19 @@ export default function GlobalPusulaBand({
     };
   }, [screen, fieldName]);
 
-  // Ekran değiştiğinde önceki ekranın önerisini taşımıyoruz.
-  // Otomatik davranış:
-  // 1) Gerçek cache varsa yalnızca gerçek öneriyi göster.
-  // 2) Yoksa o ekran için TEK bir kısa rehber + "verilerin yükleniyor" mesajı göster.
-  // 3) Sonra sus; gerçek günlük değerlendirme geldiğinde ikinci kez açıl.
+  // Ekran değiştiğinde logo aynı yerde ve aynı görünümde kalır.
+  // Cache/gerçek mesaj varsa yalnızca ışıltı ile haber verir; otomatik olarak
+  // aşağı inip konuşmaz. Mesajı açma kararı her zaman kullanıcıdadır.
   useEffect(() => {
     stopGuideRotation();
 
     setInsight(null);
+    setHasUnreadInsight(false);
     latestPageInsightRef.current = null;
     latestWeatherInsightRef.current = null;
     realInsightReadyRef.current = false;
     guideIndexRef.current = 0;
 
-    // Önce bu ekran için daha önce hazır olmuş gerçek bir sonuç var mı bak.
     try {
       const raw = window.sessionStorage.getItem(
         `tp_pusula_screen_insight_${screen}`,
@@ -1329,27 +1333,11 @@ export default function GlobalPusulaBand({
           insight?: PusulaInsight;
         };
 
-        if (
-          cached?.screen === screen &&
-          isRealUsableInsight(cached?.insight)
-        ) {
+        if (cached?.screen === screen && isRealUsableInsight(cached?.insight)) {
           latestPageInsightRef.current = cached.insight!;
           realInsightReadyRef.current = true;
-
-          const timer = window.setTimeout(() => {
-            setInsight({
-              ...cached.insight!,
-              id: `${cached.insight!.id}-cache-${Date.now()}`,
-            });
-          }, 120);
-
-          return () => {
-            window.clearTimeout(timer);
-            stopGuideRotation();
-          };
-        }
-
-        if (
+          setHasUnreadInsight(!isInsightSeen(screen, cached.insight!.id));
+        } else if (
           cached?.insight &&
           isFallbackOrTechnicalInsight(cached.insight)
         ) {
@@ -1359,37 +1347,20 @@ export default function GlobalPusulaBand({
         }
       }
     } catch {
-      // Cache yoksa aşağıdaki tek rehber mesajı gösterilir.
+      // Cache yoksa logo sessizce yerinde kalır.
     }
 
-    // Weather'ın kendi gerçek cache'i varsa rehber yerine onu kullan.
     if (screen === 'weatherHub') {
-      const cachedWeather =
-        readCachedWeatherPusula(fieldName);
-
+      const cachedWeather = readCachedWeatherPusula(fieldName);
       if (cachedWeather) {
         latestWeatherInsightRef.current = cachedWeather;
         latestPageInsightRef.current = cachedWeather;
         realInsightReadyRef.current = true;
-
-        const timer = window.setTimeout(() => {
-          setInsight({
-            ...cachedWeather,
-            id: `${cachedWeather.id}-cache-${Date.now()}`,
-          });
-        }, 120);
-
-        return () => {
-          window.clearTimeout(timer);
-          stopGuideRotation();
-        };
+        setHasUnreadInsight(
+          (current) => current || !isInsightSeen(screen, cachedWeather.id),
+        );
       }
     }
-
-    // Sadece BİR KEZ açılır. Otomatik mesaj rotasyonu yok.
-    setInsight(
-      buildLoadingInsight(screen, fieldName),
-    );
 
     return () => stopGuideRotation();
   }, [screen, fieldName]);
@@ -1426,13 +1397,40 @@ export default function GlobalPusulaBand({
 
   const handlePusulaClick = () => {
     if (screen === 'inventoryHub') {
-      if (depotOpen) {
-        setDepotOpen(false);
-        return;
-      }
+      setHasDepotSignal(false);
 
-      setDepotStep(depotState.productCount > 0 ? 'stock-home' : 'welcome');
-      setDepotOpen(true);
+      const lowStockCount = depotState.products.filter((product) => {
+        const total = Number(product.totalAmount);
+        const remaining = Number(product.remainingAmount);
+        if (!Number.isFinite(total) || total <= 0) return false;
+        if (!Number.isFinite(remaining)) return false;
+        return remaining / total <= 0.25;
+      }).length;
+
+      const depotInsight: PusulaInsight = depotState.loading
+        ? {
+            id: `pusula-depot-loading-${Date.now()}`,
+            gozlem: 'Depo kayıtlarını hazırlıyorum.',
+            yonlendirme:
+              'Stok bilgileri hazır olduğunda ürün, tarla eşleşmesi ve depo riskini birlikte değerlendirebilirim.',
+          }
+        : depotState.productCount > 0
+          ? {
+              id: `pusula-depot-stock-${depotState.productCount}-${Date.now()}`,
+              gozlem: `Deponda ${depotState.productCount} kayıtlı ürün var.`,
+              yonlendirme:
+                lowStockCount > 0
+                  ? `${lowStockCount} ürünün stoğu azalıyor. Ürün kayıtlarını tarla ve doğrulanmış etiket bilgileriyle birlikte değerlendirebilirim.`
+                  : 'Stokların şu an kritik seviyede görünmüyor. Ürün kayıtlarını tarla ve doğrulanmış etiket bilgileriyle birlikte değerlendirebilirim.',
+            }
+          : {
+              id: `pusula-depot-empty-${Date.now()}`,
+              gozlem: 'Depon henüz boş görünüyor.',
+              yonlendirme:
+                'İlk ürününü eklediğinde stok, tarla eşleşmesi ve depolama riskini birlikte takip edebilirim.',
+            };
+
+      setInsight(depotInsight);
       return;
     }
 
@@ -1441,6 +1439,15 @@ export default function GlobalPusulaBand({
       setInteractiveNeed(currentNeed);
       setInteractiveStep('main');
       setInsight(null);
+      setHasInteractiveSignal(false);
+      try {
+        window.sessionStorage.setItem(
+          `${INTERACTIVE_SESSION_PREFIX}${currentNeed.id}`,
+          '1',
+        );
+      } catch {
+        // sessionStorage kapalıysa yalnızca mevcut sinyal temizlenir.
+      }
       setInteractiveOpen((current) => !current);
       return;
     }
@@ -1457,6 +1464,8 @@ export default function GlobalPusulaBand({
         guven_skoru: 'Düşük' as const,
       };
 
+      markInsightSeen(screen, latest.id);
+      setHasUnreadInsight(false);
       setInsight({
         ...latest,
         id: `${latest.id}-manual-${Date.now()}`,
@@ -1497,6 +1506,7 @@ export default function GlobalPusulaBand({
     }
 
     if (!latest) {
+      setHasUnreadInsight(false);
       setInsight({
         ...buildGuideInsight(screen, guideIndexRef.current),
         id: `pusula-guide-manual-${screen}-${Date.now()}`,
@@ -1506,53 +1516,12 @@ export default function GlobalPusulaBand({
     }
 
     // Her ekranda global logoya dokununca o ekranın son gerçek önerisini tekrar oynat.
+    markInsightSeen(screen, latest.id);
+    setHasUnreadInsight(false);
     setInsight({
       ...latest,
       id: `${latest.id}-manual-${Date.now()}`,
     });
-  };
-
-  const depotLowStockCount = depotState.products.filter((product) => {
-    const total = Number(product.totalAmount);
-    const remaining = Number(product.remainingAmount);
-
-    if (!Number.isFinite(total) || total <= 0) return false;
-    if (!Number.isFinite(remaining)) return false;
-
-    return remaining / total <= 0.25;
-  }).length;
-
-  const depotLinkedProducts = depotState.products.filter(
-    (product) => product.fieldIds.length > 0,
-  );
-
-  const depotCrops = Array.from(
-    new Set(
-      depotState.fields
-        .map((field) => String(field.crop ?? '').trim())
-        .filter(Boolean),
-    ),
-  );
-
-  const sendDepotAction = (action: 'scan' | 'stock') => {
-    window.dispatchEvent(
-      new CustomEvent('tp-pusula-depot-action', {
-        detail: {
-          screen: 'inventoryHub',
-          action,
-        },
-      }),
-    );
-  };
-
-  const startDepotScan = () => {
-    sendDepotAction('scan');
-    setDepotOpen(false);
-  };
-
-  const openDepotStock = () => {
-    sendDepotAction('stock');
-    setDepotOpen(false);
   };
 
   const renderInteractiveAssistant = () => {
@@ -1683,261 +1652,7 @@ export default function GlobalPusulaBand({
     );
   };
 
-  const renderDepotAssistant = () => {
-    if (depotState.loading) {
-      return (
-        <>
-          <div className="tp-depot-pusula-kicker">PUSULA · DEPO REHBERİ</div>
-          <h2>Depo verilerini hazırlıyorum…</h2>
-          <p>
-            Stok kayıtlarını yüklüyor ve yorumluyorum. Gerçek durum hazır olduğunda
-            sana uygun adımı göstereceğim.
-          </p>
-        </>
-      );
-    }
 
-    if (depotStep === 'added') {
-      return (
-        <>
-          <div className="tp-depot-pusula-kicker">PUSULA · İLK ÜRÜN EKLENDİ</div>
-          <h2>Güzel, depon artık boş değil.</h2>
-          <p>
-            Bundan sonra stok durumunu, ürünün bağlı olduğu tarlayı ve kayıtlı
-            etiket/BKÜ bilgisini birlikte değerlendirebiliriz. Doz bilgisini
-            kendim üretmem; kayıtlı ve doğrulanmış kaynağı esas alırım.
-          </p>
-          <div className="tp-depot-pusula-actions">
-            <button type="button" onClick={() => setDepotStep('stock-field')}>
-              Tarlam için değerlendir
-            </button>
-            <button type="button" className="secondary" onClick={openDepotStock}>
-              Depomu göster
-            </button>
-          </div>
-        </>
-      );
-    }
-
-    if (depotState.productCount > 0) {
-      if (depotStep === 'stock-field') {
-        const linkedNames = depotLinkedProducts
-          .slice(0, 3)
-          .map((product) => product.productName)
-          .join(', ');
-
-        return (
-          <>
-            <div className="tp-depot-pusula-kicker">PUSULA · TARLA EŞLEŞMESİ</div>
-            <h2>
-              {depotLinkedProducts.length
-                ? `${depotLinkedProducts.length} ürün tarlalarınla ilişkilendirilmiş.`
-                : 'Ürünlerini henüz bir tarlayla ilişkilendirmemişsin.'}
-            </h2>
-
-            {depotLinkedProducts.length ? (
-              <p>
-                {linkedNames}
-                {depotLinkedProducts.length > 3 ? ' ve diğerleri' : ''}.
-                {depotCrops.length
-                  ? ` Kayıtlı ürünlerin: ${depotCrops.slice(0, 3).join(', ')}.`
-                  : ''}
-                {' '}
-                Kullanım değerlendirmesinde önce ürünün resmî/okunmuş etiket
-                bilgisini, sonra tarla ve hava koşullarını birlikte ele alacağız.
-              </p>
-            ) : (
-              <p>
-                Ürünü bir tarlayla ilişkilendirirsen Pusula hangi ürünün hangi
-                bitki için değerlendirileceğini daha doğru anlayabilir. Kullanım
-                uygunluğu kesinleşmeden doz veya uygulama talimatı üretmeyeceğim.
-              </p>
-            )}
-
-            <div className="tp-depot-pusula-actions">
-              <button type="button" onClick={openDepotStock}>
-                Ürünlerimi aç
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setDepotStep('stock-home')}
-              >
-                Geri
-              </button>
-            </div>
-          </>
-        );
-      }
-
-      return (
-        <>
-          <div className="tp-depot-pusula-kicker">PUSULA · DEPO DANIŞMANI</div>
-          <h2>Deponda {depotState.productCount} ürün var.</h2>
-          <p>
-            {depotLowStockCount > 0
-              ? `${depotLowStockCount} ürünün stoğu %25 veya altına düşmüş. `
-              : ''}
-            İstersen ürünlerini tarlalarınla birlikte değerlendirelim veya doğrudan
-            stok listene geçelim.
-          </p>
-          <div className="tp-depot-pusula-actions">
-            <button type="button" onClick={() => setDepotStep('stock-field')}>
-              Tarlam için değerlendir
-            </button>
-            <button type="button" className="secondary" onClick={openDepotStock}>
-              Stoklarımı göster
-            </button>
-          </div>
-        </>
-      );
-    }
-
-    switch (depotStep) {
-      case 'has-products':
-        return (
-          <>
-            <div className="tp-depot-pusula-kicker">PUSULA · 1 / 3</div>
-            <h2>Deponda şu anda ilaç veya gübre var mı?</h2>
-            <p>Varsa birlikte tanıyıp düzenli şekilde depoya kaydedebiliriz.</p>
-            <div className="tp-depot-pusula-actions">
-              <button type="button" onClick={() => setDepotStep('know-purpose')}>
-                Evet
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setDepotStep('empty-confirm')}
-              >
-                Hayır
-              </button>
-            </div>
-          </>
-        );
-
-      case 'know-purpose':
-        return (
-          <>
-            <div className="tp-depot-pusula-kicker">PUSULA · 2 / 3</div>
-            <h2>Elindeki ürünün ne işe yaradığını biliyor musun?</h2>
-            <p>
-              Emin değilsen sorun değil. Etiket fotoğrafından ürün adı, türü,
-              etken madde ve okunabilen kullanım bilgisini birlikte çıkarabiliriz.
-            </p>
-            <div className="tp-depot-pusula-actions">
-              <button type="button" onClick={() => setDepotStep('ready-scan')}>
-                Evet, biliyorum
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setDepotStep('scan-explain')}
-              >
-                Tam emin değilim
-              </button>
-            </div>
-          </>
-        );
-
-      case 'ready-scan':
-        return (
-          <>
-            <div className="tp-depot-pusula-kicker">PUSULA · 3 / 3</div>
-            <h2>O zaman etiketi tarayarak kaydedelim.</h2>
-            <p>
-              Etiketi mümkün olduğunca net çek. Ürün kimliğini ve okunabilen
-              kayıtları çıkarıp depoya ekleme ekranına götüreceğim.
-            </p>
-            <div className="tp-depot-pusula-actions">
-              <button type="button" onClick={startDepotScan}>
-                Etiketi Tara
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setDepotStep('know-purpose')}
-              >
-                Geri
-              </button>
-            </div>
-          </>
-        );
-
-      case 'scan-explain':
-        return (
-          <>
-            <div className="tp-depot-pusula-kicker">PUSULA · ÜRÜNÜ TANIYALIM</div>
-            <h2>Ben etiketi okuyup ne olduğunu anlamana yardım edeyim.</h2>
-            <p>
-              Fotoğrafta açıkça görülen bilgileri okuyacağız. Ruhsat, kullanım
-              alanı veya doz konusunda doğrulanmamış bir bilgi uydurmayacağım.
-            </p>
-            <div className="tp-depot-pusula-actions">
-              <button type="button" onClick={startDepotScan}>
-                Etiketi Tara
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setDepotStep('know-purpose')}
-              >
-                Geri
-              </button>
-            </div>
-          </>
-        );
-
-      case 'empty-confirm':
-        return (
-          <>
-            <div className="tp-depot-pusula-kicker">PUSULA · DEPO BOŞ</div>
-            <h2>Tamam, şimdilik ekleyecek ürünün yok.</h2>
-            <p>
-              Daha sonra bir ilaç veya gübre aldığında etiketi taratarak buraya
-              ekleyebilirsin. O zaman stok ve tarla eşleşmelerini ben takip ederim.
-            </p>
-            <div className="tp-depot-pusula-actions">
-              <button type="button" onClick={startDepotScan}>
-                Yine de ürün ekle
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setDepotOpen(false)}
-              >
-                Sonra
-              </button>
-            </div>
-          </>
-        );
-
-      case 'welcome':
-      default:
-        return (
-          <>
-            <div className="tp-depot-pusula-kicker">PUSULA · DEPO KURULUMU</div>
-            <h2>Depon henüz boş görünüyor.</h2>
-            <p>
-              İstersen birkaç kısa soruyla ilaç ve gübrelerini birlikte
-              düzenleyelim. Ürünlerini ekledikten sonra bu alan depo danışmanına
-              dönüşecek.
-            </p>
-            <div className="tp-depot-pusula-actions">
-              <button type="button" onClick={() => setDepotStep('has-products')}>
-                Başlayalım
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setDepotOpen(false)}
-              >
-                Şimdilik geç
-              </button>
-            </div>
-          </>
-        );
-    }
-  };
 
   if (typeof document === 'undefined') return null;
 
@@ -2202,6 +1917,22 @@ export default function GlobalPusulaBand({
             filter .35s ease!important;
         }
 
+        .tp-global-pusula-anchor.tp-pusula-has-message::before{
+          content:"";
+          position:absolute;
+          inset:-9px;
+          border-radius:50%;
+          pointer-events:none;
+          background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,.07) 42%,transparent 72%);
+          filter:blur(5px);
+          animation:tp-pusula-message-glow 2.8s ease-in-out infinite;
+        }
+
+        @keyframes tp-pusula-message-glow{
+          0%,100%{opacity:.18;transform:scale(1)}
+          50%{opacity:.42;transform:scale(1.12)}
+        }
+
         .tp-global-pusula-anchor.tp-depot-pusula-active{
           top:calc(50% + 92px)!important;
           transform:translate(-50%,-50%) scale(1.28)!important;
@@ -2232,7 +1963,7 @@ export default function GlobalPusulaBand({
         .tp-global-pusula-needle{
           z-index:2!important;
           transform-origin:50% 50%!important;
-          animation:tp-depot-needle-idle 5.4s ease-in-out infinite!important;
+          animation:tp-depot-needle-idle 8.5s ease-in-out infinite!important;
           filter:drop-shadow(0 0 6px rgba(92,230,134,.28))!important;
         }
 
@@ -2241,8 +1972,10 @@ export default function GlobalPusulaBand({
         }
 
         @keyframes tp-depot-needle-idle{
-          0%,100%{transform:rotate(-12deg)}
-          50%{transform:rotate(13deg)}
+          0%,100%{transform:rotate(0deg)}
+          28%{transform:rotate(15deg)}
+          62%{transform:rotate(-11deg)}
+          82%{transform:rotate(5deg)}
         }
 
         @keyframes tp-depot-needle-talk{
@@ -2488,20 +2221,16 @@ export default function GlobalPusulaBand({
         }
       `}</style>
 
-      {!interactiveOpen && !(screen === 'inventoryHub' && depotOpen) && (
+      {!interactiveOpen && (
         <PusulaGuide
           insight={insight}
           anchorSelector=".tp-global-pusula-anchor"
+          hasUnread={hasPusulaSignal}
+          onLogoClick={handlePusulaClick}
         />
       )}
 
-      <header
-        className={`tp-global-page-header${
-          screen === 'inventoryHub' && depotOpen
-            ? ' tp-depot-assistant-open'
-            : ''
-        }`}
-      >
+      <header className="tp-global-page-header">
         <div className="tp-global-page-left">
           <button
             type="button"
@@ -2529,39 +2258,28 @@ export default function GlobalPusulaBand({
         <button
           type="button"
           className={`tp-global-pusula-anchor${
-            (screen === 'inventoryHub' && depotOpen) || interactiveOpen
-              ? ' tp-depot-pusula-active'
-              : ''
-          }`}
+            interactiveOpen ? ' tp-depot-pusula-active' : ''
+          }${hasPusulaSignal ? ' tp-pusula-has-message' : ''}`}
           onClick={handlePusulaClick}
           aria-label="Pusula"
           title="Pusula"
         >
-          {screen === 'inventoryHub' ? (
-            <span className="tp-global-pusula-stage" aria-hidden="true">
-              <img
-                className="tp-global-pusula-body"
-                src={PUSULA_BODY_SRC}
-                crossOrigin="anonymous"
-                alt=""
-                draggable={false}
-              />
-              <img
-                className="tp-global-pusula-needle"
-                src={PUSULA_NEEDLE_SRC}
-                crossOrigin="anonymous"
-                alt=""
-                draggable={false}
-              />
-            </span>
-          ) : (
+          <span className="tp-global-pusula-stage" aria-hidden="true">
             <img
+              className="tp-global-pusula-body"
               src={PUSULA_BODY_SRC}
               crossOrigin="anonymous"
-              alt="Pusula"
+              alt=""
               draggable={false}
             />
-          )}
+            <img
+              className="tp-global-pusula-needle"
+              src={PUSULA_NEEDLE_SRC}
+              crossOrigin="anonymous"
+              alt=""
+              draggable={false}
+            />
+          </span>
         </button>
 
         <div className="tp-global-page-right">
@@ -2681,24 +2399,6 @@ export default function GlobalPusulaBand({
         </section>
       )}
 
-      {screen === 'inventoryHub' && depotOpen && (
-        <section
-          className="tp-depot-pusula-card"
-          role="dialog"
-          aria-label="Pusula depo yardımcısı"
-        >
-          <button
-            type="button"
-            className="tp-depot-pusula-close"
-            onClick={() => setDepotOpen(false)}
-            aria-label="Pusula depo yardımcısını kapat"
-          >
-            ×
-          </button>
-
-          {renderDepotAssistant()}
-        </section>
-      )}
     </>,
     document.body,
   );

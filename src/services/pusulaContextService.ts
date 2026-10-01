@@ -4,9 +4,14 @@ import {
   getRothCCarbonContext,
   type RothCCarbonContext,
 } from './rothcCarbonContextService';
+import {
+  loadFieldScientificSignals,
+  type FieldScientificSignals,
+} from './fieldScientificSignals.service';
 
 export type PersistedPusulaFieldContext = PusulaFieldContext & {
   soilCarbon?: RothCCarbonContext | null;
+  scientificSignals?: FieldScientificSignals | null;
 };
 
 function appendUnique(values: string[], value: string) {
@@ -36,6 +41,35 @@ function withRothCSourceHealth(
   }
 
   return sourceHealth;
+}
+
+function withScientificSourceHealth(
+  sourceHealth: PusulaFieldContext['sourceHealth'],
+  signals: FieldScientificSignals | null,
+) {
+  const next = {
+    ready: [...sourceHealth.ready],
+    partial: [...sourceHealth.partial],
+    unavailable: [...sourceHealth.unavailable],
+  };
+
+  for (const key of ['sl2p', 'rscm', 'unicrop']) {
+    next.ready = next.ready.filter((item) => item !== key);
+    next.partial = next.partial.filter((item) => item !== key);
+    next.unavailable = next.unavailable.filter((item) => item !== key);
+  }
+
+  if (signals?.biophysics.latest) next.ready = appendUnique(next.ready, 'sl2p');
+  else next.unavailable = appendUnique(next.unavailable, 'sl2p');
+
+  if (signals?.rscm) next.ready = appendUnique(next.ready, 'rscm');
+  else if ((signals?.biophysics.historyCount ?? 0) > 0) next.partial = appendUnique(next.partial, 'rscm');
+  else next.unavailable = appendUnique(next.unavailable, 'rscm');
+
+  if (signals?.dataConfidence) next.ready = appendUnique(next.ready, 'unicrop');
+  else next.unavailable = appendUnique(next.unavailable, 'unicrop');
+
+  return next;
 }
 
 async function buildRothCContext(
@@ -104,13 +138,24 @@ export async function savePusulaFieldContextSnapshot(
    * Tam t C/ha simülasyonu yapılmaz; yönetim girdileri eksikse RothC servisi
    * bunu açıkça blocked/turnover-context olarak taşır.
    */
-  const soilCarbon = await buildRothCContext(context);
-  const sourceHealth = withRothCSourceHealth(context, soilCarbon);
+  const [soilCarbon, scientificSignals] = await Promise.all([
+    buildRothCContext(context),
+    loadFieldScientificSignals(String(context.field.id)).catch((error) => {
+      console.info(
+        'SL2P/RSCM/Veri Güveni Pusula bağlamı hazırlanamadı:',
+        error instanceof Error ? error.message : error,
+      );
+      return null;
+    }),
+  ]);
+  const rothCSourceHealth = withRothCSourceHealth(context, soilCarbon);
+  const sourceHealth = withScientificSourceHealth(rothCSourceHealth, scientificSignals);
 
   const persistedContext: PersistedPusulaFieldContext = {
     ...context,
     sourceHealth,
     soilCarbon,
+    scientificSignals,
   };
 
   const { error } = await supabase

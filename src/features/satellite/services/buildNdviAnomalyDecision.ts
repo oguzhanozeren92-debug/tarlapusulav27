@@ -1,11 +1,8 @@
 import type { HomeDecisionEvent } from '../../decision/types/homeDecision';
-import type { NdviAnomalyResult } from '../types/ndviAnomaly';
 import { isRecentSatelliteObservation } from './buildHomeSatelliteDecision';
+import type { HomeNdviAnomalySignal } from '../types/homeSatelliteSignals';
 
-export type HomeNdviAnomalySignal = NdviAnomalyResult & {
-  fieldId: string;
-  status: 'idle' | 'loading' | 'ready' | 'error';
-};
+export type { HomeNdviAnomalySignal } from '../types/homeSatelliteSignals';
 
 /**
  * NDVI anomalisi bir teşhis değildir. Bu adaptör yalnızca motorun gerçek
@@ -49,6 +46,8 @@ export function buildNdviAnomalyDecision(
     id: `satellite:${fieldId}:ndvi-negative-anomaly:${period}`,
     group: 'satellite-anomaly',
     source: 'satellite',
+    sourceModel: 'ndvi-robust-anomaly',
+    signal: { status: 'ready', observedAt: signal.latestDate, maxAgeHours: 30 * 24 },
     priority: 92,
     severity: 'warning',
     target: 'map_vegetation',

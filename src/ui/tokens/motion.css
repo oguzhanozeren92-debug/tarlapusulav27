@@ -1,0 +1,14 @@
+:root {
+  --tp-duration-fast: 120ms;
+  --tp-duration-normal: 180ms;
+  --tp-duration-slow: 280ms;
+  --tp-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --tp-duration-fast: 0ms;
+    --tp-duration-normal: 0ms;
+    --tp-duration-slow: 0ms;
+  }
+}

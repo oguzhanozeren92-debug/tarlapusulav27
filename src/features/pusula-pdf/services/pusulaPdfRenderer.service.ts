@@ -164,11 +164,61 @@ async function radarHistoryPanel(ctx:CanvasRenderingContext2D,x:number,y:number,
 function comparisonCard(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,title:string,value:string,sub:string,accent:string,soft:string){rr(ctx,x,y,w,108,14,soft,soft);t(ctx,title,x+15,y+27,12,850,accent);t(ctx,value,x+15,y+66,27,900,INK);t(ctx,sub,x+15,y+91,11,600,MUTED)}
 function deltaText(pct:number|null){if(!valid(pct))return '—';return `${pct>=0?'↑':'↓'} %${Math.abs(pct).toFixed(0)}`}
 function insightText(guidance:ReturnType<typeof buildPusulaPdfGuidance>,index:number,fallback:string){return guidance.insights[index]?.meaning??guidance.insights[index]?.action??fallback}
+function latestYieldHarvestEvidence(snapshot:PusulaPdfSnapshot){
+  const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
+  const payloads=rows
+    .map((row:any)=>row?.payload??row)
+    .filter((payload:any)=>payload?.layer==='yield-harvest-quality');
+  payloads.sort((a:any,b:any)=>String(a?.archivedAt??a?.observedAt??'').localeCompare(String(b?.archivedAt??b?.observedAt??'')));
+  return payloads.at(-1)??null;
+}
+function yieldTrendPdfLabel(value:unknown){
+  const trend=String(value??'').toLowerCase();
+  if(trend==='rising')return '↑ artış';
+  if(trend==='falling')return '↓ düşüş';
+  if(trend==='stable')return '→ dengeli';
+  return 'geçmiş sınırlı';
+}
+function yieldHarvestEvidenceCard(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,snapshot:PusulaPdfSnapshot){
+  const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
+  const candidates=rows.map((row:any)=>row?.payload??row).filter((payload:any)=>payload?.layer==='yield-harvest-quality');
+  candidates.sort((a:any,b:any)=>String(a?.observedAt??a?.archivedAt??'').localeCompare(String(b?.observedAt??b?.archivedAt??'')));
+  const payload:any=candidates.at(-1)??null;if(!payload)return false;
+  const metrics:any=payload?.metrics??{};const details:any=payload?.details??{};
+  const asFinite=(value:any)=>value===null||value===undefined||value===''?null:(Number.isFinite(Number(value))?Number(value):null);
+  const kgHa=asFinite(metrics?.currentYieldKgHa);const avgKgHa=asFinite(metrics?.averageYieldKgHa);const currentKg=asFinite(metrics?.currentYieldKg);
+  const current=kgHa!==null?`${Math.round(kgHa/10).toLocaleString('tr-TR')} kg/da`:currentKg!==null?`${Math.round(currentKg).toLocaleString('tr-TR')} kg toplam`:'Gerçek verim kaydı yok';
+  const average=avgKgHa!==null?`${Math.round(avgKgHa/10).toLocaleString('tr-TR')} kg/da`:'geçmiş ortalama yok';
+  const lower=asFinite(metrics?.forecastLowerKgHa);const upper=asFinite(metrics?.forecastUpperKgHa);const central=asFinite(metrics?.forecastCentralKgHa);
+  const forecast=lower!==null&&upper!==null?`${Math.round(lower/10).toLocaleString('tr-TR')}–${Math.round(upper/10).toLocaleString('tr-TR')} kg/da`:central!==null?`${Math.round(central/10).toLocaleString('tr-TR')} kg/da merkez`:'model aralığı yok';
+  const actual=String(details?.actualHarvestDate??'').trim();const expected=String(details?.expectedHarvestDate??'').trim();const timing=details?.harvestTiming??null;
+  const days=Number(metrics?.daysToExpectedHarvest);
+  const harvest=actual?`Hasat ${fmt(actual,false)}`:timing?.lowerDate&&timing?.upperDate?`Pencere ${fmt(String(timing.lowerDate),false)}–${fmt(String(timing.upperDate),false)}`:details?.status==='harvest_window'?(Number.isFinite(days)&&days>0?`Hasada ~${Math.round(days)} gün`:'Hasat penceresi'):expected?`Beklenen ${fmt(expected,false)}`:'Hasat takibi';
+  const quality=details?.qualityMeasurements&&typeof details.qualityMeasurements==='object'?Object.keys(details.qualityMeasurements).filter((key)=>details.qualityMeasurements[key]!==null&&details.qualityMeasurements[key]!==''):[];
+  rr(ctx,x,y,w,112,14,GREEN_SOFT,'#d3ead9');
+  t(ctx,'VERİM · HASAT · KALİTE',x+16,y+23,11,900,GREEN_DARK);
+  t(ctx,current,x+16,y+49,18,900,INK);
+  lines(ctx,`${average} · ${yieldTrendPdfLabel(metrics?.trend)} · ${harvest}`,x+16,y+71,10,650,MUTED,w-32,1.15,2);
+  lines(ctx,`Ensemble: ${forecast} · Kalite: ${quality.length?'ölçüldü':'ölçüm yok'}`,x+16,y+92,9.5,650,MUTED,w-32,1.12,2);
+  ctx.textAlign='right';t(ctx,kgHa!==null?'Gerçek kayıt > model':'Model aralığı = kanıt zarfı',x+w-16,y+23,9,650,MUTED);ctx.textAlign='left';
+  return true;
+}
+
 function latestIrrigationSynthesis(snapshot:PusulaPdfSnapshot){
   const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
   const payloads=rows.map((row:any)=>row?.payload??row).filter((payload:any)=>payload?.layer==='irrigation-synthesis');
   payloads.sort((a:any,b:any)=>String(a?.details?.generatedAt??a?.observedAt??'').localeCompare(String(b?.details?.generatedAt??b?.observedAt??'')));
   return payloads.at(-1)??null;
+}
+function fieldBackboneCount(snapshot:PusulaPdfSnapshot){
+  const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
+  const candidates=rows.filter((row:any)=>(row?.payload??row)?.layer==='field-data-backbone');
+  candidates.sort((a:any,b:any)=>String((a?.payload??a)?.archivedAt??(a?.payload??a)?.observedAt??'').localeCompare(String((b?.payload??b)?.archivedAt??(b?.payload??b)?.observedAt??'')));
+  const latestCandidate:any=candidates.at(-1)??null;
+  const latest:any=latestCandidate?.payload??latestCandidate??null;
+  const active=Number(latest?.metrics?.activeEventCount);
+  const total=Number(latest?.metrics?.eventCount);
+  return Number.isFinite(active)&&active>0?active:Number.isFinite(total)&&total>0?total:0;
 }
 function irrigationSynthesisCard(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,snapshot:PusulaPdfSnapshot){
   const payload:any=latestIrrigationSynthesis(snapshot);if(!payload)return false;
@@ -192,6 +242,8 @@ function decisionEvidenceStrip(
 ){
   const definitions = [
     { id:'soil-intelligence-evidence', label:'TOPRAK', accent:GREEN, soft:GREEN_SOFT },
+    { id:'planting-window-evidence', label:'EKİM PENCERESİ', accent:BLUE, soft:BLUE_SOFT },
+    { id:'orchard-chill-evidence', label:'SOĞUKLAMA', accent:BLUE, soft:BLUE_SOFT },
     { id:'plant-health-synthesis-evidence', label:'BİTKİ SAĞLIĞI', accent:ORANGE, soft:ORANGE_SOFT },
     { id:'field-observation-follow-up-evidence', label:'SAHA TAKİBİ', accent:BLUE, soft:BLUE_SOFT },
   ] as const;
@@ -239,6 +291,7 @@ export async function generatePusulaPdf(snapshot:PusulaPdfSnapshot){
   const sat=[...snapshot.satellite.points].sort((a,b)=>a.date.localeCompare(b.date));
   const weather=weatherRows(snapshot).sort((a,b)=>wd(a).localeCompare(wd(b)));
   const activities=[...(snapshot.activities??[])].sort((a:any,b:any)=>activityDate(a).localeCompare(activityDate(b)));
+  const backboneCount=fieldBackboneCount(snapshot);
   const guidance=buildPusulaPdfGuidance(snapshot);
   const latest=sat.at(-1),first=sat[0];const ndviCmp=periodCompare(sat,'ndvi');const ndmiCmp=periodCompare(sat,'ndmi');
   const rainTotal=weather.map(r=>wv(r,'rain','precipitation','precipitationMm')).filter(valid).reduce((a,b)=>a+b,0);
@@ -269,7 +322,7 @@ export async function generatePusulaPdf(snapshot:PusulaPdfSnapshot){
 
     rr(ctx,20,1358,1200,235,16,ORANGE_SOFT,'#f4dfba');compass(ctx,58,1403,20,GREEN_DARK);t(ctx,"Pusula'nın Kısa Değerlendirmesi",92,1401,16,900,INK);
     lines(ctx,`${guidance.weeklySummary} ${guidance.insights[0]?.meaning??''}`.trim(),92,1433,14,600,INK,1090,1.34,5);
-    t(ctx,'Dayanak',92,1544,11,850,ORANGE);lines(ctx,`Sentinel-2 · ${sat.length} tarih${weather.length?` · Hava ${weather.length} gün`:''}${activities.length?` · ${activities.length} tarla işlemi`:''}`,155,1544,11,650,MUTED,920,1.2,2);
+    t(ctx,'Dayanak',92,1544,11,850,ORANGE);lines(ctx,`Sentinel-2 · ${sat.length} tarih${weather.length?` · Hava ${weather.length} gün`:''}${activities.length?` · ${activities.length} tarla işlemi`:''}${backboneCount?` · Tarla hafızası ${backboneCount} kayıt`:''}`,155,1544,11,650,MUTED,920,1.2,2);
     footer(ctx,1,snapshot);
   }
 
@@ -307,9 +360,21 @@ export async function generatePusulaPdf(snapshot:PusulaPdfSnapshot){
     if(!hasDecisionEvidence){
       rr(ctx,36,1362,1168,105,14,'#063a32','#063a32');t(ctx,'“',126,1418,38,900,WHITE);t(ctx,'Veri, toprağı daha iyi anlamanın anahtarıdır.',185,1406,18,750,WHITE);t(ctx,'TarlaPusula her zaman yanında.',185,1434,15,600,'#dcebe6');
     }
-    const hasIrrigationSynthesis=irrigationSynthesisCard(ctx,36,1480,1168,snapshot);
-    const radarCount=snapshot.radar?.points?.length??0;const archiveCount=snapshot.layerArchive?.length??0;const dataLine=[`Sentinel-2 ${sat.length} tarih`,radarCount?`Sentinel-1 ${radarCount} tarih`:null,weather.length?`hava ${weather.length} gün`:null,activities.length?`${activities.length} işlem`:null,temps.length?`${Math.min(...temps).toFixed(0)}–${Math.max(...temps).toFixed(0)} °C`:null,archiveCount?`arşiv ${archiveCount} kayıt`:null].filter(Boolean).join(' · ');
-    const dataY=hasIrrigationSynthesis?1592:1528;const qualityY=hasIrrigationSynthesis?1617:1553;
+    const hasYieldHarvest=Boolean(latestYieldHarvestEvidence(snapshot));
+    const hasIrrigationPayload=Boolean(latestIrrigationSynthesis(snapshot));
+    let hasYieldHarvestCard=false;let hasIrrigationSynthesis=false;
+    if(hasYieldHarvest&&hasIrrigationPayload){
+      const gap=18;const cardW=(1168-gap)/2;
+      hasYieldHarvestCard=yieldHarvestEvidenceCard(ctx,36,1480,cardW,snapshot);
+      hasIrrigationSynthesis=irrigationSynthesisCard(ctx,36+cardW+gap,1480,cardW,snapshot);
+    }else if(hasYieldHarvest){
+      hasYieldHarvestCard=yieldHarvestEvidenceCard(ctx,36,1480,1168,snapshot);
+    }else if(hasIrrigationPayload){
+      hasIrrigationSynthesis=irrigationSynthesisCard(ctx,36,1480,1168,snapshot);
+    }
+    const hasEvidenceCard=hasYieldHarvestCard||hasIrrigationSynthesis;
+    const radarCount=snapshot.radar?.points?.length??0;const archiveCount=snapshot.layerArchive?.length??0;const dataLine=[`Sentinel-2 ${sat.length} tarih`,radarCount?`Sentinel-1 ${radarCount} tarih`:null,weather.length?`hava ${weather.length} gün`:null,activities.length?`${activities.length} işlem`:null,backboneCount?`tarla hafızası ${backboneCount} kayıt`:null,temps.length?`${Math.min(...temps).toFixed(0)}–${Math.max(...temps).toFixed(0)} °C`:null,archiveCount?`arşiv ${archiveCount} kayıt`:null].filter(Boolean).join(' · ');
+    const dataY=hasEvidenceCard?1606:1528;const qualityY=hasEvidenceCard?1631:1553;
     t(ctx,`Kullanılan gerçek veri: ${dataLine||'bağlı veri bekleniyor'}`,36,dataY,11,650,MUTED);
     lines(ctx,guidance.dataQualityNote,36,qualityY,11,600,MUTED,1160,1.25,3);
     footer(ctx,2,snapshot);

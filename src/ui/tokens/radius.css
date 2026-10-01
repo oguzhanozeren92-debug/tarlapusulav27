@@ -1,0 +1,8 @@
+:root {
+  --tp-radius-sm: 0.5rem;
+  --tp-radius-md: 0.75rem;
+  --tp-radius-lg: 1rem;
+  --tp-radius-xl: 1.25rem;
+  --tp-radius-2xl: 1.5rem;
+  --tp-radius-pill: 999px;
+}

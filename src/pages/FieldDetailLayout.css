@@ -32,3 +32,211 @@
 .tp-irrigation-method-card select{width:100%;min-height:42px;padding:0 11px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:#0b0d0c;color:#fff;font-size:12px}
 .tp-irrigation-method-card select:disabled{opacity:.58}
 .tp-irrigation-method-card em{display:block;margin-top:8px;color:#9daaa1;font-size:9px;font-style:normal}
+
+/* =========================================================
+   TARLA KAYITLARI V2 — eski işlevleri koru, günlük ekranı sadeleştir
+   ========================================================= */
+.tp-field-detail-page .tp-field-detail-header > div > span {
+  letter-spacing: .08em !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact {
+  padding: 12px 14px !important;
+  margin-bottom: 10px !important;
+  border-radius: 16px !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-top {
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  gap: 10px !important;
+  align-items: center !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 11px !important;
+  background: #f1f3f4 !important;
+  color: #252b31 !important;
+  filter: none !important;
+  font-size: 0 !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-copy h1 {
+  font-size: 18px !important;
+  line-height: 1.1 !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-copy p {
+  margin: 4px 0 2px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-copy > span {
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  margin-top: 10px !important;
+  border: 1px solid #e1e5e8 !important;
+  border-radius: 11px !important;
+  overflow: hidden !important;
+  background: #f7f8f9 !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-stats > div {
+  min-width: 0 !important;
+  padding: 7px 9px !important;
+  border-right: 1px solid #e1e5e8 !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-stats > div:last-child {
+  border-right: 0 !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-stats span {
+  font-size: 8px !important;
+  letter-spacing: .05em !important;
+}
+
+.tp-field-detail-page .tp-field-hero-card-compact .tp-field-hero-stats strong {
+  margin-top: 2px !important;
+  overflow: hidden !important;
+  font-size: 12px !important;
+  line-height: 1.15 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.tp-field-detail-page .tp-field-production-card-compact {
+  position: relative !important;
+  padding: 12px !important;
+  border-radius: 14px !important;
+}
+
+.tp-field-detail-page .tp-field-production-card-compact .tp-field-production-main {
+  grid-template-columns: 36px minmax(0,1fr) auto !important;
+  gap: 9px !important;
+  align-items: center !important;
+}
+
+.tp-field-detail-page .tp-field-production-card-compact .tp-detail-icon {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border-radius: 10px !important;
+  font-size: 18px !important;
+}
+
+.tp-field-detail-page .tp-field-production-card-compact .tp-field-production-main span {
+  font-size: 8px !important;
+}
+
+.tp-field-detail-page .tp-field-production-card-compact .tp-field-production-main strong {
+  font-size: 17px !important;
+  line-height: 1.1 !important;
+}
+
+.tp-field-detail-page .tp-field-production-card-compact .tp-field-production-main p {
+  margin: 3px 0 0 !important;
+  color: #6c7680 !important;
+  font-size: 9.5px !important;
+}
+
+.tp-field-detail-page .tp-production-edit-button {
+  min-height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 0 9px !important;
+  border: 1px solid #d8dde1 !important;
+  border-radius: 9px !important;
+  background: #f7f8f9 !important;
+  color: #252b31 !important;
+  font-size: 9.5px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+}
+
+.tp-field-detail-page .tp-production-profile-summary-compact {
+  display: flex !important;
+  gap: 6px !important;
+  margin-top: 10px !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+.tp-field-detail-page .tp-production-profile-summary-compact::-webkit-scrollbar { display: none !important; }
+.tp-field-detail-page .tp-production-profile-summary-compact > div {
+  flex: 1 0 86px !important;
+  min-height: 48px !important;
+  padding: 8px 9px !important;
+  border-radius: 10px !important;
+  background: #f7f8f9 !important;
+}
+.tp-field-detail-page .tp-production-profile-summary-compact span {
+  font-size: 7.5px !important;
+}
+.tp-field-detail-page .tp-production-profile-summary-compact strong {
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
+
+.tp-field-detail-page .tp-field-production-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+  margin-top: 10px !important;
+}
+.tp-field-detail-page .tp-field-production-actions button {
+  min-height: 38px !important;
+  padding: 0 9px !important;
+  border-radius: 10px !important;
+  font-size: 10px !important;
+}
+
+.tp-field-detail-page .tp-field-detail-moved-note {
+  display: grid !important;
+  gap: 2px !important;
+  margin-top: 10px !important;
+  padding: 9px 10px !important;
+  border: 1px dashed #d6dbe0 !important;
+  border-radius: 11px !important;
+  background: #f8f9fa !important;
+}
+.tp-field-detail-page .tp-field-detail-moved-note strong {
+  color: #343b42 !important;
+  font-size: 10px !important;
+}
+.tp-field-detail-page .tp-field-detail-moved-note span {
+  color: #707981 !important;
+  font-size: 8.8px !important;
+  line-height: 1.35 !important;
+}
+
+@media (max-width: 420px) {
+  .tp-field-detail-page .tp-field-hero-card-compact { padding: 10px 11px !important; }
+  .tp-field-detail-page .tp-field-production-card-compact .tp-field-production-main {
+    grid-template-columns: 32px minmax(0,1fr) auto !important;
+  }
+  .tp-field-detail-page .tp-production-edit-button {
+    width: 32px !important;
+    min-width: 32px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    font-size: 0 !important;
+  }
+  .tp-field-detail-page .tp-production-edit-button svg { width: 14px !important; height: 14px !important; }
+}
+
+
+.tp-field-delete-loading{
+  margin: 16px 0 10px;
+  padding: 18px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: radial-gradient(circle at top, rgba(255,255,255,0.06), rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.22));
+}

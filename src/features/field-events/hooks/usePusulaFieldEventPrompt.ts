@@ -232,6 +232,66 @@ export function usePusulaFieldEventPrompt(args: {
     [candidate, fieldId],
   );
 
+  const confirmSavedOperation = useCallback(
+    async (operation: FieldOperation, expectedCandidateKey?: string | null) => {
+      if (!candidate || !fieldId) return;
+      if (String(operation.fieldId) !== String(fieldId)) return;
+      if (
+        expectedCandidateKey &&
+        fieldEventCandidateKey(candidate) !== expectedCandidateKey
+      ) {
+        return;
+      }
+
+      // Kullanıcı bu Pusula kartından işlem kaydettiği anda ekranda tekrar
+      // aynı adayı görmesin. Kalıcı teyit Supabase'e aşağıda yazılıyor.
+      setOpen(false);
+      setCandidate(null);
+      setNeedsAttention(false);
+
+      try {
+        await confirmFieldEventCandidate({
+          fieldId,
+          event: candidate,
+          operationType: operation.type as FieldOperationType,
+          operationId: operation.id,
+          responseNote: 'Kullanıcı Pusula hareketlilik kartından Tarla Günlüğü kaydı oluşturdu.',
+        });
+      } catch (confirmError) {
+        console.warn('[pusula-field-event] Kaydedilen işlem olay adayıyla eşleştirilemedi:', confirmError);
+        void load();
+      }
+    },
+    [candidate, fieldId, load],
+  );
+
+  useEffect(() => {
+    if (!enabled || !fieldId || typeof window === 'undefined') return;
+
+    const confirmFromFieldStatus = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail ?? {};
+      if (String(detail?.fieldId ?? '') !== String(fieldId)) return;
+      if (!detail?.operation) return;
+
+      void confirmSavedOperation(
+        detail.operation as FieldOperation,
+        detail?.candidateKey ? String(detail.candidateKey) : null,
+      );
+    };
+
+    window.addEventListener(
+      'tp:pusula-field-event-operation-saved',
+      confirmFromFieldStatus as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'tp:pusula-field-event-operation-saved',
+        confirmFromFieldStatus as EventListener,
+      );
+    };
+  }, [enabled, fieldId, confirmSavedOperation]);
+
   return {
     candidate,
     needsAttention,
@@ -242,6 +302,7 @@ export function usePusulaFieldEventPrompt(args: {
     closePrompt,
     dismiss,
     confirm,
+    confirmSavedOperation,
     refresh: load,
   };
 }

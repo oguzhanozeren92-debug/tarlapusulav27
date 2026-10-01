@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, ClipboardList } from 'lucide-react';
+import { Bell, ClipboardList, Gauge } from 'lucide-react';
 import HomeMapSection from './HomeMapSection';
 import {
   HOME_CLIMATE_DEPTH_LABELS,
@@ -103,6 +103,7 @@ const CSS = String.raw`
 }
 
 .tp-map-first-shell .tp-field-select-box{
+  position:relative!important;
   width:100%!important;
   min-height:40px!important;
   height:40px!important;
@@ -112,14 +113,35 @@ const CSS = String.raw`
   box-shadow:none!important;
 }
 
+.tp-map-first-shell .tp-field-select-box::after{
+  content:''!important;
+  position:absolute!important;
+  right:11px!important;
+  top:50%!important;
+  width:7px!important;
+  height:7px!important;
+  border-right:1.7px solid rgba(226,232,240,.78)!important;
+  border-bottom:1.7px solid rgba(226,232,240,.78)!important;
+  transform:translateY(-68%) rotate(45deg)!important;
+  transform-origin:center!important;
+  pointer-events:none!important;
+  opacity:.92!important;
+}
+
 .tp-map-first-shell .tp-field-pin{
-  opacity:.68!important;
+  display:none!important;
 }
 
 .tp-map-first-shell .tp-field-select{
   height:38px!important;
   min-height:38px!important;
+  padding-left:12px!important;
+  padding-right:30px!important;
   font-size:10.5px!important;
+  text-overflow:ellipsis!important;
+  -webkit-appearance:none!important;
+  appearance:none!important;
+  background-image:none!important;
 }
 
 .tp-map-first-shell .tp-field-toolbar .tp-add-field-3d{
@@ -759,6 +781,72 @@ const CSS = String.raw`
 /* =========================================================
    MOBİL
    ========================================================= */
+@media(max-width:760px){
+  /*
+   * Mobil öncelik: harita kartı ekran kenarlarına otursun.
+   * HomeScreen .tp-main mobilde 11px iç boşluk taşıyor; shell bu boşluğu
+   * yalnız harita kartı için geri alır. Telefon genişliği değişse de yüzde
+   * hesabı viewport ile birlikte uyarlanır.
+   */
+  .tp-map-first-shell{
+    width:auto!important;
+    max-width:none!important;
+    margin-left:-11px!important;
+    margin-right:-11px!important;
+  }
+
+  .tp-map-first-shell .tp-home-field{
+    width:100%!important;
+    max-width:none!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    border-left:0!important;
+    border-right:0!important;
+    border-radius:0!important;
+  }
+
+  .tp-map-first-shell .tp-home-field::before,
+  .tp-map-first-shell .tp-home-field::after{
+    border-left:0!important;
+    border-right:0!important;
+    border-radius:0!important;
+  }
+
+  .tp-map-first-shell .tp-field-head{
+    padding-left:max(7px,env(safe-area-inset-left))!important;
+    padding-right:max(7px,env(safe-area-inset-right))!important;
+  }
+
+  .tp-map-first-shell .tp-field-toolbar{
+    grid-template-columns:38px minmax(0,1fr) 38px 38px!important;
+  }
+
+  .tp-map-first-shell .tp-field-select{
+    padding-left:10px!important;
+    padding-right:28px!important;
+    font-size:11px!important;
+  }
+}
+
+@media(max-width:390px){
+  .tp-map-first-shell .tp-field-toolbar{
+    grid-template-columns:36px minmax(0,1fr) 36px 36px!important;
+    gap:4px!important;
+  }
+
+  .tp-mf-operation-toolbar,
+  .tp-map-first-shell .tp-field-toolbar .tp-add-field-3d{
+    width:36px!important;
+    height:36px!important;
+    min-width:36px!important;
+    min-height:36px!important;
+  }
+
+  .tp-map-first-shell .tp-field-select{
+    font-size:10.5px!important;
+  }
+}
+
 @media(max-width:560px){
   .tp-map-first-shell .tp-field-head{
     min-height:50px!important;
@@ -2051,6 +2139,62 @@ body.tp-map-body-fullscreen .tp-map-stage .tp-ndvi-legend-card{
 }
 
 /* =========================================================
+   V9.1 — NORMAL MOBİL ALT STACK SON SÖZ
+   Boş Pusula bandı alanı rezerve edilmez. Band görünürse ölçülen gerçek
+   yüksekliği kadar NDVI skalası ve tarih birlikte yukarı taşınır.
+   ========================================================= */
+@media(max-width:760px){
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    bottom:calc(var(--tp-pusula-strip-height, 0px) + 4px)!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-measurement-date{
+    bottom:calc(
+      var(--tp-pusula-strip-height, 0px) +
+      var(--tp-map-legend-height, 72px) +
+      11px
+    )!important;
+  }
+}
+
+/* =========================================================
+   V9.2 — MOBİL SIKI DÜZEN
+   - Üst header ile harita kartı arasındaki dikey boşluk yaklaşık yarıya iner.
+   - NDVI skalası normal durumda ekran dibine yaklaşır.
+   - Harita içine ileride bir overlay gelirse gerçek yüksekliği ölçülerek skala
+     ve uydu tarihi beraber yukarı taşınır.
+   ========================================================= */
+@media(max-width:760px){
+  .tp-map-first-shell{
+    margin-top:-5px!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    bottom:calc(var(--tp-pusula-strip-height, 0px) + 4px)!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-measurement-date{
+    bottom:calc(
+      var(--tp-pusula-strip-height, 0px) +
+      var(--tp-map-legend-height, 72px) +
+      8px
+    )!important;
+  }
+}
+
+/* =========================================================
    V10 — TARİH + LEGEND TEK ALT BİLGİ GRUBU
    Normal mobilde ve tam ekranda iki parça birlikte hareket eder:
    üstte tarih pill'i, hemen altında ortalanmış renk açıklaması.
@@ -2318,7 +2462,7 @@ body.tp-map-body-fullscreen .tp-map-stage .tp-real-home-legend .tp-legend-label 
     left:50%!important;
     right:auto!important;
     top:auto!important;
-    bottom:calc(var(--tp-pusula-strip-height, 88px) + 8px)!important;
+    bottom:calc(var(--tp-pusula-strip-height, 0px) + 4px)!important;
     transform:translateX(-50%)!important;
     width:min(330px,calc(100% - 28px))!important;
     max-width:330px!important;
@@ -2339,9 +2483,9 @@ body.tp-map-body-fullscreen .tp-map-stage .tp-real-home-legend .tp-legend-label 
     right:auto!important;
     top:auto!important;
     bottom:calc(
-      var(--tp-pusula-strip-height, 88px) +
+      var(--tp-pusula-strip-height, 0px) +
       var(--tp-map-legend-height, 82px) +
-      16px
+      11px
     )!important;
     transform:translateX(-50%)!important;
     width:auto!important;
@@ -2359,10 +2503,10 @@ body.tp-map-body-fullscreen .tp-map-stage .tp-real-home-legend .tp-legend-label 
     right:auto!important;
     top:auto!important;
     bottom:calc(
-      var(--tp-pusula-strip-height, 88px) +
+      var(--tp-pusula-strip-height, 0px) +
       var(--tp-map-legend-height, 82px) +
       var(--tp-map-date-height, 34px) +
-      24px
+      18px
     )!important;
     transform:translateX(-50%)!important;
     max-width:min(330px,calc(100% - 28px))!important;
@@ -2483,7 +2627,7 @@ body.tp-map-body-fullscreen .tp-map-stage .tp-real-home-legend .tp-legend-label 
     left:50%!important;
     right:auto!important;
     top:auto!important;
-    bottom:calc(var(--tp-pusula-strip-height, 88px) + 8px)!important;
+    bottom:calc(var(--tp-pusula-strip-height, 0px) + 4px)!important;
     transform:translateX(-50%)!important;
     width:min(330px,calc(100% - 28px))!important;
     max-width:330px!important;
@@ -2666,6 +2810,466 @@ body.tp-map-body-fullscreen .tp-map-stage .tp-mf-ndvi-strip-labels span{
   opacity:1!important;
 }
 
+
+/* =========================================================
+   V15 — MOBİL HARİTA ALT OVERLAY STACK FINAL
+   Sıra: uydu tarihi → NDVI renk skalası → Pusula yorumu.
+   Pusula sibling olarak shell içinde durduğu için yüksekliği shell'den
+   ölçülür; NDVI ve tarih gerçek yüksekliğe göre yukarı itilir.
+   ========================================================= */
+@media(max-width:760px){
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:50%!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:calc(var(--tp-pusula-strip-height, 96px) + 18px)!important;
+    transform:translateX(-50%)!important;
+    z-index:190!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-measurement-date{
+    left:50%!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:calc(
+      var(--tp-pusula-strip-height, 96px) +
+      var(--tp-map-legend-height, 72px) +
+      28px
+    )!important;
+    transform:translateX(-50%)!important;
+    z-index:195!important;
+  }
+}
+
+
+/* =========================================================
+   V16 — KALICI MOBİL NDVI ALT GRUBU
+   2026-10-01
+   - Eski Pusula alt kartı artık DOM'da render edilmiyor.
+   - NDVI kartı haritanın altına sabitlenir.
+   - Uydu tarihi NDVI kartının yalnız 6 px üstünde tutulur.
+   - Önceki tp-pusula-strip-height hesabı artık kullanılmaz.
+   ========================================================= */
+@media(max-width:760px){
+  /* HMR sırasında eski DOM bir an kalsa bile alt kart tekrar görünmesin. */
+  .tp-home-map-pusula-shell .tp-home-map-pusula-strip{
+    display:none!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:50%!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:10px!important;
+    transform:translateX(-50%)!important;
+    width:calc(100% - 24px)!important;
+    max-width:330px!important;
+    margin:0!important;
+    padding:8px 11px 8px!important;
+    border-radius:15px!important;
+    z-index:190!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip-head{
+    margin-bottom:5px!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip-labels{
+    margin-top:5px!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-measurement-date{
+    left:50%!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:calc(var(--tp-map-legend-height, 62px) + 16px)!important;
+    transform:translateX(-50%)!important;
+    margin:0!important;
+    z-index:195!important;
+  }
+}
+
+@media(max-width:430px){
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    width:calc(100% - 20px)!important;
+    max-width:none!important;
+  }
+}
+
+
+/* =========================================================
+   V17 — KALICI HARİTA ALT STACK
+   2026-10-01
+   İstenen düzen:
+   tarih → NDVI → Pusula açıklaması
+   Üçü de haritanın İÇİNDE; aralarında 6 px.
+   Alt tp-field-stats alanı fiziksel olarak kaldırılır.
+   ========================================================= */
+
+/* Haritanın altındaki eski 3 kolon veri gövdesi artık yok. */
+.tp-map-first-shell .tp-field-stats{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+}
+
+/* Açıklama kartı harita kartının altına değil, haritanın ÜZERİNE oturur. */
+.tp-home-map-pusula-shell{
+  position:relative!important;
+}
+
+.tp-home-map-pusula-shell .tp-home-map-pusula-strip{
+  position:absolute!important;
+  z-index:205!important;
+  left:12px!important;
+  right:12px!important;
+  bottom:8px!important;
+  width:auto!important;
+  margin:0!important;
+}
+
+/* V16'daki "eski kartı gizle" kuralını kesin olarak iptal et. */
+.tp-home-map-pusula-shell .tp-home-map-pusula-strip{
+  display:grid!important;
+}
+
+@media(max-width:760px){
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:50%!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:calc(
+      var(--tp-pusula-strip-height, 108px) + 14px
+    )!important;
+    transform:translateX(-50%)!important;
+    width:calc(100% - 24px)!important;
+    max-width:330px!important;
+    margin:0!important;
+    padding:8px 11px 8px!important;
+    border-radius:15px!important;
+    z-index:190!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-measurement-date{
+    left:50%!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:calc(
+      var(--tp-pusula-strip-height, 108px) +
+      var(--tp-map-legend-height, 62px) +
+      20px
+    )!important;
+    transform:translateX(-50%)!important;
+    margin:0!important;
+    z-index:195!important;
+  }
+
+  .tp-home-map-pusula-shell .tp-home-map-pusula-strip{
+    left:12px!important;
+    right:12px!important;
+    bottom:8px!important;
+  }
+}
+
+@media(max-width:430px){
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    width:calc(100% - 20px)!important;
+    max-width:none!important;
+  }
+
+  .tp-home-map-pusula-shell .tp-home-map-pusula-strip{
+    left:10px!important;
+    right:10px!important;
+  }
+}
+
+
+/* =========================================================
+   V18 — FINAL / COMPACT / NO-OVERLAP
+   2026-10-01
+   Görsel sözleşme:
+   [Uydu tarihi]
+        6 px
+   [NDVI renk kartı]
+        6 px
+   [Pusula bilgi alanı - haritaya birleşik]
+   ========================================================= */
+
+/* Alttaki eski ayrı istatistik gövdesi kesinlikle yok. */
+.tp-map-first-shell .tp-field-stats{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  overflow:hidden!important;
+}
+
+/* Dış shell harita ile Pusula'nın aynı geometriyi paylaşacağı referanstır. */
+.tp-home-map-pusula-shell{
+  position:relative!important;
+}
+
+/* Pusula kartı: kenarlardan sıfır boşluk, haritanın alt yüzeyi gibi. */
+.tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+  position:absolute!important;
+  z-index:205!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  transform:none!important;
+  display:grid!important;
+}
+
+/* Mobil ana harita: NDVI kartı Pusula'nın TAM 6 px üstünde. */
+@media(max-width:760px){
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:10px!important;
+    right:10px!important;
+    top:auto!important;
+    bottom:calc(
+      var(--tp-pusula-strip-height, 72px) + 6px
+    )!important;
+    width:auto!important;
+    max-width:none!important;
+    margin:0!important;
+    transform:none!important;
+    padding:7px 10px 7px!important;
+    border-radius:14px!important;
+    z-index:190!important;
+  }
+
+  /* Tarih kartı NDVI kartının TAM 6 px üstünde. */
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-measurement-date{
+    left:50%!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:calc(
+      var(--tp-pusula-strip-height, 72px) +
+      var(--tp-map-legend-height, 56px) +
+      12px
+    )!important;
+    transform:translateX(-50%)!important;
+    margin:0!important;
+    z-index:195!important;
+  }
+
+  .tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+    left:0!important;
+    right:0!important;
+    bottom:0!important;
+    width:100%!important;
+  }
+}
+
+@media(max-width:430px){
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:8px!important;
+    right:8px!important;
+  }
+}
+
+
+/* =========================================================
+   V19 — FINAL ENTEGRE / ÇAKIŞMASIZ HARİTA ALTLIĞI
+   2026-10-01
+
+   Yapı artık ölçüme bağlı overlay değil:
+   - Pusula bilgi alanı normal akışta haritanın hemen altında.
+   - NDVI ve tarih yalnız map-stage içinde absolute.
+   - Bu yüzden üst üste binme geometrik olarak mümkün değil.
+   ========================================================= */
+
+/* Eski alt istatistik alanı tamamen yok. */
+.tp-map-first-shell .tp-field-stats{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  overflow:hidden!important;
+}
+
+/* Harita kartının altı Pusula altlığına bağlanır. */
+.tp-home-map-pusula-shell{
+  position:relative!important;
+}
+
+.tp-home-map-pusula-shell .tp-map-first-shell .tp-home-field{
+  margin-bottom:0!important;
+  border-bottom:0!important;
+  border-radius:18px 18px 0 0!important;
+  box-shadow:none!important;
+}
+
+/* İç harita da alt köşede ayrı yuvarlak üretmesin. */
+.tp-home-map-pusula-shell .tp-map-first-shell .tp-map-stage{
+  margin-bottom:0!important;
+  border-radius:0!important;
+}
+
+.tp-home-map-pusula-shell
+.tp-map-first-shell
+.tp-map-stage > .tp-real-home-map,
+.tp-home-map-pusula-shell
+.tp-map-first-shell
+.tp-real-home-map,
+.tp-home-map-pusula-shell
+.tp-map-first-shell
+.tp-real-home-map-canvas,
+.tp-home-map-pusula-shell
+.tp-map-first-shell
+.tp-real-home-map .maplibregl-map,
+.tp-home-map-pusula-shell
+.tp-map-first-shell
+.tp-real-home-map canvas{
+  border-radius:0!important;
+}
+
+/* Pusula artık ABSOLUTE DEĞİL. Haritanın devamı olan gerçek footer. */
+.tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+  position:relative!important;
+  z-index:20!important;
+  left:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  top:auto!important;
+  width:100%!important;
+  max-width:none!important;
+  margin-top:-1px!important;
+  transform:none!important;
+}
+
+/* NDVI kartı map-stage dibinden sabit 8px yukarıda. */
+body:not(.tp-map-body-fullscreen)
+.tp-map-first-shell
+.tp-map-stage:not(.tp-map-portrait-fullscreen)
+.tp-mf-ndvi-strip{
+  left:10px!important;
+  right:10px!important;
+  top:auto!important;
+  bottom:8px!important;
+  width:auto!important;
+  max-width:none!important;
+  margin:0!important;
+  transform:none!important;
+  padding:7px 10px 7px!important;
+  border-radius:14px!important;
+  z-index:190!important;
+}
+
+/* Uydu tarihi NDVI kartının 6px üstünde. */
+body:not(.tp-map-body-fullscreen)
+.tp-map-first-shell
+.tp-map-stage:not(.tp-map-portrait-fullscreen)
+.tp-measurement-date{
+  left:50%!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:calc(
+    var(--tp-map-legend-height, 56px) + 14px
+  )!important;
+  transform:translateX(-50%)!important;
+  margin:0!important;
+  z-index:195!important;
+}
+
+/* Mobilde map-first tam genişlikteyse Pusula da aynı kenara kadar uzansın. */
+@media(max-width:760px){
+  .tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+    width:auto!important;
+    margin-left:-11px!important;
+    margin-right:-11px!important;
+    margin-top:-1px!important;
+    border-left:0!important;
+    border-right:0!important;
+    border-radius:0 0 18px 18px!important;
+  }
+
+  .tp-home-map-pusula-shell .tp-map-first-shell .tp-home-field{
+    border-radius:0!important;
+    border-bottom:0!important;
+  }
+
+  .tp-home-map-pusula-shell .tp-map-first-shell .tp-map-stage{
+    margin:0!important;
+    border-radius:0!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:9px!important;
+    right:9px!important;
+    bottom:8px!important;
+  }
+}
+
+@media(max-width:430px){
+  .tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+    margin-left:-11px!important;
+    margin-right:-11px!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:8px!important;
+    right:8px!important;
+  }
+}
+
 `
 
 function LayerIcon() {
@@ -2727,17 +3331,11 @@ export default function HomeMapSectionMapFirst(
       const nextToolbar = root.querySelector('.tp-field-toolbar') as HTMLElement | null;
 
       /*
-       * Tam ekranda aynı map stage'i document.body altına taşınıyor.
-       * Bu sırada root.querySelector doğal olarak null döner; ancak mevcut stage
-       * hâlâ document'e bağlıdır. Onu null'a çekersek fullscreen effect cleanup
-       * çalışıp haritayı anında eski yerine taşır. Yalnız gerçekten DOM'dan
-       * kopmuş bir stage'i null kabul ediyoruz.
+       * Map stage React ağacının içinde kalır. Fullscreen yalnız CSS/inline fixed
+       * boyutlandırma ile yapılır; DOM'u document.body altına elle taşımıyoruz.
+       * Böylece HomeMapEngine içindeki React onClick olayları tam ekranda da çalışır.
        */
-      setMapStage((current) => {
-        if (nextStage) return current === nextStage ? current : nextStage;
-        if (current?.isConnected) return current;
-        return null;
-      });
+      setMapStage((current) => (current === nextStage ? current : nextStage));
 
       setFieldToolbar((current) => (current === nextToolbar ? current : nextToolbar));
     };
@@ -2754,23 +3352,19 @@ export default function HomeMapSectionMapFirst(
   }, []);
 
   /*
-   * Ana sayfadaki alt bilgi elemanları artık sabit piksel tahminleriyle değil,
-   * gerçek yükseklikleriyle birbirini iter. Pusula yorum metni 1 satırdan
-   * 3 satıra çıktığında strip'in yüksekliği büyür; legend ve tarih de aynı
-   * miktarda yukarı kayar. Legend'in yüksekliği değişirse tarih onun üstünde
-   * kalmaya devam eder.
+   * Alt harita grubu:
+   * 1) Pusula açıklaması (en altta, haritanın üzerinde)
+   * 2) NDVI renk kartı
+   * 3) Uydu veri tarihi
+   *
+   * Eski tp-field-stats alanı tamamen kaldırıldığı için haritanın altında
+   * boş bir ikinci gövde oluşmaz. Yükseklikler gerçek DOM'dan ölçülür.
    */
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root || !mapStage) return;
-
-    const shell = root.closest('.tp-home-map-pusula-shell') ?? root.parentElement;
-    if (!shell) return;
+    if (!mapStage) return;
 
     const syncBottomStack = () => {
-      const pusulaStrip = shell.querySelector(
-        '.tp-home-map-pusula-strip',
-      ) as HTMLElement | null;
+      const root = rootRef.current;
       const legend = mapStage.querySelector(
         activeLayer === 'vegetation'
           ? '.tp-mf-ndvi-strip'
@@ -2780,19 +3374,21 @@ export default function HomeMapSectionMapFirst(
         '.tp-measurement-date',
       ) as HTMLElement | null;
 
-      const stripHeight = Math.ceil(
-        pusulaStrip?.getBoundingClientRect().height ?? 88,
-      );
       const legendHeight = Math.ceil(
-        legend?.getBoundingClientRect().height ?? 82,
+        legend?.getBoundingClientRect().height ?? 56,
       );
       const dateHeight = Math.ceil(
-        date?.getBoundingClientRect().height ?? 34,
+        date?.getBoundingClientRect().height ?? 28,
       );
 
-      mapStage.style.setProperty('--tp-pusula-strip-height', `${stripHeight}px`);
-      mapStage.style.setProperty('--tp-map-legend-height', `${legendHeight}px`);
-      mapStage.style.setProperty('--tp-map-date-height', `${dateHeight}px`);
+      mapStage.style.setProperty(
+        '--tp-map-legend-height',
+        `${legendHeight}px`,
+      );
+      mapStage.style.setProperty(
+        '--tp-map-date-height',
+        `${dateHeight}px`,
+      );
     };
 
     syncBottomStack();
@@ -2802,9 +3398,7 @@ export default function HomeMapSectionMapFirst(
         ? new ResizeObserver(syncBottomStack)
         : null;
 
-    const pusulaStrip = shell.querySelector(
-      '.tp-home-map-pusula-strip',
-    ) as HTMLElement | null;
+    const root = rootRef.current;
     const legend = mapStage.querySelector(
       activeLayer === 'vegetation'
         ? '.tp-mf-ndvi-strip'
@@ -2815,16 +3409,18 @@ export default function HomeMapSectionMapFirst(
     ) as HTMLElement | null;
 
     if (resizeObserver) {
-      if (pusulaStrip) resizeObserver.observe(pusulaStrip);
+      resizeObserver.observe(mapStage);
       if (legend) resizeObserver.observe(legend);
       if (date) resizeObserver.observe(date);
     }
 
     const mutationObserver = new MutationObserver(syncBottomStack);
-    mutationObserver.observe(shell, {
+    mutationObserver.observe(root ?? mapStage, {
       childList: true,
       subtree: true,
       characterData: true,
+      attributes: true,
+      attributeFilter: ['class', 'style'],
     });
 
     window.addEventListener('resize', syncBottomStack);
@@ -2839,11 +3435,11 @@ export default function HomeMapSectionMapFirst(
       mutationObserver.disconnect();
       window.removeEventListener('resize', syncBottomStack);
       timers.forEach((timer) => window.clearTimeout(timer));
-      mapStage.style.removeProperty('--tp-pusula-strip-height');
       mapStage.style.removeProperty('--tp-map-legend-height');
       mapStage.style.removeProperty('--tp-map-date-height');
     };
   }, [mapStage, activeLayer]);
+
 
   useEffect(() => {
     setLayerMenuOpen(false);
@@ -2926,15 +3522,13 @@ export default function HomeMapSectionMapFirst(
     if (!portraitExpanded || !mapStage) return;
 
     /*
-     * ÖNEMLİ: StackBlitz/mobil önizlemede üst kapsayıcılardaki transform/scale,
-     * position:fixed elemanı cihaz viewport'u yerine uygulama kartına kilitleyebiliyor.
-     * Bu yüzden tam ekranda gerçek map stage'i geçici olarak document.body altına
-     * taşıyoruz. Harita instance'ı yeniden kurulmaz; aynı DOM/canvas yaşamaya devam eder.
+     * KRİTİK: mapStage React tarafından yönetiliyor. DOM düğümünü document.body
+     * altına elle taşımak HomeMapEngine içindeki React click event zincirini koparıyor;
+     * ikonlar görünse bile tam ekranda tıklanmıyor. Stage yerinde kalır, yalnız
+     * position:fixed + viewport ölçüleriyle tam ekrana büyütülür.
      */
     const root = rootRef.current;
     const homeField = root?.querySelector('.tp-home-field');
-    const originalParent = mapStage.parentNode;
-    const placeholder = document.createComment('tp-map-stage-home-position');
 
     const mapRoot = mapStage.querySelector('.tp-real-home-map') as HTMLElement | null;
     const mapCanvasRoot = mapStage.querySelector('.tp-real-home-map-canvas') as HTMLElement | null;
@@ -2947,11 +3541,6 @@ export default function HomeMapSectionMapFirst(
 
     setLayerMenuOpen(false);
     setSubLayerMenuOpen(false);
-
-    if (originalParent) {
-      originalParent.insertBefore(placeholder, mapStage);
-    }
-    document.body.appendChild(mapStage);
 
     root?.classList.add('tp-map-portrait-active');
     homeField?.classList.add('tp-map-portrait-parent');
@@ -3022,14 +3611,7 @@ export default function HomeMapSectionMapFirst(
       window.removeEventListener('resize', syncFullscreenSize);
       window.removeEventListener('orientationchange', syncFullscreenSize);
 
-      /* Önce gerçek yerine geri koy; sonra normal ekran stillerini geri yükle. */
-      if (placeholder.parentNode) {
-        placeholder.parentNode.insertBefore(mapStage, placeholder);
-        placeholder.parentNode.removeChild(placeholder);
-      } else if (originalParent) {
-        originalParent.appendChild(mapStage);
-      }
-
+      /* DOM yer değiştirmedi; yalnız fullscreen class ve inline stilleri geri al. */
       root?.classList.remove('tp-map-portrait-active');
       homeField?.classList.remove('tp-map-portrait-parent');
       document.body.classList.remove('tp-map-body-fullscreen');
@@ -3159,6 +3741,16 @@ export default function HomeMapSectionMapFirst(
           >
             <Bell size={19} strokeWidth={1.9} aria-hidden="true" />
             {props.notificationCount > 0 && <span className="tp-mf-notification-dot" aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            className="tp-mf-quick-action tp-mf-quick-field-status"
+            onClick={() => props.onOpenFieldStatus?.()}
+            aria-label="Tarla Durumu"
+            aria-haspopup="dialog"
+            title="Tarla Durumu"
+          >
+            <Gauge size={19} strokeWidth={1.9} aria-hidden="true" />
           </button>
         </>,
         fieldToolbar,
@@ -3444,7 +4036,7 @@ export default function HomeMapSectionMapFirst(
                 aria-label="NDVI renk açıklaması"
               >
                 <div className="tp-mf-ndvi-strip-head">
-                  <strong>NDVI · Bitki Sağlığı</strong>
+                  <strong>NDVI · Bitki Örtüsü</strong>
                   <span>Ort. {ndviAverage}</span>
                 </div>
                 <div className="tp-mf-ndvi-gradient" aria-hidden="true" />

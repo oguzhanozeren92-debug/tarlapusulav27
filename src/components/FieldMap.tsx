@@ -22,6 +22,14 @@ export type FieldSectionMapItem = {
 type FieldMapProps = {
   parcelGeometry?: ParcelFeature | null;
 
+  candidateGeometry?: ParcelFeature | null;
+
+  selectedPoint?: { latitude: number; longitude: number } | null;
+
+  pointSelectionEnabled?: boolean;
+
+  onPointSelected?: (point: { latitude: number; longitude: number }) => void;
+
   sections?: FieldSectionMapItem[];
 
   initialCenter?: [number, number];
@@ -50,6 +58,10 @@ const TURKEY_CENTER: [number, number] = [35.2433, 38.9637];
 
 export default function FieldMap({
   parcelGeometry = null,
+  candidateGeometry = null,
+  selectedPoint = null,
+  pointSelectionEnabled = false,
+  onPointSelected,
   sections = [],
   initialCenter = TURKEY_CENTER,
   initialZoom = 5.3,
@@ -179,6 +191,18 @@ export default function FieldMap({
             data: EMPTY_COLLECTION,
           },
 
+          candidate: {
+            type: 'geojson',
+
+            data: EMPTY_COLLECTION,
+          },
+
+          selectedPoint: {
+            type: 'geojson',
+
+            data: EMPTY_COLLECTION,
+          },
+
           sections: {
             type: 'geojson',
 
@@ -258,6 +282,54 @@ export default function FieldMap({
               'line-color': '#1f793b',
 
               'line-width': 1.5,
+            },
+          },
+
+          {
+            id: 'candidate-fill',
+
+            type: 'fill',
+
+            source: 'candidate',
+
+            paint: {
+              'fill-color': '#ffffff',
+
+              'fill-opacity': 0.16,
+            },
+          },
+
+          {
+            id: 'candidate-line',
+
+            type: 'line',
+
+            source: 'candidate',
+
+            paint: {
+              'line-color': '#111111',
+
+              'line-width': 3,
+
+              'line-dasharray': [2, 1],
+            },
+          },
+
+          {
+            id: 'selected-point',
+
+            type: 'circle',
+
+            source: 'selectedPoint',
+
+            paint: {
+              'circle-radius': 7,
+
+              'circle-color': '#111111',
+
+              'circle-stroke-width': 3,
+
+              'circle-stroke-color': '#ffffff',
             },
           },
 
@@ -385,6 +457,15 @@ export default function FieldMap({
     const handleLoad = () => {
       updateSource('parcel', parcelGeometry);
 
+      updateSource('candidate', candidateGeometry);
+
+      updateSource(
+        'selectedPoint',
+        selectedPoint
+          ? turf.point([selectedPoint.longitude, selectedPoint.latitude])
+          : null,
+      );
+
       updateSource('sections', sectionCollection);
 
       if (parcelGeometry) {
@@ -418,7 +499,7 @@ export default function FieldMap({
     return () => {
       map.off('load', handleLoad);
     };
-  }, [parcelGeometry, sectionCollection]);
+  }, [parcelGeometry, candidateGeometry, selectedPoint, sectionCollection]);
 
   useEffect(() => {
     updateSource('drawing', drawingCollection);
@@ -454,11 +535,43 @@ export default function FieldMap({
   }, [parcelGeometry]);
 
   useEffect(() => {
+    updateSource('candidate', candidateGeometry);
+  }, [candidateGeometry]);
+
+  useEffect(() => {
+    updateSource(
+      'selectedPoint',
+      selectedPoint
+        ? turf.point([selectedPoint.longitude, selectedPoint.latitude])
+        : null,
+    );
+  }, [selectedPoint]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedPoint) return;
+
+    map.easeTo({
+      center: [selectedPoint.longitude, selectedPoint.latitude],
+      zoom: Math.max(map.getZoom(), 15.5),
+      duration: 500,
+    });
+  }, [selectedPoint]);
+
+  useEffect(() => {
     const map = mapRef.current;
 
     if (!map) return;
 
     const handleMapClick = (event: maplibregl.MapMouseEvent) => {
+      if (pointSelectionEnabled && !drawing) {
+        onPointSelected?.({
+          latitude: event.lngLat.lat,
+          longitude: event.lngLat.lng,
+        });
+        return;
+      }
+
       if (!drawing) return;
 
       const coordinate: [number, number] = [
@@ -492,7 +605,7 @@ export default function FieldMap({
 
     map.on('click', handleMapClick);
 
-    if (drawing) {
+    if (drawing || pointSelectionEnabled) {
       map.getCanvas().style.cursor = 'crosshair';
 
       map.doubleClickZoom.disable();
@@ -505,7 +618,7 @@ export default function FieldMap({
     return () => {
       map.off('click', handleMapClick);
     };
-  }, [drawing, parcelGeometry]);
+  }, [drawing, parcelGeometry, pointSelectionEnabled, onPointSelected]);
 
   useEffect(() => {
     const map = mapRef.current;

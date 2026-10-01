@@ -38,7 +38,7 @@ export type AdminOverviewResponse = {
   ok: boolean;
   metrics: AdminMetrics;
   users: AdminUserSummary[];
-  error?: string;
+  error?: string; 
 };
 
 export type AdminUserDetailResponse = {

@@ -1,0 +1,49 @@
+.tp-knowledge-updates {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  margin: 14px 0;
+  border: 1px solid #dce0e4;
+  border-radius: 12px;
+  background: #f7f8f9;
+  color: #171a1e;
+  overflow-wrap: anywhere;
+}
+.tp-knowledge-updates > p,
+.tp-knowledge-updates__option > p { margin: 0; font-size: 13px; line-height: 1.5; }
+.tp-knowledge-updates small { color: #525c67; font-size: 12px; line-height: 1.5; }
+.tp-knowledge-updates__option {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dce0e4;
+  border-radius: 10px;
+  background: #fff;
+}
+.tp-knowledge-updates summary { cursor: pointer; font-size: 13px; padding: 8px 0; }
+.tp-knowledge-updates h4 { margin: 12px 0 6px; font-size: 13px; }
+.tp-knowledge-updates .tp-knowledge-updates__text {
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  line-height: 1.5;
+  font-size: 13px;
+}
+.tp-knowledge-updates button {
+  max-width: 100%;
+  white-space: normal;
+  border: 1px solid #20252b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #20252b;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tp-knowledge-updates button:disabled { opacity: .6; cursor: default; }
+.tp-knowledge-updates button:focus-visible,
+.tp-knowledge-updates summary:focus-visible { outline: 2px solid #505e70; outline-offset: 3px; }

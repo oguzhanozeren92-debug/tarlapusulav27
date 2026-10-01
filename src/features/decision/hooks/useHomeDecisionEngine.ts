@@ -1,11 +1,49 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { HOME_REFERENCE_ASSETS } from '../../home/homeAssets';
 import { useRecentFieldOperations } from '../../field-operations/hooks/useRecentFieldOperations';
+import { useFieldDataBackbone } from '../../data-backbone/hooks/useFieldDataBackbone';
+import type { FieldDataBackboneSnapshot, FieldDataEvent } from '../../data-backbone/types/fieldDataBackbone';
+import type { FieldOperation } from '../../field-operations/types/fieldOperation';
 import { buildNdviAnomalyDecision } from '../../satellite/services/buildNdviAnomalyDecision';
 import { getCachedNdviAnomaly } from '../../satellite/services/ndviAnomaly.service';
+import {
+  useActiveProductionValidation,
+  type ActiveProductionValidation,
+} from '../../satellite/hooks/useActiveProductionValidation';
 import { buildHomeDecisionEvents } from '../services/homeDecisionEngine';
 import { buildPlantHealthSynthesisDecision } from '../services/buildPlantHealthSynthesisDecision';
+import { buildWeedDecision } from '../services/buildWeedDecision';
+import { buildWeedSatelliteDecision } from '../services/buildWeedSatelliteDecision';
+import { buildWeedIntelligenceSignal } from '../../weed/services/weedIntelligence.service';
+import { useWeedSoilContext } from '../../weed/hooks/useWeedSoilContext';
+import {
+  buildWeedSoilClue,
+  buildWeedSoilDecision,
+} from '../../weed/services/weedSoilClue.service';
+import {
+  buildWeedSatelliteScreening,
+  persistWeedSatelliteScreening,
+} from '../../weed/services/weedSatelliteIntelligence.service';
 import { harmonizeDecisionEvents } from '../services/modelGateway';
+import { buildYieldHarvestDecision } from '../../yield-quality/services/buildYieldHarvestDecision';
+import { buildOrchardDecision } from '../../orchard/services/buildOrchardDecision';
+import { useStorageRiskContext } from '../../storage-risk/hooks/useStorageRiskContext';
+import { buildStorageRiskDecision } from '../../storage-risk/services/buildStorageRiskDecision';
+import { useIrrigationEconomicsContext } from '../../irrigation-economics/hooks/useIrrigationEconomicsContext';
+import { buildIrrigationEconomicsDecision } from '../../irrigation-economics/services/buildIrrigationEconomicsDecision';
+import { useFrostPocketContext } from '../../frost-pocket/hooks/useFrostPocketContext';
+import { buildFrostPocketDecision } from '../../frost-pocket/services/buildFrostPocketDecision';
+import { isOrchardTreePilotCrop } from '../../orchard/services/orchardTree.service';
+import { useOrchardTreeContext } from '../../orchard/hooks/useOrchardTreeContext';
+import { buildCropModeRuntime } from '../../crop-mode/services/cropMode.service';
+import { applyCropModeDecisionPriority } from '../../crop-mode/services/cropModeDecisionPriority.service';
+import { collapseRiskDecisionEvents } from '../../risk-climate/services/riskDecisionStream.service';
+import { buildNutrientDifferentialDiagnosis } from '../../nutrition/services/nutrientDifferentialDiagnosis.service';
+import { buildNutrientDifferentialDecision } from '../../nutrition/services/buildNutrientDifferentialDecision';
+import {
+  guardNutrientProductionDecision,
+  type NutrientProductionDecisionGuardResult,
+} from '../../nutrition/services/nutrientProductionDecisionGuard.service';
 import type { HarmonizedHomeDecisionEvent } from '../types/modelGateway';
 import type {
   HomeDecisionEngineInput,
@@ -40,6 +78,273 @@ function formatStatusDate(value: string | null | undefined) {
     month: '2-digit',
     year: 'numeric',
   }).format(parsed);
+}
+
+function cleanBackboneText(value: unknown) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+
+function activeProductionDecisionEvent(
+  fieldId: string | number | null | undefined,
+  data: ActiveProductionValidation | null | undefined,
+  generatedAt: string | null | undefined,
+): HomeDecisionEvent | null {
+  const key = String(fieldId ?? '').trim();
+  if (!key || !data) return null;
+
+  const evidence = (data.evidence ?? [])
+    .map((item) => String(item ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const confidence =
+    data.confidence === 'high'
+      ? ('strong' as const)
+      : data.confidence === 'medium'
+        ? ('medium' as const)
+        : ('preliminary' as const);
+
+  const observedAt = String(generatedAt ?? '').trim() || null;
+
+  if (data.status === 'low_vegetation_signal') {
+    return {
+      id: `satellite:${key}:active-production:low-signal`,
+      group: 'active-production',
+      source: 'satellite',
+      priority: 91,
+      severity: 'warning',
+      target: 'map_vegetation',
+      channels: ['today', 'notification', 'pusula'],
+      kind: 'check',
+      label: 'ÜRETİM',
+      title: data.headline || 'Aktif Üretim Henüz Doğrulanmadı',
+      detail:
+        data.summary ||
+        'Açık sezon kaydına rağmen güncel bitki örtüsü sinyali düşük. Tarlayı kontrol et.',
+      evidence,
+      confidence,
+      sourceModel: 'active-production-validator:s2+s1+season',
+      signal: {
+        status: 'ready',
+        observedAt,
+        maxAgeHours: 36,
+      },
+      today: {
+        tone: 'gold',
+        visual: 'spraying',
+        iconKey: 'leaf-gold',
+        iconClass: 'leaf',
+      },
+      notification: {
+        iconKey: 'leaf',
+        iconTone: 'gold',
+        dotTone: 'warning',
+      },
+    };
+  }
+
+  if (data.status === 'active_growth_supported') {
+    return {
+      id: `satellite:${key}:active-production:supported`,
+      group: 'active-production',
+      source: 'satellite',
+      priority: 48,
+      severity: 'info',
+      target: 'map_vegetation',
+      channels: ['pusula'],
+      kind: 'data',
+      label: 'ÜRETİM',
+      title: data.headline || 'Aktif Üretim Sinyali Destekleniyor',
+      detail:
+        data.summary ||
+        'Kayıtlı sezon ile güncel uydu bitki örtüsü sinyali birbiriyle uyumlu.',
+      evidence,
+      confidence,
+      sourceModel: 'active-production-validator:s2+s1+season',
+      signal: {
+        status: 'ready',
+        observedAt,
+        maxAgeHours: 36,
+      },
+      today: {
+        tone: 'green',
+        visual: 'spraying',
+        iconKey: 'leaf-green',
+        iconClass: 'leaf',
+      },
+    };
+  }
+
+  if (data.status === 'active_growth_possible') {
+    return {
+      id: `satellite:${key}:active-production:possible`,
+      group: 'active-production',
+      source: 'satellite',
+      priority: 47,
+      severity: 'info',
+      target: 'map_vegetation',
+      channels: ['pusula'],
+      kind: 'data',
+      label: 'ÜRETİM',
+      title: data.headline || 'Aktif Üretim Olası',
+      detail:
+        data.summary ||
+        'Uydu bitki örtüsü sinyali aktif gelişimle uyumlu olabilir; doğrulama sürüyor.',
+      evidence,
+      confidence,
+      sourceModel: 'active-production-validator:s2+s1+season',
+      signal: {
+        status: 'partial',
+        observedAt,
+        maxAgeHours: 36,
+      },
+      today: {
+        tone: 'green',
+        visual: 'spraying',
+        iconKey: 'leaf-green',
+        iconClass: 'leaf',
+      },
+    };
+  }
+
+  if (data.status === 'season_closed') {
+    return {
+      id: `satellite:${key}:active-production:season-closed`,
+      group: 'active-production',
+      source: 'satellite',
+      priority: 42,
+      severity: 'info',
+      target: 'field_growth',
+      channels: ['pusula'],
+      kind: 'data',
+      label: 'ÜRETİM',
+      title: data.headline || 'Sezon Kapalı',
+      detail: data.summary || 'Hasat kaydı nedeniyle güncel uydu sinyali aktif üretim kanıtı sayılmıyor.',
+      evidence,
+      confidence,
+      sourceModel: 'active-production-validator:season',
+      signal: {
+        status: 'ready',
+        observedAt,
+        maxAgeHours: null,
+      },
+      today: {
+        tone: 'neutral',
+        visual: 'spraying',
+        iconKey: 'leaf-green',
+        iconClass: 'leaf',
+      },
+    };
+  }
+
+  return null;
+}
+
+
+function backboneEventDay(event: FieldDataEvent) {
+  const payloadDay = cleanBackboneText(event.payload?.activityDate);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(payloadDay)) return payloadDay;
+  if (event.occurredOn && /^\d{4}-\d{2}-\d{2}$/.test(event.occurredOn)) {
+    return event.occurredOn;
+  }
+  const observed = cleanBackboneText(event.observedAt || event.createdAt).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(observed) ? observed : '';
+}
+
+function operationFromBackboneEvent(event: FieldDataEvent): FieldOperation | null {
+  if (event.domain !== 'operation' || event.eventType !== 'field_operation') return null;
+  if (event.mutation === 'deleted') return null;
+
+  const type = cleanBackboneText(event.payload?.activityType);
+  const date = backboneEventDay(event);
+  if (!type || !date) return null;
+
+  const numberOrNull = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  };
+
+  return {
+    id: event.sourceRecordId || `backbone:${event.id}`,
+    userId: event.userId,
+    fieldId: event.fieldId,
+    type,
+    title: cleanBackboneText(event.payload?.title) || type,
+    date,
+    productName: cleanBackboneText(event.payload?.productName) || null,
+    quantity: numberOrNull(event.payload?.quantity),
+    unit: cleanBackboneText(event.payload?.unit) || null,
+    cost: numberOrNull(event.payload?.cost),
+    notes: cleanBackboneText(event.payload?.notes) || null,
+    createdAt: event.createdAt,
+  };
+}
+
+function operationsFromBackbone(snapshot: FieldDataBackboneSnapshot | null) {
+  if (!snapshot) return [] as FieldOperation[];
+
+  const latestByRecord = new Map<string, FieldDataEvent>();
+  const anonymous: FieldDataEvent[] = [];
+
+  for (const event of snapshot.events) {
+    if (event.domain !== 'operation' || event.eventType !== 'field_operation') continue;
+    const key = event.sourceRecordId || '';
+    if (!key) {
+      anonymous.push(event);
+      continue;
+    }
+    if (!latestByRecord.has(key)) latestByRecord.set(key, event);
+  }
+
+  return [...latestByRecord.values(), ...anonymous]
+    .map(operationFromBackboneEvent)
+    .filter((value): value is FieldOperation => Boolean(value))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+}
+
+function mergeFieldOperations(primary: FieldOperation[], backbone: FieldOperation[]) {
+  const byId = new Map<string, FieldOperation>();
+  for (const operation of [...primary, ...backbone]) {
+    const id = cleanBackboneText(operation.id);
+    const fallback = [operation.fieldId, operation.type, operation.date, operation.productName ?? '']
+      .map(cleanBackboneText)
+      .join('|');
+    const key = id || fallback;
+    if (!byId.has(key)) byId.set(key, operation);
+  }
+  return [...byId.values()]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 60);
+}
+
+function cropFromBackbone(snapshot: FieldDataBackboneSnapshot | null) {
+  if (!snapshot) return '';
+  for (const event of snapshot.events) {
+    if (event.domain !== 'field_profile') continue;
+    if (event.mutation === 'deleted') continue;
+    const crop = cleanBackboneText(event.payload?.crop);
+    if (crop) return crop;
+  }
+  for (const event of snapshot.events) {
+    if (event.domain !== 'season') continue;
+    if (event.mutation === 'deleted') continue;
+    const crop = cleanBackboneText(event.payload?.crop);
+    if (crop) return crop;
+  }
+  return '';
+}
+
+function hasBackboneSoilAnalysis(snapshot: FieldDataBackboneSnapshot | null) {
+  if (!snapshot) return false;
+  const latestByRecord = new Map<string, FieldDataEvent>();
+  for (const event of snapshot.events) {
+    if (event.domain !== 'soil' || event.eventType !== 'soil_analysis') continue;
+    const key = event.sourceRecordId || event.id;
+    if (!latestByRecord.has(key)) latestByRecord.set(key, event);
+  }
+  return [...latestByRecord.values()].some((event) => event.mutation !== 'deleted');
 }
 
 function buildObservationFollowUpEvent(
@@ -312,10 +617,11 @@ function buildTodayStatusFillers(
   if (!todayGroups.has('nutrition')) {
     const nutrientReady = input.nutrient?.status === 'ready';
     const hasAnalysis = Boolean(
-      nutrientReady &&
+      (nutrientReady &&
         input.nutrient?.latestAnalysis &&
         String(input.nutrient.latestAnalysis.field_id ?? '') ===
-          String(input.homeFieldId ?? ''),
+          String(input.homeFieldId ?? '')) ||
+        hasBackboneSoilAnalysis(input.dataBackbone ?? null),
     );
 
     fillers.push({
@@ -480,13 +786,85 @@ function toNotification(event: HomeDecisionEvent): HomeSystemNotification | null
 
 export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
   const recentOperations = useRecentFieldOperations(input.homeFieldId, 30);
+  const nutrientGuardRef = useRef<NutrientProductionDecisionGuardResult | null>(null);
+  const archivedNutrientGuardKeyRef = useRef('');
+  const dataBackbone = useFieldDataBackbone(input.homeFieldId, 140);
+  const activeProduction = useActiveProductionValidation(input.homeFieldId);
+  const weedSoilContext = useWeedSoilContext(input.homeFieldId ?? input.fieldKey);
+
+  const backboneOperations = useMemo(
+    () => operationsFromBackbone(dataBackbone.snapshot),
+    [dataBackbone.signature, dataBackbone.snapshot],
+  );
+
+  const mergedOperations = useMemo(
+    () => mergeFieldOperations(recentOperations.operations, backboneOperations),
+    [recentOperations.operations, backboneOperations],
+  );
+
+  const resolvedCrop = useMemo(() => {
+    const direct = cleanBackboneText(input.homeFieldCrop);
+    return direct || cropFromBackbone(dataBackbone.snapshot) || null;
+  }, [input.homeFieldCrop, dataBackbone.signature, dataBackbone.snapshot]);
 
   const resolvedInput = useMemo<HomeDecisionEngineInput>(
-    () => ({ ...input, recentFieldOperations: recentOperations.operations }),
-    [input, recentOperations.operations],
+    () => ({
+      ...input,
+      homeFieldCrop: resolvedCrop,
+      recentFieldOperations: mergedOperations,
+      dataBackbone: dataBackbone.snapshot,
+    }),
+    [input, resolvedCrop, mergedOperations, dataBackbone.snapshot],
+  );
+
+  const orchard = useOrchardTreeContext(
+    input.homeFieldId,
+    resolvedCrop,
+    Boolean(input.homeFieldId && isOrchardTreePilotCrop(resolvedCrop)),
+  );
+
+  const storageRisk = useStorageRiskContext(input.homeFieldId);
+  const irrigationEconomics = useIrrigationEconomicsContext(
+    input.homeFieldId,
+    input.irrigationDecision ?? null,
+  );
+  const frostPocket = useFrostPocketContext(
+    input.homeFieldId,
+    input.quickTemperatureMin ?? null,
   );
 
   const cachedAnomaly = getCachedNdviAnomaly(input.homeFieldId);
+
+  const weedSatelliteScreening = useMemo(
+    () =>
+      buildWeedSatelliteScreening({
+        fieldId: input.homeFieldId ?? input.fieldKey,
+        homePusulaResult: input.homePusulaResult,
+        ndviStats: input.homeNdviStats,
+        phenology: input.phenology,
+        resolvedSatelliteDate: input.resolvedHomeSatelliteDate ?? null,
+      }),
+    [
+      input.homeFieldId,
+      input.fieldKey,
+      input.homePusulaResult,
+      input.homeNdviStats,
+      input.phenology,
+      input.resolvedHomeSatelliteDate,
+    ],
+  );
+
+  useEffect(() => {
+    persistWeedSatelliteScreening(weedSatelliteScreening);
+  }, [
+    weedSatelliteScreening?.fieldId,
+    weedSatelliteScreening?.sceneDate,
+    weedSatelliteScreening?.status,
+    weedSatelliteScreening?.confidencePercent,
+    weedSatelliteScreening?.candidateAreaCount,
+    weedSatelliteScreening?.persistence,
+    weedSatelliteScreening?.spread,
+  ]);
 
   const events = useMemo(() => {
     const baseEvents = buildHomeDecisionEvents(resolvedInput);
@@ -498,6 +876,11 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
       phenology: input.phenology ?? null,
       now,
     });
+    const activeProductionEvent = activeProductionDecisionEvent(
+      input.homeFieldId ?? input.fieldKey,
+      activeProduction.data,
+      activeProduction.generatedAt,
+    );
     const activeGrowth = Boolean(
       input.phenology?.dataStatus === 'usable' &&
         input.phenology?.stage &&
@@ -523,9 +906,78 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
       now,
       anomalySpatialArea,
     );
-    const observationFollowUpEvent = buildObservationFollowUpEvent(input, now);
+    // Ürün kararı: NDVI/saha takip noktaları görev veya bildirim üretmez.
+    // Takip kanıtı analiz/PDF bağlamında yaşamaya devam eder; Home event zincirine girmez.
+    const observationFollowUpEvent: HomeDecisionEvent | null = null;
+    const weedSignal = buildWeedIntelligenceSignal(
+      input.homeFieldId ?? input.fieldKey,
+      dataBackbone.snapshot,
+    );
+    const weedEvent = buildWeedDecision(
+      input.homeFieldId ?? input.fieldKey,
+      weedSignal,
+    );
+    const weedSoilClue = buildWeedSoilClue(
+      weedSignal,
+      weedSoilContext.data,
+    );
+    const weedSoilEvent = buildWeedSoilDecision(
+      input.homeFieldId ?? input.fieldKey,
+      weedSoilClue,
+    );
+    const nutrientDifferential = buildNutrientDifferentialDiagnosis({
+      fieldId: input.homeFieldId ?? input.fieldKey,
+      crop: resolvedInput.homeFieldCrop ?? null,
+      phenology: input.phenology ?? null,
+      anomaly: anomalySignal,
+      satelliteTrend: input.satelliteTrend ?? null,
+      nutrient: input.nutrient ?? null,
+      irrigationDecision: input.irrigationDecision ?? null,
+      weed: weedSignal,
+      weedSatellite: weedSatelliteScreening,
+      fieldSynthesis: input.fieldSynthesis ?? null,
+      now,
+    });
+    const nutrientDifferentialEvent =
+      buildNutrientDifferentialDecision(nutrientDifferential);
+    const authoritativeNutrientEvent = baseEvents.find(
+      (event) => event.source === 'nutrition' || event.group === 'nutrition',
+    ) ?? null;
+    const nutrientProductionGuard = guardNutrientProductionDecision({
+      fieldId: input.homeFieldId ?? input.fieldKey,
+      crop: resolvedInput.homeFieldCrop ?? null,
+      authoritativeEvent: authoritativeNutrientEvent,
+      differential: nutrientDifferential,
+      differentialEvent: nutrientDifferentialEvent,
+      nutrient: input.nutrient ?? null,
+      ndviStats: input.homeNdviStats ?? null,
+      phenology: input.phenology ?? null,
+      recentOperations: mergedOperations,
+      photoFollowUpDue: Boolean(input.observationFollowUp?.dueForPhoto),
+      now,
+    });
+    nutrientGuardRef.current = nutrientProductionGuard;
+    const guardedNutrientEvent = nutrientProductionGuard.event;
+    const weedSatelliteEvent = buildWeedSatelliteDecision(
+      input.homeFieldId ?? input.fieldKey,
+      weedSatelliteScreening,
+    );
+    const yieldHarvestEvent = buildYieldHarvestDecision(
+      input.fieldSynthesis?.yieldHarvest ?? null,
+    );
+    const orchardEvent = buildOrchardDecision(orchard.snapshot);
+    const storageRiskEvent = buildStorageRiskDecision(storageRisk.snapshot);
+    const irrigationEconomicsEvent = buildIrrigationEconomicsDecision(irrigationEconomics.snapshot);
+    const frostPocketEvent = buildFrostPocketDecision(frostPocket.snapshot);
+    const effectiveWeedSatelliteEvent = weedEvent ? null : weedSatelliteEvent;
 
-    let merged = baseEvents;
+    // 14.2: HomeDecisionEngine'in ürettiği tek nutrition olayı burada
+    // production guard'dan geçirilir. soil-nutrition-engine otoritesi korunur;
+    // filtre yalnız kullanıcıya çıkan olayı laboratuvar + son gübreleme + fenoloji
+    // + alternatif stres bağlamıyla güvenli hale getirir.
+    let merged = baseEvents.filter(
+      (event) => event.source !== 'nutrition' && event.group !== 'nutrition',
+    );
 
     if (riskEvent) {
       const hasSpatialAlert = Boolean(
@@ -538,13 +990,22 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
           );
     }
 
-    if (anomalyEvent) {
+    if (anomalyEvent || nutrientDifferentialEvent) {
       merged = merged.filter((event) => event.group !== 'satellite-trend');
     }
 
-    const effectiveAnomalyEvent = input.observationFollowUp?.dueForPhoto
+    // 14.1: Negatif NDVI sinyali varsa klasik uydu uyarısını tek başına bırakma.
+    // Önce besin/su/hastalık/yabancı ot/drenaj/sıkışma ayrım filtresi çalışır.
+    // Filtre aktifse aynı gözlem için ikinci bir NDVI kartı üretmeyiz.
+    const effectiveNutrientDifferentialEvent = guardedNutrientEvent
       ? null
-      : anomalyEvent;
+      : input.observationFollowUp?.dueForPhoto
+        ? null
+        : nutrientDifferentialEvent;
+    const effectiveAnomalyEvent =
+      input.observationFollowUp?.dueForPhoto || nutrientDifferentialEvent
+        ? null
+        : anomalyEvent;
     const photoEvidenceWasSynthesized = Boolean(
       riskEvent?.sourceModel?.includes('field-photo'),
     );
@@ -553,15 +1014,55 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
         ? null
         : observationFollowUpEvent;
     const realEvents = [
+      frostPocketEvent,
+      storageRiskEvent,
+      irrigationEconomicsEvent,
+      orchardEvent,
+      yieldHarvestEvent,
+      weedEvent,
+      weedSoilEvent,
+      effectiveWeedSatelliteEvent,
+      activeProductionEvent,
       riskEvent,
       effectiveObservationFollowUpEvent,
+      guardedNutrientEvent,
+      effectiveNutrientDifferentialEvent,
       effectiveAnomalyEvent,
       ...merged,
     ].filter((event): event is HomeDecisionEvent => Boolean(event));
 
     const fillers = buildTodayStatusFillers(resolvedInput, realEvents, now);
 
-    const sortedEvents = [...realEvents, ...fillers].sort(
+    const fieldProfilePayload =
+      dataBackbone.snapshot?.latestByDomain?.field_profile?.payload ?? {};
+    const cropMode = buildCropModeRuntime({
+      crop: input.homeFieldCrop ?? '',
+      cropCycle:
+        (fieldProfilePayload as any)?.cropCycle ??
+        (fieldProfilePayload as any)?.crop_cycle ??
+        undefined,
+      irrigationStatus:
+        (fieldProfilePayload as any)?.irrigationStatus ??
+        (fieldProfilePayload as any)?.irrigation_status ??
+        undefined,
+      bearing: (fieldProfilePayload as any)?.bearing,
+    });
+
+    const cropAwareEvents = applyCropModeDecisionPriority(
+      [...realEvents, ...fillers],
+      cropMode,
+      { riskRadar: input.fieldSynthesis?.riskRadar ?? null },
+    );
+
+    // 12.3: Aynı riskin Weather / Risk Radar / Pusula tarafından farklı
+    // cümlelerle çoğaltılmasını burada kes. Kanonik risk olayı zaten Today,
+    // Notification ve Pusula kanallarını tek event üzerinden besler.
+    const singleRiskStreamEvents = collapseRiskDecisionEvents(
+      cropAwareEvents,
+      riskEvent,
+    );
+
+    const sortedEvents = singleRiskStreamEvents.sort(
       (a, b) => b.priority - a.priority || a.id.localeCompare(b.id),
     );
 
@@ -572,13 +1073,73 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
     );
   }, [
     resolvedInput,
+    mergedOperations,
     input.homeFieldId,
+    input.homeFieldCrop,
     input.fieldSynthesis,
     input.now,
     input.phenology,
     input.observationFollowUp,
+    dataBackbone.signature,
     cachedAnomaly,
+    weedSatelliteScreening,
+    orchard.snapshot,
+    storageRisk.snapshot,
+    irrigationEconomics.snapshot,
+    frostPocket.snapshot,
+    activeProduction.signature,
+    activeProduction.data,
+    activeProduction.generatedAt,
+    weedSoilContext.data,
+    weedSoilContext.generatedAt,
   ]);
+
+  useEffect(() => {
+    const fieldId = String(input.homeFieldId ?? input.fieldKey ?? '').trim();
+    const guard = nutrientGuardRef.current;
+    if (!fieldId || !guard || guard.fieldId !== fieldId) return;
+    const archivable = Boolean(
+      guard.event ||
+      guard.blockedNitrogenClaim ||
+      guard.zoningReadiness.samplingPlan.allowed
+    );
+    if (!archivable) return;
+
+    const archiveKey = [
+      guard.fieldId,
+      guard.event?.id ?? 'zoning-only',
+      guard.blockedNitrogenClaim ? 'blocked' : 'open',
+      guard.recentFertilization.date ?? 'no-fertilization',
+      guard.phenologyContext.stage ?? 'no-stage',
+      guard.alternativeCauseLabels.join(','),
+      guard.localNutrientContext.acquiredAt ?? 'no-sl2p',
+      guard.localNutrientContext.biophysicsQuality ?? 'no-biophysics-quality',
+      guard.localNutrientContext.laiTrend ?? 'no-lai-trend',
+      guard.localNutrientContext.cccTrend ?? 'no-ccc-trend',
+      guard.zoningReadiness.status,
+      guard.zoningReadiness.samplingPlan.allowed ? 'sampling-ready' : 'sampling-not-ready',
+      guard.zoningReadiness.samplingPlan.candidates.map((candidate) => candidate.area).join(','),
+      guard.zoningReadiness.spatialSignal.sceneId ?? 'no-zoning-scene',
+    ].join('|');
+
+    if (archivedNutrientGuardKeyRef.current === archiveKey) return;
+    let cancelled = false;
+
+    void import('../../pusula-pdf/services/pusulaPdfDecisionEvidence.service')
+      .then((module) => module.mirrorNutrientProductionGuardEvidenceForPdf(fieldId, guard))
+      .then((saved) => {
+        if (!cancelled && saved) archivedNutrientGuardKeyRef.current = archiveKey;
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn('[TarlaPusula] 14.7 besin karar/zonlama bağlamı PDF arşivine yazılamadı:', error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [events, input.homeFieldId, input.fieldKey]);
 
   const todayDecisions = useMemo(() => {
     const selected = selectTodayEvents(events);
@@ -617,8 +1178,21 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
     notifications,
     primaryDecision,
     pusulaDecision,
+    // 14.4: Pusula görünümü aynı kanonik besin guard sonucunu kullanır.
+    // Ref burada yalnız okuma amaçlı dışarı verilir; yeni karar üretmez.
+    nutrientProductionGuard: nutrientGuardRef.current,
     modelSignals: events.map((event) => event.gateway),
-    recentFieldOperations: recentOperations.operations,
-    recentFieldOperationsReady: !recentOperations.loading && !recentOperations.error,
+    recentFieldOperations: mergedOperations,
+    recentFieldOperationsReady:
+      !recentOperations.loading && !recentOperations.error && !dataBackbone.loading,
+    dataBackbone: dataBackbone.snapshot,
+    dataBackboneReady: dataBackbone.ready,
+    dataBackboneError: dataBackbone.error,
+    orchardSnapshot: orchard.snapshot,
+    orchardLoading: orchard.loading,
+    orchardError: orchard.error,
+    storageRiskSnapshot: storageRisk.snapshot,
+    irrigationEconomicsSnapshot: irrigationEconomics.snapshot,
+    frostPocketSnapshot: frostPocket.snapshot,
   };
 }

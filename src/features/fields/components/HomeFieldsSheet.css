@@ -192,3 +192,12 @@ html body .tp-fields-sheet .tp-fields-sheet-field.is-dragging {
     width: 26px;
   }
 }
+
+
+.tp-fields-delete-loading{
+  margin: 16px 0 10px;
+  padding: 18px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: radial-gradient(circle at top, rgba(255,255,255,0.06), rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.22));
+}

@@ -50,6 +50,56 @@ function finiteNumber(
     : null;
 }
 
+async function loadSatelliteCanopyCover(
+  fieldId: string,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from('field_biophysical_snapshots')
+    .select('acquired_at,metrics,qc')
+    .eq('field_id', fieldId)
+    .eq('user_id', userId)
+    .eq('algorithm', 'sl2p')
+    .order('acquired_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[irrigation] Uydu bitki örtüsü okunamadı:', error.message);
+    return null;
+  }
+
+  if (!data) return null;
+
+  const quality = String(data.qc?.quality ?? '')
+    .trim()
+    .toLocaleLowerCase('tr-TR');
+
+  if (quality === 'low' || quality === 'düşük' || quality === 'dusuk') {
+    return null;
+  }
+
+  const acquiredAt = String(data.acquired_at ?? '');
+  const acquiredMs = Date.parse(acquiredAt);
+  if (!Number.isFinite(acquiredMs)) return null;
+
+  const ageDays = Math.max(0, (Date.now() - acquiredMs) / 86400000);
+  if (ageDays > 21) return null;
+
+  const metric = data.metrics?.fCOVER;
+  const cover = finiteNumber(metric?.value ?? metric?.mean);
+  if (cover === null || cover < 0 || cover > 1) return null;
+
+  const validFraction = finiteNumber(metric?.valid_fraction ?? data.qc?.valid_pixel_fraction);
+  if (validFraction !== null && validFraction < 0.35) return null;
+
+  return {
+    percent: Number((cover * 100).toFixed(1)),
+    acquiredAt,
+    quality: quality || 'unknown',
+  };
+}
+
 function round3(
   value:
     | number
@@ -421,6 +471,7 @@ export async function calculateCropWaterUse(
   const [
     phenology,
     climate,
+    satelliteCanopy,
   ] =
     await Promise.all([
       getFieldPhenologySnapshot(
@@ -437,6 +488,11 @@ export async function calculateCropWaterUse(
             fieldId,
         },
       ),
+
+      loadSatelliteCanopyCover(
+        fieldId,
+        user.id,
+      ),
     ]);
 
   const cropSubtype =
@@ -444,10 +500,20 @@ export async function calculateCropWaterUse(
       dbField.crop_subtype,
     );
 
+  const manualCanopyCover =
+    finiteNumber(
+      dbField.canopy_cover_percent,
+    );
+
+  const satelliteCanopyCover =
+    manualCanopyCover === null
+      ? satelliteCanopy?.percent ?? null
+      : null;
+
   const canopyModel =
     resolveCanopyModelInput({
       canopyCoverPercent:
-        dbField.canopy_cover_percent,
+        manualCanopyCover ?? satelliteCanopyCover,
       canopyHeightM:
         dbField.canopy_height_m,
       canopyDevelopmentClass:
@@ -577,7 +643,15 @@ export async function calculateCropWaterUse(
       dbField.canopy_height_class,
     );
 
-  if (canopyDevelopmentLabel) {
+  if (manualCanopyCover !== null) {
+    evidence.push(
+      `Bitki örtüsü kullanıcı/saha kaydı: %${manualCanopyCover.toFixed(0)}.`,
+    );
+  } else if (satelliteCanopyCover !== null && satelliteCanopy) {
+    evidence.push(
+      `Bitki örtüsü uydu ölçümünden alındı: %${satelliteCanopyCover.toFixed(0)} (${new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'short' }).format(new Date(satelliteCanopy.acquiredAt))}).`,
+    );
+  } else if (canopyDevelopmentLabel) {
     evidence.push(
       `Taç gelişimi kullanıcı seçimi: ${canopyDevelopmentLabel}.`,
     );

@@ -1,7 +1,12 @@
 import { supabase } from '../../../supabaseClient';
+import type { BiophysicalTaskCandidate } from '../../../services/fieldBiophysicsInsight.service';
 import type { IrrigationDecisionSynthesis } from '../../irrigation/types/irrigationDecision';
 
 const TASK_NOTIFICATION_STORAGE_KEY = 'tp_system_notifications_v1';
+
+const TASK_MAINTENANCE_TTL_MS = 60_000;
+const taskMaintenanceStartedAt = new Map<string, number>();
+const taskMaintenanceInFlight = new Map<string, Promise<void>>();
 
 export type FieldTask = {
   id: string;
@@ -17,6 +22,7 @@ export type FieldTask = {
   metadata: Record<string, unknown>;
   completed: boolean;
   createdAt: string | null;
+  fieldName?: string | null;
 };
 
 type RawFieldTask = {
@@ -37,6 +43,28 @@ type RawFieldTask = {
 
 function text(value: unknown) {
   return String(value ?? '').trim();
+}
+
+function trTitle(value: unknown) {
+  const raw = text(value);
+  if (!raw) return '';
+  return raw.charAt(0).toLocaleUpperCase('tr-TR') + raw.slice(1);
+}
+
+function taskTitleWithFieldName(titleInput: unknown, fieldNameInput: unknown) {
+  const raw = text(titleInput).replace(/\s+/g, ' ');
+  const fieldName = trTitle(fieldNameInput);
+  if (!raw || !fieldName) return raw;
+
+  if (/^tarlanın\b/iu.test(raw)) {
+    return raw.replace(/^tarlanın\b/iu, `${fieldName} tarlasının`);
+  }
+
+  if (/^tarla\b/iu.test(raw)) {
+    return raw.replace(/^tarla\b/iu, `${fieldName} tarlası`);
+  }
+
+  return raw;
 }
 
 function metadataObject(metadata: unknown): Record<string, unknown> {
@@ -78,6 +106,7 @@ export function resolveTaskRewardPoints(input: {
   if (taskKey.startsWith('model-growth-stage-observation:')) return 20;
   if (taskKey === 'model-last-irrigation-amount') return 15;
   if (taskKey === 'irrigation-synthesis-field-check') return 25;
+  if (taskKey === 'biophysics-field-check') return 30;
 
   if (taskKey === 'notification:soil-analysis') return 150;
   if (taskKey.startsWith('pusula-field-check:')) return 30;
@@ -85,6 +114,7 @@ export function resolveTaskRewardPoints(input: {
 
   if (title.includes('toprak analizi')) return 150;
   if (title.includes('fotoğraf')) return 30;
+  if (title.includes('bitki gidişat')) return 30;
   if (title.includes('nem')) return 25;
   if (title.includes('sulama')) return 15;
   if (title.includes('gelişim evresi')) return 20;
@@ -96,6 +126,42 @@ export function resolveTaskRewardPoints(input: {
 
   // Görevlerim ekranına düşen gerçek bir görev asla puansız kalmaz.
   return 10;
+}
+
+export function taskNotificationSubject(task: Pick<FieldTask, 'title'>) {
+  const raw = text(task.title).replace(/\s+/g, ' ');
+  const title = raw.toLocaleLowerCase('tr-TR');
+
+  if (!raw) return 'Görev';
+  if (title.includes('külleme')) return 'Bağ küllemesi';
+  if (title.includes('toprak analizi')) return 'Toprak analizi';
+  if (title.includes('toprak nem')) return 'Toprak nemi';
+  if (title.includes('son sulama')) return 'Sulama kaydı';
+  if (title.includes('uydu görünt')) return 'Uydu görüntüsü';
+  if (title.includes('gelişim evresi')) return 'Gelişim evresi';
+  if (title.includes('fotoğraf')) return 'Tarla fotoğrafı';
+  if (title.includes('bitki gidişat')) return 'Bitki gidişatı';
+
+  const direction = [
+    ['doğu', 'Doğu bölüm'],
+    ['batı', 'Batı bölüm'],
+    ['kuzey', 'Kuzey bölüm'],
+    ['güney', 'Güney bölüm'],
+    ['merkez', 'Merkez bölüm'],
+  ].find(([needle]) => title.includes(needle));
+
+  if (direction && title.includes('kontrol')) {
+    return `${direction[1]} kontrolü`;
+  }
+
+  const cleaned = raw
+    .replace(/\b(?:tarlanın|tarla|tarlayı|tarlada)\b/giu, '')
+    .replace(/\b(?:kontrol et|ekle|ölç|incele|doğrula|kaydet)\b/giu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const value = cleaned || raw;
+  return value.length > 34 ? `${value.slice(0, 31).trimEnd()}…` : value;
 }
 
 export function taskNotificationTitle(task: Pick<FieldTask, 'title'>) {
@@ -111,8 +177,8 @@ export function taskNotificationMessage(
     ?.trim();
 
   const shortSummary =
-    summary && summary.length > 86
-      ? `${summary.slice(0, 83).trimEnd()}…`
+    summary && summary.length > 72
+      ? `${summary.slice(0, 69).trimEnd()}…`
       : summary;
 
   return `Yeni görev tanımlandı · +${task.rewardPoints} Pusula Puanı${
@@ -165,7 +231,7 @@ function emitTasksChanged(fieldId: string) {
 }
 
 function linkedTaskId(item: any) {
-  const direct = text(item?.task?.id);
+  const direct = text(item?.taskId ?? item?.task_id ?? item?.task?.id);
   if (direct) return direct;
 
   const id = text(item?.id);
@@ -205,7 +271,7 @@ function removeTaskNotification(taskIdInput: string) {
   }
 }
 
-function publishTaskNotifications(tasks: FieldTask[]) {
+function publishTaskNotifications(tasks: FieldTask[], fieldNameInput?: string | null) {
   if (typeof window === 'undefined') return;
 
   try {
@@ -233,6 +299,7 @@ function publishTaskNotifications(tasks: FieldTask[]) {
     });
 
     const nowIso = new Date().toISOString();
+    const fieldName = trTitle(fieldNameInput);
 
     tasks.forEach((task) => {
       if (!task.id) return;
@@ -243,29 +310,33 @@ function publishTaskNotifications(tasks: FieldTask[]) {
       );
       const createdAt = task.createdAt || existing?.createdAt || nowIso;
 
+      const nextTitle = taskNotificationTitle(task);
+      const nextMessage = taskNotificationMessage(task);
+      const contentChanged =
+        !existing ||
+        text(existing.title) !== nextTitle ||
+        text(existing.message) !== nextMessage ||
+        text(existing.fieldName) !== fieldName;
+
       byId.set(notificationId, {
         id: notificationId,
         fieldId: task.fieldId,
-        fieldName: existing?.fieldName ?? null,
+        fieldName: fieldName || existing?.fieldName || null,
         source: 'task-system',
         severity: task.priority >= 90 ? 'warning' : 'info',
-        title: taskNotificationTitle(task),
-        message: taskNotificationMessage(task),
+        title: nextTitle,
+        message: nextMessage,
         iconKey: 'task',
         target: 'tasks',
         priority: task.priority,
         kind: 'notification',
-        task: {
-          id: task.id,
-          task_key: task.taskKey,
-          action_target: task.actionTarget,
-          title: task.title,
-          status: 'open',
-          reward_points: task.rewardPoints,
-        },
-        isRead: existing?.isRead ?? false,
+        // Bildirim kendi kaydıdır; gerçek görev field_todos'ta yaşar.
+        // Aradaki tek bağ taskId'dir, görev verisini bildirime kopyalamıyoruz.
+        taskId: task.id,
+        isRead: contentChanged ? false : (existing?.isRead ?? false),
         createdAt: existing?.createdAt ?? createdAt,
-        updatedAt: nowIso,
+        // Aynı açık görev her senkronizasyonda tekrar "yeni" görünmesin.
+        updatedAt: contentChanged ? nowIso : (existing?.updatedAt ?? createdAt),
       });
     });
 
@@ -289,6 +360,115 @@ function publishTaskNotifications(tasks: FieldTask[]) {
   } catch (error) {
     console.warn('[tasks] Yeni görev bildirimi kaydedilemedi:', error);
   }
+}
+
+
+
+export function syncBiophysicalTrendTaskBestEffort(
+  fieldIdInput: string,
+  candidate: BiophysicalTaskCandidate | null | undefined,
+) {
+  const fieldId = text(fieldIdInput);
+  if (!fieldId || !supabase) return;
+
+  void (async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) return;
+
+    const taskKey = 'biophysics-field-check';
+    const { data: existing, error: existingError } = await supabase
+      .from('field_todos')
+      .select('id,completed,dismissed,metadata')
+      .eq('user_id', userData.user.id)
+      .eq('field_id', fieldId)
+      .eq('task_key', taskKey)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const existingMetadata = metadataObject(existing?.metadata);
+    const now = new Date().toISOString();
+
+    if (!candidate?.active) {
+      if (existing && !existing.completed && !existing.dismissed) {
+        const { error } = await supabase
+          .from('field_todos')
+          .update({
+            completed: true,
+            completed_at: now,
+            metadata: {
+              ...existingMetadata,
+              autoResolved: true,
+              autoResolvedAt: now,
+              resolution: 'biophysical_trend_normalized',
+            },
+            updated_at: now,
+          })
+          .eq('id', existing.id)
+          .eq('user_id', userData.user.id);
+
+        if (error) throw error;
+        removeTaskNotification(String(existing.id));
+        emitTasksChanged(fieldId);
+      }
+      return;
+    }
+
+    const sceneId = text(candidate.sceneId);
+    if (
+      existing &&
+      !existing.completed &&
+      !existing.dismissed &&
+      text(existingMetadata.sceneId) === sceneId
+    ) {
+      return;
+    }
+
+    const row = {
+      title: candidate.title,
+      description: candidate.description,
+      source: 'biophysics_trend',
+      action_target: 'field-photo',
+      priority: candidate.priority,
+      reward_rule_key: null,
+      due_date: null,
+      completed: false,
+      completed_at: null,
+      dismissed: false,
+      metadata: {
+        sceneId: candidate.sceneId,
+        acquiredAt: candidate.acquiredAt,
+        reasonCodes: candidate.reasonCodes,
+        sourceLayer: candidate.sourceLayer,
+        openPhoto: candidate.openPhoto,
+        productionAuthority: false,
+        verificationReason: 'biophysical_multi_signal_decline',
+        rewardPoints: candidate.rewardPoints,
+      },
+      updated_at: now,
+    };
+
+    if (existing?.id) {
+      const { error } = await supabase
+        .from('field_todos')
+        .update(row)
+        .eq('id', existing.id)
+        .eq('user_id', userData.user.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('field_todos').insert({
+        ...row,
+        user_id: userData.user.id,
+        field_id: fieldId,
+        task_key: taskKey,
+      });
+      if (error) throw error;
+    }
+
+    emitTasksChanged(fieldId);
+  })().catch((error: unknown) => {
+    console.warn('[tasks] Biyofizik trend görevi senkronize edilemedi:', error);
+  });
 }
 
 export function syncIrrigationSynthesisVerificationTaskBestEffort(
@@ -457,6 +637,121 @@ async function synchronizeGeneratedTasks(fieldId: string) {
   }
 }
 
+
+function isLegacyNdviRelativeAutoTask(row: any) {
+  const taskKey = text(row?.task_key ?? row?.taskKey);
+  const metadata = metadataObject(row?.metadata);
+  const metadataSource = text(metadata.source).toLocaleLowerCase('tr-TR');
+  const importantArea = metadataObject(metadata.importantArea);
+  const searchable = [
+    row?.title,
+    row?.description,
+    row?.source,
+    row?.action_target ?? row?.actionTarget,
+    taskKey,
+    metadataSource,
+    metadata.taskBasis,
+    metadata.notificationId,
+    metadata.originalTaskKey,
+    importantArea.summary,
+    JSON.stringify(importantArea.evidence ?? []),
+  ]
+    .map((value) => text(value, 2000).toLocaleLowerCase('tr-TR'))
+    .join(' ');
+
+  const explicitNdviTask =
+    taskKey.startsWith('ndvi-follow-up-photo:') ||
+    taskKey === 'pusula-field-check:ndvi-relative' ||
+    taskKey.startsWith('pusula-field-check:ndvi-relative:') ||
+    taskKey.startsWith('pusula-field-check:area:') ||
+    metadataSource === 'ndvi_follow_up' ||
+    metadataSource === 'ndvi_relative_difference';
+
+  const ndviAreaEvidence =
+    text(metadata.sourceLayer).toLocaleLowerCase('tr-TR') === 'vegetation' &&
+    (
+      searchable.includes('ndvi') ||
+      searchable.includes('parsel ortalamas') ||
+      searchable.includes('göreli bitki gelişim fark')
+    );
+
+  return explicitNdviTask || ndviAreaEvidence;
+}
+
+async function closeLegacyNdviRelativeAutoTasks(fieldId: string) {
+  if (!supabase) return;
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) return;
+
+  const { data, error } = await supabase
+    .from('field_todos')
+    .select('id,title,description,source,action_target,task_key,metadata')
+    .eq('user_id', user.id)
+    .eq('field_id', fieldId)
+    .eq('completed', false)
+    .eq('dismissed', false);
+
+  if (error) throw error;
+
+  const obsolete = (data ?? []).filter(isLegacyNdviRelativeAutoTask);
+  if (!obsolete.length) return;
+
+  const now = new Date().toISOString();
+
+  for (const row of obsolete) {
+    const metadata = metadataObject((row as any).metadata);
+
+    const { error: updateError } = await supabase
+      .from('field_todos')
+      .update({
+        completed: true,
+        completed_at: now,
+        metadata: {
+          ...metadata,
+          autoResolved: true,
+          autoResolvedAt: now,
+          resolution: 'ndvi_analysis_no_longer_creates_tasks_or_notifications',
+        },
+        updated_at: now,
+      })
+      .eq('id', (row as any).id)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.warn('[tasks] Eski NDVI görevi kapatılamadı:', updateError.message);
+    }
+  }
+}
+
+function scheduleTaskMaintenance(fieldId: string) {
+  const now = Date.now();
+  const lastStarted = taskMaintenanceStartedAt.get(fieldId) ?? 0;
+
+  if (taskMaintenanceInFlight.has(fieldId)) return;
+  if (now - lastStarted < TASK_MAINTENANCE_TTL_MS) return;
+
+  taskMaintenanceStartedAt.set(fieldId, now);
+
+  const pending = (async () => {
+    try {
+      await synchronizeGeneratedTasks(fieldId);
+      await closeLegacyNdviRelativeAutoTasks(fieldId);
+      emitTasksChanged(fieldId);
+    } catch (error) {
+      console.warn('[tasks] Arka plan görev bakımı tamamlanamadı:', error);
+    } finally {
+      taskMaintenanceInFlight.delete(fieldId);
+    }
+  })();
+
+  taskMaintenanceInFlight.set(fieldId, pending);
+}
+
 export async function getFieldTasks(
   fieldId: string,
 ): Promise<FieldTask[]> {
@@ -468,24 +763,36 @@ export async function getFieldTasks(
     throw new Error('Supabase bağlantısı hazır değil.');
   }
 
-  await synchronizeGeneratedTasks(id);
+  // Listeyi açarken altı ayrı RPC'yi bekletme. Mevcut görevleri hemen oku;
+  // üretim/temizlik senkronu arka planda bir kez çalışsın. NDVI görevleri aşağıdaki
+  // filtreyle zaten ekrana çıkmaz.
+  scheduleTaskMaintenance(id);
 
-  const { data, error } = await supabase
-    .from('field_todos')
-    .select(
-      'id,field_id,title,description,source,action_target,priority,reward_rule_key,metadata,due_date,task_key,completed,created_at',
-    )
-    .eq('field_id', id)
-    .eq('completed', false)
-    .eq('dismissed', false)
-    .order('priority', { ascending: false })
-    .order('created_at', { ascending: true });
+  const [taskResult, fieldResult] = await Promise.all([
+    supabase
+      .from('field_todos')
+      .select(
+        'id,field_id,title,description,source,action_target,priority,reward_rule_key,metadata,due_date,task_key,completed,created_at',
+      )
+      .eq('field_id', id)
+      .eq('completed', false)
+      .eq('dismissed', false)
+      .order('priority', { ascending: false })
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('fields')
+      .select('name')
+      .eq('id', id)
+      .maybeSingle(),
+  ]);
 
+  const { data, error } = taskResult;
   if (error) throw error;
 
   const now = Date.now();
 
   const tasks = (data ?? [])
+    .filter((row) => !isLegacyNdviRelativeAutoTask(row))
     .map((row) => normalizeTask(row as RawFieldTask))
     .filter((task) => {
       const snoozedUntil = text(task.metadata.snoozedUntil);
@@ -498,8 +805,15 @@ export async function getFieldTasks(
       return true;
     });
 
-  publishTaskNotifications(tasks);
-  return tasks;
+  const fieldName = trTitle(fieldResult.data?.name);
+  const namedTasks = tasks.map((task) => ({
+    ...task,
+    fieldName: fieldName || null,
+    title: taskTitleWithFieldName(task.title, fieldName),
+  }));
+
+  publishTaskNotifications(namedTasks, fieldName);
+  return namedTasks;
 }
 
 /**

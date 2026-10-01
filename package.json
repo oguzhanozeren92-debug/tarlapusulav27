@@ -8,7 +8,10 @@
     "build": "vite build",
     "typecheck": "tsc -b",
     "lint": "oxlint",
-    "test": "node --test \"src/**/*.test.mjs\" \"supabase/functions/**/*.test.mjs\"",
+    "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --experimental-loader ./scripts/resolve-ts-test-imports.mjs --test \"src/**/*.test.mjs\" \"supabase/functions/**/*.test.mjs\"",
+    "audit:repo": "node ./scripts/repo-audit.mjs",
+    "audit:cycles": "node ./scripts/import-cycle-audit.mjs",
+    "verify": "npm run audit:cycles && npm run typecheck && npm run test && npm run lint && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -24,7 +27,8 @@
     "maplibre-gl": "^6.6.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "@sentry/react": "11.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

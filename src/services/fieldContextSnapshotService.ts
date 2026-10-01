@@ -11,6 +11,9 @@ import {
 import { analyzeSpatialFieldImages } from './spatialFieldReader';
 import { getFieldPhenologySnapshot } from '../features/phenology/services/fieldPhenologySnapshot.service';
 import { applyPhenologyToMapAnalysis } from '../features/phenology/services/phenologyPusulaGuard.service';
+import { buildCropModeRuntime } from '../features/crop-mode/services/cropMode.service';
+import { applyCropModeToMapAnalysis } from '../features/crop-mode/services/cropModePusula.service';
+import type { CropModeRuntime } from '../features/crop-mode/types/cropMode';
 
 
 const HOME_PUSULA_RESULT_CACHE_PREFIX = 'tp_home_pusula_result_v2';
@@ -20,6 +23,7 @@ function homePusulaContextKey(
   fieldId: string,
   activeLayer: UnifiedMapActiveLayer,
   activeLayerContext: ActiveLayerContext,
+  cropMode?: CropModeRuntime | null,
 ) {
   const contextKey = JSON.stringify({
     property: activeLayerContext?.property ?? null,
@@ -48,6 +52,9 @@ function homePusulaContextKey(
           `${zone.area}:${zone.status}:${Number(zone.mean).toFixed(3)}:${Number(zone.deltaFromFieldMean).toFixed(3)}`,
         )
         .join('|') ?? null,
+    cropMode: cropMode
+      ? `${cropMode.modeKey}:${cropMode.subMode}:${cropMode.runtimeTags.join(',')}`
+      : null,
   });
 
   return `${HOME_PUSULA_RESULT_CACHE_PREFIX}:${fieldId}:${activeLayer}:${contextKey}`;
@@ -201,6 +208,8 @@ export type FieldContextRefreshResult = {
   activeLayer: UnifiedMapActiveLayer;
 
   activeLayerLabel: string;
+
+  cropMode: CropModeRuntime;
 
   context: {
     ndvi: any;
@@ -1320,11 +1329,14 @@ export async function refreshFieldContextAndInterpret(
     options.activeLayerContext ??
     {};
 
+  const cropMode = buildCropModeRuntime(field as any);
+
   const cacheKey =
     homePusulaContextKey(
       String(field.id),
       activeLayer,
       activeLayerContext,
+      cropMode,
     );
 
   /*
@@ -1857,6 +1869,8 @@ export async function refreshFieldContextAndInterpret(
 
         activeLayerContext,
 
+        cropMode,
+
         context:
           normalizedContext,
       },
@@ -1867,10 +1881,13 @@ export async function refreshFieldContextAndInterpret(
     Son aşamada fenoloji guard'ı yanlış dönem önerilerini engeller.
   */
   const analysis =
-    applyPhenologyToMapAnalysis(
-      rawAnalysis,
-      phenology,
-      activeLayer,
+    applyCropModeToMapAnalysis(
+      applyPhenologyToMapAnalysis(
+        rawAnalysis,
+        phenology,
+        activeLayer,
+      ),
+      cropMode,
     );
 
   /*
@@ -1904,6 +1921,8 @@ export async function refreshFieldContextAndInterpret(
     activeLayer,
 
     activeLayerLabel,
+
+    cropMode,
 
     context:
       normalizedContext,

@@ -842,7 +842,6 @@ export function buildHomeDecisionEvents(
     input.fieldSynthesis?.importantArea?.area ??
       input.homePusulaResult?.analysis?.importantArea?.area,
   );
-  const pusulaAreaKey = normalizeTaskAreaKey(pusulaArea);
   const pusulaAreaTitle = pusulaArea
     ? `Tarlanın ${pusulaArea.toLocaleLowerCase('tr-TR')} bölümünü kontrol et`
     : 'Pusula önerisini kontrol et';
@@ -850,19 +849,45 @@ export function buildHomeDecisionEvents(
   const synthesisNeedsAttention =
     Boolean(pusulaArea) || Boolean(synthesisStatus && synthesisStatus !== 'normal');
 
-  if (pusulaAction && synthesisNeedsAttention && !phenology.postHarvest) {
-    const observationId = String(
-      input.homePusulaResult?.analysis?.memoryObservationId ??
-        input.homePusulaResult?.snapshotId ??
-        `${fieldKey}:${input.activeHomeLayer ?? 'home'}:${dayKey}`,
+  /*
+   * FOTOĞRAF / SAHA görevi üretme kuralı:
+   * Görev, Pusula metninde bir yön geçti diye oluşmaz. NDVI katmanında gerçek
+   * Sentinel-2 3x3 göreli analizinin en az bir `weaker` bölgesi olmalıdır.
+   * Bu aynı zamanda “Göreli farkı göster” aksiyonunun veri kaynağıdır.
+   * Dolayısıyla buton yoksa NDVI saha kontrol görevi de yoktur. Bir analiz
+   * çevriminde tek bir kontrol görevi tutulur; 3x3 hücreler ayrı ayrı göreve
+   * çevrilmez. En güçlü negatif fark saha hedefi olarak seçilir.
+   */
+  const ndviRelativeZones = Array.isArray(input.homeNdviStats?.relativeZones)
+    ? input.homeNdviStats.relativeZones
+    : [];
+  const weakerNdviZones = ndviRelativeZones
+    .filter((zone: any) => zone?.status === 'weaker')
+    .sort(
+      (a: any, b: any) =>
+        Number(a?.deltaFromFieldMean ?? 0) - Number(b?.deltaFromFieldMean ?? 0),
     );
+  const hasRealRelativeDifference = weakerNdviZones.length > 0;
 
-    const pusulaEventId = pusulaAreaKey
-      ? `pusula:${fieldKey}:area:${pusulaAreaKey}`
-      : `pusula:${fieldKey}:general`;
-
+  /*
+   * NDVI göreli fark analiz olarak kalır; Görevlerim'e otomatik görev üretmez.
+   * Kullanıcı isterse haritadaki göreli alanı Fotoğraf ekle ile doğrular.
+   */
+  /*
+   * Ürün kararı (30.09.2026): NDVI / göreli fark yalnız harita analizidir.
+   * Görev, Görev Haritası, Bildirimler veya Bugün kartı üretmez.
+   * Başka bir Pusula nedeni varsa genel Pusula uyarısı yalnız göreli NDVI
+   * farkı YOKKEN üretilebilir; böylece göreli fark dolaylı olarak bildirim
+   * tetiklemez.
+   */
+  if (
+    !hasRealRelativeDifference &&
+    pusulaAction &&
+    synthesisNeedsAttention &&
+    !phenology.postHarvest
+  ) {
     pushEvent(items, {
-      id: pusulaEventId,
+      id: `pusula:${fieldKey}:general`,
       group: 'pusula',
       source: 'pusula',
       priority: 89,
@@ -873,32 +898,6 @@ export function buildHomeDecisionEvents(
       label: 'PUSULA',
       title: pusulaAreaTitle,
       detail: pusulaAction,
-      /*
-       * Yalnız gerçek bir saha bölgesi varsa görev oluştur.
-       * Katman değiştikçe yeni UUID ile aynı görevin çoğalmasını engelle.
-       */
-      task: pusulaAreaKey
-        ? {
-            taskKey: `pusula-field-check:area:${pusulaAreaKey}`,
-            actionTarget: 'field-photo',
-            rewardPoints: 30,
-            /*
-             * Ödül görevin düğmesine basınca değil, gerçek saha fotoğrafı
-             * başarıyla kaydedildiğinde FIELD_OBSERVATION_PHOTO ile verilir.
-             */
-            rewardRuleKey: null,
-            metadata: {
-              notificationId: pusulaEventId,
-              observationId,
-              openPhoto: true,
-              sourceLayer: input.activeHomeLayer ?? 'vegetation',
-              importantArea:
-                input.fieldSynthesis?.importantArea ??
-                input.homePusulaResult?.analysis?.importantArea ??
-                null,
-            },
-          }
-        : undefined,
       today: {
         tone: 'amber',
         visual: 'spraying',

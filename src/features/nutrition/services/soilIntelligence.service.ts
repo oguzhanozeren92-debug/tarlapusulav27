@@ -1,5 +1,9 @@
 import type { SoilAnalysisRecord } from '../../../lib/soilAnalysisService';
 import type { SoilGridsProfile } from '../../../services/soilGridsService';
+import type {
+  NutritionIntelligenceDecision,
+  NutritionIntelligenceResponse,
+} from './nutritionIntelligence.service';
 
 export type SoilIntelligenceStatus =
   | 'lab-backed'
@@ -17,6 +21,12 @@ export type SoilIntelligenceResult = {
   warnings: string[];
   labAnalysisId: string | null;
   soilGridsGeneratedAt: string | null;
+  productionAuthority?: boolean;
+  authorityBasis?: 'laboratory' | 'soilgrids_context' | 'insufficient';
+  serverDecision?: NutritionIntelligenceDecision | null;
+  serverGeneratedAt?: string | null;
+  recentFertilizationCount?: number;
+  phenologyStageLabel?: string | null;
 };
 
 function finite(value: unknown) {
@@ -38,7 +48,9 @@ function soilGridsEvidence(profile: SoilGridsProfile | null | undefined) {
 
   if (ph != null) evidence.push(`SoilGrids 0–30 cm pH tahmini: ${ph.toFixed(1)}.`);
   if (organicCarbon != null) {
-    evidence.push(`SoilGrids 0–30 cm organik karbon tahmini: ${organicCarbon.toFixed(1)} ${profile.properties.organicCarbon.unit}.`);
+    evidence.push(
+      `SoilGrids 0–30 cm organik karbon tahmini: ${organicCarbon.toFixed(1)} ${profile.properties.organicCarbon.unit}.`,
+    );
   }
   if (clay != null || sand != null || silt != null) {
     const parts = [
@@ -52,9 +64,76 @@ function soilGridsEvidence(profile: SoilGridsProfile | null | undefined) {
   return evidence;
 }
 
+function compact(values: Array<string | null | undefined>, limit = 8) {
+  return [...new Set(values.map((item) => String(item ?? '').trim()).filter(Boolean))]
+    .slice(0, limit);
+}
+
 /**
- * Laboratuvar verisi ölçüm otoritesidir. SoilGrids yalnız mekânsal/model
- * arka planıdır; gübreleme reçetesi veya laboratuvar ölçümü yerine geçmez.
+ * Sunucu-side soil-nutrition-engine çıktısını uygulamanın ortak toprak bağlamına
+ * çevirir. Production otoritesi yalnız sunucu kararıdır; istemci burada yeni
+ * besin eşiği veya gübre dozu hesaplamaz.
+ */
+export function buildServerSoilIntelligence(
+  server: NutritionIntelligenceResponse,
+  latestAnalysis: SoilAnalysisRecord | null,
+): SoilIntelligenceResult {
+  const decision = server.nutrition;
+  const labBacked = decision.authority_basis === 'laboratory';
+  const soilGridsReady = server.soilgrids?.available === true;
+
+  const status: SoilIntelligenceStatus = labBacked
+    ? 'lab-backed'
+    : decision.authority_basis === 'soilgrids_context'
+      ? 'context-only'
+      : 'empty';
+
+  const conflictWarnings = (server.conflicts ?? [])
+    .map((item) => String(item?.note ?? '').trim())
+    .filter(Boolean);
+
+  return {
+    status,
+    laboratoryAuthority: labBacked,
+    soilGridsContextAvailable: soilGridsReady,
+    sourceModel: 'soil-nutrition-engine:server-v1',
+    evidence: compact([
+      labBacked
+        ? 'Bu tarlaya ait laboratuvar toprak analizi production besin kararının ana ölçüm dayanağıdır.'
+        : null,
+      soilGridsReady
+        ? 'SoilGrids model tahmini yalnız arka plan bağlamı olarak kullanılıyor; laboratuvar yerine geçmiyor.'
+        : null,
+      decision.headline,
+      decision.summary,
+      server.recent_fertilization_count > 0
+        ? `Son kayıtlarda ${server.recent_fertilization_count} gübreleme işlemi besin bağlamına dahil edildi.`
+        : null,
+      server.phenology_context?.stage_label
+        ? `Güncel fenoloji bağlamı: ${server.phenology_context.stage_label}.`
+        : null,
+    ]),
+    warnings: compact([
+      ...conflictWarnings,
+      decision.authority_basis !== 'laboratory'
+        ? 'Laboratuvar analizi olmadan sayısal gübre dozu üretilmez.'
+        : null,
+    ], 5),
+    labAnalysisId: latestAnalysis?.id ?? server.laboratory?.id ?? null,
+    soilGridsGeneratedAt: server.soilgrids?.generated_at ?? null,
+    productionAuthority: true,
+    authorityBasis: decision.authority_basis,
+    serverDecision: decision,
+    serverGeneratedAt: server.generated_at,
+    recentFertilizationCount: server.recent_fertilization_count ?? 0,
+    phenologyStageLabel: server.phenology_context?.stage_label ?? null,
+  };
+}
+
+/**
+ * Yerel fallback. Laboratuvar verisi ölçüm otoritesidir. SoilGrids yalnız
+ * mekânsal/model arka planıdır; gübreleme reçetesi veya laboratuvar ölçümü
+ * yerine geçmez.
  */
 export function buildSoilIntelligence(input: {
   latestAnalysis: SoilAnalysisRecord | null;
@@ -87,6 +166,9 @@ export function buildSoilIntelligence(input: {
       warnings,
       labAnalysisId: analysis.id,
       soilGridsGeneratedAt: soilReady ? profile?.generatedAt ?? null : null,
+      productionAuthority: false,
+      authorityBasis: 'laboratory',
+      serverDecision: null,
     };
   }
 
@@ -100,6 +182,9 @@ export function buildSoilIntelligence(input: {
       warnings,
       labAnalysisId: null,
       soilGridsGeneratedAt: profile?.generatedAt ?? null,
+      productionAuthority: false,
+      authorityBasis: 'soilgrids_context',
+      serverDecision: null,
     };
   }
 
@@ -113,6 +198,8 @@ export function buildSoilIntelligence(input: {
       warnings: [],
       labAnalysisId: null,
       soilGridsGeneratedAt: null,
+      productionAuthority: false,
+      serverDecision: null,
     };
   }
 
@@ -123,9 +210,13 @@ export function buildSoilIntelligence(input: {
       soilGridsContextAvailable: false,
       sourceModel: 'soil-intelligence',
       evidence: [],
-      warnings: ['SoilGrids arka planı alınamadı; laboratuvar verisi varsa karar akışı yine çalışır.'],
+      warnings: [
+        'SoilGrids arka planı alınamadı; laboratuvar verisi varsa karar akışı yine çalışır.',
+      ],
       labAnalysisId: null,
       soilGridsGeneratedAt: null,
+      productionAuthority: false,
+      serverDecision: null,
     };
   }
 
@@ -138,5 +229,8 @@ export function buildSoilIntelligence(input: {
     warnings: [],
     labAnalysisId: null,
     soilGridsGeneratedAt: null,
+    productionAuthority: false,
+    authorityBasis: 'insufficient',
+    serverDecision: null,
   };
 }

@@ -1,0 +1,255 @@
+.tp-map-zone-draw-control[aria-pressed="true"]{background:#111!important;color:#fff!important}
+.tp-map-zone-undo-control:disabled,.tp-map-zone-finish-control:disabled{opacity:.36!important;cursor:not-allowed!important}
+.tp-map-zone-finish-control:not(:disabled){background:#111!important;color:#fff!important}
+.tp-orchard-zone-draw-hud{position:absolute;left:12px;right:64px;bottom:12px;z-index:80;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 11px;border:1px solid rgba(255,255,255,.28);border-radius:13px;background:rgba(0,0,0,.86);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.34);backdrop-filter:blur(8px)}
+.tp-orchard-zone-draw-hud>div:first-child{min-width:0}.tp-orchard-zone-draw-hud span{display:block;color:#b8bec4;font-size:9px;font-weight:900;letter-spacing:.07em}.tp-orchard-zone-draw-hud strong{display:block;margin-top:2px;font-size:12px}.tp-orchard-zone-draw-hud small{display:block;margin-top:2px;color:#cfd3d6;font-size:10px;line-height:1.35}.tp-orchard-zone-draw-actions{display:flex;gap:5px;flex:0 0 auto}.tp-orchard-zone-draw-actions button{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.25);border-radius:9px;background:#111;color:#fff}.tp-orchard-zone-draw-actions button.primary{background:#fff;color:#000}.tp-orchard-zone-draw-actions button:disabled{opacity:.38}.tp-orchard-zone-save-backdrop{position:absolute;inset:0;z-index:95;display:flex;align-items:flex-end;justify-content:center;padding:10px;background:rgba(0,0,0,.44);backdrop-filter:blur(2px)}.tp-orchard-zone-save-sheet{width:min(100%,460px);max-height:82%;overflow:auto;padding:14px;border:1px solid #313131;border-radius:18px;background:#0d0d0d;color:#fff;box-shadow:0 22px 48px rgba(0,0,0,.48)}.tp-orchard-zone-save-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.tp-orchard-zone-save-head span,.tp-orchard-zone-save-sheet label>span{display:block;color:#9da3a8;font-size:9px;font-weight:900;letter-spacing:.07em}.tp-orchard-zone-save-head strong{display:block;margin-top:3px;font-size:17px}.tp-orchard-zone-save-head small{display:block;margin-top:4px;color:#c0c4c7;font-size:10px}.tp-orchard-zone-save-head button{display:grid;place-items:center;width:32px;height:32px;border:1px solid #333;border-radius:9px;background:#111;color:#fff}.tp-orchard-zone-save-sheet label{display:block;margin-top:12px}.tp-orchard-zone-save-sheet input,.tp-orchard-zone-save-sheet textarea{width:100%;margin-top:5px;padding:11px;border:1px solid #303030;border-radius:11px;background:#151515;color:#fff;outline:0;font:inherit}.tp-orchard-zone-save-sheet textarea{min-height:70px;resize:vertical}.tp-orchard-zone-tree-mode{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:7px}.tp-orchard-zone-tree-mode button{padding:9px 7px;border:1px solid #333;border-radius:10px;background:#151515;color:#ddd;font-size:10px;font-weight:800}.tp-orchard-zone-tree-mode button.active{background:#fff;color:#000}.tp-orchard-zone-spacing-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.tp-orchard-zone-estimate{margin-top:8px;padding:9px 10px;border:1px solid #2f2f2f;border-radius:10px;background:#151515;color:#d4d6d8;font-size:10px;line-height:1.4}.tp-orchard-zone-save-actions{display:flex;gap:7px;margin-top:13px}.tp-orchard-zone-save-actions button{flex:1;padding:11px;border:1px solid #353535;border-radius:11px;background:#181818;color:#fff;font-weight:900}.tp-orchard-zone-save-actions button.primary{background:#fff;color:#000;border-color:#fff}.tp-orchard-zone-save-message{margin-top:8px;color:#f2c879;font-size:10px;line-height:1.35}@media(max-width:560px){.tp-orchard-zone-draw-hud{left:8px;right:52px;bottom:8px;padding:9px}.tp-orchard-zone-save-backdrop{padding:7px}.tp-orchard-zone-save-sheet{border-radius:16px}.tp-orchard-zone-tree-mode{grid-template-columns:1fr}.tp-orchard-zone-spacing-grid{grid-template-columns:1fr 1fr}}
+
+/* =========================================================
+   TAKIP ALANI MODAL V2 — HARITANIN USTUNDE / OKUNAKLI
+   ========================================================= */
+.tp-map-stage .tp-orchard-zone-save-backdrop,
+.tp-map-first-shell .tp-orchard-zone-save-backdrop,
+body.tp-map-body-fullscreen .tp-map-stage .tp-orchard-zone-save-backdrop{
+  position:absolute!important;
+  inset:0!important;
+  z-index:10000!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:16px!important;
+  background:rgba(0,0,0,.62)!important;
+  -webkit-backdrop-filter:blur(5px)!important;
+  backdrop-filter:blur(5px)!important;
+  overflow:hidden!important;
+}
+
+.tp-map-stage .tp-orchard-zone-save-sheet,
+.tp-map-first-shell .tp-orchard-zone-save-sheet,
+body.tp-map-body-fullscreen .tp-map-stage .tp-orchard-zone-save-sheet{
+  position:relative!important;
+  z-index:10001!important;
+  width:min(430px,calc(100% - 20px))!important;
+  max-width:430px!important;
+  max-height:min(620px,calc(100% - 28px))!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  padding:16px 16px 0!important;
+  border:1px solid #d8dadd!important;
+  border-radius:18px!important;
+  background:#fff!important;
+  color:#111!important;
+  box-shadow:0 24px 70px rgba(0,0,0,.48)!important;
+}
+
+.tp-orchard-zone-save-sheet *,
+.tp-orchard-zone-save-sheet *::before,
+.tp-orchard-zone-save-sheet *::after{
+  box-sizing:border-box!important;
+}
+
+.tp-orchard-zone-save-head{
+  position:relative!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+}
+
+.tp-orchard-zone-save-head span,
+.tp-orchard-zone-save-sheet label>span{
+  color:#7b838a!important;
+}
+
+.tp-orchard-zone-save-head strong{
+  color:#111!important;
+  font-size:18px!important;
+  line-height:1.2!important;
+}
+
+.tp-orchard-zone-save-head small{
+  color:#737b82!important;
+}
+
+.tp-orchard-zone-save-head button{
+  flex:0 0 34px!important;
+  width:34px!important;
+  height:34px!important;
+  border:1px solid #111!important;
+  border-radius:10px!important;
+  background:#111!important;
+  color:#fff!important;
+}
+
+.tp-orchard-zone-save-head button svg{
+  color:#fff!important;
+  stroke:#fff!important;
+}
+
+.tp-orchard-zone-save-sheet input,
+.tp-orchard-zone-save-sheet textarea{
+  border:1px solid #cfd3d7!important;
+  background:#fff!important;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  caret-color:#111!important;
+  box-shadow:none!important;
+}
+
+.tp-orchard-zone-save-sheet input::placeholder,
+.tp-orchard-zone-save-sheet textarea::placeholder{
+  color:#a8afb6!important;
+  opacity:1!important;
+}
+
+.tp-orchard-zone-tree-mode{
+  gap:7px!important;
+}
+
+.tp-orchard-zone-tree-mode button{
+  min-height:40px!important;
+  border:1px solid #d3d7db!important;
+  background:#fff!important;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  opacity:1!important;
+  font-weight:850!important;
+}
+
+.tp-orchard-zone-tree-mode button:hover{
+  background:#f3f4f5!important;
+  color:#111!important;
+}
+
+.tp-orchard-zone-tree-mode button.active,
+.tp-orchard-zone-tree-mode button[aria-pressed="true"]{
+  border-color:#111!important;
+  background:#111!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+
+.tp-orchard-zone-tree-mode button.active *,
+.tp-orchard-zone-tree-mode button[aria-pressed="true"] *{
+  color:#fff!important;
+}
+
+.tp-orchard-zone-estimate{
+  border:1px solid #d9dcdf!important;
+  background:#f6f7f8!important;
+  color:#34383c!important;
+}
+
+.tp-orchard-zone-save-message{
+  color:#8a5200!important;
+}
+
+.tp-orchard-zone-save-actions{
+  position:sticky!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  z-index:5!important;
+  margin:14px -16px 0!important;
+  padding:12px 16px 16px!important;
+  border-top:1px solid #e2e4e7!important;
+  background:rgba(255,255,255,.98)!important;
+  -webkit-backdrop-filter:blur(6px)!important;
+  backdrop-filter:blur(6px)!important;
+}
+
+.tp-orchard-zone-save-actions button{
+  min-height:44px!important;
+  border:1px solid #cfd3d7!important;
+  background:#fff!important;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  opacity:1!important;
+}
+
+.tp-orchard-zone-save-actions button.primary{
+  border-color:#111!important;
+  background:#111!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+
+.tp-orchard-zone-save-actions button.primary:disabled,
+.tp-orchard-zone-save-actions button:disabled{
+  opacity:.5!important;
+}
+
+/* Modal acikken harita legend ve araclari modalin ustune cikamaz. */
+.tp-map-stage:has(.tp-orchard-zone-save-backdrop) .tp-real-home-legend,
+.tp-map-stage:has(.tp-orchard-zone-save-backdrop) .tp-home-spatial-note,
+.tp-map-stage:has(.tp-orchard-zone-save-backdrop) .tp-mf-ndvi,
+.tp-map-stage:has(.tp-orchard-zone-save-backdrop) .tp-map-control-rail,
+.tp-map-stage:has(.tp-orchard-zone-save-backdrop) .tp-mf-layer-trigger,
+.tp-map-stage:has(.tp-orchard-zone-save-backdrop) .maplibregl-ctrl{
+  pointer-events:none!important;
+}
+
+@media(max-width:560px){
+  .tp-map-stage .tp-orchard-zone-save-backdrop,
+  .tp-map-first-shell .tp-orchard-zone-save-backdrop,
+  body.tp-map-body-fullscreen .tp-map-stage .tp-orchard-zone-save-backdrop{
+    padding:10px!important;
+  }
+
+  .tp-map-stage .tp-orchard-zone-save-sheet,
+  .tp-map-first-shell .tp-orchard-zone-save-sheet,
+  body.tp-map-body-fullscreen .tp-map-stage .tp-orchard-zone-save-sheet{
+    width:100%!important;
+    max-width:100%!important;
+    max-height:calc(100% - 16px)!important;
+    border-radius:16px!important;
+  }
+
+  .tp-orchard-zone-tree-mode{
+    grid-template-columns:1fr 1fr 1fr!important;
+  }
+
+  .tp-orchard-zone-tree-mode button{
+    padding:9px 5px!important;
+    font-size:9.5px!important;
+  }
+}
+
+
+/* =========================================================
+   MODAL ACIKKEN HARITA OVERLAY'LERI GERCEKTEN ARKAYA AL
+   Onceki surum yalniz pointer-events kapatiyordu; bu yeterli degildi.
+   ========================================================= */
+body:has(.tp-orchard-zone-save-backdrop) .tp-real-home-legend,
+body:has(.tp-orchard-zone-save-backdrop) .tp-home-spatial-note,
+body:has(.tp-orchard-zone-save-backdrop) .tp-mf-ndvi,
+body:has(.tp-orchard-zone-save-backdrop) .tp-map-data-date,
+body:has(.tp-orchard-zone-save-backdrop) .tp-home-map-data-date,
+body:has(.tp-orchard-zone-save-backdrop) .tp-map-control-rail,
+body:has(.tp-orchard-zone-save-backdrop) .tp-mf-layer-trigger,
+body:has(.tp-orchard-zone-save-backdrop) .maplibregl-ctrl{
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+
+body:has(.tp-orchard-zone-save-backdrop) .tp-orchard-zone-save-backdrop{
+  z-index:2147483000!important;
+}
+
+body:has(.tp-orchard-zone-save-backdrop) .tp-orchard-zone-save-sheet{
+  z-index:2147483001!important;
+}
+
+/* =========================================================
+   TAKİP ALANI MODALI AÇIKKEN GERÇEK MAP-FIRST NDVI ŞERİDİNİ GİZLE
+   Görünen "NDVI · Bitki Örtüsü / Ort. ..." elemanının gerçek class'ı
+   .tp-mf-ndvi-strip'tir. Önceki .tp-mf-ndvi selector'ı bu elemana değmiyordu.
+   ========================================================= */
+.tp-map-stage:has(.tp-orchard-zone-save-backdrop) .tp-mf-ndvi-strip,
+.tp-map-first-shell:has(.tp-orchard-zone-save-backdrop) .tp-mf-ndvi-strip,
+body:has(.tp-orchard-zone-save-backdrop) .tp-mf-ndvi-strip {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

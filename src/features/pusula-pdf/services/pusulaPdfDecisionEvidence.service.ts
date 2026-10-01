@@ -13,6 +13,8 @@ import {
   buildSoilIntelligence,
   type SoilIntelligenceResult,
 } from '../../nutrition/services/soilIntelligence.service';
+import { fetchWheatPlantingWindowDecision } from '../../planting-window/services/plantingWindowDecision.service';
+import type { NutrientProductionDecisionGuardResult } from '../../nutrition/services/nutrientProductionDecisionGuard.service';
 
 const PDF_LAYER_ARCHIVE_NAMESPACE = 'pdf-layer-archive-v1';
 const RETENTION_MS = 20 * 365 * 24 * 60 * 60 * 1000;
@@ -212,6 +214,116 @@ function observationSignalFromLatest(
   };
 }
 
+
+export async function mirrorNutrientProductionGuardEvidenceForPdf(
+  fieldIdInput: string,
+  guard: NutrientProductionDecisionGuardResult | null | undefined,
+) {
+  const fieldId = text(fieldIdInput);
+  if (!fieldId || !guard || guard.fieldId !== fieldId) return false;
+
+  const archivable = Boolean(
+    guard.event ||
+      guard.blockedNitrogenClaim ||
+      guard.zoningReadiness.samplingPlan.allowed,
+  );
+  if (!archivable) return false;
+
+  const userId = await requirePdfUser();
+  const event = guard.event ?? null;
+  const zoning = guard.zoningReadiness;
+  const observedAt =
+    dateOnly(event?.signal?.observedAt) ??
+    dateOnly(zoning.spatialSignal.acquiredAt) ??
+    dateOnly(guard.generatedAt) ??
+    new Date().toISOString().slice(0, 10);
+  const layer = 'nutrition-decision-guard';
+  const productionAuthorityPresent = text(event?.sourceModel).includes('soil-nutrition-engine');
+  const candidateAreas = zoning.samplingPlan.candidates.map((candidate) => candidate.area);
+
+  const payload = {
+    schemaVersion: 1,
+    layer,
+    source: 'TarlaPusula Besin Karar Güvenlik + Zonlama Readiness Kapısı',
+    observedAt,
+    processingVersion: 'nutrition-production-guard-14.7-pdf-v1',
+    metrics: {
+      mergedDifferential: guard.mergedDifferential,
+      blockedNitrogenClaim: guard.blockedNitrogenClaim,
+      nitrogenSpecificAuthorityText: guard.nitrogenSpecificAuthorityText,
+      recentFertilizationPresent: guard.recentFertilization.present,
+      recentFertilizationAgeDays: guard.recentFertilization.ageDays,
+      phenologyUsable: guard.phenologyContext.usable,
+      alternativeCauseCount: guard.alternativeCauseLabels.length,
+      localNutrientContextPresent: Boolean(guard.localNutrientContext.version),
+      sl2pNutrientContextAvailable: guard.localNutrientContext.sl2pAvailable,
+      biophysicsQuality: guard.localNutrientContext.biophysicsQuality,
+      localMethodRuntimeCount: guard.localNutrientContext.runtimeMethodCount,
+      pysticsRuntimeStatus: guard.localNutrientContext.pysticsRuntimeStatus,
+      pysticsPackageVersion: guard.localNutrientContext.pysticsPackageVersion,
+      pysticsTurkeyWheatProfileValidated: guard.localNutrientContext.pysticsTurkeyWheatProfileValidated,
+      pysticsShadowRunAllowed: guard.localNutrientContext.pysticsShadowRunAllowed,
+      zoningStatus: zoning.status,
+      zoningConfidence: zoning.confidence,
+      zoningSamplingAllowed: zoning.samplingPlan.allowed,
+      zoningCandidateCount: candidateAreas.length,
+      zoningValidRelativeZoneCount: zoning.spatialSignal.validZoneCount,
+      zoningWeakRelativeZoneCount: zoning.spatialSignal.weakZoneCount,
+      zoningSceneAgeDays: zoning.spatialSignal.ageDays,
+      zoningRuntimeAvailable: zoning.prescriptionGate.runtimeAvailable,
+      variableRateNitrogenAllowed:
+        zoning.prescriptionGate.variableRateNitrogenAllowed,
+      numericDoseAllowed: zoning.prescriptionGate.numericDoseAllowed,
+      productionAuthorityPresent,
+      guardProductionAuthority: false,
+    },
+    details: {
+      version: guard.version,
+      crop: guard.crop,
+      eventId: event?.id ?? null,
+      title:
+        event?.title ??
+        (guard.blockedNitrogenClaim
+          ? 'Azot nedeni doğrulama bekliyor'
+          : zoning.samplingPlan.allowed
+            ? 'Parsel içi örnekleme hedefleri hazır'
+            : 'Besin karar güvenlik bağlamı'),
+      detail:
+        event?.detail ??
+        (zoning.samplingPlan.allowed
+          ? zoning.samplingPlan.note
+          : 'Besin bağlamı güvenlik kapısında; yeni gübre dozu üretilmedi.'),
+      sourceModel: event?.sourceModel ?? null,
+      confidence: event?.confidence ?? zoning.confidence,
+      eventKind: event?.kind ?? null,
+      evidence: event?.evidence ?? guard.evidence,
+      recentFertilization: guard.recentFertilization,
+      phenologyContext: guard.phenologyContext,
+      alternativeCauseLabels: guard.alternativeCauseLabels,
+      localNutrientContext: guard.localNutrientContext,
+      zoningReadiness: zoning,
+      guardrails: guard.guardrails,
+      authorityNote: productionAuthorityPresent
+        ? 'Besin karar otoritesi soil-nutrition-engine olarak korunur; 14.2–14.8 katmanları yalnız yanlış teşhis filtresi, yerel bağlam, örnekleme readiness ve kanıt birleştirme yapar. 3×3 NDVI bölgeleri gübre/N reçete zonu değildir. pySTICS yalnız doğrulanmış worker + kalibrasyon profiliyle shadow crop-model girdisi olabilir; resmî STICS/ICAR/HaFAS yöntem referansları ve pySTICS hiçbir koşulda soil-nutrition-engine yerine gübre/N reçete otoritesi değildir.'
+        : 'Bu kayıt güvenli doğrulama/örnekleme bağlamıdır; production besin otoritesi veya variable-rate gübre reçetesi olarak sunulmaz.',
+    },
+  };
+
+  const sourceKey = [
+    layer,
+    event?.id ?? `zoning-${candidateAreas.join('-') || 'no-candidate'}`,
+    observedAt,
+    guard.blockedNitrogenClaim ? 'blocked' : 'open',
+    zoning.status,
+    zoning.samplingPlan.allowed ? 'sampling-ready' : 'sampling-not-ready',
+    guard.recentFertilization.date ?? 'no-fertilization',
+    guard.phenologyContext.stage ?? 'no-stage',
+  ].join(':');
+
+  await archiveLayer(userId, fieldId, payload, sourceKey);
+  return true;
+}
+
 export async function mirrorLatestDecisionEvidenceForPdf(fieldIdInput: string) {
   const fieldId = text(fieldIdInput);
   if (!fieldId) return false;
@@ -264,13 +376,17 @@ export async function mirrorLatestDecisionEvidenceForPdf(fieldIdInput: string) {
     archived.push(layer);
   }
 
-  const [latestObservation, riskResult, phenologySnapshot] = await Promise.all([
+  const [latestObservation, riskResult, phenologySnapshot, plantingWindowDecision] = await Promise.all([
     loadObservationDecisionSignal(fieldId).catch(() => null),
     fetchFieldRiskRadar(fieldId).catch((error) => {
       console.warn('[PUSULAPDF] Risk Radar hazırlanamadı:', error);
       return null;
     }),
     getFieldPhenologySnapshot(field, { forceRefresh: false }).catch(() => null),
+    fetchWheatPlantingWindowDecision(fieldId).catch((error) => {
+      console.warn('[PUSULAPDF] Ekim Penceresi kararı hazırlanamadı:', error);
+      return null;
+    }),
   ]);
 
   const observation = observationSignalFromLatest(latestObservation);
@@ -309,6 +425,76 @@ export async function mirrorLatestDecisionEvidenceForPdf(fieldIdInput: string) {
     archived.push(layer);
   }
 
+  if (plantingWindowDecision?.status === 'ready') {
+    const layer = 'planting-window-decision';
+    const observedAt =
+      dateOnly(plantingWindowDecision.generatedAt) ??
+      new Date().toISOString().slice(0, 10);
+    const lowerScenario =
+      plantingWindowDecision.scenarios.find(
+        (scenario) =>
+          scenario.key ===
+          plantingWindowDecision.lowerHistoricalExposureScenarioKey,
+      ) ?? null;
+    const payload = {
+      schemaVersion: 1,
+      layer,
+      source: 'TarlaPusula Ekim Penceresi',
+      observedAt,
+      processingVersion: 'planting-window-13.5-pdf-v1',
+      metrics: {
+        status: plantingWindowDecision.status,
+        comparisonBasis: plantingWindowDecision.comparisonBasis,
+        scenarioCount: plantingWindowDecision.scenarios.length,
+        lowerHistoricalExposureScenarioKey:
+          plantingWindowDecision.lowerHistoricalExposureScenarioKey,
+        lowerHistoricalExposureIndex:
+          lowerScenario?.relativeExposureIndex ?? null,
+        relativeIndexIsNotRiskProbability:
+          plantingWindowDecision.guardrails.relativeIndexIsNotRiskProbability,
+      },
+      details: {
+        version: plantingWindowDecision.version,
+        crop: plantingWindowDecision.crop,
+        summary: plantingWindowDecision.summary,
+        actionContext: plantingWindowDecision.actionContext,
+        lowerHistoricalExposureScenario: lowerScenario
+          ? {
+              key: lowerScenario.key,
+              label: lowerScenario.label,
+              plantingDate: lowerScenario.plantingDate,
+              relativeExposureIndex: lowerScenario.relativeExposureIndex,
+              headline: lowerScenario.headline,
+            }
+          : null,
+        scenarios: plantingWindowDecision.scenarios.map((scenario) => ({
+          key: scenario.key,
+          label: scenario.label,
+          plantingDate: scenario.plantingDate,
+          relativeExposureIndex: scenario.relativeExposureIndex,
+          relativeExposure: scenario.relativeExposure,
+          headline: scenario.headline,
+          tradeoffs: scenario.tradeoffs.slice(0, 3),
+        })),
+        evidence: plantingWindowDecision.evidence.slice(0, 7),
+        guardrails: plantingWindowDecision.guardrails,
+        missingInputs: plantingWindowDecision.missingInputs,
+        authorityNote:
+          'Göreli tarihsel maruziyet karşılaştırmasıdır; otomatik ekim tarihi tavsiyesi, risk olasılığı, zarar veya verim tahmini değildir.',
+      },
+    };
+    const scenarioDates = plantingWindowDecision.scenarios
+      .map((scenario) => scenario.plantingDate)
+      .join('-');
+    const sourceKey = [
+      layer,
+      plantingWindowDecision.version,
+      scenarioDates,
+    ].join(':');
+    await archiveLayer(userId, fieldId, payload, sourceKey);
+    archived.push(layer);
+  }
+
   if (riskResult) {
     const compactRadar = compactRiskRadarForPusula(riskResult);
     const plantHealth = buildPlantHealthSynthesisDecision({
@@ -331,13 +517,17 @@ export async function mirrorLatestDecisionEvidenceForPdf(fieldIdInput: string) {
         layer,
         source: 'TarlaPusula plant health synthesis',
         observedAt,
-        processingVersion: 'plant-health-synthesis-pdf-v1',
+        processingVersion: 'plant-health-synthesis-pdf-v17',
         metrics: {
           riskScore: riskResult.overall?.score ?? topThreat?.score ?? null,
           riskLevel: riskResult.overall?.level ?? topThreat?.level ?? null,
           peakRiskScore7d: topThreat?.peakScore7d ?? null,
           photoEvidenceMatched: photoMatched,
           scoreRecomputedFromPhoto: false,
+          regionalPressureScore: riskResult.regionalPestDisease?.topSignal?.pressureScore ?? null,
+          regionalPressureLevel: riskResult.regionalPestDisease?.topSignal?.level ?? null,
+          regionalObservationCount: riskResult.regionalPestDisease?.topSignal?.observationCount ?? 0,
+          regionalNearestDistanceKm: riskResult.regionalPestDisease?.topSignal?.nearestDistanceKm ?? null,
         },
         details: {
           title: plantHealth.title,
@@ -348,7 +538,9 @@ export async function mirrorLatestDecisionEvidenceForPdf(fieldIdInput: string) {
           radarGeneratedAt: riskResult.generatedAt,
           weatherSource: riskResult.weather?.source ?? null,
           riskModelProvenance: riskResult.provenance ?? null,
-          threatName: topThreat?.displayName ?? null,
+          regionalPestDisease: riskResult.regionalPestDisease ?? null,
+          regionalAuthority: 'Yakın çevre aggregate gözlem desteğidir; tarlada varlık, risk olasılığı veya kimyasal reçete değildir.',
+          threatName: topThreat?.displayName ?? riskResult.regionalPestDisease?.topSignal?.commonName ?? riskResult.regionalPestDisease?.topSignal?.scientificName ?? null,
           photoTrackedIssue: photoMatched ? observation?.trackedIssueLabel ?? null : null,
           photoComparedAt: photoMatched ? observation?.comparedAt ?? null : null,
           photoAuthority: photoMatched

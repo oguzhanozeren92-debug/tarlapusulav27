@@ -1,0 +1,22 @@
+:root {
+  /* Neutral application chrome — data visualisation colours are deliberately separate. */
+  --tp-color-page: #f6f6f4;
+  --tp-color-surface: #ffffff;
+  --tp-color-surface-subtle: #f1f2f2;
+  --tp-color-surface-strong: #111214;
+
+  --tp-color-text: #111214;
+  --tp-color-text-secondary: #5f6368;
+  --tp-color-text-muted: #85898f;
+  --tp-color-text-inverse: #ffffff;
+
+  --tp-color-border: #d8dadd;
+  --tp-color-border-strong: #a9adb2;
+  --tp-color-focus: #111214;
+
+  /* Semantic only — these are not theme colours. */
+  --tp-color-success: #237a4b;
+  --tp-color-warning: #a76700;
+  --tp-color-danger: #c43842;
+  --tp-color-info: #246da8;
+}

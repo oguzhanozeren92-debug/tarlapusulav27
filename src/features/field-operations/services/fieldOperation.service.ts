@@ -80,6 +80,36 @@ async function syncSeasonPlantingDateBestEffort(
   }
 }
 
+async function syncSeasonHarvestDateBestEffort(
+  userId: string,
+  fieldId: string,
+  operationDate: string,
+) {
+  try {
+    const { data: season, error: seasonError } = await supabase
+      .from('field_seasons')
+      .select('id,harvest_date,year')
+      .eq('user_id', userId)
+      .eq('field_id', fieldId)
+      .order('year', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (seasonError) throw seasonError;
+    if (!season || season.harvest_date) return;
+
+    const { error: updateError } = await supabase
+      .from('field_seasons')
+      .update({ harvest_date: operationDate })
+      .eq('id', season.id)
+      .eq('user_id', userId);
+
+    if (updateError) throw updateError;
+  } catch (error) {
+    console.warn('[field-operation] Sezon hasat tarihi senkronize edilemedi:', error);
+  }
+}
+
 function syncIrrigationAmountTaskBestEffort(fieldId: string) {
   void supabase
     .rpc('tp_sync_irrigation_amount_task', { p_field_id: fieldId })
@@ -91,6 +121,126 @@ function syncIrrigationAmountTaskBestEffort(fieldId: string) {
     .catch((error: unknown) => {
       console.warn('[field-operation] Sulama miktarı görevi senkronize edilemedi:', error);
     });
+}
+
+export type FieldOperationMutation = 'saved' | 'updated' | 'deleted';
+
+function normalizedOperationType(value: unknown) {
+  return String(value ?? '').trim().toLocaleLowerCase('tr-TR');
+}
+
+function operationChangedFields(typeInput: unknown) {
+  const type = normalizedOperationType(typeInput);
+  const changed = new Set<string>([
+    'activities',
+    'field_operations',
+    'cost_history',
+    'field_memory',
+  ]);
+
+  if (type === 'sulama') {
+    ['irrigation_history', 'water_balance', 'irrigation_decision', 'irrigation_distribution_context', 'water_scarcity_plan', 'pyfao56_readiness', 'aquacrop_readiness']
+      .forEach((item) => changed.add(item));
+  }
+
+  if (type === 'gübreleme' || type === 'gubreleme') {
+    ['fertilization_history', 'nutrition_context', 'soil_nutrition_decision']
+      .forEach((item) => changed.add(item));
+  }
+
+  if (type === 'ilaçlama' || type === 'ilaclama') {
+    ['spraying_history', 'plant_protection_context', 'risk_context']
+      .forEach((item) => changed.add(item));
+  }
+
+  if (type === 'ekim / dikim' || type === 'ekim/dikim') {
+    ['planting_history', 'planting_management', 'season', 'phenology_context', 'dssat_readiness']
+      .forEach((item) => changed.add(item));
+  }
+
+  if (type === 'hasat') {
+    ['harvest_history', 'season', 'phenology_context', 'yield_context']
+      .forEach((item) => changed.add(item));
+  }
+
+  if (['sürme', 'surme', 'ikileme', 'çapalama', 'capalama', 'budama'].includes(type)) {
+    ['management_history', 'satellite_interpretation_context', 'radar_interpretation_context']
+      .forEach((item) => changed.add(item));
+  }
+
+  if (type === 'saha kontrolü' || type === 'saha kontrolu') {
+    ['field_observation_history', 'diagnosis_context', 'risk_context']
+      .forEach((item) => changed.add(item));
+  }
+
+  return [...changed];
+}
+
+/**
+ * Tarla günlüğüne girilen bir işlemi uygulamanın ortak tarla hafızasına duyurur.
+ * Böylece kayıt yalnız geçmiş listesinde kalmaz; Bugün/Pusula, sulama motoru,
+ * besleme/koruma kararları, model kanıtları ve diğer context tüketicileri aynı
+ * tarlanın güncel yönetim geçmişini tekrar okur.
+ *
+ * Bu fonksiyon DB'ye kayıt yazmaz. Kayıt başarıyla yazıldıktan/silindikten sonra
+ * çağrılır; farklı ekranların doğrudan `activities` tablosuna yazdığı durumları
+ * da aynı veri omurgasına bağlamak için dışarı açılmıştır.
+ */
+export function notifyFieldOperationImpact(input: {
+  fieldId: string;
+  type: string;
+  operation?: Partial<FieldOperation> | null;
+  mutation?: FieldOperationMutation;
+  source?: string;
+  openAgriOcsm?: unknown;
+}) {
+  const fieldId = String(input.fieldId ?? '').trim();
+  const type = String(input.type ?? '').trim();
+  const mutation = input.mutation ?? 'saved';
+  if (!fieldId || !type) return;
+
+  const normalizedType = normalizedOperationType(type);
+
+  // Sulama geçmişindeki her değişiklik su dengesi ve gölge modelleri için
+  // doğrudan yeni kanıttır. Silme de yeniden hesap gerektirir.
+  if (normalizedType === 'sulama') {
+    refreshModelReadinessBestEffort(fieldId, 'pyfao56');
+    refreshModelReadinessBestEffort(fieldId, 'aquacrop');
+    runDualKcShadowEvidenceBestEffort(fieldId);
+    syncIrrigationAmountTaskBestEffort(fieldId);
+  }
+
+  if (normalizedType === 'ekim / dikim' || normalizedType === 'ekim/dikim') {
+    refreshModelReadinessBestEffort(fieldId, 'dssat');
+  }
+
+  if (typeof window === 'undefined') return;
+
+  const detail = {
+    fieldId,
+    operation: input.operation ?? null,
+    operationType: type,
+    mutation,
+    source: input.source ?? 'field-operation',
+    openAgriOcsm: input.openAgriOcsm ?? null,
+  };
+
+  // Eski tüketiciler bu event'i dinliyor; mutation alanı ile save/delete ayrımı
+  // yapılabilir. Tüketicilerin çoğu yalnız yeniden sorgu yaptığı için güvenlidir.
+  window.dispatchEvent(new CustomEvent('tp:field-operation-saved', { detail }));
+  window.dispatchEvent(new CustomEvent('tp:field-operation-changed', { detail }));
+
+  window.dispatchEvent(
+    new CustomEvent('tp:field-context-updated', {
+      detail: {
+        fieldId,
+        changedFields: operationChangedFields(type),
+        operationType: type,
+        mutation,
+        source: input.source ?? 'field-operation',
+      },
+    }),
+  );
 }
 
 function mapOperation(row: any): FieldOperation {
@@ -306,53 +456,30 @@ export async function createFieldOperation(
    */
   const openAgriOcsm = appendOpenAgriOcsmSnapshot(operation);
 
-  if (operation.type === 'Sulama') {
-    refreshModelReadinessBestEffort(operation.fieldId, 'pyfao56');
-    refreshModelReadinessBestEffort(operation.fieldId, 'aquacrop');
-    runDualKcShadowEvidenceBestEffort(operation.fieldId);
-    syncIrrigationAmountTaskBestEffort(operation.fieldId);
-  }
-
   if (operation.type === 'Ekim / Dikim') {
     await syncSeasonPlantingDateBestEffort(
       authData.user.id,
       operation.fieldId,
       operation.date,
     );
-    refreshModelReadinessBestEffort(operation.fieldId, 'dssat');
   }
 
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(
-      new CustomEvent('tp:field-operation-saved', {
-        detail: {
-          fieldId: operation.fieldId,
-          operation,
-          openAgriOcsm,
-        },
-      }),
-    );
-
-    /*
-     * Ortak Field Context tüketicilerine de haber ver.
-     * Sulama Motoru activities tablosundaki Sulama kaydını gerçek bağlam olarak
-     * okuduğu için yeni kayıt sonrası eski kararı ekranda tutmamalı.
-     */
-    window.dispatchEvent(
-      new CustomEvent('tp:field-context-updated', {
-        detail: {
-          fieldId: operation.fieldId,
-          changedFields:
-            operation.type === 'Sulama'
-              ? ['activities', 'irrigation_history', 'openagri_ocsm']
-              : operation.type === 'Ekim / Dikim'
-                ? ['activities', 'field_operations', 'planting_management', 'dssat_readiness', 'openagri_ocsm']
-                : ['activities', 'field_operations', 'openagri_ocsm'],
-          source: 'field-operation',
-        },
-      }),
+  if (operation.type === 'Hasat') {
+    await syncSeasonHarvestDateBestEffort(
+      authData.user.id,
+      operation.fieldId,
+      operation.date,
     );
   }
+
+  notifyFieldOperationImpact({
+    fieldId: operation.fieldId,
+    type: operation.type,
+    operation,
+    mutation: 'saved',
+    source: 'field-operation-modal',
+    openAgriOcsm,
+  });
 
   return operation;
 }

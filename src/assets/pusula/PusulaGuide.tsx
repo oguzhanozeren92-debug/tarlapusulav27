@@ -101,6 +101,8 @@ type PusulaGuideProps = {
   logoSrc?: string;
   insight?: PusulaInsight | null;
   anchorSelector?: string;
+  hasUnread?: boolean;
+  onLogoClick?: () => void;
   onFeedback?: (feedback: PusulaFeedbackValue) => void | Promise<void>;
 };
 
@@ -110,6 +112,8 @@ const wait = (ms: number) =>
 export default function PusulaGuide({
   insight = null,
   anchorSelector = '.tp-homev3-brand',
+  hasUnread = false,
+  onLogoClick,
   onFeedback,
 }: PusulaGuideProps) {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -265,15 +269,18 @@ export default function PusulaGuide({
 
   useEffect(() => {
     const target = document.querySelector(anchorSelector) as HTMLElement | null;
-    const image = target?.querySelector('img') as HTMLImageElement | null;
+    const visual = (
+      target?.querySelector('.tp-global-pusula-stage') ??
+      target?.querySelector('img')
+    ) as HTMLElement | null;
 
-    if (!image) return;
+    if (!visual) return;
 
-    const previousOpacity = image.style.opacity;
-    image.style.opacity = '0';
+    const previousOpacity = visual.style.opacity;
+    visual.style.opacity = '0';
 
     return () => {
-      image.style.opacity = previousOpacity;
+      visual.style.opacity = previousOpacity;
     };
   }, [anchorSelector]);
 
@@ -423,11 +430,21 @@ export default function PusulaGuide({
   } as CSSProperties;
 
   return (
-    <div className={`pusula-guide pusula-guide--${phase}`} style={style}>
+    <div
+      className={`pusula-guide pusula-guide--${phase}${hasUnread ? ' pusula-guide--has-unread' : ''}`}
+      style={style}
+    >
       <button
         type="button"
         className="pusula-guide__logo"
-        onClick={replayLastMessage}
+        onClick={() => {
+          if (phase !== 'idle') return;
+          if (onLogoClick) {
+            onLogoClick();
+            return;
+          }
+          void replayLastMessage();
+        }}
         aria-label={
           lastInsight
             ? "Pusula'nın son mesajını tekrar göster"

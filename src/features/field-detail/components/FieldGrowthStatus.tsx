@@ -2,11 +2,21 @@ import { useMemo } from 'react';
 import { Sprout } from 'lucide-react';
 
 import { useHomePhenologyInsight } from '../../phenology/hooks/useHomePhenologyInsight';
+import type { PhenologyResult } from '../../phenology/types/phenology';
 
 import './FieldGrowthStatus.css';
 
 type Props = {
   field: any;
+};
+
+export type FieldGrowthStatusViewProps = {
+  field: any;
+  phenology: PhenologyResult | null | undefined;
+  contextStatus?: string | null;
+  timeSeriesStatus?: string | null;
+  contextMessage?: string | null;
+  timeSeriesMessage?: string | null;
 };
 
 function confidenceLabel(value: unknown) {
@@ -15,16 +25,25 @@ function confidenceLabel(value: unknown) {
   return 'Ön değerlendirme';
 }
 
-export default function FieldGrowthStatus({ field }: Props) {
-  const insight = useHomePhenologyInsight(field);
-  const phenology = insight.phenology;
-
+export function FieldGrowthStatusView({
+  field,
+  phenology,
+  contextStatus = null,
+  timeSeriesStatus = null,
+  contextMessage = null,
+  timeSeriesMessage = null,
+}: FieldGrowthStatusViewProps) {
   const sourceLabel = useMemo(() => {
     const evidence = (phenology?.basis ?? [])
       .map((item) => String(item ?? '').toLocaleLowerCase('tr-TR'))
       .join(' ');
 
+    if (evidence.includes('saha gözlemi')) return 'Saha gözlemi + modeller';
+    if (evidence.includes('nasa harvest') && /pcse|wofost/.test(evidence)) {
+      return 'Uydu + ürün modeli + sezon';
+    }
     if (evidence.includes('nasa harvest')) return 'Uydu + sezon';
+    if (/pcse|wofost/.test(evidence)) return 'Ürün modeli + sezon';
     if (String(field?.cropCycle ?? field?.crop_cycle ?? '') === 'perennial') {
       return 'Ürün takvimi + sezon';
     }
@@ -37,6 +56,8 @@ export default function FieldGrowthStatus({ field }: Props) {
       phenology.stage !== 'unknown',
   );
 
+  const loading = contextStatus === 'loading' || timeSeriesStatus === 'loading';
+
   return (
     <section className="tp-field-growth-status" aria-label="Gelişim durumu">
       <div className="tp-field-growth-status-icon" aria-hidden="true">
@@ -48,8 +69,7 @@ export default function FieldGrowthStatus({ field }: Props) {
         <strong>
           {usable
             ? phenology?.stageLabel || 'Gelişim dönemi'
-            : insight.phenologyContextStatus === 'loading' ||
-                insight.timeSeriesStatus === 'loading'
+            : loading
               ? 'Gelişim verisi hazırlanıyor'
               : 'Gelişim dönemi henüz net değil'}
         </strong>
@@ -57,8 +77,8 @@ export default function FieldGrowthStatus({ field }: Props) {
           {usable
             ? phenology?.summary ||
               'Sezon ve gözlem verileri birlikte değerlendirilerek mevcut gelişim dönemi izleniyor.'
-            : insight.phenologyContextMessage ||
-              insight.timeSeriesMessage ||
+            : contextMessage ||
+              timeSeriesMessage ||
               'Sezon veya gözlem verisi tamamlandıkça bu alan otomatik güncellenecek.'}
         </p>
 
@@ -80,5 +100,20 @@ export default function FieldGrowthStatus({ field }: Props) {
         ) : null}
       </div>
     </section>
+  );
+}
+
+export default function FieldGrowthStatus({ field }: Props) {
+  const insight = useHomePhenologyInsight(field);
+
+  return (
+    <FieldGrowthStatusView
+      field={field}
+      phenology={insight.phenology}
+      contextStatus={insight.phenologyContextStatus}
+      timeSeriesStatus={insight.timeSeriesStatus}
+      contextMessage={insight.phenologyContextMessage}
+      timeSeriesMessage={insight.timeSeriesMessage}
+    />
   );
 }

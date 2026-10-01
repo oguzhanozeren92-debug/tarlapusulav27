@@ -1,0 +1,32 @@
+.tp-task-map-panel{
+  margin:0 14px 12px;
+  padding:12px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:16px;
+  background:#0b0b0b;
+  color:#fff;
+}
+.tp-task-map-panel.is-empty{opacity:.72}
+.tp-task-map-head,.tp-task-map-title,.tp-task-map-gate,.tp-task-map-zone{display:flex;align-items:center}
+.tp-task-map-head{justify-content:space-between;gap:10px}
+.tp-task-map-title{gap:8px;min-width:0}
+.tp-task-map-title>div{min-width:0}
+.tp-task-map-title strong{display:block;font-size:12px;letter-spacing:.02em}
+.tp-task-map-title small{display:block;margin-top:2px;color:#a8a8a8;font-size:9px}
+.tp-task-map-head>button{border:1px solid rgba(255,255,255,.25);border-radius:10px;background:#fff;color:#000;padding:7px 9px;font-size:9px;font-weight:900}
+.tp-task-map-gate{gap:7px;flex-wrap:wrap;margin-top:10px}
+.tp-task-map-gate span{display:inline-flex;align-items:center;gap:4px;padding:5px 7px;border:1px solid rgba(255,255,255,.14);border-radius:999px;font-size:8px;font-weight:800;color:#ddd}
+.tp-task-map-gate span.warn{color:#ffd18a}
+.tp-task-map-zones{display:grid;gap:6px;margin-top:10px}
+.tp-task-map-zone{width:100%;justify-content:space-between;gap:10px;text-align:left;border:1px solid rgba(255,255,255,.11);border-radius:12px;background:#121212;color:#fff;padding:9px 10px}
+.tp-task-map-zone>span{min-width:0}
+.tp-task-map-zone small,.tp-task-map-zone strong,.tp-task-map-zone em{display:block}
+.tp-task-map-zone small{font-size:7px;font-weight:900;color:#9d9d9d;letter-spacing:.08em}
+.tp-task-map-zone strong{margin-top:2px;font-size:10px}
+.tp-task-map-zone em{margin-top:2px;font-style:normal;font-size:8px;color:#b9b9b9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.tp-task-map-zone b{font-size:8px;color:#fff;white-space:nowrap}
+.tp-task-map-note{margin:10px 0 0;color:#8f8f8f;font-size:8px;line-height:1.45}
+
+.tp-task-map-zone-actions{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto}
+.tp-task-map-zone-actions i{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:0 7px;border-radius:999px;background:#fff;color:#000;font-style:normal;font-size:8px;font-weight:950;white-space:nowrap}
+.tp-task-map-zone-actions b{white-space:nowrap}

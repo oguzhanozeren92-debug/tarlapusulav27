@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { ListTodo, Map as MapIcon, MapPin, Plus } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { Bell, ClipboardList, Gauge, ListTodo, Map as MapIcon, MapPin, Plus } from 'lucide-react';
 import FieldMap from '../../../components/FieldMap';
 import {
   formatHomeSatelliteDate,
@@ -7,6 +7,8 @@ import {
 } from '../../home/homeFormatters';
 import { useEarthSearchNdvi } from '../hooks/useEarthSearchNdvi';
 import type { EarthSearchNdviStats } from '../services/earthSearchNdvi.service';
+import { buildCropModeRuntime } from '../../crop-mode/services/cropMode.service';
+import type { CropModeMapLayer, CropModeModule } from '../../crop-mode/types/cropMode';
 import {
   HomeInlineLayerMap,
   HOME_CLIMATE_DEPTH_LABELS,
@@ -28,6 +30,10 @@ type HomeMapSectionProps = {
   setFieldControlFieldId?: (fieldId: string) => void;
   onAddField: () => void;
   onOpenTasks?: () => void;
+  onOpenToday?: () => void;
+  onOpenNotifications?: () => void;
+  onOpenFieldStatus?: () => void;
+  notificationCount?: number;
   activeHomeLayer: HomeLayer;
   openMapLayer: (layer: HomeLayer) => void;
   soilMenuOpen: boolean;
@@ -55,6 +61,10 @@ export default function HomeMapSection({
   setFieldControlFieldId,
   onAddField,
   onOpenTasks,
+  onOpenToday,
+  onOpenNotifications,
+  onOpenFieldStatus,
+  notificationCount = 0,
   activeHomeLayer,
   openMapLayer,
   soilMenuOpen,
@@ -73,6 +83,45 @@ export default function HomeMapSection({
   onSpatialSummary: setHomeLayerSpatialSummary,
   onNdviStats,
 }: HomeMapSectionProps) {
+  const cropMode = useMemo(() => buildCropModeRuntime(homeField ?? {}), [homeField]);
+
+  const layerRank = (mapLayers: CropModeMapLayer[], module: CropModeModule) => {
+    const preferredIndexes = mapLayers
+      .map((item) => cropMode.preferredMapLayers.indexOf(item))
+      .filter((index) => index >= 0);
+    if (preferredIndexes.length) return Math.min(...preferredIndexes);
+    const moduleIndex = cropMode.priorityModules.indexOf(module);
+    return 20 + (moduleIndex >= 0 ? moduleIndex : 20);
+  };
+
+  const primaryLayerShortcuts = [
+    { layer: 'vegetation' as HomeLayer, label: 'Sağlık', mapLayers: ['ndvi', 'ndre', 'savi', 'gndvi'] as CropModeMapLayer[], module: 'satellite' as CropModeModule },
+    { layer: 'radar-vv' as HomeLayer, label: 'Nemli Alanlar', mapLayers: ['vv'] as CropModeMapLayer[], module: 'irrigation' as CropModeModule },
+    { layer: 'radar-vh' as HomeLayer, label: 'Yüzey & Bitki Farkı', mapLayers: ['vh'] as CropModeMapLayer[], module: 'satellite' as CropModeModule },
+    { layer: 'radar-water' as HomeLayer, label: 'Su Birikimi Riski', mapLayers: [] as CropModeMapLayer[], module: 'risk' as CropModeModule },
+    { layer: 'soil' as HomeLayer, label: 'Toprak', mapLayers: [] as CropModeMapLayer[], module: 'soil' as CropModeModule },
+    { layer: 'climate' as HomeLayer, label: 'İklim', mapLayers: ['rain', 'frost', 'lst', 'et'] as CropModeMapLayer[], module: 'weather' as CropModeModule },
+  ].sort((a, b) => layerRank(a.mapLayers, a.module) - layerRank(b.mapLayers, b.module));
+
+  const climateLayerShortcuts = [
+    { layer: 'surface-temperature' as HomeLayer, label: 'Yüzey Sıcaklığı', mapLayer: 'lst' as CropModeMapLayer },
+    { layer: 'evapotranspiration' as HomeLayer, label: 'Su İhtiyacı', mapLayer: 'et' as CropModeMapLayer },
+    { layer: 'rainfall-history' as HomeLayer, label: 'Yağış Geçmişi', mapLayer: 'rain' as CropModeMapLayer },
+  ].sort((a, b) => {
+    const aIndex = cropMode.preferredMapLayers.indexOf(a.mapLayer);
+    const bIndex = cropMode.preferredMapLayers.indexOf(b.mapLayer);
+    return (aIndex >= 0 ? aIndex : 99) - (bIndex >= 0 ? bIndex : 99);
+  });
+
+  const openCropAwareLayer = (layer: HomeLayer) => {
+    if (layer === 'climate') {
+      const climatePriority = cropMode.preferredMapLayers.find((item) => item === 'frost' || item === 'rain');
+      if (climatePriority === 'frost') setHomeClimateLayer('air-temperature');
+      if (climatePriority === 'rain') setHomeClimateLayer('precipitation');
+    }
+    openMapLayer(layer);
+  };
+
   const ndviReady = Boolean(sat?.ndviImage);
   const trueColorReady = Boolean(sat?.trueColorImage);
   // The date must belong to the rendered image, not a different catalog scene.
@@ -113,25 +162,95 @@ export default function HomeMapSection({
             </div>
             <small>{homeField?.crop || 'Ürün belirtilmedi'} · {homeField?.area || '—'} da</small>
           </div>
-          <button type="button" className="tp-add-field-3d tp-map-tasks-btn" onClick={() => onOpenTasks?.()} aria-label="Görevlerim" title="Görevlerim"><ListTodo size={23} strokeWidth={1.9} /></button>
-          <button type="button" className="tp-add-field-3d tp-map-add-field-btn" onClick={onAddField} aria-label="Yeni tarla ekle" title="Tarla ekle"><Plus size={25} strokeWidth={2} /></button>
+          <button
+            type="button"
+            className="tp-add-field-3d tp-map-tasks-btn"
+            onClick={() => onOpenTasks?.()}
+            aria-label="Görevlerim"
+            title="Görevlerim"
+          >
+            <ListTodo size={23} strokeWidth={1.9} />
+          </button>
+
+          <button
+            type="button"
+            className="tp-mf-quick-action tp-mf-quick-inline tp-mf-quick-field-status"
+            onClick={() => onOpenFieldStatus?.()}
+            aria-label="Tarla Durumu"
+            aria-haspopup="dialog"
+            title="Tarla Durumu"
+          >
+            <Gauge size={19} strokeWidth={1.9} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="tp-mf-quick-action tp-mf-quick-inline tp-mf-quick-today"
+            onClick={() => onOpenToday?.()}
+            aria-label="Bugün ne yapmalısın?"
+            aria-haspopup="dialog"
+            title="Bugün ne yapmalısın?"
+          >
+            <ClipboardList size={19} strokeWidth={1.9} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="tp-mf-quick-action tp-mf-quick-inline tp-mf-quick-notifications"
+            onClick={() => onOpenNotifications?.()}
+            aria-label={`Bildirimler${notificationCount > 0 ? `, ${notificationCount} yeni gelişme` : ''}`}
+            aria-haspopup="dialog"
+            title="Bildirimler"
+          >
+            <Bell size={19} strokeWidth={1.9} aria-hidden="true" />
+            {notificationCount > 0 && (
+              <span className="tp-mf-notification-dot" aria-hidden="true" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            className="tp-add-field-3d tp-map-add-field-btn"
+            onClick={onAddField}
+            aria-label="Yeni tarla ekle"
+            title="Tarla ekle"
+          >
+            <Plus size={25} strokeWidth={2} />
+          </button>
         </div>
       </div>
 
       <div className="tp-map-shortcut-stack">
-        <div className="tp-map-shortcuts" aria-label="Harita katmanları">
-          <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'vegetation' ? 'active' : ''}`} onClick={() => openMapLayer('vegetation')}>Sağlık</button>
-          <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'radar-vv' ? 'active' : ''}`} onClick={() => openMapLayer('radar-vv')}>Nemli Alanlar</button>
-          <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'radar-vh' ? 'active' : ''}`} onClick={() => openMapLayer('radar-vh')}>Yüzey & Bitki Farkı</button>
-          <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'radar-water' ? 'active' : ''}`} onClick={() => openMapLayer('radar-water')}>Su Birikimi Riski</button>
-          <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'soil' ? 'active' : ''}`} onClick={() => openMapLayer('soil')}>Toprak</button>
-          <button type="button" className={`tp-map-shortcut ${['climate', 'surface-temperature', 'evapotranspiration', 'rainfall-history'].includes(activeHomeLayer) ? 'active' : ''}`} onClick={() => openMapLayer('climate')}>İklim</button>
+        <div className="tp-map-shortcuts" aria-label={`${cropMode.modeLabel} için öncelikli harita katmanları`}>
+          {primaryLayerShortcuts.map((shortcut) => {
+            const active = shortcut.layer === 'climate'
+              ? ['climate', 'surface-temperature', 'evapotranspiration', 'rainfall-history'].includes(activeHomeLayer)
+              : activeHomeLayer === shortcut.layer;
+            return (
+              <button
+                key={shortcut.layer}
+                type="button"
+                className={`tp-map-shortcut ${active ? 'active' : ''}`}
+                onClick={() => openCropAwareLayer(shortcut.layer)}
+              >
+                {shortcut.label}
+              </button>
+            );
+          })}
         </div>
         {['climate', 'surface-temperature', 'evapotranspiration', 'rainfall-history'].includes(activeHomeLayer) && (
-          <div className="tp-map-shortcuts tp-map-shortcuts-secondary" aria-label="İklim ve su katmanları">
-            <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'surface-temperature' ? 'active' : ''}`} onClick={() => openMapLayer('surface-temperature')} title="ERA5-Land 0–7 cm yüzeye yakın toprak sıcaklığı">Yüzey Sıcaklığı</button>
-            <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'evapotranspiration' ? 'active' : ''}`} onClick={() => openMapLayer('evapotranspiration')}>Su İhtiyacı</button>
-            <button type="button" className={`tp-map-shortcut ${activeHomeLayer === 'rainfall-history' ? 'active' : ''}`} onClick={() => openMapLayer('rainfall-history')}>Yağış Geçmişi</button>
+          <div className="tp-map-shortcuts tp-map-shortcuts-secondary" aria-label={`${cropMode.modeLabel} için iklim ve su katmanları`}>
+            {climateLayerShortcuts.map((shortcut) => (
+              <button
+                key={shortcut.layer}
+                type="button"
+                className={`tp-map-shortcut ${activeHomeLayer === shortcut.layer ? 'active' : ''}`}
+                onClick={() => openMapLayer(shortcut.layer)}
+                title={shortcut.layer === 'surface-temperature' ? 'ERA5-Land 0–7 cm yüzeye yakın toprak sıcaklığı' : undefined}
+              >
+                {shortcut.label}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -152,7 +271,7 @@ export default function HomeMapSection({
 
       <div className="tp-map-stage">
         {trueColorReady || ndviReady || homeField?.parcelGeometry ? (
-          <HomeInlineLayerMap layer={activeHomeLayer} field={homeField} satelliteData={{ ...sat, latestImageDate: displayedSatelliteDate }} soilProperty={homeSoilProperty} soilDepth={homeSoilDepth} climateLayer={homeClimateLayer} climateDepth={homeClimateDepth} height={390} onSpatialSummary={setHomeLayerSpatialSummary} />
+          <HomeInlineLayerMap layer={activeHomeLayer} field={homeField} satelliteData={{ ...sat, latestImageDate: displayedSatelliteDate }} soilProperty={homeSoilProperty} soilDepth={homeSoilDepth} climateLayer={homeClimateLayer} climateDepth={homeClimateDepth} ndviStats={liveNdvi} height={390} onSpatialSummary={setHomeLayerSpatialSummary} />
         ) : (
           <FieldMap initialCenter={[homeField?.parcelCentroidLng ?? homeField?.longitude ?? 35.2433, homeField?.parcelCentroidLat ?? homeField?.latitude ?? 38.9637]} initialZoom={homeField?.parcelGeometry ? 15 : 10} height={390} parcelGeometry={homeField?.parcelGeometry ?? null} sections={[]} drawEnabled={false} />
         )}

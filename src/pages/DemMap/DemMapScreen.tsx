@@ -11,6 +11,7 @@ import {
   type DemGridCell,
   type DemTerrainProfile,
 } from '../../services/demService';
+import { buildFrostPocketCells, recordFrostEvent } from '../../features/frost-pocket/services/frostPocket.service';
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -21,7 +22,7 @@ type Props = {
   onBack: () => void;
 };
 
-type Variable = 'elevation' | 'slope' | 'aspect';
+type Variable = 'elevation' | 'slope' | 'aspect' | 'frost-pocket';
 
 const EMPTY: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
@@ -129,7 +130,9 @@ function gridGeoJson(
           ? cell.elevationM
           : variable === 'slope'
             ? cell.slopeDeg
-            : cell.aspectDeg;
+            : variable === 'aspect'
+              ? cell.aspectDeg
+              : cell.elevationM;
 
       if (value === null) return [];
 
@@ -153,8 +156,11 @@ function gridGeoJson(
         );
       } else if (variable === 'slope') {
         fill = ramp(Math.min(1, value / 25));
-      } else {
+      } else if (variable === 'aspect') {
         fill = aspectColor(cell.aspectLabel);
+      } else {
+        const frost = (cell as any).susceptibility;
+        fill = frost === 'high' ? '#9b2c2c' : frost === 'medium' ? '#b7791f' : '#315b48';
       }
 
       return [
@@ -260,6 +266,14 @@ function legendItems(
     ];
   }
 
+  if (variable === 'frost-pocket') {
+    return [
+      { label: 'Yüksek topoğrafik hassasiyet', color: '#9b2c2c' },
+      { label: 'Orta hassasiyet', color: '#b7791f' },
+      { label: 'Düşük hassasiyet', color: '#315b48' },
+    ];
+  }
+
   return [
     { label: 'Kuzey (K)', color: aspectColor('K') },
     { label: 'Kuzeydoğu (KD)', color: aspectColor('KD') },
@@ -297,6 +311,9 @@ export default function DemMapScreen({
   const [message, setMessage] = useState('');
   const [profile, setProfile] =
     useState<DemTerrainProfile | null>(null);
+  const [frostEventDate, setFrostEventDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [frostObservedMin, setFrostObservedMin] = useState('');
+  const [frostMessage, setFrostMessage] = useState('');
 
   const mapContainer =
     useRef<HTMLDivElement | null>(null);
@@ -319,6 +336,13 @@ export default function DemMapScreen({
     () => coordinates(selectedField),
     [selectedField],
   );
+
+  const frostCells = useMemo(
+    () => (profile ? buildFrostPocketCells(profile) : []),
+    [profile],
+  );
+
+  const mapCells = variable === 'frost-pocket' ? frostCells : (profile?.cells ?? []);
 
   const legend = useMemo(
     () => legendItems(variable, profile),
@@ -566,7 +590,7 @@ export default function DemMapScreen({
     if (!map || !profile) return;
 
     const data = gridGeoJson(
-      profile.cells,
+      mapCells,
       variable,
       profile.stats.minElevationM,
       profile.stats.maxElevationM,
@@ -642,6 +666,7 @@ export default function DemMapScreen({
             ['elevation', 'Rakım'],
             ['slope', 'Eğim'],
             ['aspect', 'Bakı'],
+            ['frost-pocket', 'Don Cepleri'],
           ] as const).map(
             ([value, label]) => (
               <button
@@ -673,7 +698,9 @@ export default function DemMapScreen({
                 ? 'Rakım renkleri'
                 : variable === 'slope'
                   ? 'Eğim renkleri'
-                  : 'Bakı yönleri'}
+                  : variable === 'frost-pocket'
+                    ? 'Topoğrafik don cebi hassasiyeti'
+                    : 'Bakı yönleri'}
             </strong>
           </div>
 
@@ -682,7 +709,9 @@ export default function DemMapScreen({
               ? 'Yeşilden kahverengiye doğru gidildikçe rakım yükselir.'
               : variable === 'slope'
                 ? 'Yeşil tonlar daha düz; sarı-kahve tonlar daha dik araziyi gösterir.'
-                : 'Renkler, arazinin baktığı yönü (bakı) gösterir.'}
+                : variable === 'frost-pocket'
+                  ? 'Kırmızı hücreler yalnız DEM tabanlı göreli alçak/düşük eğimli soğuk-hava birikme adaylarıdır; ölçülmüş sıcaklık değildir.'
+                  : 'Renkler, arazinin baktığı yönü (bakı) gösterir.'}
           </span>
         </div>
 
@@ -714,8 +743,8 @@ export default function DemMapScreen({
             </strong>
 
             <span>
-              81 noktadan rakım, eğim ve
-              bakı hesaplanıyor.
+              81 noktadan rakım, eğim, bakı ve
+              topoğrafik don cebi hassasiyeti hesaplanıyor.
             </span>
           </div>
         )}
@@ -787,6 +816,31 @@ export default function DemMapScreen({
           </strong>
         </article>
       </section>
+
+      {variable === 'frost-pocket' ? (
+        <section style={styles.note}>
+          <strong>Don olayı kaydı</strong>
+          <p>Gerçek don yaşandıysa tarihi ve varsa ölçülen minimum sıcaklığı kaydet. Olay sonrası kullanılabilir NDVI gözlemi geldiğinde Pusula zaman ilişkisini kontrol eder; bunu tek başına don hasarı teşhisi saymaz.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
+            <input type="date" value={frostEventDate} onChange={(event) => setFrostEventDate(event.target.value)} />
+            <input inputMode="decimal" placeholder="Min °C (opsiyonel)" value={frostObservedMin} onChange={(event) => setFrostObservedMin(event.target.value)} />
+            <button type="button" onClick={async () => {
+              const fieldKey = String(selectedField?.id ?? '').trim();
+              if (!fieldKey) return;
+              setFrostMessage('');
+              try {
+                const min = frostObservedMin.trim() ? Number(frostObservedMin) : null;
+                await recordFrostEvent({ fieldId: fieldKey, eventDate: frostEventDate, observedMinTempC: Number.isFinite(min as number) ? min : null });
+                setFrostMessage('Don olayı kaydedildi.');
+              } catch (error) {
+                setFrostMessage(error instanceof Error ? error.message : 'Don olayı kaydedilemedi.');
+              }
+            }}>Olayı kaydet</button>
+          </div>
+          {frostMessage ? <p>{frostMessage}</p> : null}
+          <p>Yüksek hassasiyetli grid: <b>{frostCells.filter((cell) => cell.susceptibility === 'high').length}</b> · Orta: <b>{frostCells.filter((cell) => cell.susceptibility === 'medium').length}</b>. GLO-90 yaklaşık 90 m çözünürlüktedir; mikro-topografya/RTK ölçümü yerine geçmez.</p>
+        </section>
+      ) : null}
 
       <section style={styles.note}>
         <strong>DEM neyi gösteriyor?</strong>

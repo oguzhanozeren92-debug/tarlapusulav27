@@ -23,11 +23,11 @@ export function openMapAtField(
           [bbox[2], bbox[3]],
         ],
         {
-          padding: { top: 18, right: 18, bottom: 30, left: 18 },
-          maxZoom: 18.35,
+          padding: { top: 28, right: 28, bottom: 148, left: 28 },
+          maxZoom: 17.45,
         },
       )
-    : { center, zoom };
+    : { center, zoom: Math.min(zoom, 17.2) };
 
   if (!camera) return;
 

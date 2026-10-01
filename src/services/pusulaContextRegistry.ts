@@ -1,3 +1,6 @@
+import { buildCropModeRuntime } from '../features/crop-mode/services/cropMode.service';
+import type { CropModeRuntime } from '../features/crop-mode/types/cropMode';
+
 export type PusulaSourceValue =
   | Record<string, unknown>
   | unknown[]
@@ -26,12 +29,19 @@ export type PusulaFieldContext = {
   crop?: string | null;
   city?: string | null;
   district?: string | null;
+  cropCycle?: string | null;
+  crop_cycle?: string | null;
+  irrigationStatus?: string | null;
+  irrigation_status?: string | null;
+  bearing?: boolean | null;
 };
 
 export type CollectedPusulaContext = {
   focus: PusulaFocusContext;
 
   field?: PusulaFieldContext | null;
+
+  cropMode?: CropModeRuntime | null;
 
   supportingContext: Record<
     string,
@@ -156,12 +166,21 @@ export async function collectPusulaContext({
     }
   }
 
+  const cropMode = field
+    ? buildCropModeRuntime(field as any)
+    : null;
+
   return {
     focus,
     field:
       field ?? null,
 
-    supportingContext,
+    cropMode,
+
+    supportingContext: {
+      cropMode,
+      ...supportingContext,
+    },
 
     collectedAt:
       new Date().toISOString(),

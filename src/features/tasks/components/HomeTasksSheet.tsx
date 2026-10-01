@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -11,6 +11,8 @@ import {
 import { createPortal } from 'react-dom';
 import { useFieldTasks } from '../hooks/useFieldTasks';
 import type { FieldTask } from '../services/fieldTasks.service';
+import TaskMapPanel from '../../task-map/components/TaskMapPanel';
+import { buildTaskMapSnapshot } from '../../task-map/services/taskMap.service';
 import './HomeTasksSheet.css';
 
 type Props = {
@@ -165,6 +167,18 @@ export default function HomeTasksSheet({
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const { tasks, loading, error, message, refresh, complete, dismiss } =
     useFieldTasks(fieldId, open);
+  const taskMapSnapshot = useMemo(
+    () => buildTaskMapSnapshot(fieldId, tasks),
+    [fieldId, tasks],
+  );
+  const mappedTaskIds = useMemo(
+    () => new Set(taskMapSnapshot.zones.map((zone) => zone.taskId)),
+    [taskMapSnapshot.zones],
+  );
+  const listTasks = useMemo(
+    () => tasks.filter((task) => !mappedTaskIds.has(task.id)),
+    [mappedTaskIds, tasks],
+  );
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -258,14 +272,17 @@ export default function HomeTasksSheet({
         </button>
       </div>
 
+      <TaskMapPanel snapshot={taskMapSnapshot} onOpenMap={close} />
+
       {message ? <p className="tp-home-tasks-message">{message}</p> : null}
       {error ? <p className="tp-home-tasks-error">{error}</p> : null}
 
-      <div className="tp-home-tasks-list">
+      {(loading && !tasks.length) || listTasks.length || (!tasks.length && !loading) ? (
+        <div className="tp-home-tasks-list">
         {loading && !tasks.length ? (
           <div className="tp-home-tasks-empty">Görevlerin hazırlanıyor…</div>
-        ) : tasks.length ? (
-          tasks.map((task) => {
+        ) : listTasks.length ? (
+          listTasks.map((task) => {
             const priority = priorityLabel(task.priority);
             const expanded = expandedTaskId === task.id;
             const preview = compactDescription(task);
@@ -362,7 +379,8 @@ export default function HomeTasksSheet({
             <span>Pusula yeni bir ihtiyaç tespit ettiğinde görev burada görünecek.</span>
           </div>
         )}
-      </div>
+        </div>
+      ) : null}
     </dialog>,
     document.body,
   );

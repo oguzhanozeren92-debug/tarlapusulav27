@@ -5,6 +5,7 @@ import {
   Bell,
   ClipboardList,
   CalendarDays,
+  CheckCheck,
   ChevronDown,
   CloudSun,
   Compass,
@@ -25,11 +26,7 @@ import type {
   HomeSystemNotification,
   HomeTodayDecision,
 } from '../../decision/types/homeDecision';
-import {
-  taskNotificationMessage,
-  taskNotificationTitle,
-  type FieldTask,
-} from '../../tasks/services/fieldTasks.service';
+import type { FieldTask } from '../../tasks/services/fieldTasks.service';
 import type { IrrigationDecisionResult } from '../../irrigation/types/irrigationDecision';
 import type { IrrigationWhatIfResult } from '../../irrigation/services/irrigationWhatIf.service';
 import { buildRainfedTodaySummary } from '../../irrigation/services/rainfedTodaySummary';
@@ -43,6 +40,15 @@ import {
   saveFieldPlantingYear,
 } from '../../fields/services/fieldProfileCompletion.service';
 import { createFieldOperation } from '../../field-operations/services/fieldOperation.service';
+import SwipeDismissNotification from '../../notifications/components/SwipeDismissNotification';
+import {
+  hideNotificationLocally,
+  isNotificationHidden,
+  isNotificationRead,
+  markNotificationRead,
+  markNotificationsRead,
+  subscribeNotificationInboxState,
+} from '../../notifications/services/notificationInboxState.service';
 
 import './HomeQuickSheets.css';
 import './HomeTodayDecisionSystem.css';
@@ -127,6 +133,15 @@ function TodayDecisionIcon({ decision }: { decision: HomeTodayDecision }) {
       return <MapPin {...common} />;
     case 'operation':
       return <ClipboardList {...common} />;
+    case 'field-workability':
+      return <MapPin {...common} />;
+    case 'irrigation-distribution':
+    case 'water-scarcity':
+      return <Droplets {...common} />;
+    case 'microclimate-sensor':
+      return <CloudSun {...common} />;
+    case 'multi-stress':
+      return <Leaf {...common} />;
     default:
       return decision.iconClass === 'water'
         ? <Droplets {...common} />
@@ -177,6 +192,50 @@ const SOURCE_META: Record<
   nutrition: {
     label: 'Toprak analizi',
     basis: 'Bu tarlaya ait laboratuvar/toprak analizinin varlığı ve rapor durumu kullanılıyor.',
+  },
+  'weed-intelligence': {
+    label: 'Yabancı ot zekâsı',
+    basis: 'Uydu şüphesi ve varsa saha gözlemi birbirinden ayrılarak kullanılıyor.',
+  },
+  'yield-harvest': {
+    label: 'Verim & hasat',
+    basis: 'Gerçek verim/hasat kaydı model kanıtlarının üstünde tutuluyor.',
+  },
+  'orchard-tree': {
+    label: 'Ağaç/Bahçe Pusulası',
+    basis: 'Kayıtlı ağaç kimliği ile gerçek saha veya sensör gözlemleri kullanılıyor.',
+  },
+  'storage-risk': {
+    label: 'Depo risk taraması',
+    basis: 'Kayıtlı ürün nemi, depo sıcaklığı/nemi ve depolama süresi çevresel taramada kullanılıyor.',
+  },
+  'irrigation-economics': {
+    label: 'Sulama ekonomisi',
+    basis: 'Production sulama motorunun NET su kararı kullanıcı pompa, randıman ve enerji bilgisiyle maliyete çevriliyor.',
+  },
+  'frost-pocket': {
+    label: 'Don cebi analizi',
+    basis: 'DEM tabanlı topoğrafik hassasiyet, hava sıcaklığı ve varsa kayıtlı don olayı ayrı kanıtlar olarak kullanılıyor.',
+  },
+  'field-workability': {
+    label: 'Tarlaya giriş / sıkışma taraması',
+    basis: 'Son 24/48/72 saat yağış, son sulama, toprak tekstürü/tarla kapasitesi, Open-Meteo yüzey nemi model bağlamı ve DEM eğimi birlikte kullanılıyor; manuel nem ölçümü zorunlu değil.',
+  },
+  'irrigation-distribution': {
+    label: 'Sulama Dağılım Zekâsı',
+    basis: 'Tarihli sulama kaydı, sulama sonrasındaki Sentinel-2/Sentinel-1 parsel içi farkları ve aynı desenin farklı sulamalarda tekrarlanması birlikte kullanılıyor; arıza teşhisi yapılmıyor.',
+  },
+  'water-scarcity': {
+    label: 'Su Kıtlığı Planı',
+    basis: 'Kayıtlı kullanılabilir su, Production Sulama Motoru NET ihtiyacı ve fenoloji hassasiyeti birlikte değerlendiriliyor; optimum eksik sulama yüzdesi uydurulmuyor.',
+  },
+  'microclimate-sensor': {
+    label: 'Mikroiklim sensörü',
+    basis: 'Gerçek saha sıcaklığı, nem, toprak nemi ve varsa debi/basınç ölçümleri bağımsız saha kanıtı olarak kullanılıyor.',
+  },
+  'multi-stress': {
+    label: 'Birleşik Çoklu Stres',
+    basis: 'Su, ısı, don, besin, hastalık-zararlı ve yabancı ot kararları kaynak otoriteleri korunarak birlikte yorumlanıyor; uydu anomalisi tek başına yeni stres nedeni sayılmıyor.',
   },
 };
 
@@ -385,6 +444,8 @@ function decisionActionLabel(
   if (decision.target === 'spray_weather') return 'Saatleri gör';
   if (decision.target === 'irrigation_detail') return 'Sulama detayını aç';
   if (decision.target === 'soil') return 'Toprak detayını aç';
+  if (decision.target === 'inventory') return 'Depoyu aç';
+  if (decision.target === 'terrain') return 'Don ceplerini aç';
   if (decision.target === 'ai') return 'Pusula detayını aç';
   if (kind === 'data') return 'Bilgiyi tamamla';
   if (kind === 'check') return 'Kontrol ekranını aç';
@@ -418,6 +479,7 @@ export default function HomeQuickSheets({
   const [missingCrop, setMissingCrop] = useState('');
   const [missingYear, setMissingYear] = useState('');
   const [missingMethod, setMissingMethod] = useState<FieldIrrigationMethod>('trickle');
+  const [notificationInboxRevision, setNotificationInboxRevision] = useState(0);
 
   const sprayDecision: HomeTodayDecision | null = sprayWeather
     ? {
@@ -489,6 +551,10 @@ export default function HomeQuickSheets({
     setMissingMethod('trickle');
   }, [currentDecision?.id]);
 
+  useEffect(() => subscribeNotificationInboxState(() => {
+    setNotificationInboxRevision((value) => value + 1);
+  }), []);
+
   const close = () => {
     dialogRef.current?.close();
     onClose();
@@ -539,8 +605,8 @@ export default function HomeQuickSheets({
       priority: Math.max(60, task.priority),
       severity: task.priority >= 90 ? 'warning' : 'info',
       source: 'field',
-      title: taskNotificationTitle(task),
-      detail: taskNotificationMessage(task),
+      title: 'Yeni görev tanımlandı',
+      detail: `${task.title}${task.rewardPoints > 0 ? ` · +${task.rewardPoints} Pusula Puanı` : ''}`,
       iconKey: 'document',
       iconTone: 'gold',
       dotTone: task.priority >= 90 ? 'warning' : 'info',
@@ -551,9 +617,25 @@ export default function HomeQuickSheets({
       ...taskNotices,
       ...notifications.filter((item) => !item.task),
     ]
+      .filter((item) => !isNotificationHidden(item.id))
       .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))
       .slice(0, 12);
-  }, [notifications, tasks]);
+  }, [notifications, tasks, notificationInboxRevision]);
+
+  const unreadInformationCount = informationNotifications.filter(
+    (item) => !isNotificationRead(item.id),
+  ).length;
+
+  const markAllInformationRead = async () => {
+    await markNotificationsRead(informationNotifications.map((item) => item.id));
+    setNotificationInboxRevision((value) => value + 1);
+  };
+
+  const dismissInformationNotification = (id: string) => {
+    hideNotificationLocally(id);
+    setExpandedNotificationId((current) => current === `info:${id}` ? null : current);
+    setNotificationInboxRevision((value) => value + 1);
+  };
 
   const finishMissingSave = (reload = false) => {
     if (!currentDecision) return;
@@ -972,8 +1054,27 @@ export default function HomeQuickSheets({
                   return;
                 }
                 const target = currentDecision.target;
+                const importantArea = currentDecision.task?.metadata?.importantArea as
+                  | { area?: unknown; geometry?: unknown }
+                  | undefined;
+                const irrigationDistribution = currentDecision.source === 'irrigation-distribution';
+                const fieldId = currentFieldId;
                 close();
                 onOpenDecision(target);
+                if (irrigationDistribution && fieldId && typeof window !== 'undefined') {
+                  window.setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('tp:home-map-show-pusula-area', {
+                      detail: {
+                        fieldId,
+                        layer: 'vegetation',
+                        source: 'irrigation_distribution',
+                        decisionId: currentDecision.id,
+                        importantArea: importantArea ?? { area: currentDecision.task?.metadata?.direction ?? 'Tarla geneli' },
+                      },
+                    }));
+                    document.querySelector('.tp-map-stage')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 220);
+                }
               }}
             >
               {missingFormOpen && currentMissingKind && currentMissingKind !== 'soil-analysis'
@@ -987,69 +1088,93 @@ export default function HomeQuickSheets({
 
       {active === 'notifications' && (
         <div className="tp-home-quick-list">
-          {informationNotifications.map((item) => {
+          <div className="tp-home-notification-tools">
+            <span>
+              {unreadInformationCount > 0
+                ? `${unreadInformationCount} okunmamış`
+                : 'Hepsi okundu'}
+            </span>
+            {informationNotifications.length > 0 ? (
+              <button type="button" onClick={() => void markAllInformationRead()}>
+                <CheckCheck size={14} aria-hidden="true" />
+                Tümünü okundu
+              </button>
+            ) : null}
+            <small>Sola kaydır → gizle</small>
+          </div>
+
+          {informationNotifications.map((item, index) => {
             const notificationId = `info:${item.id}`;
             const expanded = expandedNotificationId === notificationId;
+            const read = isNotificationRead(item.id);
 
             return (
-              <article
-                className={`tp-home-quick-notification${expanded ? ' is-expanded' : ''}`}
+              <SwipeDismissNotification
                 key={item.id}
+                notificationId={item.id}
+                onDismiss={dismissInformationNotification}
+                className={index % 2 === 1 ? 'is-zebra' : ''}
               >
-                <span
-                  className={`tp-home-quick-severity is-${item.severity}`}
-                  aria-hidden="true"
-                />
-                <div className="tp-home-quick-notification-copy">
-                  <button
-                    type="button"
-                    className="tp-home-quick-notification-toggle"
-                    aria-expanded={expanded}
-                    aria-controls={`${notificationId}:detail`}
-                    onClick={() =>
-                      setExpandedNotificationId((current) =>
-                        current === notificationId ? null : notificationId,
-                      )
-                    }
-                  >
-                    <strong>{item.title}</strong>
-                    <ChevronDown className="tp-home-quick-chevron" size={16} aria-hidden="true" />
-                  </button>
-
-                  {expanded ? (
-                    <div
-                      id={`${notificationId}:detail`}
-                      className="tp-home-quick-notification-detail"
+                <article
+                  className={`tp-home-quick-notification${expanded ? ' is-expanded' : ''}${read ? ' is-read' : ' is-unread'}`}
+                >
+                  <span
+                    className={`tp-home-quick-severity is-${item.severity}`}
+                    aria-hidden="true"
+                  />
+                  <div className="tp-home-quick-notification-copy">
+                    <button
+                      type="button"
+                      className="tp-home-quick-notification-toggle"
+                      aria-expanded={expanded}
+                      aria-controls={`${notificationId}:detail`}
+                      onClick={() => {
+                        void markNotificationRead(item.id);
+                        setNotificationInboxRevision((value) => value + 1);
+                        setExpandedNotificationId((current) =>
+                          current === notificationId ? null : notificationId,
+                        );
+                      }}
                     >
-                      <p>{item.detail}</p>
-                      <button
-                        type="button"
-                        className="tp-home-quick-task-action"
-                        onClick={() => {
-                          const linkedTask = item.id.startsWith('task-notice:')
-                            ? tasks.find((task) => `task-notice:${task.id}` === item.id)
-                            : null;
+                      <strong>{item.title}</strong>
+                      <ChevronDown className="tp-home-quick-chevron" size={16} aria-hidden="true" />
+                    </button>
 
-                          close();
-
-                          if (linkedTask && onOpenTask) {
-                            onOpenTask(linkedTask);
-                            return;
-                          }
-
-                          onOpenDecision(item.target);
-                        }}
+                    {expanded ? (
+                      <div
+                        id={`${notificationId}:detail`}
+                        className="tp-home-quick-notification-detail"
                       >
-                        <span>{item.id.startsWith('task-notice:') ? 'Göreve git' : 'Detaya git'}</span>
-                        <span aria-hidden="true">→</span>
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </article>
+                        <p>{item.detail}</p>
+                        <button
+                          type="button"
+                          className="tp-home-quick-task-action"
+                          onClick={() => {
+                            void markNotificationRead(item.id);
+                            const linkedTask = item.id.startsWith('task-notice:')
+                              ? tasks.find((task) => `task-notice:${task.id}` === item.id)
+                              : null;
+
+                            close();
+
+                            if (linkedTask && onOpenTask) {
+                              onOpenTask(linkedTask);
+                              return;
+                            }
+
+                            onOpenDecision(item.target);
+                          }}
+                        >
+                          <span>{item.id.startsWith('task-notice:') ? 'Göreve git' : 'Detaya git'}</span>
+                          <span aria-hidden="true">→</span>
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </article>
+              </SwipeDismissNotification>
             );
           })}
-
 
           {!informationNotifications.length ? (
             <p className="tp-home-quick-empty">Şu an yeni bir gelişme görünmüyor.</p>

@@ -1,5 +1,6 @@
 import { onboardingQuestions } from '../../data/onboarding';
-import { onboardingStyles } from '../../styles/onboardingStyles';
+import { Button, Card } from '../../ui';
+import './Onboarding.css';
 
 type OnboardingScreenProps = {
   cmsRuntimeCss: string;
@@ -35,96 +36,134 @@ export default function OnboardingScreen({
 
   if (!currentQuestion) return null;
 
+  const isLastStep = onboardingStep === onboardingQuestions.length - 1;
+
   return (
     <>
-      <style>{cmsRuntimeCss + onboardingStyles}</style>
+      <style>{cmsRuntimeCss}</style>
 
-      <div className="tp-onboarding-page">
-        <div className="tp-question-shell">
-          <div className="tp-question-top">
-            <button className="tp-back-button" onClick={onBack}>
+      <main className="tp-ob-page">
+        <div className="tp-ob-pattern" aria-hidden="true" />
+
+        <Card className="tp-ob-shell">
+          <header className="tp-ob-top">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="tp-ob-back"
+              onClick={onBack}
+              aria-label="Geri"
+            >
               ←
-            </button>
+            </Button>
 
-            <strong>
-              {onboardingStep + 1} / {onboardingQuestions.length}
-            </strong>
-          </div>
+            <div className="tp-ob-step">
+              <strong>{onboardingStep + 1}</strong>
+              <span>/ {onboardingQuestions.length}</span>
+            </div>
 
-          <div className="tp-progress">
+            <div className="tp-ob-top-spacer" aria-hidden="true" />
+          </header>
+
+          <div
+            className="tp-ob-progress"
+            aria-label={`Adım ${onboardingStep + 1} / ${onboardingQuestions.length}`}
+          >
             {onboardingQuestions.map((_, index) => (
               <span
                 key={index}
-                className={index <= onboardingStep ? 'tp-progress-active' : ''}
+                className={index <= onboardingStep ? 'is-active' : ''}
               />
             ))}
           </div>
 
-          <div className="tp-question-copy">
-            <p className="tp-question-label">SENİ TANIYALIM</p>
+          <section className="tp-ob-copy">
+            <span className="tp-ob-kicker">SENİ TANIYALIM</span>
             <h1>{currentQuestion.title}</h1>
             <p>{currentQuestion.subtitle}</p>
-          </div>
+          </section>
 
-          <div className="tp-options">
+          <div className="tp-ob-options">
             {currentQuestion.options.map(([icon, label]) => {
               const selected = selectedAnswers.includes(label);
 
               return (
                 <button
                   key={label}
-                  className={`tp-option ${selected ? 'selected' : ''}`}
+                  type="button"
+                  className={`tp-ob-option${selected ? ' is-selected' : ''}`}
                   onClick={() => onSelectAnswer(label)}
+                  aria-pressed={selected}
                 >
-                  <span className="tp-option-icon">{icon}</span>
-                  <span>{label}</span>
-                  <span className="tp-option-check">{selected ? '✓' : ''}</span>
+                  <span className="tp-ob-option-icon" aria-hidden="true">
+                    {icon}
+                  </span>
+
+                  <span className="tp-ob-option-label">{label}</span>
+
+                  <span
+                    className="tp-ob-option-check"
+                    aria-hidden="true"
+                  >
+                    {selected ? '✓' : ''}
+                  </span>
                 </button>
               );
             })}
 
-            {showOtherProductInput && (
-              <div className="tp-other-product-box">
-                <label>
+            {showOtherProductInput ? (
+              <Card tone="subtle" flat className="tp-ob-other">
+                <label htmlFor="tp-ob-other-product">
                   Diğer ürünün adı
-                  <input
-                    type="text"
-                    value={otherProduct}
-                    onChange={(e) => onOtherProductChange(e.target.value)}
-                    placeholder="Örn: Şeker pancarı, Pamuk, Çay, Kivi..."
-                  />
                 </label>
 
-                <small>Buraya listede olmayan ürünü yazabilirsin.</small>
-              </div>
-            )}
+                <input
+                  id="tp-ob-other-product"
+                  type="text"
+                  value={otherProduct}
+                  onChange={(event) =>
+                    onOtherProductChange(event.target.value)
+                  }
+                  placeholder="Örn: Şeker pancarı, Pamuk, Çay, Kivi..."
+                />
+
+                <small>
+                  Listede olmayan ürünü buraya yazabilirsin.
+                </small>
+              </Card>
+            ) : null}
           </div>
 
-          {authMessage && <div className="tp-auth-message">{authMessage}</div>}
+          {authMessage ? (
+            <div className="tp-ob-message" role="status">
+              {authMessage}
+            </div>
+          ) : null}
 
-          <div className="tp-question-actions">
-            <button
-              className="tp-skip-button"
+          <footer className="tp-ob-actions">
+            <Button
+              variant="secondary"
+              size="lg"
               onClick={onSkip}
               disabled={authLoading}
             >
               Şimdilik geç
-            </button>
+            </Button>
 
-            <button
-              className="tp-main-button tp-next-button"
+            <Button
+              size="lg"
               onClick={onNext}
               disabled={authLoading}
             >
               {authLoading
                 ? 'Kaydediliyor...'
-                : onboardingStep === onboardingQuestions.length - 1
+                : isLastStep
                   ? 'Tamamla'
                   : 'Devam'}
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </footer>
+        </Card>
+      </main>
     </>
   );
 }

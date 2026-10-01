@@ -789,6 +789,35 @@ export async function calculateIrrigationDecision(
     );
   }
 
+  /*
+    Yağış özeti sulama tipinden bağımsızdır.
+    rainfedStress yalnız susuz tarla risk yorumu için kullanılır;
+    ham geçmiş/tahmin yağışı tüm tarlalarda aynı climate context'ten gelir.
+  */
+  const climateWaterSummary =
+    calculateRainfedStressAssessment(
+      climate,
+      kc,
+      stressThresholdMm,
+    );
+
+  const rainSummary = {
+    past7DayPrecipitationMm:
+      climateWaterSummary.past7DayPrecipitationMm,
+    past7DayCropWaterUseMm:
+      climateWaterSummary.past7DayCropWaterUseMm,
+    forecast5DayPrecipitationMm:
+      climateWaterSummary.forecast5DayPrecipitationMm,
+    forecast5DayCropWaterUseMm:
+      climateWaterSummary.forecast5DayCropWaterUseMm,
+    validPastDayCount:
+      climateWaterSummary.validPastDayCount,
+    validForecastDayCount:
+      climateWaterSummary.validForecastDayCount,
+    nextMeaningfulRain:
+      climateWaterSummary.nextMeaningfulRain,
+  };
+
   const lastIrrigationDate =
     irrigation
       .lastIrrigation
@@ -826,12 +855,7 @@ export async function calculateIrrigationDecision(
     irrigationStatus ===
     'rainfed'
   ) {
-    const rainfedStress =
-      calculateRainfedStressAssessment(
-        climate,
-        kc,
-        stressThresholdMm,
-      );
+    const rainfedStress = climateWaterSummary;
 
     const riskLevel =
       rainfedStress
@@ -1182,6 +1206,7 @@ export async function calculateIrrigationDecision(
           null,
       },
       rainfedStress,
+      rainSummary,
       recommendation: {
         netWaterMm:
           null,
@@ -1294,6 +1319,7 @@ export async function calculateIrrigationDecision(
       },
       rainfedStress:
         null,
+      rainSummary,
       recommendation: {
         netWaterMm:
           null,
@@ -1389,6 +1415,7 @@ export async function calculateIrrigationDecision(
       },
       rainfedStress:
         null,
+      rainSummary,
       recommendation: {
         netWaterMm:
           null,
@@ -1737,6 +1764,7 @@ export async function calculateIrrigationDecision(
 
     rainfedStress:
       null,
+    rainSummary,
     recommendation: {
       netWaterMm,
 

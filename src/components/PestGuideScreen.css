@@ -15,9 +15,16 @@
   width: min(100%, 1180px);
   min-height: calc(100svh - 150px);
   margin: 0 auto;
-  padding: 18px 16px 108px;
+  padding: 84px 16px 108px;
 }
 
 .tp-knowledge-empty {
   min-height: 62vh;
+}
+
+
+@media (max-width: 620px) {
+  .tp-knowledge-canvas {
+    padding-top: 76px;
+  }
 }

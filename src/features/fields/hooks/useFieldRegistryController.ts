@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { TURKEY_CROPS } from '../../../data/crops';
-import { lookupParcel } from '../../../lib/parcelService';
+import {
+  lookupMapBoundary,
+  lookupParcel,
+  type MapBoundaryCandidate,
+} from '../../../lib/parcelService';
 import { createUserField, deleteUserField, fetchUserFields } from '../../../services/fieldService';
 import {
   fetchDistrictOptions,
@@ -11,6 +15,11 @@ import {
 import { getNextFieldGate } from '../../../gamification/useGamificationStore';
 import { getDistrictDisplayName, getDistrictLookupName } from '../../../utils/locationUtils';
 import { shouldShowPusulaIntro } from '../../../components/PusulaIntroTrailer';
+import {
+  fetchCropVarieties,
+  isLocalOfficialVarietyId,
+  type CropVarietyOption,
+} from '../services/cropVarietyCatalog.service';
 import type { CropCycle, Field, LocationOption, Screen } from '../../../types';
 
 type UseFieldRegistryControllerOptions = {
@@ -56,23 +65,73 @@ export function useFieldRegistryController({
   const [parcelLookupMessage, setParcelLookupMessage] = useState('');
   const [parcelGeometry, setParcelGeometry] = useState<any | null>(null);
   const [parcelLookupSource, setParcelLookupSource] = useState('');
+  const [mapBoundaryLoading, setMapBoundaryLoading] = useState(false);
+  const [mapBoundaryMessage, setMapBoundaryMessage] = useState('');
+  const [mapBoundaryCandidates, setMapBoundaryCandidates] = useState<MapBoundaryCandidate[]>([]);
+  const [mapBoundarySuggestedCandidateId, setMapBoundarySuggestedCandidateId] = useState<string | null>(null);
 
   const [fieldArea, setFieldArea] = useState('');
   const [fieldCrop, setFieldCrop] = useState('');
+  const [fieldVarietyId, setFieldVarietyId] = useState('');
+  const [fieldVarietyName, setFieldVarietyName] = useState('');
+  const [fieldVarietyOptions, setFieldVarietyOptions] = useState<CropVarietyOption[]>([]);
+  const [fieldVarietyLoading, setFieldVarietyLoading] = useState(false);
+  const [fieldVarietyMessage, setFieldVarietyMessage] = useState('');
+  const varietyRequestRef = useRef(0);
   const [fieldSeason, setFieldSeason] = useState(String(new Date().getFullYear()));
   const [fieldCropCycle, setFieldCropCycle] = useState<CropCycle>('annual');
   const [fieldPlantingYear, setFieldPlantingYear] = useState('');
   const [fieldBearing, setFieldBearing] = useState(true);
 
+  const loadFieldVarietyOptions = async (cropName: string) => {
+    const requestId = ++varietyRequestRef.current;
+    setFieldVarietyLoading(true);
+    setFieldVarietyMessage('');
+    try {
+      const options = await fetchCropVarieties(cropName);
+      if (requestId !== varietyRequestRef.current) return;
+      setFieldVarietyOptions(options);
+      setFieldVarietyMessage(
+        options.length
+          ? `${options.length.toLocaleString('tr-TR')} resmî çeşit bulundu.`
+          : 'Bu ürünün resmî çeşitleri henüz kataloğa aktarılmadı. Çeşidi bilmiyorum seçeneğiyle devam edebilirsin.',
+      );
+    } catch (error) {
+      if (requestId !== varietyRequestRef.current) return;
+      console.error('Çeşit kataloğu yüklenemedi:', error);
+      setFieldVarietyOptions([]);
+      setFieldVarietyMessage('Çeşit kataloğu şu anda alınamadı. Ürün kaydı yine yapılabilir.');
+    } finally {
+      if (requestId === varietyRequestRef.current) setFieldVarietyLoading(false);
+    }
+  };
+
   const handleFieldCropSelection = (cropName: string) => {
     const crop = TURKEY_CROPS.find((item) => item.name === cropName);
     setFieldCrop(cropName);
+    setFieldVarietyId('');
+    setFieldVarietyName('');
+    setFieldVarietyOptions([]);
+    setFieldVarietyMessage('');
+    if (cropName.trim()) void loadFieldVarietyOptions(cropName);
     if (!crop) return;
     setFieldCropCycle(crop.cycle);
     if (crop.cycle === 'annual') {
       setFieldPlantingYear('');
       setFieldBearing(true);
     }
+  };
+
+  const handleFieldVarietySelection = (value: string) => {
+    if (!value || value === '__unknown__') {
+      setFieldVarietyId(value === '__unknown__' ? '__unknown__' : '');
+      setFieldVarietyName('');
+      return;
+    }
+
+    const variety = fieldVarietyOptions.find((item) => item.id === value);
+    setFieldVarietyId(value);
+    setFieldVarietyName(variety?.varietyName ?? '');
   };
 
   const loadFields = async () => {
@@ -172,6 +231,80 @@ export function useFieldRegistryController({
     }
   }, [screen]);
 
+  const clearMapBoundarySearch = () => {
+    setMapBoundaryLoading(false);
+    setMapBoundaryMessage('');
+    setMapBoundaryCandidates([]);
+    setMapBoundarySuggestedCandidateId(null);
+  };
+
+  const handleMapBoundaryLookup = async (anchor: { latitude: number; longitude: number }) => {
+    setMapBoundaryLoading(true);
+    setMapBoundaryMessage('Uydu tabanlı sınır adayları aranıyor…');
+    setMapBoundaryCandidates([]);
+    setMapBoundarySuggestedCandidateId(null);
+
+    const parsedArea = Number(fieldArea.replace(',', '.'));
+
+    try {
+      const result = await lookupMapBoundary({
+        latitude: anchor.latitude,
+        longitude: anchor.longitude,
+        areaDecare: Number.isFinite(parsedArea) && parsedArea > 0 ? parsedArea : null,
+        maxCandidates: 6,
+      });
+
+      setMapBoundaryCandidates(result.candidates);
+      setMapBoundarySuggestedCandidateId(result.suggestedCandidateId);
+
+      if (!result.candidates.length) {
+        setMapBoundaryMessage(
+          result.message ??
+            'Bu noktada güvenilir bir sınır adayı bulunamadı. Haritada başka bir nokta seçip tekrar deneyebilirsin.',
+        );
+        return;
+      }
+
+      setMapBoundaryMessage(
+        `${result.candidates.length} sınır adayı bulundu. Haritada ve listedeki alanları kontrol edip doğru olanı seç.`,
+      );
+    } catch (error) {
+      console.error('Uydu sınır adayları alınamadı:', error);
+      setMapBoundaryMessage(
+        error instanceof Error ? error.message : 'Uydu sınır adayları alınamadı.',
+      );
+    } finally {
+      setMapBoundaryLoading(false);
+    }
+  };
+
+  const handleMapBoundaryAccept = (
+    candidate: MapBoundaryCandidate,
+    anchor: { latitude: number; longitude: number },
+  ) => {
+    setParcelGeometry(candidate.geometry);
+    setFieldLatitude(anchor.latitude);
+    setFieldLongitude(anchor.longitude);
+    setParcelLookupSource(candidate.source || 'Agribound · Fields of The World');
+    setShowSatellitePreview(true);
+    setFieldAda('');
+    setFieldParcel('');
+
+    if (candidate.areaDecare !== null && candidate.areaDecare > 0) {
+      setFieldArea(
+        candidate.areaDecare.toLocaleString('tr-TR', { maximumFractionDigits: 3 }),
+      );
+    }
+
+    setParcelLookupMessage(
+      `Haritadan seçtiğin sınır kullanılıyor${
+        candidate.areaDecare
+          ? ` • ${candidate.areaDecare.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} da`
+          : ''
+      }. Bu sınır resmî kadastro sınırı değildir.`,
+    );
+  };
+
   const handleParcelLookup = async () => {
     setParcelLookupMessage('');
     if (
@@ -210,6 +343,7 @@ export function useFieldRegistryController({
 
       setParcelGeometry(result.geometry);
       setParcelLookupSource(result.source ?? '');
+      clearMapBoundarySearch();
       if (result.centroid) {
         setFieldLatitude(result.centroid.latitude);
         setFieldLongitude(result.centroid.longitude);
@@ -305,8 +439,14 @@ export function useFieldRegistryController({
     setParcelLookupMessage('');
     setParcelGeometry(null);
     setParcelLookupSource('');
+    clearMapBoundarySearch();
     setFieldArea('');
     setFieldCrop('');
+    setFieldVarietyId('');
+    setFieldVarietyName('');
+    setFieldVarietyOptions([]);
+    setFieldVarietyLoading(false);
+    setFieldVarietyMessage('');
     setFieldSeason(String(new Date().getFullYear()));
     setFieldCropCycle('annual');
     setFieldPlantingYear('');
@@ -337,18 +477,20 @@ export function useFieldRegistryController({
       return;
     }
 
+    const hasParcelIdentity = Boolean(fieldAda.trim() && fieldParcel.trim());
+    const hasAcceptedBoundary = Boolean(parcelGeometry);
+
     if (
       !fieldName.trim() ||
       !fieldCity.trim() ||
       !fieldDistrict.trim() ||
       !fieldVillage.trim() ||
-      !fieldAda.trim() ||
-      !fieldParcel.trim() ||
+      (!hasParcelIdentity && !hasAcceptedBoundary) ||
       !fieldArea.trim() ||
       !fieldCrop.trim()
     ) {
       setFieldFormMessage(
-        'İl, ilçe, köy / mahalle, tarla adı, ada, parsel, alan ve ürün bilgilerini doldur.',
+        'Konum, tarla adı, alan ve ürün bilgilerini doldur; ayrıca ada/parsel gir veya haritadan bir sınır seç.',
       );
       return;
     }
@@ -392,6 +534,13 @@ export function useFieldRegistryController({
         parcelLookupSource,
         areaDecare: areaValue,
         crop: fieldCrop,
+        varietyId:
+          fieldVarietyId &&
+          fieldVarietyId !== '__unknown__' &&
+          !isLocalOfficialVarietyId(fieldVarietyId)
+            ? fieldVarietyId
+            : null,
+        varietyName: fieldVarietyName || null,
         season: seasonValue,
         cropCycle: fieldCropCycle,
         plantingYear: plantingYearValue,
@@ -459,9 +608,18 @@ export function useFieldRegistryController({
     parcelLookupMessage,
     parcelGeometry,
     parcelLookupSource,
+    mapBoundaryLoading,
+    mapBoundaryMessage,
+    mapBoundaryCandidates,
+    mapBoundarySuggestedCandidateId,
     fieldArea,
     setFieldArea,
     fieldCrop,
+    fieldVarietyId,
+    fieldVarietyName,
+    fieldVarietyOptions,
+    fieldVarietyLoading,
+    fieldVarietyMessage,
     fieldSeason,
     setFieldSeason,
     fieldCropCycle,
@@ -475,10 +633,14 @@ export function useFieldRegistryController({
     handleDistrictSelection,
     handleVillageSelection,
     handleParcelLookup,
+    handleMapBoundaryLookup,
+    handleMapBoundaryAccept,
+    clearMapBoundarySearch,
     openOfficialParcelQuery,
     openAddField,
     resetFieldForm,
     handleFieldCropSelection,
+    handleFieldVarietySelection,
     handleAddField,
     handleDeleteField,
     districtDisplayName,

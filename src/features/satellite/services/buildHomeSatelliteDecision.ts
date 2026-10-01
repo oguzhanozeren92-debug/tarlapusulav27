@@ -1,14 +1,7 @@
 import type { HomeDecisionEvent } from '../../decision/types/homeDecision';
+import type { HomeSatelliteTrendSignal } from '../types/homeSatelliteSignals';
 
-export type HomeSatelliteTrendSignal = {
-  fieldId: string;
-  status: 'idle' | 'loading' | 'ready' | 'error';
-  quality: 'usable' | 'insufficient';
-  direction: 'rising' | 'stable' | 'falling' | 'unknown';
-  observationCount: number;
-  spanDays: number | null;
-  latestDate: string | null;
-};
+export type { HomeSatelliteTrendSignal } from '../types/homeSatelliteSignals';
 
 export function isRecentSatelliteObservation(latestDate: string | null | undefined, now: Date = new Date()) {
   const latestMs = latestDate ? Date.parse(latestDate) : NaN;
@@ -35,6 +28,8 @@ export function buildHomeSatelliteDecision(
     id: `satellite:${fieldId}:ndvi-falling`,
     group: 'satellite-trend',
     source: 'satellite',
+    sourceModel: 'ndvi-time-series-trend',
+    signal: { status: 'ready', observedAt: trend.latestDate, maxAgeHours: 30 * 24 },
     priority: 78,
     severity: 'warning',
     target: 'map_vegetation',

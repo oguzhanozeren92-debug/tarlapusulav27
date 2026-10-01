@@ -14,6 +14,16 @@ import {
   fetchAgroClimateBaselineEvidence,
   type AgroClimateBaselineEvidence,
 } from './agroClimateBaseline.service';
+import {
+  compactRiskClimateForPusula,
+  fetchRiskClimateIntelligence,
+} from '../features/risk-climate/services/riskClimateIntelligence.service';
+import type { RiskClimateIntelligence } from '../features/risk-climate/types/riskClimateIntelligence';
+import {
+  compactRegionalPestDiseaseContext,
+  fetchRegionalPestDiseaseContext,
+} from '../features/regional-risk/services/regionalPestDiseaseRadar.service';
+import type { RegionalPestDiseaseContext } from '../features/regional-risk/types/regionalPestDisease';
 
 export type RiskRadarLevel =
   | 'low'
@@ -60,6 +70,77 @@ export type RiskRadarThreat = {
   action: string;
 };
 
+export type RiskRadarIntelligenceDecisionStatus =
+  | 'no_signal'
+  | 'watch'
+  | 'elevated'
+  | 'field_evidence'
+  | 'conflict'
+  | 'unsupported_model'
+  | 'needs_data';
+
+export type RiskRadarIntelligence = {
+  status: 'ready' | 'partial' | 'needs_data';
+  decisionStatus: RiskRadarIntelligenceDecisionStatus;
+  confidence: 'low' | 'medium' | 'high' | 'unknown';
+  topThreat: string | null;
+  topThreatType: string | null;
+  riskScore: number | null;
+  riskLevel: RiskRadarLevel | 'unknown';
+  headline: string;
+  summary: string;
+  action: string;
+  diagnosisAuthority: false;
+  photoEvidence?: {
+    issue_type?: string | null;
+    status?: string | null;
+    severity?: string | null;
+    possible_issue?: string | null;
+    confidence_percent?: number | null;
+    observations?: string[];
+    recommendations?: string[];
+    needs_more_evidence?: boolean;
+    requested_evidence?: string | null;
+    trend?: string | null;
+    disclaimer?: string | null;
+    updated_at?: string | null;
+  } | null;
+  fieldObservations?: {
+    active_point_count?: number;
+    worsening_point_count?: number;
+    improving_point_count?: number;
+    interpretation?: string | null;
+  } | null;
+  phenologyContext?: {
+    stage?: string | null;
+    stage_label?: string | null;
+    confidence?: string | null;
+    authority_basis?: string | null;
+    summary?: string | null;
+    generated_at?: string | null;
+  } | null;
+  satelliteContext?: {
+    status?: string | null;
+    summary?: string | null;
+    generatedAt?: string | null;
+  } | null;
+  knowledgeContext?: {
+    guide_count?: number;
+    role?: string;
+  } | null;
+  referenceContext?: {
+    agml_reference_count?: number;
+    role?: string;
+  } | null;
+  conflicts?: Array<{
+    type?: string;
+    note?: string;
+    [key: string]: unknown;
+  }>;
+  missingInputs?: string[];
+  generatedAt: string;
+};
+
 export type RiskRadarResult = {
   ok: boolean;
   supported: boolean;
@@ -92,11 +173,16 @@ export type RiskRadarResult = {
     recommendation: string;
   };
   threats: RiskRadarThreat[];
+  intelligence?: RiskRadarIntelligence | null;
+  intelligenceSnapshotId?: string | null;
+  intelligenceGeneratedAt?: string | null;
   reason?: string;
   supportedCrops?: string[];
   worldCerealReference?: WorldCerealReferenceContext | null;
   phibaseEvidence?: PhiBaseFieldEvidence | null;
   agroClimateBaseline?: AgroClimateBaselineEvidence | null;
+  climateIntelligence?: RiskClimateIntelligence | null;
+  regionalPestDisease?: RegionalPestDiseaseContext | null;
   provenance?: {
     engine: string;
     upstream: string;
@@ -120,7 +206,7 @@ type CachedRiskRadar = {
 };
 
 const MEMORY_CACHE = new Map<string, CachedRiskRadar>();
-const CACHE_PREFIX = 'tp_risk_radar_v1:';
+const CACHE_PREFIX = 'tp_risk_radar_v3:';
 const CACHE_MS = 30 * 60 * 1000;
 
 function todayLocalIso() {
@@ -272,11 +358,11 @@ export async function fetchFieldRiskRadar(
 
   const { data, error } =
     await supabase.functions.invoke(
-      'risk-radar',
+      'satellite-health',
       {
         body: {
-          fieldId: normalizedFieldId,
-          appDate: todayLocalIso(),
+          mode: 'risk',
+          field_id: normalizedFieldId,
           seasonStartDate:
             cleanDate(options.seasonStartDate) ??
             undefined,
@@ -310,6 +396,19 @@ export async function fetchFieldRiskRadar(
     threats: Array.isArray(data.threats)
       ? data.threats
       : [],
+    intelligence:
+      data.intelligence &&
+      typeof data.intelligence === 'object'
+        ? data.intelligence
+        : null,
+    intelligenceSnapshotId:
+      typeof data.intelligenceSnapshotId === 'string'
+        ? data.intelligenceSnapshotId
+        : null,
+    intelligenceGeneratedAt:
+      typeof data.intelligenceGeneratedAt === 'string'
+        ? data.intelligenceGeneratedAt
+        : null,
     generatedAt:
       String(data.generatedAt ?? '') ||
       new Date().toISOString(),
@@ -381,6 +480,58 @@ export async function fetchFieldRiskRadar(
     result.agroClimateBaseline = null;
   }
 
+  try {
+    result.regionalPestDisease = await fetchRegionalPestDiseaseContext(
+      normalizedFieldId,
+      { radiusKm: 75, lookbackDays: 21 },
+    );
+  } catch (error) {
+    console.warn('[Pusula] Bölgesel hastalık/zararlı radarı bağlamı alınamadı:', error);
+    result.regionalPestDisease = null;
+  }
+
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    try {
+      const topThreat = result.threats[0] ?? null;
+      result.climateIntelligence = await fetchRiskClimateIntelligence({
+        fieldId: normalizedFieldId,
+        latitude,
+        longitude,
+        agroClimate: result.agroClimateBaseline ?? null,
+        diseaseRisk: {
+          supported: result.supported,
+          overallScore: result.overall?.score ?? null,
+          overallLevel: result.overall?.level ?? null,
+          headline: result.overall?.headline ?? null,
+          topThreat: topThreat
+            ? {
+                name: topThreat.displayName,
+                score: topThreat.score,
+                level: topThreat.level,
+                peakDate: topThreat.peakDate,
+                reasons: topThreat.reasons,
+                action: topThreat.action,
+              }
+            : null,
+        },
+        cropName: result.field?.crop ?? null,
+        phenology: result.intelligence?.phenologyContext
+          ? {
+              stage: result.intelligence.phenologyContext.stage ?? null,
+              stageLabel: result.intelligence.phenologyContext.stage_label ?? null,
+              confidence: result.intelligence.phenologyContext.confidence ?? null,
+            }
+          : null,
+        forceRefresh: options.forceRefresh,
+      });
+    } catch (error) {
+      console.warn('[Pusula] Risk & İklim Zekâsı bağlamı alınamadı:', error);
+      result.climateIntelligence = null;
+    }
+  } else {
+    result.climateIntelligence = null;
+  }
+
   writeCached(key, result);
 
   return result;
@@ -404,16 +555,94 @@ export function compactRiskRadarForPusula(
     result.agroClimateBaseline,
   );
 
+  const climateIntelligence = compactRiskClimateForPusula(
+    result.climateIntelligence,
+  );
+
+  const regionalPestDisease = compactRegionalPestDiseaseContext(
+    result.regionalPestDisease,
+  );
+
+  const intelligence = result.intelligence
+    ? {
+        status: result.intelligence.status,
+        decisionStatus:
+          result.intelligence.decisionStatus,
+        confidence:
+          result.intelligence.confidence,
+        topThreat:
+          result.intelligence.topThreat,
+        topThreatType:
+          result.intelligence.topThreatType,
+        riskScore:
+          result.intelligence.riskScore,
+        riskLevel:
+          result.intelligence.riskLevel,
+        headline:
+          result.intelligence.headline,
+        summary:
+          result.intelligence.summary,
+        action:
+          result.intelligence.action,
+        diagnosisAuthority: false as const,
+        photoEvidence:
+          result.intelligence.photoEvidence
+            ? {
+                issueType:
+                  result.intelligence.photoEvidence.issue_type ??
+                  null,
+                status:
+                  result.intelligence.photoEvidence.status ??
+                  null,
+                severity:
+                  result.intelligence.photoEvidence.severity ??
+                  null,
+                possibleIssue:
+                  result.intelligence.photoEvidence.possible_issue ??
+                  null,
+                confidencePercent:
+                  result.intelligence.photoEvidence.confidence_percent ??
+                  null,
+                trend:
+                  result.intelligence.photoEvidence.trend ??
+                  null,
+                needsMoreEvidence:
+                  result.intelligence.photoEvidence.needs_more_evidence ??
+                  false,
+              }
+            : null,
+        fieldObservations:
+          result.intelligence.fieldObservations ?? null,
+        phenologyContext:
+          result.intelligence.phenologyContext ?? null,
+        satelliteContext:
+          result.intelligence.satelliteContext ?? null,
+        knowledgeContext:
+          result.intelligence.knowledgeContext ?? null,
+        referenceContext:
+          result.intelligence.referenceContext ?? null,
+        conflicts:
+          result.intelligence.conflicts ?? [],
+        missingInputs:
+          result.intelligence.missingInputs ?? [],
+        generatedAt:
+          result.intelligence.generatedAt,
+      }
+    : null;
+
   if (!result.supported) {
     return {
       supported: false,
       crop: result.field?.crop ?? null,
       reason:
         result.reason ??
-        'Bu ürün için doğrulanmış risk modeli henüz yok.',
+        'Bu ürün için doğrulanmış çevresel risk modeli henüz yok.',
+      intelligence,
       worldCerealReference,
       phibaseEvidence,
       agroClimateBaseline,
+      climateIntelligence,
+      regionalPestDisease,
       generatedAt: result.generatedAt,
     };
   }
@@ -437,9 +666,12 @@ export function compactRiskRadarForPusula(
         reasons: threat.reasons,
         action: threat.action,
       })),
+    intelligence,
     worldCerealReference,
     phibaseEvidence,
     agroClimateBaseline,
+    climateIntelligence,
+    regionalPestDisease,
     provenance: result.provenance ?? null,
     generatedAt: result.generatedAt,
   };

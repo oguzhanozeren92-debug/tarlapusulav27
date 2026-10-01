@@ -1,0 +1,12 @@
+@import './colors.css';
+@import './typography.css';
+@import './spacing.css';
+@import './radius.css';
+@import './shadows.css';
+@import './motion.css';
+
+/*
+ * Foundation only.
+ * This file is intentionally NOT imported by src/main.tsx in Phase 0.1.
+ * UI migration starts only after safety/verification gates are stable.
+ */

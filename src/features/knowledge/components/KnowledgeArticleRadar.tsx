@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { supabase } from '../../../supabaseClient';
 import {
   importArticleRadarCandidate,
   listArticleRadarCandidates,
@@ -20,9 +21,27 @@ function canAutoImport(candidate: KnowledgeArticleCandidate) {
 }
 
 function statusLabel(status: KnowledgeArticleStatus) {
-  if (status === 'imported') return 'Bilgi Motoruna alındı';
+  if (status === 'imported') return 'Rehber için alındı';
   if (status === 'ignored') return 'Gizlendi';
   return 'Aday';
+}
+
+
+function metadataText(candidate: KnowledgeArticleCandidate, key: string) {
+  const value = candidate.metadata?.[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function sourceLanguageLabel(candidate: KnowledgeArticleCandidate) {
+  const raw = metadataText(candidate, 'sourceLanguage') || String(candidate.language ?? '').trim().toLowerCase();
+  if (raw === 'tr' || raw === 'turkish') return 'Türkçe kaynak';
+  if (raw === 'en' || raw === 'english') return 'İngilizce kaynak';
+  if (!raw || raw === 'unknown' || raw === 'und') return 'Kaynak dili belirtilmemiş';
+  return 'Yabancı kaynak';
+}
+
+function isTurkishReady(candidate: KnowledgeArticleCandidate) {
+  return metadataText(candidate, 'translationStatus') === 'ready';
 }
 
 function authorText(candidate: KnowledgeArticleCandidate) {
@@ -35,7 +54,7 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
   const currentYear = new Date().getFullYear();
   const [query, setQuery] = useState('');
   const [fromYear, setFromYear] = useState(Math.max(2000, currentYear - 5));
-  const [openAccessOnly, setOpenAccessOnly] = useState(true);
+  const [openAccessOnly, setOpenAccessOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<KnowledgeArticleStatus | 'all'>('candidate');
   const [candidates, setCandidates] = useState<KnowledgeArticleCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +64,24 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
 
   const visible = useMemo(() => candidates, [candidates]);
 
+  const ensureTurkish = async (rows: KnowledgeArticleCandidate[], filter: KnowledgeArticleStatus | 'all') => {
+    const pendingIds = rows.filter((candidate) => !isTurkishReady(candidate)).map((candidate) => candidate.id).slice(0, 60);
+    if (!pendingIds.length) return rows;
+
+    const { data, error } = await supabase.functions.invoke('knowledge-article-radar', {
+      body: { action: 'translate', candidateIds: pendingIds },
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(String(data.error));
+    return listArticleRadarCandidates(filter);
+  };
+
   const refresh = async (filter: KnowledgeArticleStatus | 'all' = statusFilter) => {
     setLoading(true);
     try {
       const rows = await listArticleRadarCandidates(filter);
-      setCandidates(rows);
+      const translatedRows = await ensureTurkish(rows, filter);
+      setCandidates(translatedRows.filter(isTurkishReady));
     } finally {
       setLoading(false);
     }
@@ -71,8 +103,9 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
       const result = await scanArticleRadar({ query, fromYear, openAccessOnly, limit: 20 });
       setStatusFilter('candidate');
       const rows = await listArticleRadarCandidates('candidate');
-      setCandidates(rows);
-      setMessage(`${result.found} çalışma bulundu; ${result.stored} aday güncellendi. Sonuçlar yayınlanmaz, önce sen incelersin.`);
+      const translatedRows = await ensureTurkish(rows, 'candidate');
+      setCandidates(translatedRows.filter(isTurkishReady));
+      setMessage(`${result.found} çalışma bulundu; ${result.stored} aday Türkçeleştirilerek hazırlandı. Sonuçlar yayınlanmaz, önce sen incelersin.`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Makale taraması tamamlanamadı.');
     } finally {
@@ -87,9 +120,9 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
     try {
       await setArticleRadarCandidateStatus(candidate.id, status);
       await refresh(statusFilter);
-      setMessage(status === 'ignored' ? 'Makale adayı gizlendi.' : 'Makale yeniden aday listesine alındı.');
+      setMessage(status === 'ignored' ? 'Kaynak adayı gizlendi.' : 'Kaynak yeniden aday listesine alındı.');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Makale durumu güncellenemedi.');
+      setErrorMessage(error instanceof Error ? error.message : 'Kaynak durumu güncellenemedi.');
     } finally {
       setBusy('');
     }
@@ -104,14 +137,14 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
       await refresh(statusFilter);
       await onImported?.();
       if (result.extractionError) {
-        setMessage(`PDF Bilgi Motoruna alındı fakat otomatik çıkarım tamamlanamadı: ${result.extractionError}. Belgeyi panelden yeniden çıkarabilirsin.`);
+        setMessage(`PDF Bilgi Rehberi hazırlığına alındı fakat otomatik çıkarım tamamlanamadı: ${result.extractionError}. Belgeyi aşağıdaki PDF bölümünden yeniden çıkarabilirsin.`);
       } else if (result.extraction) {
-        setMessage(`Kaynak Bilgi Motoruna alındı; ${result.extraction.claimCount ?? 0} iddia ve ${result.extraction.relationCount ?? 0} ilişki inceleme kuyruğuna geldi.`);
+        setMessage(`Kaynak Bilgi Rehberi hazırlığına alındı; PDF’den ${result.extraction.claimCount ?? 0} bilgi parçası çıkarıldı. Aşağıdaki belge bölümünden rehberde kullanacaklarını seçebilirsin.`);
       } else {
-        setMessage(result.alreadyImported ? 'Bu çalışma zaten Bilgi Motorunda.' : 'Kaynak Bilgi Motoruna alındı ve inceleme kuyruğuna gönderildi.');
+        setMessage(result.alreadyImported ? 'Bu çalışma zaten Bilgi Rehberi hazırlık alanında.' : 'Kaynak Bilgi Rehberi hazırlığına alındı ve seçim ekranına gönderildi.');
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Makale Bilgi Motoruna alınamadı.');
+      setErrorMessage(error instanceof Error ? error.message : 'Kaynak Bilgi Rehberi hazırlığına alınamadı.');
     } finally {
       setBusy('');
     }
@@ -121,29 +154,29 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
     <section className="tp-ka-card tp-kar">
       <div className="tp-ka-head">
         <div>
-          <h3>Makale Radarı</h3>
-          <p className="tp-ka-sub">OpenAlex üzerinden akademik çalışma adaylarını bulur. Açık erişim ve lisans bilgisi gösterilir; hiçbir çalışma otomatik yayınlanmaz.</p>
+          <h3>Bilgi Rehberi Kaynak Radarı</h3>
+          <p className="tp-ka-sub">OpenAlex, Crossref ve Semantic Scholar üzerinden Bilgi Rehberi için kaynak tarar. Yabancı kaynakların başlığı ve metin özeti admin ekranına gelmeden otomatik Türkçeleştirilir.</p>
         </div>
-        <span className="tp-ka-status">OPENALEX</span>
+        <span className="tp-ka-status">3 AKADEMİK KAYNAK</span>
       </div>
 
       <form className="tp-kar-toolbar" onSubmit={scan}>
         <label className="tp-kar-search">Konu / ürün / araştırma
-          <input className="tp-ka-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Örn. wheat stripe rust remote sensing" />
+          <input className="tp-ka-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Örn. badem, buğday sulama, fındık hastalıkları" />
         </label>
         <label>Başlangıç yılı
           <input className="tp-ka-input" type="number" min="1900" max={currentYear + 1} value={fromYear} onChange={(event) => setFromYear(Number(event.target.value) || currentYear - 5)} />
         </label>
         <label className="tp-kar-check">
           <input type="checkbox" checked={openAccessOnly} onChange={(event) => setOpenAccessOnly(event.target.checked)} />
-          Açık erişim
+          Sadece açık erişim
         </label>
         <button className="tp-ka-btn tp-ka-btn-primary tp-kar-submit" type="submit" disabled={busy === 'scan' || query.trim().length < 3}>
-          {busy === 'scan' ? 'Taranıyor…' : 'Makaleleri Tara'}
+          {busy === 'scan' ? 'Taranıyor…' : 'Rehber Kaynaklarını Tara'}
         </button>
       </form>
 
-      <p className="tp-kar-note">Otomatik PDF aktarımı bilinçli olarak yalnız CC0, CC BY veya public-domain lisanslı doğrudan açık PDF kopyalarında açılır. Diğer sonuçlarda kaynağı inceleyip uygun dosyayı yukarıdaki PDF yükleme alanından ekleyebilirsin.</p>
+      <p className="tp-kar-note">Buradaki çalışmalar Bilgi Rehberi için kaynak adaylarıdır. Admin yalnız Türkçe başlık ve Türkçe metin özeti görür; orijinal yabancı metin arka planda kaynak kanıtı olarak saklanır. Güvenli lisanslı PDF varsa “Rehberde Kullan” ile içeriği parçalara ayırırız. Hiçbiri otomatik yayınlanmaz.</p>
 
       {message && <div className="tp-kar-result">{message}</div>}
       {errorMessage && <div className="tp-kar-result is-error">{errorMessage}</div>}
@@ -151,7 +184,7 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
       <div className="tp-kar-status-tabs">
         {(['candidate', 'imported', 'ignored', 'all'] as const).map((status) => (
           <button key={status} type="button" className={`tp-kar-status-tab ${statusFilter === status ? 'is-active' : ''}`} onClick={() => setStatusFilter(status)}>
-            {status === 'candidate' ? 'Adaylar' : status === 'imported' ? 'Alınanlar' : status === 'ignored' ? 'Gizlenenler' : 'Tümü'}
+            {status === 'candidate' ? 'Kaynak Adayları' : status === 'imported' ? 'Rehbere Alınanlar' : status === 'ignored' ? 'Gizlenenler' : 'Tümü'}
           </button>
         ))}
       </div>
@@ -171,6 +204,9 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
                     {[candidate.source_name, candidate.publication_year ? String(candidate.publication_year) : null].filter(Boolean).join(' · ') || 'Kaynak bilgisi yok'}
                   </p>
                   {authors && <div className="tp-kar-author">{authors}</div>}
+                  <p style={{ margin: '10px 0 0', lineHeight: 1.55, color: '#2f3437', fontSize: '0.92rem' }}>
+                    {metadataText(candidate, 'turkishSummary') || 'Bu kaynak için Türkçe özet bulunamadı; tam metin rehber hazırlığı aşamasında incelenecek.'}
+                  </p>
                 </div>
                 <span className="tp-ka-status" data-status={candidate.status === 'imported' ? 'approved' : candidate.status === 'ignored' ? 'rejected' : 'review'}>{statusLabel(candidate.status)}</span>
               </div>
@@ -180,7 +216,7 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
                 {candidate.oa_status && <span className="tp-kar-pill">OA: {candidate.oa_status}</span>}
                 {candidate.license && <span className={`tp-kar-pill ${autoImport ? 'is-license' : 'is-warning'}`}>Lisans: {candidate.license}</span>}
                 <span className="tp-kar-pill">Atıf: {candidate.cited_by_count ?? 0}</span>
-                {candidate.language && <span className="tp-kar-pill">Dil: {candidate.language}</span>}
+                <span className="tp-kar-pill">{sourceLanguageLabel(candidate)}</span>
                 {(candidate.topics ?? []).slice(0, 4).map((topic) => <span className="tp-kar-pill" key={`${candidate.id}:${topic}`}>{topic}</span>)}
               </div>
 
@@ -190,14 +226,14 @@ export default function KnowledgeArticleRadar({ onImported }: { onImported?: () 
                 {candidate.pdf_url && <a className="tp-ka-btn" href={candidate.pdf_url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>Açık PDF</a>}
                 {candidate.status === 'candidate' && (
                   <button className="tp-ka-btn tp-ka-btn-primary" type="button" disabled={!autoImport || Boolean(busy)} title={!autoImport ? 'Otomatik aktarım için doğrudan PDF ve CC0 / CC BY / public-domain lisansı gerekli.' : undefined} onClick={() => void importCandidate(candidate)}>
-                    {busy === `import:${candidate.id}` ? 'Alınıyor…' : 'Bilgi Motoruna Al'}
+                    {busy === `import:${candidate.id}` ? 'Hazırlanıyor…' : 'Rehberde Kullan'}
                   </button>
                 )}
                 {candidate.status === 'candidate' && <button className="tp-ka-btn" type="button" disabled={Boolean(busy)} onClick={() => void updateStatus(candidate, 'ignored')}>Gizle</button>}
                 {candidate.status === 'ignored' && <button className="tp-ka-btn" type="button" disabled={Boolean(busy)} onClick={() => void updateStatus(candidate, 'candidate')}>Adaylara döndür</button>}
               </div>
 
-              {candidate.status === 'imported' && <div className="tp-kar-import-ok">PDF Bilgi Motoruna bağlandı. Yayına girmesi için çıkarılan iddiaların ayrıca admin onayı gerekir.</div>}
+              {candidate.status === 'imported' && <div className="tp-kar-import-ok">PDF Bilgi Rehberi hazırlığına bağlandı. Aşağıdaki belge bölümünde çıkarılan bilgi parçalarını PDF sırasıyla seç; yalnız seçtiklerin rehber taslağında kullanılacak.</div>}
               {candidate.status === 'candidate' && !autoImport && <div className="tp-kar-note">Otomatik aktarım kapalı: {candidate.pdf_url ? `lisans ${candidate.license || 'belirsiz'}` : 'doğrudan açık PDF bulunamadı'}. Kaynağı açıp lisansını doğruladıktan sonra uygun PDF’yi elle yükleyebilirsin.</div>}
             </article>
           );

@@ -33,6 +33,8 @@ import {
   fetchFieldCropSuitability,
   type CropSuitabilityResponse,
 } from '../services/fieldCropSuitability.service';
+import { buildCropModeRuntime } from '../features/crop-mode/services/cropMode.service';
+import type { CropModeRuntime } from '../features/crop-mode/types/cropMode';
 
 export type PusulaEvidencePriority =
   | 'authoritative'
@@ -73,6 +75,8 @@ export type PusulaFieldContext = {
     latitude: number | null;
     longitude: number | null;
   };
+
+  cropMode: CropModeRuntime;
 
   userGroundTruth: {
     soilAnalysisAvailable: boolean;
@@ -798,6 +802,7 @@ export async function buildPusulaFieldContext({
   }
 
   const coords = fieldCoordinates(field);
+  const cropMode = buildCropModeRuntime(field as any);
 
   let soilModel: PusulaFieldContext['soilModel'] = null;
   let terrain: PusulaFieldContext['terrain'] = null;
@@ -1016,6 +1021,8 @@ export async function buildPusulaFieldContext({
       latitude: coords?.latitude ?? null,
       longitude: coords?.longitude ?? null,
     },
+
+    cropMode,
 
     userGroundTruth: {
       soilAnalysisAvailable: Boolean(

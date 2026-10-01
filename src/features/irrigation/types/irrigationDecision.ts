@@ -148,6 +148,22 @@ export type RainfedStressAssessment = {
   basis: 'climate_water_balance_not_soil_moisture';
 };
 
+
+export type IrrigationRainSummary = {
+  past7DayPrecipitationMm: number | null;
+  past7DayCropWaterUseMm: number | null;
+  forecast5DayPrecipitationMm: number | null;
+  forecast5DayCropWaterUseMm: number | null;
+  validPastDayCount: number;
+  validForecastDayCount: number;
+  nextMeaningfulRain:
+    | {
+        date: string;
+        precipitationMm: number;
+      }
+    | null;
+};
+
 export type IrrigationDecisionResult = {
   fieldId: string;
   fieldName: string | null;
@@ -177,6 +193,9 @@ export type IrrigationDecisionResult = {
   };
 
   rainfedStress: RainfedStressAssessment | null;
+
+  /** Yağış özeti sulu/kuru tüm tarlalarda aynı iklim kaynağından gelir. */
+  rainSummary?: IrrigationRainSummary;
 
   recommendation: {
     /*

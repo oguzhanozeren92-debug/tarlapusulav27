@@ -1,0 +1,12 @@
+{
+  "name": "tarlapusula-mqtt-bridge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "mqtt": "^5.14.1"
+  }
+}

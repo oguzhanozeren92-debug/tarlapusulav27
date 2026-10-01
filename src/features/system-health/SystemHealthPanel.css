@@ -1,0 +1,17 @@
+.tp-health{padding:16px;color:#151515;font:13px/1.5 Inter,system-ui,sans-serif;overflow-wrap:anywhere}
+.tp-health-toolbar,.tp-health-card>header,.tp-health-row-head,.tp-health-row-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tp-health h3{margin:0;font-size:20px}.tp-health h4{margin:0;font-size:15px}
+.tp-health p{margin:6px 0 12px}.tp-health-toolbar p,.tp-health-note,.tp-health-time,.tp-health-card>p{color:#595959}
+.tp-health-toolbar button{background:#111;color:#fff;border:1px solid #111;border-radius:10px;padding:10px 14px;cursor:pointer;font:inherit}
+.tp-health-toolbar button:disabled{background:#eee;color:#555;border-color:#ccc;cursor:default}
+.tp-health a{color:#111;text-decoration:underline;text-underline-offset:3px}
+.tp-health a:focus-visible,.tp-health button:focus-visible{outline:2px solid #111;outline-offset:3px}
+.tp-health-card{background:#fff;border:1px solid #d8d8d8;border-radius:16px;padding:16px;margin:14px 0}
+.tp-health-badge{font-size:11px;font-weight:700;border:1px solid #ccc;border-radius:999px;padding:4px 9px;white-space:nowrap}
+.tp-health-badge--error{background:#111;color:#fff;border-color:#111}.tp-health-badge--missing{background:#f2f2f2;color:#555}
+.tp-health ul{list-style:none;margin:0;padding:0}.tp-health li{border-top:1px solid #e4e4e4;padding:13px 0}
+.tp-health-row-head{align-items:flex-start}.tp-health-row-head strong{flex:1;min-width:130px}.tp-health-row-head span{font-size:11px;font-weight:700}
+.tp-health li p,.tp-health-row-foot{font-size:12px;color:#555}.tp-health-service-link{display:inline-block;margin-top:10px}
+.tp-health-error{border:1px solid #111;border-radius:12px;padding:14px;background:#f3f3f3}
+.tp-admin-sheet--health{width:min(620px,calc(100vw - 36px))}
+@media(max-width:720px){.tp-admin-sheet--health{width:auto}.tp-health{padding:12px}.tp-health-card{padding:13px}.tp-health-toolbar button{min-height:42px}}
