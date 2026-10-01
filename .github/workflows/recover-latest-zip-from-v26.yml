@@ -46,6 +46,13 @@ jobs:
               continue
             fi
 
+            # GitHub Actions token cannot push workflow-file changes.
+            # Track them as missing and handle them separately through the connector.
+            if [[ "$path" == .github/workflows/* ]]; then
+              printf '%s\t%s\n' "$wanted_sha" "$path" >> /tmp/missing.tsv
+              continue
+            fi
+
             tmpjson="$(mktemp)"
             code="$(curl -sS -o "$tmpjson" -w '%{http_code}' \
               -H "Authorization: Bearer ${GH_TOKEN}" \
