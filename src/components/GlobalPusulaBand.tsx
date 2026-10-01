@@ -1116,6 +1116,27 @@ export default function GlobalPusulaBand({
     setHasInteractiveSignal(false);
   };
 
+  // İnteraktif Pusula aşağıdayken kullanıcı kartın veya logonun dışına
+  // dokunursa kartı kapat ve logoyu eski header konumuna geri getir.
+  useEffect(() => {
+    if (!interactiveOpen) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('.tp-interactive-pusula-card')) return;
+      if (target.closest('.tp-global-pusula-anchor')) return;
+
+      setInteractiveOpen(false);
+      setInteractiveStep('main');
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointer, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer, true);
+    };
+  }, [interactiveOpen]);
+
   const stopGuideRotation = () => {
     if (guideDelayRef.current != null) {
       window.clearTimeout(guideDelayRef.current);
@@ -2258,7 +2279,9 @@ export default function GlobalPusulaBand({
         <button
           type="button"
           className={`tp-global-pusula-anchor${
-            interactiveOpen ? ' tp-depot-pusula-active' : ''
+            interactiveOpen && interactiveStep === 'main'
+              ? ' tp-depot-pusula-active'
+              : ''
           }${hasPusulaSignal ? ' tp-pusula-has-message' : ''}`}
           onClick={handlePusulaClick}
           aria-label="Pusula"
