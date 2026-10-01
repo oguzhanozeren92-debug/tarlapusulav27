@@ -30,18 +30,28 @@ html body .tp-fields-sheet .tp-fields-sheet-field-status {
   font-weight: 800 !important;
 }
 
-html body .tp-fields-sheet .tp-fields-sheet-add {
-  background: #0b0b0b !important;
-  border-color: #0b0b0b !important;
+/* WhiteAppTheme içindeki genel button override'ından özellikle daha güçlü.
+   Tarlalarım sheet'indeki ana CTA her koşulda siyah/beyaz kalır. */
+html body .tp-fields-sheet.tp-fields-sheet .tp-fields-sheet-add.tp-fields-sheet-add {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: #000000 !important;
+  background-image: none !important;
+  border: 1px solid #000000 !important;
   color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
   box-shadow: none !important;
+  opacity: 1 !important;
 }
 
-html body .tp-fields-sheet .tp-fields-sheet-add:hover,
-html body .tp-fields-sheet .tp-fields-sheet-add:focus-visible {
-  background: #1a1a1a !important;
-  border-color: #1a1a1a !important;
+html body .tp-fields-sheet.tp-fields-sheet .tp-fields-sheet-add.tp-fields-sheet-add:hover,
+html body .tp-fields-sheet.tp-fields-sheet .tp-fields-sheet-add.tp-fields-sheet-add:focus-visible,
+html body .tp-fields-sheet.tp-fields-sheet .tp-fields-sheet-add.tp-fields-sheet-add:active {
+  background: #181818 !important;
+  background-image: none !important;
+  border-color: #181818 !important;
   color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
 @media (max-width: 390px) {
