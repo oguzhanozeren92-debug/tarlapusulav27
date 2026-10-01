@@ -18,7 +18,6 @@
   --tp-mono-text-soft: #b9b9b9;
   --tp-mono-text-muted: #808080;
 
-  /* Eski modüllerde kalan tema değişkenleri nötrlenir. */
   --tp-green: #d8d8d8;
   --tp-green-strong: #ffffff;
   --tp-green-soft: #181818;
@@ -30,174 +29,95 @@
   --soil-good: #bdbdbd;
 }
 
+/* Eski neon/yeşil body atmosferini kapat; Home kendi görselini içeride korur. */
 html,
 body,
 #root,
 body .app {
-  color-scheme: dark;
-  background-color: var(--tp-mono-bg);
-  color: var(--tp-mono-text);
+  color-scheme: dark !important;
+  background: var(--tp-mono-bg) !important;
+  color: var(--tp-mono-text) !important;
 }
 
-/* Home arka plan resmi / harita alanı korunur. Sadece metin rengi ortaklaşır. */
+/* Home'un kendi arka plan görseline / haritasına dokunma. */
 html body .tp-v1 {
   color-scheme: dark !important;
   color: var(--tp-mono-text) !important;
 }
 
-/* İkincil ekranların ortak sayfa zemini. */
+/* İkincil ekranların tek sayfa zemini. */
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell,
-  .tp-peststore-page,
-  .tp-market-ref-page,
-  .tp-support-page,
-  .tp-agri-news-page,
-  .tp-nutrition-page,
-  .tp-producer-market-page,
-  .tp-pest-guide-page,
-  .tp-placeholder-page,
-  .tp-era5-page,
-  .tp-theme-page
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+  .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page,
+  .tp-era5-page,.tp-theme-page
 ) {
   color-scheme: dark !important;
   background: var(--tp-mono-bg) !important;
   color: var(--tp-mono-text) !important;
 }
 
-/* Kart / panel / bölüm hiyerarşisi. Harita ve veri katmanlarına dokunma. */
+/* Kart / panel / bölüm hiyerarşisi. */
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell,
-  .tp-peststore-page,
-  .tp-market-ref-page,
-  .tp-support-page,
-  .tp-agri-news-page,
-  .tp-nutrition-page,
-  .tp-producer-market-page,
-  .tp-pest-guide-page,
-  .tp-placeholder-page
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+  .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page
 ) :is(
-  [class$='-card'],
-  [class$='-panel'],
-  [class$='-tile'],
-  [class$='-surface'],
-  [class$='-box'],
-  [class$='-section'],
-  .tp-card,
-  .tp-panel,
-  .tp-surface
-):not(.maplibregl-map):not(.tp-map-stage):not(.tp-real-home-map) {
+  [class$='-card'],[class$='-panel'],[class$='-tile'],
+  [class$='-surface'],[class$='-box'],[class$='-section'],
+  .tp-card,.tp-panel,.tp-surface
+):not(.maplibregl-map):not(.tp-map-stage):not(.tp-real-home-map):not(.tp-ui-card) {
   background: var(--tp-mono-surface) !important;
   border-color: var(--tp-mono-border) !important;
   color: var(--tp-mono-text) !important;
   box-shadow: none !important;
 }
 
-/* İç içe ikincil yüzeyler. */
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell,
-  .tp-peststore-page,
-  .tp-market-ref-page,
-  .tp-support-page,
-  .tp-agri-news-page,
-  .tp-nutrition-page,
-  .tp-producer-market-page,
-  .tp-pest-guide-page,
-  .tp-placeholder-page
-) :is([class*='-row'], [class*='-item']):not(.maplibregl-ctrl):not(.maplibregl-popup) {
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+  .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page
+) :is([class*='-row'],[class*='-item']):not(.maplibregl-ctrl):not(.maplibregl-popup) {
   border-color: var(--tp-mono-border) !important;
 }
 
-/* Tipografi. Veri/harita etiketleri kapsam dışı. */
+/* Tipografi. */
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell,
-  .tp-peststore-page,
-  .tp-market-ref-page,
-  .tp-support-page,
-  .tp-agri-news-page,
-  .tp-nutrition-page,
-  .tp-producer-market-page,
-  .tp-pest-guide-page,
-  .tp-placeholder-page
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+  .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page
 ) :is(h1,h2,h3,h4,h5,h6,strong,b,dt,label) {
   color: var(--tp-mono-text) !important;
   text-shadow: none !important;
 }
 
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell,
-  .tp-peststore-page,
-  .tp-market-ref-page,
-  .tp-support-page,
-  .tp-agri-news-page,
-  .tp-nutrition-page,
-  .tp-producer-market-page,
-  .tp-pest-guide-page,
-  .tp-placeholder-page
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+  .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page
 ) :is(p,small,em,li,dd,summary) {
   color: var(--tp-mono-text-soft) !important;
   text-shadow: none !important;
 }
 
-/* Form elemanları: siyah yüzey, beyaz metin. */
+/* Legacy formlar. Yeni tp-ui-* primitive'leri kendi token sistemini kullanır. */
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell,
-  .tp-peststore-page,
-  .tp-market-ref-page,
-  .tp-support-page,
-  .tp-agri-news-page,
-  .tp-nutrition-page,
-  .tp-producer-market-page,
-  .tp-pest-guide-page,
-  .tp-placeholder-page
-) :is(input,select,textarea) {
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+  .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page
+) :is(input,select,textarea):not(.tp-ui-input):not(.tp-ui-select) {
   color-scheme: dark !important;
   background: var(--tp-mono-surface-2) !important;
   border-color: var(--tp-mono-border-strong) !important;
@@ -206,39 +126,20 @@ html body :is(
 }
 
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell
 ) :is(input,textarea)::placeholder {
   color: var(--tp-mono-text-muted) !important;
 }
 
-/* Genel butonlar: koyu yüzey, beyaz ikon/yazı. */
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell,
-  .tp-peststore-page,
-  .tp-market-ref-page,
-  .tp-support-page,
-  .tp-agri-news-page,
-  .tp-nutrition-page,
-  .tp-producer-market-page,
-  .tp-pest-guide-page,
-  .tp-placeholder-page
-) :is(button,[role='button']):not(.maplibregl-ctrl-icon):not([class*='danger']):not([class*='delete']) {
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+  .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+  .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page
+) :is(button,[role='button']):not(.tp-ui-button):not(.tp-ui-icon-button):not(.maplibregl-ctrl-icon):not([class*='danger']):not([class*='delete']) {
   background: var(--tp-mono-surface-2) !important;
   border-color: var(--tp-mono-border-strong) !important;
   color: var(--tp-mono-text) !important;
@@ -247,21 +148,40 @@ html body :is(
 }
 
 html body :is(
-  .tp-field-detail-page,
-  .tp-calendar-page,
-  .tp-ai-page,
-  .tp-wxr-page,
-  .tp-wxv2-page,
-  .soil-page,
-  .tp-onboarding-page,
-  .pt-page,
-  .tp-chat-shell
+  .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+  .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+  .pt-page,.tp-chat-shell
 ) :is(button,[role='button'],input,select,textarea):focus-visible {
   outline: 2px solid #ffffff !important;
   outline-offset: 2px;
 }
 
-/* Sol çekmece: tek siyah-beyaz dil. Pusula artwork olduğu gibi kalır. */
+/* Yeni UI foundation doğrudan siyah-beyaz. */
+html body .tp-ui-card {
+  background: var(--tp-color-surface) !important;
+  border-color: var(--tp-color-border) !important;
+  color: var(--tp-color-text) !important;
+}
+
+html body .tp-ui-button--primary {
+  background: #f5f5f5 !important;
+  border-color: #f5f5f5 !important;
+  color: #080808 !important;
+}
+
+html body .tp-ui-button--secondary {
+  background: #111111 !important;
+  border-color: #333333 !important;
+  color: #f5f5f5 !important;
+}
+
+html body .tp-ui-button--ghost {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: #f5f5f5 !important;
+}
+
+/* Sol çekmece. Pusula artwork korunur. */
 html body .tp-premium-drawer {
   background: #070707 !important;
   border-color: var(--tp-mono-border) !important;
@@ -276,10 +196,8 @@ html body .tp-premium-drawer::after {
 }
 
 html body .tp-premium-drawer :is(
-  .tp-premium-drawer-brand-name,
-  .tp-premium-drawer-brand-name em,
-  .tp-premium-drawer-welcome strong,
-  .tp-premium-drawer-x
+  .tp-premium-drawer-brand-name,.tp-premium-drawer-brand-name em,
+  .tp-premium-drawer-welcome strong,.tp-premium-drawer-x
 ) {
   color: #ffffff !important;
   text-shadow: none !important;
@@ -301,17 +219,11 @@ html body .tp-premium-drawer-backdrop {
   background: rgba(0,0,0,.66) !important;
 }
 
-/* Sheet / modal / dialog. Pusula konuşma kartları özellikle hariç. */
+/* Sheet / modal / dialog. Pusula konuşma kartları özellikle kapsam dışı. */
 html body :is(
-  .tp-fields-sheet,
-  .tp-field-delete-dialog,
-  .tp-irrigation-detail-modal,
-  .tp-home-quick-sheet,
-  .tp-market-ref-modal,
-  .tp-support-news-modal,
-  .tp-agri-news-modal,
-  .tp-field-gate-modal,
-  .tp-modal-card
+  .tp-fields-sheet,.tp-field-delete-dialog,.tp-irrigation-detail-modal,
+  .tp-home-quick-sheet,.tp-market-ref-modal,.tp-support-news-modal,
+  .tp-agri-news-modal,.tp-field-gate-modal,.tp-modal-card
 ) {
   background: #090909 !important;
   border-color: #292929 !important;
@@ -320,34 +232,22 @@ html body :is(
 }
 
 html body :is(
-  .tp-fields-sheet,
-  .tp-field-delete-dialog,
-  .tp-irrigation-detail-modal,
-  .tp-home-quick-sheet,
-  .tp-market-ref-modal,
-  .tp-support-news-modal,
-  .tp-agri-news-modal,
-  .tp-field-gate-modal,
-  .tp-modal-card
+  .tp-fields-sheet,.tp-field-delete-dialog,.tp-irrigation-detail-modal,
+  .tp-home-quick-sheet,.tp-market-ref-modal,.tp-support-news-modal,
+  .tp-agri-news-modal,.tp-field-gate-modal,.tp-modal-card
 ) :is(h1,h2,h3,h4,strong,label) {
   color: #ffffff !important;
 }
 
 html body :is(
-  .tp-fields-sheet,
-  .tp-field-delete-dialog,
-  .tp-irrigation-detail-modal,
-  .tp-home-quick-sheet,
-  .tp-market-ref-modal,
-  .tp-support-news-modal,
-  .tp-agri-news-modal,
-  .tp-field-gate-modal,
-  .tp-modal-card
+  .tp-fields-sheet,.tp-field-delete-dialog,.tp-irrigation-detail-modal,
+  .tp-home-quick-sheet,.tp-market-ref-modal,.tp-support-news-modal,
+  .tp-agri-news-modal,.tp-field-gate-modal,.tp-modal-card
 ) :is(p,small,span) {
   color: #b9b9b9 !important;
 }
 
-/* Home alt navigasyon: siyah arka plan, beyaz ikon/yazı. */
+/* Home alt navigasyon: siyah zemin, beyaz ikon ve yazı. */
 html body #root .tp-v1 .tp-bottom {
   background: rgba(5,5,5,.98) !important;
   border-top: 1px solid #242424 !important;
@@ -407,7 +307,7 @@ html body #root .tp-v1 .tp-bottom button.active .tp-bottom-line-icon {
   color: #ffffff !important;
 }
 
-/* Zebra listeler koyu yüzeylerde de okunur. */
+/* Zebra listeler koyu yüzeyde okunabilir kalır. */
 :root {
   --tp-list-row-white: #0a0a0a;
   --tp-list-row-soft: #101010;
@@ -415,27 +315,17 @@ html body #root .tp-v1 .tp-bottom button.active .tp-bottom-line-icon {
 }
 
 html body :is(
-  .tp-home-quick-item,
-  .tp-home-quick-notification,
-  .tp-home-task-card,
-  .tp-notification-item,
-  .tp-home-data-status-row,
-  .tp-home-notification-row,
-  .tp-growth-observations-list > article,
-  .tp-field-water-measurements-list > article
+  .tp-home-quick-item,.tp-home-quick-notification,.tp-home-task-card,
+  .tp-notification-item,.tp-home-data-status-row,.tp-home-notification-row,
+  .tp-growth-observations-list > article,.tp-field-water-measurements-list > article
 ):nth-child(odd) {
   background: var(--tp-list-row-white) !important;
 }
 
 html body :is(
-  .tp-home-quick-item,
-  .tp-home-quick-notification,
-  .tp-home-task-card,
-  .tp-notification-item,
-  .tp-home-data-status-row,
-  .tp-home-notification-row,
-  .tp-growth-observations-list > article,
-  .tp-field-water-measurements-list > article
+  .tp-home-quick-item,.tp-home-quick-notification,.tp-home-task-card,
+  .tp-notification-item,.tp-home-data-status-row,.tp-home-notification-row,
+  .tp-growth-observations-list > article,.tp-field-water-measurements-list > article
 ):nth-child(even) {
   background: var(--tp-list-row-soft) !important;
 }
@@ -450,18 +340,14 @@ html body .tp-zebra-list > :not([hidden]):nth-child(even) {
 
 @media (hover:hover) {
   html body :is(
-    .tp-home-quick-item,
-    .tp-home-quick-notification,
-    .tp-home-task-card,
-    .tp-notification-item,
-    .tp-home-data-status-row,
-    .tp-home-notification-row
+    .tp-home-quick-item,.tp-home-quick-notification,.tp-home-task-card,
+    .tp-notification-item,.tp-home-data-status-row,.tp-home-notification-row
   ):hover {
     background: var(--tp-list-row-hover) !important;
   }
 }
 
-/* UI ikonları nötr; Pusula ve harita imagery kapsam dışı. */
+/* Dekoratif UI ikonları nötr. Pusula ve harita görüntüleri korunur. */
 html body :is(.tp-field-detail-page,.tp-home-quick-sheet,.tp-premium-drawer) img[src*='/ui-icons/'] {
   filter: grayscale(1) saturate(0) contrast(1.08) !important;
 }
@@ -474,25 +360,13 @@ html body .tp-real-home-map img {
   filter: none !important;
 }
 
-@media (max-width: 560px) {
+@media (max-width:560px) {
   html body :is(
-    .tp-field-detail-page,
-    .tp-calendar-page,
-    .tp-ai-page,
-    .tp-wxr-page,
-    .tp-wxv2-page,
-    .soil-page,
-    .tp-onboarding-page,
-    .pt-page,
-    .tp-chat-shell,
-    .tp-peststore-page,
-    .tp-market-ref-page,
-    .tp-support-page,
-    .tp-agri-news-page,
-    .tp-nutrition-page,
-    .tp-producer-market-page,
-    .tp-pest-guide-page,
-    .tp-placeholder-page
+    .tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
+    .tp-wxr-page,.tp-wxv2-page,.soil-page,.tp-onboarding-page,
+    .pt-page,.tp-chat-shell,.tp-peststore-page,.tp-market-ref-page,
+    .tp-support-page,.tp-agri-news-page,.tp-nutrition-page,
+    .tp-producer-market-page,.tp-pest-guide-page,.tp-placeholder-page
   ) {
     background: #050505 !important;
   }
