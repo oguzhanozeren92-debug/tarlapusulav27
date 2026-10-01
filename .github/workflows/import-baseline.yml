@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '*.zip'
+      - '.github/workflows/import-baseline.yml'
   workflow_dispatch:
 
 permissions:
@@ -47,27 +48,20 @@ jobs:
           ZIP_FILE="${{ steps.zip.outputs.zip_file }}"
           ZIP_BASENAME="$(basename "$ZIP_FILE")"
 
-          # Remove current repository content, while keeping .git and the
-          # temporary workflow alive until this job finishes.
           find . -mindepth 1 -maxdepth 1 \
             ! -name '.git' \
             ! -name '.github' \
             ! -name "$ZIP_BASENAME" \
             -exec rm -rf {} +
 
-          # Copy the uploaded StackBlitz baseline exactly into the repo.
           cp -a /tmp/tarlapusula-baseline/. .
-
-          # The uploaded archive is only a transport file.
           rm -f "$ZIP_FILE"
 
-          # Remove this temporary importer, but preserve any .github files
-          # that came from the real TarlaPusula ZIP.
-          rm -f .github/workflows/import-baseline.yml
-
-          # Remove empty workflow directory only when nothing from the ZIP
-          # remains in it.
-          rmdir .github/workflows 2>/dev/null || true
+          # GitHub Actions' GITHUB_TOKEN cannot create/update workflow files
+          # unless the app has the special workflows permission. Application
+          # source is imported exactly; workflow files are skipped and can be
+          # restored separately through the GitHub connector afterwards.
+          rm -rf .github/workflows
           rmdir .github 2>/dev/null || true
 
       - name: Commit imported baseline
@@ -81,5 +75,5 @@ jobs:
             echo "No changes to commit."
             exit 0
           fi
-          git commit -m "Import TarlaPusula baseline from StackBlitz ZIP"
+          git commit -m "Import TarlaPusula baseline from uploaded ZIP"
           git push origin HEAD:main
