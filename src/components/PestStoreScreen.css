@@ -3649,3 +3649,55 @@
   .tp-depot-v4-sheet{max-height:88svh;padding-left:13px;padding-right:13px}
   .tp-depot-v4-sheet-head h2{font-size:23px}
 }
+
+
+/* v27 monochrome action overrides */
+.tp-peststore-page .tp-depot-v4-score-ring strong,
+.tp-peststore-page .tp-depot-v4-score-ring small{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  text-shadow:none!important;
+}
+
+.tp-peststore-page .tp-depot-v4-health-detail,
+.tp-peststore-page .tp-storage-risk-v4-status,
+.tp-peststore-page .tp-storage-risk-v4-summary button,
+.tp-peststore-page .tp-storage-risk-v4-measure-toggle,
+.tp-peststore-page .tp-storage-risk-v4-form button.primary,
+.tp-peststore-page .tp-depot-v4-inventory-head>button,
+.tp-peststore-page .tp-depot-v4-tabs button,
+.tp-peststore-page .tp-depot-v4-toolbar button{
+  background:#050607!important;
+  background-image:none!important;
+  border-color:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  box-shadow:none!important;
+}
+
+.tp-peststore-page .tp-storage-risk-v4-status i{
+  background:#fff!important;
+  box-shadow:none!important;
+}
+
+.tp-peststore-page :is(
+  .tp-depot-v4-health-detail,
+  .tp-storage-risk-v4-summary button,
+  .tp-storage-risk-v4-measure-toggle,
+  .tp-storage-risk-v4-form button.primary,
+  .tp-depot-v4-inventory-head>button,
+  .tp-depot-v4-tabs button,
+  .tp-depot-v4-toolbar button
+) svg{
+  color:#fff!important;
+  stroke:currentColor!important;
+}
+
+.tp-peststore-page .tp-depot-v4-tabs button:hover,
+.tp-peststore-page .tp-depot-v4-tabs button:focus-visible,
+.tp-peststore-page .tp-depot-v4-tabs button.active{
+  background:#171717!important;
+  border-color:#171717!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}

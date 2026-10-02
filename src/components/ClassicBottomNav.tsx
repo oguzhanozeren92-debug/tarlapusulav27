@@ -286,6 +286,44 @@ button:focus-visible
     height: 18px;
   }
 }
+
+/* v27: global light theme must never wash out the bottom navigation */
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav {
+  background:#050607!important;
+  background-image:none!important;
+  border-top-color:rgba(255,255,255,.08)!important;
+  color:#fff!important;
+  box-shadow:0 -10px 30px rgba(0,0,0,.32)!important;
+}
+
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav button {
+  background:transparent!important;
+  background-image:none!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav .tp-classic-bottom-label {
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav .tp-classic-bottom-icon,
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav .tp-classic-bottom-icon svg {
+  color:#fff!important;
+  stroke:#fff!important;
+}
+
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav button.active .tp-classic-bottom-icon {
+  background:#fff!important;
+  color:#060708!important;
+}
+
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav button.active .tp-classic-bottom-icon svg {
+  color:#060708!important;
+  stroke:#060708!important;
+}
+
 `;
 
 export default function ClassicBottomNav({

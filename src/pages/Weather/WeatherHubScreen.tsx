@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { Field, FieldWeatherState, Screen } from '../../types';
 import ClassicBottomNav from '../../components/ClassicBottomNav';
 import SprayWeatherGuide from '../../features/weather/components/SprayWeatherGuide';
-import MicroclimateSensorPanel from '../../features/microclimate/components/MicroclimateSensorPanel';
 import type { HourlySprayState } from '../../features/weather/services/hourlySprayForecast';
 import {
   fetchWaterClimatePoint,
@@ -1581,6 +1580,14 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
         </section>
 
         <section className="tp-wxref-card">
+          <img
+            className="tp-wxref-ambient-art"
+            src={weather3DIcon(currentCondition)}
+            crossOrigin="anonymous"
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+          />
           <div className="tp-wxref-current">
             <div className="tp-wxref-art">
               <img
@@ -1736,8 +1743,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
             </button>
           </div>
         </section>
-
-        <MicroclimateSensorPanel fieldId={weatherKey} />
 
         <section className="tp-wxr-forecast">
           <div className="tp-wxr-section-title">
@@ -2142,15 +2147,15 @@ const WEATHER_STYLES = `
   .tp-wxr-section-title h2{margin:0;color:#e9ddc7;font-size:19px}.tp-wxr-section-title>span{color:#8f9a8e;font-size:12px}
   .tp-wxr-table-card{overflow:hidden;border-radius:20px}
   .tp-wxr-table-scroll{overflow-x:auto}
-  .tp-wxr-table{width:100%;min-width:700px;border-collapse:collapse;table-layout:fixed}
+  .tp-wxr-table{width:100%;min-width:620px;border-collapse:collapse;table-layout:fixed}
   .tp-wxr-table th,.tp-wxr-table td{border-right:1px solid rgba(202,171,104,.12);border-bottom:1px solid rgba(202,171,104,.12)}
   .tp-wxr-table th{height:48px;padding:7px;color:#d5cbb9;background:rgba(7,14,9,.86);font-family:Georgia,serif;font-size:11px;font-weight:500}
-  .tp-wxr-table th:first-child,.tp-wxr-table td:first-child{width:122px;text-align:left}
+  .tp-wxr-table th:first-child,.tp-wxr-table td:first-child{width:68px;text-align:left;padding-left:6px;padding-right:4px}
   .tp-wxr-table td{height:86px;padding:8px;text-align:center}
   .tp-wxr-provider{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
   .tp-wxr-provider i{width:20px;height:4px;border-radius:99px;background:#65ce84}
   .tp-wxr-provider i.source-1{background:#69c6df}.tp-wxr-provider i.source-2{background:#c4a45c}
-  .tp-wxr-provider strong{max-width:104px;color:#ded4c2;font-family:Georgia,serif;font-size:10px;line-height:1.15}
+  .tp-wxr-provider strong{max-width:58px;color:#ded4c2;font-family:Inter,system-ui,sans-serif;font-size:9px;line-height:1.08;white-space:normal;overflow-wrap:anywhere}
   .tp-wxr-provider small{color:#65736a;font-size:7px}
   .tp-wxr-day{display:grid;justify-items:center;gap:4px}
   .tp-wxr-day>span{height:32px;color:#efc256}
@@ -2208,7 +2213,7 @@ const WEATHER_STYLES = `
     .tp-wxr-big-weather{height:100px}.tp-wxr-temp{font-size:36px}
     .tp-wxr-impact-message{grid-template-columns:37px 1fr}.tp-wxr-impact-message>span{width:37px;height:37px}.tp-wxr-impact-message p{font-size:11px}
     .tp-wxr-risks div{grid-template-columns:1fr 45px 57px;font-size:8px}
-    .tp-wxr-table{min-width:620px}.tp-wxr-table th:first-child,.tp-wxr-table td:first-child{width:104px}
+    .tp-wxr-table{min-width:560px}.tp-wxr-table th:first-child,.tp-wxr-table td:first-child{width:62px}
     .tp-wxr-detail-grid{grid-template-columns:repeat(2,1fr)}
     .tp-wxr-pusula{grid-template-columns:42px 1fr}.tp-wxr-pusula small{grid-column:2;text-align:left;max-width:none}
   }
@@ -3927,6 +3932,47 @@ const WEATHER_STYLES = `
       padding:0 7px!important;
       font-size:6.6px!important;
     }
+  }
+
+
+  /* v27 polish: dynamic atmosphere + monochrome actions */
+  .tp-wxref-ambient-art{
+    position:absolute;
+    top:-8px;
+    right:-22px;
+    z-index:0;
+    width:205px;
+    height:150px;
+    object-fit:contain;
+    opacity:.10;
+    filter:saturate(.72) contrast(.92);
+    pointer-events:none;
+    user-select:none;
+    -webkit-mask-image:radial-gradient(ellipse at center,#000 28%,rgba(0,0,0,.72) 48%,transparent 78%);
+    mask-image:radial-gradient(ellipse at center,#000 28%,rgba(0,0,0,.72) 48%,transparent 78%);
+  }
+
+  html body .tp-wxr-page .tp-wxref-actions .tp-wxref-refresh,
+  html body .tp-wxr-page .tp-wxref-actions .tp-wxref-primary{
+    background:#050607!important;
+    background-image:none!important;
+    border-color:#050607!important;
+    color:#fff!important;
+    -webkit-text-fill-color:#fff!important;
+    box-shadow:0 5px 14px rgba(0,0,0,.12)!important;
+  }
+
+  html body .tp-wxr-page .tp-wxref-actions button svg{
+    color:#fff!important;
+    stroke:currentColor!important;
+  }
+
+  .tp-wxr-section-title h2,
+  .tp-wxr-table th,
+  .tp-wxr-provider strong,
+  .tp-wxr-day strong,
+  .tp-wxr-card-title strong{
+    font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
   }
 
 `;
