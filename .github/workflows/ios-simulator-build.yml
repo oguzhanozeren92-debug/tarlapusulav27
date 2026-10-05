@@ -1,0 +1,41 @@
+name: iOS Simulator Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and sync web assets
+        run: |
+          npm run build
+          npx cap sync ios
+
+      - name: Compile iOS simulator target
+        shell: bash
+        run: |
+          xcodebuild             -project ios/App/App.xcodeproj             -scheme App             -configuration Debug             -sdk iphonesimulator             CODE_SIGNING_ALLOWED=NO             build

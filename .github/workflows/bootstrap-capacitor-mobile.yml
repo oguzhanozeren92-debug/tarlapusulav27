@@ -1,0 +1,97 @@
+name: Bootstrap Capacitor Mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/bootstrap-capacitor-mobile.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Capacitor runtime and native plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --save             @capacitor/core@latest             @capacitor/android@latest             @capacitor/ios@latest             @capacitor/app@latest             @capacitor/browser@latest             @capacitor/camera@latest             @capacitor/filesystem@latest             @capacitor/geolocation@latest             @capacitor/haptics@latest             @capacitor/keyboard@latest             @capacitor/local-notifications@latest             @capacitor/push-notifications@latest             @capacitor/share@latest             @capacitor/splash-screen@latest             @capacitor/status-bar@latest
+          npm install --save-dev @capacitor/cli@latest
+
+      - name: Add mobile scripts
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.scripts ||= {};
+          p.scripts['mobile:sync'] = 'npm run build && npx cap sync';
+          p.scripts['mobile:android'] = 'npm run build && npx cap sync android';
+          p.scripts['mobile:ios'] = 'npm run build && npx cap sync ios';
+          p.scripts['android:open'] = 'npx cap open android';
+          p.scripts['ios:open'] = 'npx cap open ios';
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Create iOS project
+        shell: bash
+        run: |
+          if [ ! -d ios ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+
+      - name: Add iOS privacy permission descriptions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLIST="ios/App/App/Info.plist"
+
+          plist_string() {
+            local key="$1"
+            local value="$2"
+            /usr/libexec/PlistBuddy -c "Set :$key $value" "$PLIST" 2>/dev/null ||               /usr/libexec/PlistBuddy -c "Add :$key string $value" "$PLIST"
+          }
+
+          plist_string NSCameraUsageDescription "TarlaPusula, tarla ve bitki fotoğraflarını analiz etmek için kamerayı kullanır."
+          plist_string NSPhotoLibraryUsageDescription "TarlaPusula, analiz için seçtiğin fotoğraflara erişir."
+          plist_string NSPhotoLibraryAddUsageDescription "TarlaPusula, oluşturduğun rapor ve görselleri kaydetmek için fotoğraf arşivine erişebilir."
+          plist_string NSLocationWhenInUseUsageDescription "TarlaPusula, tarla konumunu bulmak ve hava ile uydu verilerini eşlemek için konumunu kullanır."
+
+      - name: Commit native projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json capacitor.config.ts android ios
+          if git diff --cached --quiet; then
+            echo "Capacitor projects already synchronized."
+            exit 0
+          fi
+          git commit -m "mobile: bootstrap Capacitor Android and iOS"
+          git push origin HEAD:main
