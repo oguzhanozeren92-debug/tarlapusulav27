@@ -25,6 +25,8 @@ import FieldDetailScreen from './pages/FieldDetailScreen';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { FALLBACK_DESKTOP_MENU_ITEMS, BASE_PLACEHOLDER_META, weatherDayLabel, weatherIcon } from './data/navigation';
 import PusulaIntroTrailer from './components/PusulaIntroTrailer';
+import AppDrawer from './components/AppDrawer';
+import GlobalPusulaBand from './components/GlobalPusulaBand';
 import { cmsBlockStyle, cmsText, cmsSub } from './utils/cmsUtils';
 import { useEntitlementStore } from './entitlements/useEntitlementStore';
 import { useMenuHistory } from './features/app-shell/hooks/useMenuHistory';
@@ -738,6 +740,7 @@ export default function App() {
           activityPhotoPreview={activityPhotoPreview}
           activityPhoto={activityPhoto}
           activityNotes={activityNotes}
+          activityMessage={activityMessage}
           setActivityNotes={setActivityNotes}
           aiAnalyzing={aiAnalyzing}
           aiAnalysisError={aiAnalysisError}
@@ -882,13 +885,24 @@ export default function App() {
       <ReadyScreen
         cmsRuntimeCss={cmsRuntimeCss}
         onContinue={() => {
-          setScreen('home');
-
-          // Geliştirici YENİ KULLANICI önizlemesinde gerçek hesapta tarla olsa bile
-          // fragmanı 0 tarlalı yeni kullanıcı gibi zorla göster.
+          // Onboarding'in son adımı artık ana sayfaya uğramadan
+          // doğrudan "Yeni Tarla Ekle" akışını açar.
           if (isNewUserPreview) {
-            window.setTimeout(() => setPusulaIntroOpen(true), 260);
+            // Test önizlemesinde gerçek hesabın mevcut tarlaları / plan limiti
+            // yeni kullanıcı deneyimini bozmasın; yalnız formu gösteririz.
+            resetFieldForm();
+            setFieldFormMessage('');
+            setPusulaIntroOpen(false);
+            setScreen('addField');
+
+            if (provinceOptions.length === 0) {
+              void loadProvinceOptions();
+            }
+            return;
           }
+
+          setPusulaIntroOpen(false);
+          openAddField();
         }}
       />
     );
@@ -1020,12 +1034,20 @@ export default function App() {
     ...(cmsDesktopMenuItems.length ? cmsDesktopMenuItems : FALLBACK_DESKTOP_MENU_ITEMS),
     ...(isAdmin && !(cmsDesktopMenuItems.length && cmsDesktopMenuItems.some(item=>item.screen==='adminHub')) ? [{screen:'adminHub' as Screen,icon:'◆',label:'Yönetim',badge:'ADMIN'}] : []),
   ].map((item) => {
+    if (String(item.screen) === 'inventoryHub') {
+      return { ...item, label: 'Depom' };
+    }
+
     if (String(item.screen) === 'supportHub') {
       return { ...item, label: 'Tarımsal Destek' };
     }
 
     if (String(item.screen) === 'agendaHub') {
       return { ...item, label: 'Tarım Gündemi' };
+    }
+
+    if (String(item.screen) === 'pestGuideHub') {
+      return { ...item, label: 'Bilgi Rehberi' };
     }
 
     return item;

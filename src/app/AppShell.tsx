@@ -51,6 +51,13 @@ export default function AppShell({
     (field) => String(field.id) === String(favoriteFieldId),
   );
 
+  const shellTitle =
+    screen === 'pestGuideHub'
+      ? 'Bilgi Rehberi'
+      : menuItems.find(
+          (item) => String(item.screen) === String(screen),
+        )?.label ?? null;
+
   return (
     <>
       <AppDrawer
@@ -63,11 +70,7 @@ export default function AppShell({
       {showGlobalBand && screen !== 'home' && (
         <GlobalPusulaBand
           screen={String(screen)}
-          title={
-            menuItems.find(
-              (item) => String(item.screen) === String(screen),
-            )?.label ?? null
-          }
+          title={shellTitle}
           fieldName={favoriteField?.name ?? fields[0]?.name ?? null}
           onBack={onBack}
           onMenu={onOpenDrawer}

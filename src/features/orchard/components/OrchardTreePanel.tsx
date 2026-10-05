@@ -140,7 +140,7 @@ export default function OrchardTreePanel({ field }: Props) {
   };
 
   return (
-    <section className="tp-orchard-card">
+    <section className="tp-orchard-card" data-required-plan="premium" data-plan-feature="Bahçe / Ağaç Zekâsı">
       <header>
         <div>
           <span>AĞAÇ BAZLI PUSULA · 16</span>

@@ -7,6 +7,10 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [react()],
   server: {
+    // StackBlitz/WebContainer önizlemesinde HMR websocket'i 404/ERR_CONNECTION_REFUSED
+    // üretebiliyor. Son test aşamasında konsolu temiz tutmak için HMR kapalı.
+    // Production build etkilenmez; kod değişiminden sonra önizlemeyi manuel yenile.
+    hmr: false,
     proxy: {
       '/arcgis-world-imagery': {
         target: 'https://services.arcgisonline.com',

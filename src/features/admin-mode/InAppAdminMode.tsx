@@ -3,6 +3,7 @@ import { supabase } from '../../supabaseClient';
 import { useAdminRole } from '../app-shell/hooks/useAdminRole';
 import ContentAdminPanel from '../content-admin/ContentAdminPanel';
 import SystemHealthPanel from '../system-health/SystemHealthPanel';
+import IssueInboxPanel from './IssueInboxPanel';
 import {
   deleteAdminUiOverride,
   fetchAdminAudit,
@@ -18,7 +19,7 @@ import {
 } from './adminControl.service';
 import './InAppAdminMode.css';
 
-type Panel = 'overview' | 'edit' | 'content' | 'system' | 'users' | 'broadcast' | 'audit';
+type Panel = 'overview' | 'edit' | 'content' | 'system' | 'issues' | 'users' | 'broadcast' | 'audit';
 type Preset = 'same' | 'white' | 'black' | 'transparent';
 type TextPreset = 'same' | 'black' | 'white';
 type SizePreset = 'same' | 'small' | 'normal' | 'large';
@@ -233,6 +234,7 @@ export default function InAppAdminMode() {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
+  const [issueNewCount, setIssueNewCount] = useState(0);
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
@@ -275,6 +277,15 @@ export default function InAppAdminMode() {
     }
   };
 
+  const loadIssueCount = async () => {
+    const { count, error } = await supabase
+      .from('app_issue_reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'new');
+
+    if (!error) setIssueNewCount(count ?? 0);
+  };
+
   const loadOverview = async () => {
     setOverviewLoading(true);
     setMessage('');
@@ -288,7 +299,10 @@ export default function InAppAdminMode() {
   };
 
   useEffect(() => {
-    if (isAdmin && modeOpen) void loadOverview();
+    if (isAdmin && modeOpen) {
+      void loadOverview();
+      void loadIssueCount();
+    }
   }, [isAdmin, modeOpen]);
 
   const loadExistingOverride = async (selection: SelectedElement) => {
@@ -484,6 +498,7 @@ export default function InAppAdminMode() {
     setSheetCollapsed(false);
     setMessage('');
     if (next === 'audit') void loadAudit();
+    if (next === 'issues') void loadIssueCount();
     if (next === 'users' && !overview) void loadOverview();
   };
 
@@ -533,6 +548,15 @@ export default function InAppAdminMode() {
   }
 
   const metrics = overview?.metrics ?? EMPTY_METRICS;
+  const panelTitle =
+    panel === 'overview' ? 'Yönetim özeti' :
+    panel === 'edit' ? 'Ekranı düzenle' :
+    panel === 'content' ? 'Haber akışı' :
+    panel === 'system' ? 'Sistem sağlığı' :
+    panel === 'issues' ? 'Mesaj Kutusu' :
+    panel === 'users' ? 'Kullanıcılar' :
+    panel === 'broadcast' ? 'Bildirim gönder' :
+    'Değişiklik geçmişi';
 
   return (
     <div data-tp-admin-ui="1" className="tp-admin-mode-root">
@@ -541,6 +565,7 @@ export default function InAppAdminMode() {
         <button className={panel === 'edit' ? 'active' : ''} onClick={() => { changePanel('edit'); setEditing((value) => !value); }}><b>{editing ? '●' : '✦'}</b><span>{editing ? 'Seçiliyor' : 'Düzenle'}</span></button>
         <button className={panel === 'content' ? 'active' : ''} onClick={() => changePanel('content')}><b>▤</b><span>Haber</span></button>
         <button className={panel === 'system' ? 'active' : ''} onClick={() => changePanel('system')}><b>⌁</b><span>Sistem</span></button>
+        <button className={panel === 'issues' ? 'active' : ''} onClick={() => changePanel('issues')}><b>✉</b><span>Mesaj{issueNewCount ? ` (${issueNewCount})` : ''}</span></button>
         <button className={panel === 'users' ? 'active' : ''} onClick={() => changePanel('users')}><b>◎</b><span>Kullanıcı</span></button>
         <button className={panel === 'broadcast' ? 'active' : ''} onClick={() => changePanel('broadcast')}><b>⌁</b><span>Bildirim</span></button>
         <button className={panel === 'audit' ? 'active' : ''} onClick={() => changePanel('audit')}><b>↺</b><span>Geçmiş</span></button>
@@ -553,7 +578,7 @@ export default function InAppAdminMode() {
         <header className="tp-admin-sheet-head">
           <div>
             <small>TarlaPusula · ADMIN MODU</small>
-            <h2>{panel === 'overview' ? 'Yönetim özeti' : panel === 'edit' ? 'Ekranı düzenle' : panel === 'content' ? 'Haber akışı' : panel === 'users' ? 'Kullanıcılar' : panel === 'broadcast' ? 'Bildirim gönder' : 'Değişiklik geçmişi'}</h2>
+            <h2>{panelTitle}</h2>
           </div>
           <button type="button" aria-label={sheetCollapsed ? 'Yönetim panelini aç' : 'Yönetim panelini daralt'} title={sheetCollapsed ? 'Paneli aç' : 'Paneli daralt'} onClick={() => setSheetCollapsed((value) => !value)}>{sheetCollapsed ? '⌃' : '⌄'}</button>
         </header>
@@ -573,6 +598,7 @@ export default function InAppAdminMode() {
             <div className="tp-admin-quick-grid">
               <button onClick={() => { setPanel('edit'); setEditing(true); }}><b>✦</b><span>Ekranda gördüğünü düzenle</span><small>Öğeye dokun, görerek değiştir</small></button>
               <button onClick={() => changePanel('content')}><b>▤</b><span>Haber akışını yönet</span><small>Adaylar · yayınlananlar · kaynaklar</small></button>
+              <button onClick={() => changePanel('issues')}><b>✉</b><span>Mesaj Kutusunu aç</span><small>{issueNewCount ? `${issueNewCount} yeni kullanıcı mesajı` : 'Hata bildirimleri · öneriler · ekran görüntüleri'}</small></button>
               <button onClick={() => changePanel('users')}><b>◎</b><span>Kullanıcıları gör</span><small>Tarla · ürün · faaliyet · puan</small></button>
               <button onClick={() => changePanel('broadcast')}><b>⌁</b><span>Bildirim gönder</span><small>Herkese veya seçili gruba</small></button>
             </div>
@@ -642,6 +668,8 @@ export default function InAppAdminMode() {
         {panel === 'content' && <div className="tp-admin-content-wrap"><ContentAdminPanel /></div>}
 
         {panel === 'system' && <div className="tp-admin-content-wrap"><SystemHealthPanel /></div>}
+
+        {panel === 'issues' && <div className="tp-admin-content-wrap"><IssueInboxPanel onChanged={() => void loadIssueCount()} /></div>}
 
         {panel === 'users' && (
           <div className="tp-admin-users">

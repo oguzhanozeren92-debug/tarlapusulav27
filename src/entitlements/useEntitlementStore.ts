@@ -45,9 +45,13 @@ let authListenerStarted = false;
 let refreshPromise: Promise<EntitlementSnapshot> | null = null;
 
 function normalizePlan(value: unknown): TarlaPusulaPlan {
-  return String(value ?? 'free').trim().toLowerCase() === 'free'
-    ? 'free'
-    : 'premium';
+  const plan = String(value ?? 'free')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (plan === 'premium' || plan === 'plus') return 'premium';
+  return 'free';
 }
 
 function normalizeMode(value: unknown): DeveloperPlanMode {
@@ -227,7 +231,7 @@ function switchText() {
   if (state.developerMode === 'free') return 'ÜCRETSİZ';
   if (state.developerMode === 'new_user') return 'YENİ KULLANICI';
 
-  return `GERÇEK · ${state.realPlan === 'premium' ? 'PREMIUM' : 'FREE'}`;
+  return `GERÇEK · ${state.realPlan === 'premium' ? 'PREMIUM' : 'ÜCRETSİZ'}`;
 }
 
 function renderDeveloperSwitch() {
@@ -253,22 +257,21 @@ function renderDeveloperSwitch() {
       <strong class="tp-dev-value"></strong>
     `;
 
-    button.addEventListener('click', () => {
-      void cycleDeveloperPlanMode();
-    });
-
     document.body.appendChild(button);
   }
 
+  button.onclick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void cycleDeveloperPlanMode();
+  };
+
+  button.style.pointerEvents = state.switching ? 'none' : 'auto';
   button.dataset.mode = state.developerMode;
   button.dataset.synced = String(state.backendSynced);
   button.disabled = state.switching;
   button.title =
-    state.developerMode === 'new_user'
-      ? 'Yeni kullanıcı önizlemesi: Premium → Ücretsiz → Yeni Kullanıcı → Gerçek Plan'
-      : state.backendSynced
-        ? 'Test planı: Premium → Ücretsiz → Yeni Kullanıcı → Gerçek Plan'
-        : 'Test planı yalnızca bu cihazdaki frontend önizlemesidir.';
+    'Test görünümü: Premium → Ücretsiz → Yeni Kullanıcı → Premium';
   button.setAttribute(
     'aria-label',
     `TarlaPusula test planı: ${switchText()}`,
@@ -502,9 +505,7 @@ export async function cycleDeveloperPlanMode() {
       ? 'free'
       : state.developerMode === 'free'
         ? 'new_user'
-        : state.developerMode === 'new_user'
-          ? 'real'
-          : 'premium';
+        : 'premium';
 
   return setDeveloperPlanMode(next);
 }

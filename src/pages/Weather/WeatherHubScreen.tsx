@@ -1657,7 +1657,11 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
             </article>
           </div>
 
-          <div className="tp-wxref-data-grid">
+          <div
+            className="tp-wxref-data-grid"
+            data-required-plan="premium"
+            data-plan-feature="Gelişmiş Tarla İklimi ve Geçmiş Veriler"
+          >
             <article>
               <span className="tp-wxref-data-icon"><Icon name="rain" size={17} /></span>
               <div>
@@ -3973,6 +3977,41 @@ const WEATHER_STYLES = `
   .tp-wxr-day strong,
   .tp-wxr-card-title strong{
     font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  }
+
+
+  /* ===== Hava ekranı alt aksiyon final siyah buton fix ===== */
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-refresh.tp-wxref-refresh,
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-primary.tp-wxref-primary{
+    appearance:none!important;
+    -webkit-appearance:none!important;
+    background:#050607!important;
+    background-color:#050607!important;
+    background-image:none!important;
+    border:1px solid #050607!important;
+    color:#fff!important;
+    -webkit-text-fill-color:#fff!important;
+    box-shadow:none!important;
+    text-shadow:none!important;
+    opacity:1!important;
+    filter:none!important;
+  }
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-refresh.tp-wxref-refresh *,
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-primary.tp-wxref-primary *,
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-refresh.tp-wxref-refresh svg,
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-primary.tp-wxref-primary svg{
+    color:#fff!important;
+    -webkit-text-fill-color:#fff!important;
+    stroke:#fff!important;
+    opacity:1!important;
+  }
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-refresh.tp-wxref-refresh:disabled,
+  html body #root .tp-wxr-page .tp-wxref-actions .tp-wxref-primary.tp-wxref-primary:disabled{
+    background:#050607!important;
+    border-color:#050607!important;
+    color:#fff!important;
+    -webkit-text-fill-color:#fff!important;
+    opacity:1!important;
   }
 
 `;

@@ -1,0 +1,29 @@
+.tp-quick-calendar{
+  appearance:none;
+  -webkit-appearance:none;
+  min-height:36px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:0 11px;
+  border:1px solid #050607;
+  border-radius:10px;
+  background:#050607;
+  color:#fff;
+  -webkit-text-fill-color:#fff;
+  font:850 9px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.tp-quick-calendar svg{color:#fff;stroke:#fff}
+.tp-quick-calendar.is-saved{
+  border-color:#d8dde1;
+  background:#f2f4f5;
+  color:#252b31;
+  -webkit-text-fill-color:#252b31;
+}
+.tp-quick-calendar.is-saved svg{color:#252b31;stroke:#252b31}
+.tp-quick-calendar:disabled{cursor:default;opacity:1}
+.tp-quick-calendar .is-spinning{animation:tp-quick-calendar-spin .8s linear infinite}
+@keyframes tp-quick-calendar-spin{to{transform:rotate(360deg)}}

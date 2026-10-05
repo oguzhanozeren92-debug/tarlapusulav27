@@ -917,3 +917,19 @@ html body .tp-chat-field .tp-chat-shell .tp-field-form
   transform: scale(.98);
 }
 
+/* V28 — YENİ TARLA SİYAH BAŞLIKLAR */
+.tp-field-hero-copy{display:grid;gap:9px}
+.tp-field-eyebrow{
+  display:inline-flex!important;align-items:center!important;width:fit-content!important;
+  min-height:24px!important;padding:0 10px!important;border-radius:999px!important;
+  background:#050607!important;color:#fff!important;-webkit-text-fill-color:#fff!important
+}
+.tp-field-hero h1{
+  display:inline!important;width:fit-content!important;max-width:100%!important;
+  padding:6px 10px 8px!important;border-radius:16px!important;
+  background:#050607!important;color:#fff!important;-webkit-text-fill-color:#fff!important;
+  box-decoration-break:clone;-webkit-box-decoration-break:clone
+}
+.tp-field-lookup-button,.tp-field-external-button,.tp-field-primary-action{
+  border-color:#050607!important;background:#050607!important;color:#fff!important;-webkit-text-fill-color:#fff!important
+}

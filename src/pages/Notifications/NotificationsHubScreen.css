@@ -227,3 +227,26 @@
   .tp-notification-item { grid-template-columns: 34px minmax(0, 1fr) auto; padding-inline: 10px; }
   .tp-notification-item-icon { width: 32px; height: 32px; }
 }
+
+/* V28 — BİLDİRİMLER SİYAH AKSİYONLAR */
+.tp-notifications-field-picker select{
+  min-height:42px!important;
+  border:1px solid #050607!important;
+  border-radius:12px!important;
+  padding:0 36px 0 12px!important;
+  background-color:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-weight:800!important;
+  appearance:none!important;
+}
+.tp-notifications-home-button,
+.tp-notification-feed-actions button{
+  border:1px solid #050607!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  box-shadow:none!important;
+}
+.tp-notification-feed-actions button svg{color:#fff!important;stroke:#fff!important}
+

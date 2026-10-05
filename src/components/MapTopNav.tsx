@@ -67,6 +67,8 @@ export default function MapTopNav({ active, onNavigate }: Props) {
             <button
               key={item.key}
               type="button"
+              data-required-plan={item.key === 'vegetation' ? undefined : 'premium'}
+              data-plan-feature={item.key === 'vegetation' ? undefined : `Gelişmiş Harita · ${item.label}`}
               onClick={() => onNavigate(item.key)}
               aria-current={isActive ? 'page' : undefined}
               style={{

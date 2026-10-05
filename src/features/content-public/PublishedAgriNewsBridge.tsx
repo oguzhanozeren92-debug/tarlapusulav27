@@ -25,9 +25,11 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
+import { maybeShowFreeInterstitial } from '../../monetization/adRuntime';
 import './PublishedAgriNewsBridge.css';
 
 type ContentTab = 'turkey' | 'world' | 'articles';
+type WorldFilter = 'all' | 'markets' | 'agtech' | 'policy';
 
 type SourceRef = {
   source_name?: unknown;
@@ -186,6 +188,35 @@ function doiUrl(doi: string | null) {
   return normalized ? `https://doi.org/${normalized}` : '';
 }
 
+function worldBucket(item: LiveContentRow): Exclude<WorldFilter, 'all'> {
+  const source = sourceName(item).toLocaleLowerCase('tr-TR');
+  const text = [
+    item.title,
+    item.excerpt,
+    item.body,
+    item.category,
+    ...(item.tags ?? []),
+    ...(item.crop_tags ?? []),
+    source,
+  ].filter(Boolean).join(' ').toLocaleLowerCase('tr-TR');
+
+  if (
+    /agfunder|croplife|successful farming · agtech|global agriculture/.test(source) ||
+    /\b(agtech|precision|hassas tarım|yapay zek|artificial intelligence|robot|otonom|autonom|drone|dijital tarım|digital farming|sensör|sensor|uydu|satellite|biyolojik|biological|gen düzen|gene edit|smart tech|spraying technology)\b/.test(text)
+  ) {
+    return 'agtech';
+  }
+
+  if (
+    /world grain|western producer|farm progress|successful farming · markets|successful farming · crops/.test(source) ||
+    /\b(emtia|commodity|wheat|buğday|corn|mısır|soy|soya|canola|kanola|grain|tahıl|pulse|bakliyat|market|fiyat|price|export|import|ihracat|ithalat|stok|stock|futures|trade|ticaret|rekolte|yield)\b/.test(text)
+  ) {
+    return 'markets';
+  }
+
+  return 'policy';
+}
+
 function categoryLabel(item: LiveContentRow) {
   if (item.category?.trim()) return item.category;
   return item.content_subtype === 'article' ? 'Araştırma' : 'Tarım Gündemi';
@@ -318,6 +349,7 @@ function RatingStars({ value, average, count, disabled, onRate }: {
 
 export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSupport?: () => void }) {
   const [activeTab, setActiveTab] = useState<ContentTab>('turkey');
+  const [worldFilter, setWorldFilter] = useState<WorldFilter>('all');
   const [news, setNews] = useState<LiveContentRow[]>([]);
   const [articles, setArticles] = useState<LiveContentRow[]>([]);
   const [images, setImages] = useState<Record<string, ImageRow>>({});
@@ -397,9 +429,20 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
 
   const turkeyNews = useMemo(() => news.filter((item) => item.coverage_scope !== 'world'), [news]);
   const worldNews = useMemo(() => news.filter((item) => item.coverage_scope === 'world'), [news]);
-  const visibleNews = activeTab === 'world' ? worldNews : turkeyNews;
+  const worldCounts = useMemo(() => ({
+    all: worldNews.length,
+    markets: worldNews.filter((item) => worldBucket(item) === 'markets').length,
+    agtech: worldNews.filter((item) => worldBucket(item) === 'agtech').length,
+    policy: worldNews.filter((item) => worldBucket(item) === 'policy').length,
+  }), [worldNews]);
+  const filteredWorldNews = useMemo(
+    () => worldFilter === 'all' ? worldNews : worldNews.filter((item) => worldBucket(item) === worldFilter),
+    [worldFilter, worldNews],
+  );
+  const visibleNews = activeTab === 'world' ? filteredWorldNews : turkeyNews;
 
   const openDetail = async (item: LiveContentRow) => {
+    await maybeShowFreeInterstitial('agenda_deep_read');
     setDetail(item);
     setDetailPayload(null);
     setDetailLoading(true);
@@ -465,6 +508,23 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
         </button>
       </nav>
 
+      {activeTab === 'world' ? (
+        <nav className="tp-world-news-filters" aria-label="Dünyadan Haberler filtreleri">
+          <button type="button" className={worldFilter === 'all' ? 'active' : ''} onClick={() => setWorldFilter('all')}>
+            Tümü <small>{worldCounts.all}</small>
+          </button>
+          <button type="button" className={worldFilter === 'markets' ? 'active' : ''} onClick={() => setWorldFilter('markets')}>
+            Piyasalar / Emtia <small>{worldCounts.markets}</small>
+          </button>
+          <button type="button" className={worldFilter === 'agtech' ? 'active' : ''} onClick={() => setWorldFilter('agtech')}>
+            AgTech <small>{worldCounts.agtech}</small>
+          </button>
+          <button type="button" className={worldFilter === 'policy' ? 'active' : ''} onClick={() => setWorldFilter('policy')}>
+            Politika / İklim <small>{worldCounts.policy}</small>
+          </button>
+        </nav>
+      ) : null}
+
       {error ? <div className="tp-content-message error"><span>{error}</span><button type="button" onClick={() => setError('')}>Kapat</button></div> : null}
 
       {loading && !news.length && !articles.length ? (
@@ -478,7 +538,7 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
             </div>
             <div className="tp-news-carousel" ref={railRef}>
               {visibleNews.map((item) => {
-                const image = images[item.id];
+                const image = item.image_status === 'ready' ? images[item.id] : undefined;
                 return (
                   <article key={item.id} className="tp-news-slide" onClick={() => void openDetail(item)}>
                     <div className="tp-news-slide__media">
@@ -499,28 +559,30 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
           </div>
         ) : <div className="tp-content-state">Bu başlıkta henüz admin onaylı içerik yok.</div>
       ) : articles.length ? (
-        <div className="tp-research-list">
-          {articles.map((item) => {
-            const findings = safeArray(item.structured_body?.findings).slice(0, 3);
-            const image = images[item.id];
-            return (
-              <article key={item.id} className="tp-research-card" onClick={() => void openDetail(item)}>
-                <div className="tp-research-card__top">
-                  <div className="tp-research-card__copy">
-                    <div className="tp-research-card__meta"><span>{categoryLabel(item)}</span><time>Makale tarihi: {fmtDate(item.event_date || item.published_at)}</time><small>{readTime(item)} dk okuma</small></div>
-                    <h3>{item.title}</h3>
-                    {findings.length ? <ul className="tp-research-findings">{findings.map((finding, index) => <li key={`${item.id}-top-${index}`}>{finding}</li>)}</ul> : null}
-                    <p>{item.excerpt || item.body}</p>
-                  </div>
-                  <ContentImage image={image} className="tp-research-card__image" alt={item.title} />
+        <div className="tp-research-list tp-research-list--compact">
+          {articles.map((item) => (
+            <article key={item.id} className="tp-research-card tp-research-card--compact" onClick={() => void openDetail(item)}>
+              <div className="tp-research-card__compact-copy">
+                <div className="tp-research-card__meta">
+                  <span>{categoryLabel(item)}</span>
+                  <time>{fmtDate(item.event_date || item.published_at)}</time>
+                  <small>{readTime(item)} dk</small>
                 </div>
-                <footer className="tp-research-card__foot">
-                  <div><strong>{item.author_text || sourceName(item)}</strong>{item.institution_text ? <small>{item.institution_text}</small> : null}</div>
-                  <RatingStars value={ratings[item.id] ?? 0} average={numberValue(item.average_rating)} count={item.rating_count ?? 0} disabled={ratingBusyId === item.id} onRate={(value) => void rateArticle(item.id, value)} />
-                </footer>
-              </article>
-            );
-          })}
+                <h3>{item.title}</h3>
+              </div>
+              <button
+                type="button"
+                className="tp-research-card__open"
+                aria-label={`${item.title} makalesini aç`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void openDetail(item);
+                }}
+              >
+                <ChevronRight size={17} />
+              </button>
+            </article>
+          ))}
         </div>
       ) : <div className="tp-content-state">2 makale adayı admin onay kuyruğunda. Onaylanınca burada görünecek.</div>}
     </section>
@@ -533,6 +595,8 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
   const takeaway = payload?.practical_takeaway ?? detailStructured?.practical_takeaway ?? '';
   const chart = payload?.chart_data ?? detailStructured?.chart_data ?? null;
   const table = payload?.table_data ?? detailStructured?.table_data ?? null;
+  const fullBodyText = detail?.body?.trim() || '';
+  const leadText = payload?.summary || detail?.excerpt || '';
 
   const modal = detail ? createPortal(
     <div className="tp-content-modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setDetail(null); }}>
@@ -545,7 +609,13 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
           <figure className="tp-content-modal__cover"><ContentImage image={images[detail.id]} alt={detail.title} /></figure>
           <h2>{payload?.title || detail.title}</h2>
           {findings.length ? <section className="tp-article-section"><span>ÖNE ÇIKAN BULGULAR</span><ul>{findings.map((finding, index) => <li key={index}>{finding}</li>)}</ul></section> : null}
-          <p className="tp-content-modal__lead">{payload?.summary || detail.excerpt || detail.body}</p>
+          {leadText ? <p className="tp-content-modal__lead">{leadText}</p> : null}
+          {fullBodyText && fullBodyText !== leadText ? (
+            <section className="tp-content-full-body">
+              <span>TAM METİN</span>
+              <p>{fullBodyText}</p>
+            </section>
+          ) : null}
           {detailLoading ? <div className="tp-content-inline-loading">R2 içerik paketi yükleniyor…</div> : null}
 
           {detailBlock?.what_happened ? <section className="tp-article-section"><span>NE OLDU?</span><p>{detailBlock.what_happened}</p></section> : null}
@@ -558,6 +628,19 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
           {takeaway ? <section className="tp-article-takeaway"><span>PRATİK ÇIKARIM</span><p>{takeaway}</p></section> : null}
           {chart ? <ArticleChart chart={chart} /> : null}
           {table ? <ArticleTable table={table} /> : null}
+
+          {detail.content_subtype === 'article' ? (
+            <section className="tp-content-article-rating">
+              <span>MAKALEYİ PUANLA</span>
+              <RatingStars
+                value={ratings[detail.id] ?? 0}
+                average={numberValue(detail.average_rating)}
+                count={detail.rating_count ?? 0}
+                disabled={ratingBusyId === detail.id}
+                onRate={(value) => void rateArticle(detail.id, value)}
+              />
+            </section>
+          ) : null}
 
           <section className="tp-content-source-box">
             <span>KAYNAK</span>

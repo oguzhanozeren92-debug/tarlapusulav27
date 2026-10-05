@@ -169,7 +169,7 @@ export default function StorageRiskPanel({ fields }: { fields: Field[] }) {
   };
 
   return (
-    <section className="tp-storage-risk-v4">
+    <section className="tp-storage-risk-v4" data-required-plan="premium" data-plan-feature="Depo / Mikotoksin Riski">
       <div className="tp-storage-risk-v4-head">
         <div>
           <span>HASAT ÜRÜNLERİ</span>

@@ -1,5 +1,7 @@
 import IrrigationEconomicsPanel from '../../irrigation-economics/components/IrrigationEconomicsPanel';
 import WaterScarcityPlanPanel from '../../water-scarcity/components/WaterScarcityPlanPanel';
+import QuickCalendarButton from '../../calendar/components/QuickCalendarButton';
+import { calendarDateAfterDays } from '../../calendar/services/quickCalendar.service';
 import type { IrrigationDecisionResult } from '../types/irrigationDecision';
 import type { IrrigationWhatIfResult } from '../services/irrigationWhatIf.service';
 import './IrrigationResultPanel.css';
@@ -10,11 +12,15 @@ type Props = {
   status?: string;
   error?: string | null;
   onOpenDataEntry?: () => void;
+  onAddIrrigationRecord?: () => void;
 };
 
 function mm(value: unknown) {
+  if (value === null || value === undefined || value === '') return 'Veri yok';
   const n = Number(value);
-  return Number.isFinite(n) ? `${n.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} mm` : 'Veri yok';
+  return Number.isFinite(n)
+    ? `${n.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} mm`
+    : 'Veri yok';
 }
 function trDate(value: string | null | undefined) {
   if (!value) return '—';
@@ -36,7 +42,14 @@ function riskLabel(value: unknown) {
   return 'Hesaplanamadı';
 }
 
-export default function IrrigationResultPanel({ decision, whatIf, status, error, onOpenDataEntry }: Props) {
+export default function IrrigationResultPanel({
+  decision,
+  whatIf,
+  status,
+  error,
+  onOpenDataEntry,
+  onAddIrrigationRecord,
+}: Props) {
   if (!decision) {
     return (
       <section className="tp-irrigation-result empty">
@@ -48,6 +61,12 @@ export default function IrrigationResultPanel({ decision, whatIf, status, error,
   }
 
   const balance = decision.waterBalance;
+  const missing = new Set(Array.isArray(decision.missing) ? decision.missing : []);
+  const needsIrrigationRecord =
+    decision.irrigationStatus !== 'rainfed' &&
+    (missing.has('last_irrigation') || missing.has('last_irrigation_amount'));
+  const needsData = decision.decision === 'needs_data';
+
   const stress = decision.rainfedStress;
   const rain = decision.rainSummary;
   const forecast = Array.isArray(decision.forecast) ? decision.forecast.slice(0, 5) : [];
@@ -56,6 +75,13 @@ export default function IrrigationResultPanel({ decision, whatIf, status, error,
   const seasonModel = decision.seasonModelEvidence;
   const validation = model?.promotionGate?.validationHistory;
   const todayScenario = whatIf?.status === 'ready' ? whatIf.metrics.find((item) => item.key === 'deficit_after_2d') : null;
+  const irrigationCalendarDate =
+    decision.decision === 'irrigate_now'
+      ? calendarDateAfterDays(0)
+      : decision.decision === 'irrigation_approaching' &&
+          Number.isFinite(Number(balance?.daysToStressThreshold))
+        ? calendarDateAfterDays(Math.max(1, Math.ceil(Number(balance?.daysToStressThreshold))))
+        : null;
 
   return (
     <div className="tp-irrigation-result">
@@ -64,6 +90,44 @@ export default function IrrigationResultPanel({ decision, whatIf, status, error,
         <strong>{decision.display?.headline || 'Sulama durumu hazır'}</strong>
         <p>{decision.display?.summary || 'Su dengesi, yağış ve bitki ihtiyacı birlikte değerlendirildi.'}</p>
         {decision.display?.action ? <em>{decision.display.action}</em> : null}
+
+        {needsData && needsIrrigationRecord && onAddIrrigationRecord ? (
+          <button
+            type="button"
+            className="tp-irrigation-result-missing-action"
+            onClick={onAddIrrigationRecord}
+          >
+            <span>Eksik kayıt</span>
+            <strong>Son sulama tarihini ve verilen su miktarını ekle</strong>
+            <small>Kayıt sonrası su açığı ve önerilen su otomatik yeniden hesaplanır.</small>
+          </button>
+        ) : needsData && onOpenDataEntry ? (
+          <button
+            type="button"
+            className="tp-irrigation-result-missing-action"
+            onClick={onOpenDataEntry}
+          >
+            <span>Eksik veri</span>
+            <strong>Sulama için gerekli saha bilgilerini tamamla</strong>
+            <small>Eksik kayıtları Veri Girişi sekmesinde göstereceğim.</small>
+          </button>
+        ) : null}
+
+        {irrigationCalendarDate ? (
+          <QuickCalendarButton
+            className="tp-irrigation-calendar-action"
+            fieldId={decision.fieldId}
+            reminderType="Sulama"
+            title={decision.decision === 'irrigate_now' ? 'Sulama planı' : 'Yaklaşan sulama kontrolü'}
+            reminderDate={irrigationCalendarDate}
+            notes={[
+              decision.display?.headline,
+              decision.display?.summary,
+              decision.display?.action,
+            ].filter(Boolean).join(' · ')}
+            label={decision.decision === 'irrigate_now' ? 'Sulamayı takvime ekle' : 'Sulama kontrolünü takvime ekle'}
+          />
+        ) : null}
       </section>
 
       <section className="tp-irrigation-result-kpis">

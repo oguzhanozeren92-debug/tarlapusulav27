@@ -1,8 +1,8 @@
 import {
-  CalendarDays,
   CloudSun,
   House,
   MapPinned,
+  Newspaper,
   Sparkles,
 } from 'lucide-react';
 
@@ -330,7 +330,6 @@ export default function ClassicBottomNav({
   activeScreen,
   setScreen,
   onOpenAi,
-  onOpenCalendar,
   onOpenFields,
 }: ClassicBottomNavProps) {
 
@@ -385,17 +384,6 @@ export default function ClassicBottomNav({
     }
 
     go('aiAnalysis');
-  };
-
-
-  const goCalendar = () => {
-
-    if (onOpenCalendar) {
-      onOpenCalendar();
-      return;
-    }
-
-    go('calendar');
   };
 
 
@@ -508,24 +496,24 @@ export default function ClassicBottomNav({
         <button
           type="button"
           className={
-            activeScreen === 'calendar'
+            activeScreen === 'agendaHub'
               ? 'active'
               : ''
           }
           aria-current={
-            activeScreen === 'calendar'
+            activeScreen === 'agendaHub'
               ? 'page'
               : undefined
           }
-          onClick={goCalendar}
+          onClick={() => go('agendaHub')}
         >
 
           <span className="tp-classic-bottom-icon">
-            <CalendarDays strokeWidth={1.8} />
+            <Newspaper strokeWidth={1.8} />
           </span>
 
           <span className="tp-classic-bottom-label">
-            Takvim
+            Gündem
           </span>
 
         </button>

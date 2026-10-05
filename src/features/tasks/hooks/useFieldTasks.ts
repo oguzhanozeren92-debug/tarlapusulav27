@@ -78,10 +78,33 @@ export function useFieldTasks(fieldId: string, open: boolean) {
 
   const complete = useCallback(async (task: FieldTask) => {
     setMessage(null);
+    const beforePoints = getGamificationState().points;
+
     try {
       const result = await completeFieldTask(task);
       setMessage(result.message);
-      if (result.completed) await refresh();
+
+      if (result.completed) {
+        await refresh();
+
+        try {
+          const nextGamification = await refreshGamification();
+          const gainedFromState = Math.max(0, nextGamification.points - beforePoints);
+          const gainedFromResult = Math.max(0, Number((result as any)?.awardedPoints ?? 0));
+          const gained = Math.max(gainedFromState, gainedFromResult);
+
+          if (gained > 0) {
+            showGamificationAward(
+              task.title || 'Görev tamamlandı',
+              gained,
+              task.taskKey || 'TASK_REWARD',
+            );
+          }
+        } catch (gamificationError) {
+          console.warn('[tasks] Puan kutlaması yenilenemedi:', gamificationError);
+        }
+      }
+
       return result;
     } catch (caught) {
       const next = caught instanceof Error ? caught.message : 'Görev tamamlanamadı.';

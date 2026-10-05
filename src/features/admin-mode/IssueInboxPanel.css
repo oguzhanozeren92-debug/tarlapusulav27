@@ -1,0 +1,54 @@
+.tp-issue-inbox{color:#111}
+.tp-issue-inbox-toolbar{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}
+.tp-issue-inbox-toolbar h3{margin:0;color:#111;font-size:20px}
+.tp-issue-inbox-toolbar p{margin:4px 0 0;color:#66707a;font-size:12px}
+.tp-issue-inbox-toolbar>button,.tp-issue-inbox-filters button,.tp-issue-inbox-actions button{
+  border:1px solid #d3d8dd;border-radius:12px;background:#fff;color:#111;font-weight:800;cursor:pointer
+}
+.tp-issue-inbox-toolbar>button{min-height:38px;padding:0 14px}
+.tp-issue-inbox-filters{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.tp-issue-inbox-filters button{min-height:34px;padding:0 10px;font-size:10px}
+.tp-issue-inbox-filters button.active{background:#111;color:#fff;border-color:#111}
+.tp-issue-inbox-filters button b{margin-left:4px}
+.tp-issue-inbox-filters input{min-width:220px;flex:1;min-height:36px;border:1px solid #d3d8dd;border-radius:12px;background:#fff;color:#111;padding:0 11px;font-size:11px;outline:none}
+.tp-issue-inbox-notice{margin:8px 0 12px;padding:9px 11px;border-radius:11px;background:#f1f3f5;color:#111;font-size:11px;font-weight:750}
+.tp-issue-inbox-layout{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.35fr);gap:12px;min-height:420px}
+.tp-issue-inbox-list,.tp-issue-inbox-detail{border:1px solid #dce0e4;border-radius:16px;background:#fff;overflow:auto}
+.tp-issue-inbox-list{max-height:56vh}
+.tp-issue-inbox-list>button{width:100%;display:block;padding:12px;border:0;border-bottom:1px solid #edf0f2;background:#fff;color:#111;text-align:left;cursor:pointer}
+.tp-issue-inbox-list>button.active{background:#f0f2f4;box-shadow:inset 3px 0 0 #111}
+.tp-issue-inbox-list-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.tp-issue-inbox-list time{color:#7b848c;font-size:9px}
+.tp-issue-inbox-list strong{display:block;margin-top:7px;font-size:11px;color:#111}
+.tp-issue-inbox-list p{margin:5px 0;color:#404850;font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tp-issue-inbox-list small{color:#778089;font-size:9px}
+.tp-issue-inbox .status{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:999px;font-size:9px;font-weight:900}
+.tp-issue-inbox .status--new{background:#111;color:#fff}
+.tp-issue-inbox .status--reviewing{background:#e9ecef;color:#111}
+.tp-issue-inbox .status--resolved{background:#f4f5f6;color:#5c636a}
+.tp-issue-inbox-detail{padding:15px;max-height:56vh}
+.tp-issue-inbox-detail header small{color:#737b83;font-size:9px;font-weight:900;letter-spacing:.08em}
+.tp-issue-inbox-detail header h4{margin:4px 0 2px;color:#111;font-size:17px}
+.tp-issue-inbox-detail header p{margin:0;color:#757e86;font-size:10px}
+.tp-issue-inbox-message{margin-top:14px;padding:13px;border-radius:14px;background:#f4f5f6}
+.tp-issue-inbox-message strong{font-size:10px}
+.tp-issue-inbox-message p{margin:7px 0 0;color:#111;font-size:12px;line-height:1.55;white-space:pre-wrap}
+.tp-issue-inbox-attachment{margin-top:12px}
+.tp-issue-inbox-attachment>div:first-child{display:flex;justify-content:space-between;gap:10px;margin-bottom:7px}
+.tp-issue-inbox-attachment strong{font-size:10px}.tp-issue-inbox-attachment span{color:#737b83;font-size:9px}
+.tp-issue-inbox-attachment img{display:block;width:100%;max-height:320px;object-fit:contain;border:1px solid #dde1e4;border-radius:12px;background:#eef0f2}
+.tp-issue-inbox-image-loading{min-height:120px;display:grid;place-items:center;border-radius:12px;background:#f1f3f5;color:#69717a;font-size:10px}
+.tp-issue-inbox-meta{display:grid;gap:6px;margin-top:12px}
+.tp-issue-inbox-meta>div{display:grid;grid-template-columns:60px minmax(0,1fr);gap:8px;font-size:9px}
+.tp-issue-inbox-meta span{color:#7a8289}.tp-issue-inbox-meta b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#222}
+.tp-issue-inbox-note{display:grid;gap:6px;margin-top:13px;font-size:10px;font-weight:850}
+.tp-issue-inbox-note textarea{width:100%;padding:10px;border:1px solid #d4d9dd;border-radius:12px;background:#fff;color:#111;resize:vertical;font:inherit;font-weight:600;line-height:1.45;outline:none}
+.tp-issue-inbox-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:12px}
+.tp-issue-inbox-actions button{min-height:37px;padding:0 11px;font-size:10px}
+.tp-issue-inbox-actions button.primary{background:#111;color:#fff;border-color:#111}
+.tp-issue-inbox-empty{padding:24px;color:#737b83;font-size:11px;text-align:center}
+@media(max-width:780px){
+  .tp-issue-inbox-layout{grid-template-columns:1fr}
+  .tp-issue-inbox-list,.tp-issue-inbox-detail{max-height:none}
+  .tp-issue-inbox-list{max-height:34vh}
+}

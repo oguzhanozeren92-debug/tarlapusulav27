@@ -1,0 +1,42 @@
+.tp-issue-modal-backdrop{
+  position:fixed; inset:0; z-index:12050; display:grid; place-items:center; padding:18px;
+  background:rgba(0,0,0,.56); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}
+.tp-issue-modal{
+  width:min(100%,520px); max-height:min(88vh,760px); overflow:auto; padding:20px;
+  border:1px solid #d9dde1; border-radius:24px; background:#fff; color:#111;
+  box-shadow:0 24px 80px rgba(0,0,0,.26);
+}
+.tp-issue-modal header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+.tp-issue-modal header small{display:block;color:#6b7280;font-size:10px;font-weight:900;letter-spacing:.14em}
+.tp-issue-modal header h3{margin:4px 0 4px;color:#080808;font-size:24px;line-height:1.1}
+.tp-issue-modal header p{margin:0;color:#4b5563;font-size:13px;line-height:1.45}
+.tp-issue-modal header>button{width:36px;height:36px;border:1px solid #d8dde2;border-radius:50%;background:#fff;color:#111;font-size:24px;cursor:pointer}
+.tp-issue-field{display:grid;gap:7px;margin-top:14px;color:#111;font-size:12px;font-weight:800}
+.tp-issue-field select,.tp-issue-field textarea{
+  width:100%; border:1px solid #cfd5db; border-radius:14px; background:#fff; color:#111; font:inherit; font-weight:600; outline:none;
+}
+.tp-issue-field select{height:44px;padding:0 12px}
+.tp-issue-field textarea{min-height:132px;padding:12px;resize:vertical;line-height:1.45}
+.tp-issue-field select:focus,.tp-issue-field textarea:focus{border-color:#111;box-shadow:0 0 0 3px rgba(17,17,17,.08)}
+.tp-issue-field>small{justify-self:end;color:#7a828a;font-size:10px}
+.tp-issue-attachment{margin-top:14px;padding:13px;border:1px solid #d9dde1;border-radius:16px;background:#f7f8f9;display:flex;gap:12px;align-items:center;justify-content:space-between}
+.tp-issue-attachment>div{display:grid;gap:3px}
+.tp-issue-attachment strong{color:#111;font-size:12px}
+.tp-issue-attachment span{color:#68717a;font-size:10px}
+.tp-issue-file-button{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 13px;border-radius:12px;background:#111;color:#fff;font-size:11px;font-weight:850;cursor:pointer;white-space:nowrap}
+.tp-issue-file-button input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.tp-issue-preview{margin-top:12px;padding:10px;border:1px solid #dde1e5;border-radius:16px;background:#f8f9fa}
+.tp-issue-preview img{display:block;width:100%;max-height:280px;object-fit:contain;border-radius:10px;background:#eceff1}
+.tp-issue-preview button{margin-top:8px;border:0;background:transparent;color:#111;text-decoration:underline;font-size:11px;font-weight:800;cursor:pointer}
+.tp-issue-notice{margin-top:12px;padding:10px 12px;border-radius:12px;background:#f1f3f5;color:#111;font-size:12px;font-weight:750}
+.tp-issue-modal footer{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
+.tp-issue-modal footer button{min-height:42px;padding:0 16px;border-radius:12px;font-size:12px;font-weight:850;cursor:pointer}
+.tp-issue-modal footer .ghost{border:1px solid #cfd5db;background:#fff;color:#111}
+.tp-issue-modal footer .primary{border:1px solid #111;background:#111;color:#fff}
+.tp-issue-modal footer .primary:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:560px){
+  .tp-issue-modal-backdrop{align-items:end;padding:0}
+  .tp-issue-modal{width:100%;max-height:92vh;border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  .tp-issue-attachment{align-items:flex-start;flex-direction:column}
+}

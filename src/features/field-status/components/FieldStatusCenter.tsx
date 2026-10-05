@@ -2469,7 +2469,15 @@ export default function FieldStatusCenter({
                 whatIf={irrigation?.whatIf ?? null}
                 status={irrigationStatus}
                 error={irrigation?.error ?? null}
-                onOpenDataEntry={() => setTab('input')}
+                onAddIrrigationRecord={onOpenIrrigationRecord}
+                onOpenDataEntry={() => {
+                  setTab('input');
+                  window.setTimeout(() => {
+                    document
+                      .getElementById('tp-field-status-irrigation-inputs')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 120);
+                }}
               />
 
             </div>

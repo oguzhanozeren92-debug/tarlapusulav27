@@ -40,6 +40,10 @@ type FieldMapProps = {
 
   drawEnabled?: boolean;
 
+  drawButtonLabel?: string;
+
+  constrainDrawingToParcel?: boolean;
+
   onSectionDrawn?: (result: {
     geometry: ParcelFeature;
     areaSquareMeters: number;
@@ -67,6 +71,8 @@ export default function FieldMap({
   initialZoom = 5.3,
   height = 520,
   drawEnabled = true,
+  drawButtonLabel = '✏️ Alan Çiz',
+  constrainDrawingToParcel = true,
   onSectionDrawn,
 }: FieldMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -502,6 +508,39 @@ export default function FieldMap({
   }, [parcelGeometry, candidateGeometry, selectedPoint, sectionCollection]);
 
   useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map) return;
+    if (parcelGeometry || selectedPoint || drawing) return;
+
+    const moveToInitialView = () => {
+      map.easeTo({
+        center: initialCenter,
+        zoom: initialZoom,
+        duration: 650,
+      });
+    };
+
+    if (map.loaded()) {
+      moveToInitialView();
+      return;
+    }
+
+    map.once('load', moveToInitialView);
+
+    return () => {
+      map.off('load', moveToInitialView);
+    };
+  }, [
+    initialCenter[0],
+    initialCenter[1],
+    initialZoom,
+    parcelGeometry,
+    selectedPoint,
+    drawing,
+  ]);
+
+  useEffect(() => {
     updateSource('drawing', drawingCollection);
   }, [drawingCollection]);
 
@@ -580,7 +619,7 @@ export default function FieldMap({
         event.lngLat.lat,
       ];
 
-      if (parcelGeometry) {
+      if (parcelGeometry && constrainDrawingToParcel) {
         const clickedPoint = turf.point(coordinate);
 
         const insideParcel = turf.booleanPointInPolygon(
@@ -697,7 +736,7 @@ export default function FieldMap({
       coordinates,
     ]) as ParcelFeature;
 
-    if (parcelGeometry) {
+    if (parcelGeometry && constrainDrawingToParcel) {
       const completelyInside = turf.booleanWithin(
         polygonFeature,
 
@@ -767,7 +806,7 @@ export default function FieldMap({
                 className="field-map-draw-button"
                 onClick={startDrawing}
               >
-                ✏️ Bölüm Çiz
+                {drawButtonLabel}
               </button>
             ) : (
               <>
@@ -799,9 +838,15 @@ export default function FieldMap({
         )}
       </div>
 
+      {pointSelectionEnabled && !drawing ? (
+        <div className="field-map-pick-banner" aria-live="polite">
+          ⌖ Tarlanın içine dokun
+        </div>
+      ) : null}
+
       <div
         ref={mapContainerRef}
-        className="field-map-container"
+        className={`field-map-container${pointSelectionEnabled && !drawing ? ' is-point-selection' : ''}`}
         style={{
           height:
             typeof height === 'number'
@@ -826,6 +871,7 @@ export default function FieldMap({
 
       <style>{`
         .field-map-shell {
+          position: relative;
           width: 100%;
           overflow: hidden;
           border: 1px solid rgba(35, 78, 48, 0.12);
@@ -892,6 +938,30 @@ export default function FieldMap({
           width: 100%;
           min-height: 320px;
           background: #e7ece5;
+        }
+
+        .field-map-container.is-point-selection,
+        .field-map-container.is-point-selection .maplibregl-canvas {
+          cursor: crosshair !important;
+        }
+
+        .field-map-pick-banner {
+          position: absolute;
+          z-index: 25;
+          top: 68px;
+          left: 50%;
+          transform: translateX(-50%);
+          max-width: calc(100% - 28px);
+          padding: 8px 12px;
+          border: 1px solid rgba(17,18,20,.22);
+          border-radius: 999px;
+          background: rgba(17,18,20,.92);
+          color: #fff;
+          font-size: 11px;
+          font-weight: 850;
+          box-shadow: 0 8px 22px rgba(17,18,20,.18);
+          pointer-events: none;
+          white-space: nowrap;
         }
 
         .field-map-message {

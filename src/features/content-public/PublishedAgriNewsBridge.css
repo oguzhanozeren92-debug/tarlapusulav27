@@ -800,3 +800,308 @@
       line-height: 1.65 !important;
     }
   }
+
+/* =========================================================
+   TARIM GÜNDEMİ V26 — SİYAH KONTROLLER + KOMPAKT MAKALELER
+   ========================================================= */
+
+html body #root .tp-content-hub .tp-content-refresh--icon,
+html body #root .tp-content-hub .tp-news-carousel-controls button {
+  background:#050607 !important;
+  background-color:#050607 !important;
+  background-image:none !important;
+  border-color:#050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  box-shadow:none !important;
+}
+html body #root .tp-content-hub .tp-content-refresh--icon svg,
+html body #root .tp-content-hub .tp-news-carousel-controls button svg {
+  color:#ffffff !important;
+  stroke:#ffffff !important;
+}
+
+html body #root .tp-content-hub .tp-content-tabs--clean {
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:4px !important;
+}
+html body #root .tp-content-hub .tp-content-tabs--clean > button {
+  min-width:0 !important;
+  min-height:42px !important;
+  padding:0 6px !important;
+  background:#050607 !important;
+  background-color:#050607 !important;
+  border:1px solid #050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  font-family:var(--tp-font-display, Georgia, "Times New Roman", serif) !important;
+  font-size:10px !important;
+  font-weight:650 !important;
+  box-shadow:none !important;
+}
+html body #root .tp-content-hub .tp-content-tabs--clean > button svg {
+  color:#ffffff !important;
+  stroke:#ffffff !important;
+}
+html body #root .tp-content-hub .tp-content-tabs--clean > button small {
+  background:rgba(255,255,255,.17) !important;
+  color:#ffffff !important;
+}
+html body #root .tp-content-hub .tp-content-tabs--clean > button.active {
+  background:#000 !important;
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.36) !important;
+}
+
+html body #root .tp-content-hub .tp-content-hub__header h2,
+html body #root .tp-content-hub .tp-news-slide h3,
+html body #root .tp-content-hub .tp-research-card h3,
+html body #root .tp-content-modal h2 {
+  font-family:var(--tp-font-display, Georgia, "Times New Roman", serif) !important;
+  font-weight:650 !important;
+  letter-spacing:-.025em !important;
+}
+html body #root .tp-content-hub .tp-content-hub__header > div:first-child > span {
+  color:#a98137 !important;
+}
+
+/* Makaleler artık liste halinde başlık-first. */
+.tp-research-list--compact {
+  display:grid !important;
+  gap:8px !important;
+}
+.tp-research-card--compact {
+  min-height:72px !important;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) 38px !important;
+  align-items:center !important;
+  gap:10px !important;
+  padding:12px 12px 12px 14px !important;
+  border-radius:15px !important;
+}
+.tp-research-card__compact-copy {
+  min-width:0;
+}
+.tp-research-card--compact h3 {
+  margin:5px 0 0 !important;
+  font-size:16px !important;
+  line-height:1.2 !important;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+}
+.tp-research-card__open {
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border:1px solid #050607;
+  border-radius:11px;
+  background:#050607;
+  color:#fff;
+  cursor:pointer;
+}
+.tp-research-card__open svg {
+  color:#fff;
+  stroke:#fff;
+}
+.tp-content-article-rating {
+  margin-top:14px;
+  padding:14px;
+  border:1px solid #e3e6e8;
+  border-radius:15px;
+  background:#f7f8f9;
+}
+.tp-content-article-rating > span {
+  display:block;
+  margin-bottom:7px;
+  color:#6c7580;
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:.12em;
+}
+
+@media(max-width:640px){
+  html body #root .tp-content-hub .tp-content-tabs--clean {
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    gap:3px !important;
+  }
+  html body #root .tp-content-hub .tp-content-tabs--clean > button {
+    min-height:40px !important;
+    padding:0 3px !important;
+    gap:3px !important;
+    font-size:8.2px !important;
+    flex-direction:row !important;
+  }
+  html body #root .tp-content-hub .tp-content-tabs--clean > button svg {
+    width:12px !important;
+    height:12px !important;
+  }
+  html body #root .tp-content-hub .tp-content-tabs--clean > button small {
+    display:inline-flex !important;
+    min-width:15px !important;
+    height:15px !important;
+    font-size:6.5px !important;
+  }
+  .tp-research-card--compact {
+    min-height:68px !important;
+    padding:10px 10px 10px 12px !important;
+  }
+  .tp-research-card--compact h3 {
+    font-size:15px !important;
+  }
+}
+
+/* =========================================================
+   TARIM GÜNDEMİ — TİPOGRAFİ SON OTORİTE
+   Diğer TarlaPusula ekranlarıyla aynı UI font ailesi.
+   ========================================================= */
+
+/* Ana başlık */
+html body #root .tp-content-hub .tp-content-hub__header h2 {
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  font-size:20px !important;
+  font-weight:800 !important;
+  line-height:1.08 !important;
+  letter-spacing:-.035em !important;
+}
+
+/* Üst açıklama */
+html body #root .tp-content-hub .tp-content-hub__header p {
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  font-size:10px !important;
+  font-weight:500 !important;
+  line-height:1.4 !important;
+}
+
+/* Altın küçük üst başlık */
+html body #root .tp-content-hub .tp-content-hub__header > div:first-child > span {
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  font-size:7px !important;
+  font-weight:850 !important;
+  letter-spacing:.13em !important;
+  text-transform:uppercase !important;
+}
+
+/* Türkiye / Dünya / Makaleler / Destekler */
+html body #root .tp-content-hub .tp-content-tabs--clean > button {
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  font-size:9px !important;
+  font-weight:800 !important;
+  line-height:1 !important;
+  letter-spacing:-.015em !important;
+}
+
+/* Sayaçlar */
+html body #root .tp-content-hub .tp-content-tabs--clean > button small {
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  font-size:7px !important;
+  font-weight:850 !important;
+  letter-spacing:0 !important;
+}
+
+/* Haber / makale başlıkları da aynı ailede */
+html body #root .tp-content-hub .tp-news-slide h3,
+html body #root .tp-content-hub .tp-research-card h3,
+html body #root .tp-content-modal h2 {
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  font-weight:800 !important;
+  letter-spacing:-.025em !important;
+}
+
+@media(max-width:640px){
+  html body #root .tp-content-hub .tp-content-hub__header h2 {
+    font-size:18px !important;
+  }
+
+  html body #root .tp-content-hub .tp-content-tabs--clean > button {
+    font-size:8px !important;
+    font-weight:800 !important;
+  }
+}
+
+
+/* FULL PUBLISHED CONTENT BODY */
+.tp-content-full-body{
+  margin:14px 0 0;
+  padding:15px;
+  border:1px solid #e3e6e8;
+  border-radius:15px;
+  background:#fff;
+}
+.tp-content-full-body>span{
+  display:block;
+  margin-bottom:7px;
+  color:#737d87;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.11em;
+}
+.tp-content-full-body>p{
+  margin:0;
+  color:#414a54;
+  font-size:13px;
+  font-weight:400;
+  line-height:1.72;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+@media(max-width:640px){
+  .tp-content-full-body{
+    padding:13px;
+  }
+  .tp-content-full-body>p{
+    font-size:13.5px;
+    line-height:1.72;
+  }
+}
+
+
+/* WORLD NEWS FILTERS */
+.tp-world-news-filters{
+  display:flex;
+  gap:7px;
+  margin:-5px 0 14px;
+  padding:2px 0 3px;
+  overflow-x:auto;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.tp-world-news-filters::-webkit-scrollbar{display:none}
+.tp-world-news-filters button{
+  flex:0 0 auto;
+  min-height:34px;
+  padding:0 11px;
+  border:1px solid #d9dee2;
+  border-radius:999px;
+  background:#fff;
+  color:#4e5862;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  font:800 10px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  cursor:pointer;
+}
+.tp-world-news-filters button.active{
+  border-color:#0b0d0f;
+  background:#0b0d0f;
+  color:#fff;
+}
+.tp-world-news-filters button small{
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#eef1f3;
+  color:#59636d;
+  font-size:8px;
+}
+.tp-world-news-filters button.active small{
+  background:#fff;
+  color:#0b0d0f;
+}

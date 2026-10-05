@@ -1,5 +1,10 @@
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Compass,
+} from 'lucide-react';
 import { onboardingQuestions } from '../../data/onboarding';
-import { Button, Card } from '../../ui';
 import './Onboarding.css';
 
 type OnboardingScreenProps = {
@@ -37,49 +42,59 @@ export default function OnboardingScreen({
   if (!currentQuestion) return null;
 
   const isLastStep = onboardingStep === onboardingQuestions.length - 1;
+  const answered = selectedAnswers.length > 0;
+  const progress = ((onboardingStep + 1) / onboardingQuestions.length) * 100;
 
   return (
     <>
       <style>{cmsRuntimeCss}</style>
 
       <main className="tp-ob-page">
-        <div className="tp-ob-pattern" aria-hidden="true" />
-
-        <Card className="tp-ob-shell">
+        <section className="tp-ob-shell" aria-labelledby="tp-ob-question">
           <header className="tp-ob-top">
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
+              type="button"
               className="tp-ob-back"
               onClick={onBack}
               aria-label="Geri"
             >
-              ←
-            </Button>
+              <ArrowLeft size={18} />
+            </button>
 
-            <div className="tp-ob-step">
-              <strong>{onboardingStep + 1}</strong>
-              <span>/ {onboardingQuestions.length}</span>
+            <div className="tp-ob-brand" aria-label="TarlaPusula başlangıç profili">
+              <span className="tp-ob-brand-mark" aria-hidden="true">
+                <Compass size={17} />
+              </span>
+              <div>
+                <small>BAŞLANGIÇ PROFİLİ</small>
+                <strong>Seni tanıyalım</strong>
+              </div>
             </div>
 
-            <div className="tp-ob-top-spacer" aria-hidden="true" />
+            <span className="tp-ob-step">
+              <strong>{onboardingStep + 1}</strong>
+              <small>/ {onboardingQuestions.length}</small>
+            </span>
           </header>
 
           <div
             className="tp-ob-progress"
-            aria-label={`Adım ${onboardingStep + 1} / ${onboardingQuestions.length}`}
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={onboardingQuestions.length}
+            aria-valuenow={onboardingStep + 1}
+            aria-label={`Soru ${onboardingStep + 1} / ${onboardingQuestions.length}`}
           >
-            {onboardingQuestions.map((_, index) => (
-              <span
-                key={index}
-                className={index <= onboardingStep ? 'is-active' : ''}
-              />
-            ))}
+            <i style={{ width: `${progress}%` }} />
           </div>
 
           <section className="tp-ob-copy">
-            <span className="tp-ob-kicker">SENİ TANIYALIM</span>
-            <h1>{currentQuestion.title}</h1>
+            <div className="tp-ob-question-meta">
+              <span>SORU {String(onboardingStep + 1).padStart(2, '0')}</span>
+              {currentQuestion.multi ? <em>Birden fazla seçebilirsin</em> : <em>Bir seçim yap</em>}
+            </div>
+
+            <h1 id="tp-ob-question">{currentQuestion.title}</h1>
             <p>{currentQuestion.subtitle}</p>
           </section>
 
@@ -101,38 +116,27 @@ export default function OnboardingScreen({
 
                   <span className="tp-ob-option-label">{label}</span>
 
-                  <span
-                    className="tp-ob-option-check"
-                    aria-hidden="true"
-                  >
-                    {selected ? '✓' : ''}
+                  <span className="tp-ob-option-check" aria-hidden="true">
+                    {selected ? <Check size={13} strokeWidth={3} /> : null}
                   </span>
                 </button>
               );
             })}
-
-            {showOtherProductInput ? (
-              <Card tone="subtle" flat className="tp-ob-other">
-                <label htmlFor="tp-ob-other-product">
-                  Diğer ürünün adı
-                </label>
-
-                <input
-                  id="tp-ob-other-product"
-                  type="text"
-                  value={otherProduct}
-                  onChange={(event) =>
-                    onOtherProductChange(event.target.value)
-                  }
-                  placeholder="Örn: Şeker pancarı, Pamuk, Çay, Kivi..."
-                />
-
-                <small>
-                  Listede olmayan ürünü buraya yazabilirsin.
-                </small>
-              </Card>
-            ) : null}
           </div>
+
+          {showOtherProductInput ? (
+            <label className="tp-ob-other" htmlFor="tp-ob-other-product">
+              <span>Diğer ürünün adı</span>
+              <input
+                id="tp-ob-other-product"
+                type="text"
+                value={otherProduct}
+                onChange={(event) => onOtherProductChange(event.target.value)}
+                placeholder="Örn. Şeker pancarı, Pamuk, Çay…"
+                autoComplete="off"
+              />
+            </label>
+          ) : null}
 
           {authMessage ? (
             <div className="tp-ob-message" role="status">
@@ -141,28 +145,33 @@ export default function OnboardingScreen({
           ) : null}
 
           <footer className="tp-ob-actions">
-            <Button
-              variant="secondary"
-              size="lg"
+            <button
+              type="button"
+              className="tp-ob-skip"
               onClick={onSkip}
               disabled={authLoading}
             >
               Şimdilik geç
-            </Button>
+            </button>
 
-            <Button
-              size="lg"
+            <button
+              type="button"
+              className="tp-ob-next"
               onClick={onNext}
               disabled={authLoading}
+              data-answered={answered ? 'true' : 'false'}
             >
-              {authLoading
-                ? 'Kaydediliyor...'
-                : isLastStep
-                  ? 'Tamamla'
-                  : 'Devam'}
-            </Button>
+              <span>
+                {authLoading
+                  ? 'Kaydediliyor…'
+                  : isLastStep
+                    ? 'Profili tamamla'
+                    : 'Devam et'}
+              </span>
+              {!authLoading ? <ArrowRight size={17} /> : null}
+            </button>
           </footer>
-        </Card>
+        </section>
       </main>
     </>
   );

@@ -504,6 +504,87 @@ function savePreferences(value: NotificationPreferences) {
   }
 }
 
+async function loadServerPreferences(): Promise<NotificationPreferences | null> {
+  if (!supabase) return null;
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return null;
+
+    const { data, error } = await supabase
+      .from('user_notification_preferences')
+      .select('satellite_enabled,field_activity_enabled,irrigation_enabled,plant_health_enabled,weather_enabled,market_enabled,support_enabled,news_enabled,reports_enabled,achievement_enabled,reengagement_enabled')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      field: Boolean(
+        data.satellite_enabled &&
+        data.field_activity_enabled &&
+        data.irrigation_enabled &&
+        data.plant_health_enabled
+      ),
+      weather: Boolean(data.weather_enabled),
+      market: Boolean(data.market_enabled),
+      pusula: Boolean(
+        data.support_enabled &&
+        data.news_enabled &&
+        data.reports_enabled &&
+        data.achievement_enabled &&
+        data.reengagement_enabled
+      ),
+    };
+  } catch (error) {
+    console.warn('Sunucu bildirim tercihleri okunamadı:', error);
+    return null;
+  }
+}
+
+async function saveServerPreferenceGroup(
+  key: NotificationPreferenceKey,
+  enabled: boolean,
+) {
+  if (!supabase) return;
+
+  const groupPatch: Record<NotificationPreferenceKey, Record<string, boolean>> = {
+    field: {
+      satellite_enabled: enabled,
+      field_activity_enabled: enabled,
+      irrigation_enabled: enabled,
+      plant_health_enabled: enabled,
+    },
+    weather: { weather_enabled: enabled },
+    market: { market_enabled: enabled },
+    pusula: {
+      support_enabled: enabled,
+      news_enabled: enabled,
+      reports_enabled: enabled,
+      achievement_enabled: enabled,
+      reengagement_enabled: enabled,
+    },
+  };
+
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return;
+
+    const { error } = await supabase
+      .from('user_notification_preferences')
+      .upsert(
+        {
+          user_id: user.id,
+          ...groupPatch[key],
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' },
+      );
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Bildirim tercihi sunucuya kaydedilemedi:', error);
+  }
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -632,6 +713,11 @@ function NotificationsHub({
 
   useEffect(() => {
     void loadNotifications();
+    void loadServerPreferences().then((serverPreferences) => {
+      if (!serverPreferences) return;
+      setPreferences(serverPreferences);
+      savePreferences(serverPreferences);
+    });
   }, []);
 
   const filtered = useMemo(() => {
@@ -667,9 +753,22 @@ function NotificationsHub({
   const openNotification = async (item: HubNotification) => {
     await markOneRead(item.id);
 
-    const actionTarget = String(item.data?.action_target ?? '').trim();
+    const actionTarget = String(item.data?.action_target ?? item.data?.actionTarget ?? '').trim();
+
+    if (actionTarget === 'field-activity') {
+      const fieldId = String(item.data?.fieldId ?? item.data?.field_id ?? '').trim();
+      const field = realFields.find((entry) => String(entry?.id ?? '') === fieldId);
+
+      if (field && openFieldDetail) {
+        openFieldDetail(field, { actionTarget: 'field-activity' });
+      } else {
+        setScreen('home');
+      }
+      return;
+    }
+
     if (item.target === 'field_growth' || actionTarget === 'field-growth') {
-      const fieldId = String(item.data?.field_id ?? '').trim();
+      const fieldId = String(item.data?.field_id ?? item.data?.fieldId ?? '').trim();
       const field = realFields.find((entry) => String(entry?.id ?? '') === fieldId);
 
       if (field && openFieldDetail) {
@@ -705,6 +804,7 @@ function NotificationsHub({
     setPreferences((current) => {
       const next = { ...current, [key]: !current[key] };
       savePreferences(next);
+      void saveServerPreferenceGroup(key, next[key]);
       return next;
     });
   };
@@ -869,6 +969,14 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
     return () => { alive = false; };
   }, []);
 
+  useEffect(() => {
+    void loadServerPreferences().then((serverPreferences) => {
+      if (!serverPreferences) return;
+      setPreferences(serverPreferences);
+      savePreferences(serverPreferences);
+    });
+  }, []);
+
   const planLabel = plan === 'premium' ? 'Premium' : plan === 'plus' ? 'Plus' : 'Ücretsiz';
   const planText = plan === 'premium'
     ? 'Sınırsız tarla, tüm modüller ve tam Pusula asistanı.'
@@ -880,6 +988,7 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
     setPreferences((current) => {
       const next = { ...current, [key]: !current[key] };
       savePreferences(next);
+      void saveServerPreferenceGroup(key, next[key]);
       return next;
     });
   };

@@ -1,42 +1,37 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, RefreshCw, Search, Sprout } from 'lucide-react';
+import {
+  ArrowLeft,
+  ExternalLink,
+  RefreshCw,
+  Search,
+  Sprout,
+  X,
+} from 'lucide-react';
 import { supabase } from '../../../supabaseClient';
-import { KNOWLEDGE_GUIDE, type KnowledgeGuideEntry } from '../data/guide.ts';
-import { knowledgeEntries } from '../services/catalog.ts';
-import { knowledgeSources } from '../data/sources.ts';
 import './KnowledgeLibrary.css';
 
-type LiveGuideStructuredBody = {
-  channel?: string | null;
-  problem?: string | null;
-  findings?: string[] | null;
-  practical_takeaway?: string | null;
-  crop_matches?: string[] | null;
-  topic?: string | null;
-  guide?: {
-    problem_or_goal?: string | null;
-    when_to_check?: string[] | null;
-    what_to_look_for?: string[] | null;
-    field_check_steps?: string[] | null;
-    management_steps?: string[] | null;
-    prevention?: string[] | null;
-    avoid?: string[] | null;
-    turkey_note?: string | null;
-    source_sufficiency?: 'strong' | 'medium' | 'weak' | string | null;
-    producer_value_score?: number | null;
-  } | null;
-  detail?: {
-    lead?: string | null;
-    background?: string | null;
-    what_happened?: string | null;
-    why_it_matters?: string | null;
-    producer_impact?: string | null;
-    where_when?: string | null;
-    source_note?: string | null;
-  } | null;
+type GuideData = {
+  quick_answer?: string | null;
+  why_it_matters?: string | null;
+  when_to_check?: string[] | null;
+  what_to_look_for?: string[] | null;
+  field_check_steps?: string[] | null;
+  decision_rules?: string[] | null;
+  management_steps?: string[] | null;
+  prevention?: string[] | null;
+  common_mistakes?: string[] | null;
+  avoid?: string[] | null;
+  turkey_note?: string | null;
+  producer_value_score?: number | null;
 };
 
-type LiveGuideRow = {
+type KnowledgeStructuredBody = {
+  crop_matches?: string[] | null;
+  topic?: string | null;
+  guide?: GuideData | null;
+};
+
+type KnowledgeRow = {
   id: string;
   title: string;
   excerpt: string | null;
@@ -45,24 +40,23 @@ type LiveGuideRow = {
   tags: string[] | null;
   crop_tags: string[] | null;
   source_refs: Array<Record<string, unknown>> | null;
-  published_at: string | null;
-  updated_at: string | null;
-  content_subtype: string | null;
-  structured_body: LiveGuideStructuredBody | null;
+  structured_body: KnowledgeStructuredBody | null;
+  published_at?: string | null;
 };
 
 type KnowledgeCard = {
-  key: string;
-  kind: 'static' | 'live';
+  id: string;
   category: string;
   title: string;
   summary: string;
+  fullBody: string;
+  highlights: string[];
+  details: string[];
   crops: string[];
-  publishedAt: string | null;
   sourceName: string;
   sourceUrl: string;
-  staticEntry?: KnowledgeGuideEntry;
-  liveRow?: LiveGuideRow;
+  quality: number;
+  publishedAt: string | null;
 };
 
 type KnowledgeLibraryProps = {
@@ -88,102 +82,107 @@ const normalize = (value: unknown) =>
 const uniqueText = (values: Array<string | null | undefined>) =>
   [...new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean))];
 
-const cropNames = (row: LiveGuideRow) =>
+const sourceName = (row: KnowledgeRow) => {
+  const first = row.source_refs?.[0];
+  return typeof first?.source_name === 'string' && first.source_name.trim()
+    ? first.source_name.trim()
+    : 'Kaynak';
+};
+
+const sourceUrl = (row: KnowledgeRow) => {
+  const first = row.source_refs?.[0];
+  return typeof first?.url === 'string' ? first.url : '';
+};
+
+const cropNames = (row: KnowledgeRow) =>
   uniqueText([
     ...(row.crop_tags ?? []),
     ...(row.structured_body?.crop_matches ?? []),
   ]);
 
-const sourceLabel = (row: LiveGuideRow) => {
-  const first = row.source_refs?.[0];
-  const sourceName = typeof first?.source_name === 'string' ? first.source_name.trim() : '';
-  return sourceName || 'Kaynak';
+const pickHighlights = (guide: GuideData | null | undefined) => {
+  if (!guide) return [];
+  return uniqueText([
+    ...(guide.what_to_look_for ?? []).slice(0, 1),
+    ...(guide.when_to_check ?? []).slice(0, 1),
+    ...(guide.management_steps ?? []).slice(0, 1),
+  ]).slice(0, 3);
 };
 
-const sourceUrl = (row: LiveGuideRow) => {
-  const first = row.source_refs?.[0];
-  return typeof first?.url === 'string' ? first.url : '';
+const pickDetails = (guide: GuideData | null | undefined) => {
+  if (!guide) return [];
+  return uniqueText([
+    ...(guide.field_check_steps ?? []),
+    ...(guide.decision_rules ?? []),
+    ...(guide.prevention ?? []),
+    ...(guide.common_mistakes ?? []).map((item) => `Sık hata: ${item}`),
+    ...(guide.avoid ?? []).map((item) => `Kaçın: ${item}`),
+    guide.turkey_note || '',
+  ]).slice(0, 8);
 };
 
-const fmtDate = (value: string | null) => {
-  if (!value) return '';
-  try {
-    return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium' }).format(new Date(value));
-  } catch {
-    return '';
-  }
+const toCard = (row: KnowledgeRow): KnowledgeCard => {
+  const guide = row.structured_body?.guide;
+  return {
+    id: row.id,
+    category: row.category || row.structured_body?.topic || 'Genel Bilgi',
+    title: row.title,
+    summary: guide?.quick_answer || row.excerpt || row.body || 'Bilgi hazırlanıyor.',
+    fullBody: String(row.body || '').trim(),
+    highlights: pickHighlights(guide),
+    details: pickDetails(guide),
+    crops: cropNames(row),
+    sourceName: sourceName(row),
+    sourceUrl: sourceUrl(row),
+    quality: Number(guide?.producer_value_score ?? 0),
+    publishedAt: row.published_at ?? null,
+  };
 };
 
 const matchesFieldCrop = (card: KnowledgeCard, fieldCrops: string[]) => {
   if (!fieldCrops.length) return false;
-  const cardCrops = card.crops.map(normalize);
-  const haystack = normalize(`${card.title} ${card.summary} ${card.category}`);
+  const haystack = normalize(
+    `${card.title} ${card.summary} ${card.highlights.join(' ')} ${card.category} ${card.crops.join(' ')}`,
+  );
 
   return fieldCrops.some((crop) => {
     const key = normalize(crop);
-    return key.length > 1 && (cardCrops.includes(key) || haystack.includes(key));
+    return key.length > 1 && haystack.includes(key);
   });
 };
 
-const staticCards = (): KnowledgeCard[] =>
-  KNOWLEDGE_GUIDE.map((entry) => ({
-    key: `static:${entry.id}`,
-    kind: 'static' as const,
-    category: entry.category,
-    title: entry.title,
-    summary: entry.summary,
-    crops: [],
-    publishedAt: null,
-    sourceName: 'TarlaPusula Bilgi Rehberi',
-    sourceUrl: '',
-    staticEntry: entry,
-  }));
-
-const liveCards = (rows: LiveGuideRow[]): KnowledgeCard[] =>
-  rows.map((row) => ({
-    key: `live:${row.id}`,
-    kind: 'live' as const,
-    category: row.category || row.structured_body?.topic || 'Bilgi Rehberi',
-    title: row.title,
-    summary: row.excerpt || row.structured_body?.detail?.lead || row.body?.slice(0, 360) || 'Özet hazırlanıyor.',
-    crops: cropNames(row),
-    publishedAt: row.published_at || row.updated_at,
-    sourceName: sourceLabel(row),
-    sourceUrl: sourceUrl(row),
-    liveRow: row,
-  }));
-
 export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryProps) {
-  const [liveRows, setLiveRows] = useState<LiveGuideRow[]>([]);
+  const [rows, setRows] = useState<KnowledgeRow[]>([]);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('Tümü');
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<KnowledgeCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const normalizedFieldCrops = useMemo(() => uniqueText(fieldCrops), [fieldCrops]);
-  const labels = useMemo(() => knowledgeEntries.filter((entry) => entry.contentType === 'label'), []);
 
-  const loadLiveGuide = async (manual = false) => {
+  const loadCards = async (manual = false) => {
     if (manual) setRefreshing(true);
     else setLoading(true);
     setError('');
 
     try {
-      const { data, error: guideError } = await supabase
+      // Bilgi Rehberi kullanıcı tarafında yalnızca admin onayından geçip
+      // published durumuna alınmış rehberleri gösterir.
+      const { data, error: fetchError } = await supabase
         .from('content_items')
-        .select('id,title,excerpt,body,category,tags,crop_tags,source_refs,published_at,updated_at,content_subtype,structured_body')
+        .select('id,title,excerpt,body,category,tags,crop_tags,source_refs,structured_body,published_at')
         .eq('status', 'published')
         .eq('content_type', 'knowledge')
         .eq('content_subtype', 'guide')
         .order('published_at', { ascending: false })
-        .limit(250);
+        .limit(300);
 
-      if (guideError) throw guideError;
-      setLiveRows((data ?? []) as LiveGuideRow[]);
+      if (fetchError) throw fetchError;
+      setRows((data ?? []) as KnowledgeRow[]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Onaylı Bilgi Rehberi içerikleri yüklenemedi.');
+      setError(cause instanceof Error ? cause.message : 'Bilgi kartları yüklenemedi.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -191,339 +190,269 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
   };
 
   useEffect(() => {
-    void loadLiveGuide();
+    void loadCards();
   }, []);
 
   const cards = useMemo(() => {
-    const live = liveCards(liveRows);
-    const all = [...live, ...staticCards()];
+    return rows
+      .map(toCard)
+      .sort((a, b) => {
+        const aMine = matchesFieldCrop(a, normalizedFieldCrops) ? 1 : 0;
+        const bMine = matchesFieldCrop(b, normalizedFieldCrops) ? 1 : 0;
+        if (aMine !== bMine) return bMine - aMine;
+        if (a.quality !== b.quality) return b.quality - a.quality;
+        return a.title.localeCompare(b.title, 'tr');
+      });
+  }, [rows, normalizedFieldCrops]);
 
-    return all.sort((a, b) => {
-      const aMine = matchesFieldCrop(a, normalizedFieldCrops) ? 1 : 0;
-      const bMine = matchesFieldCrop(b, normalizedFieldCrops) ? 1 : 0;
-      if (aMine !== bMine) return bMine - aMine;
-
-      if (a.kind !== b.kind) return a.kind === 'live' ? -1 : 1;
-
-      const aDate = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-      const bDate = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
-      return bDate - aDate;
+  const categoryGroups = useMemo(() => {
+    const map = new Map<string, KnowledgeCard[]>();
+    cards.forEach((card) => {
+      const bucket = map.get(card.category) ?? [];
+      bucket.push(card);
+      map.set(card.category, bucket);
     });
-  }, [liveRows, normalizedFieldCrops]);
 
-  const categories = useMemo(
-    () => uniqueText(cards.map((card) => card.category)).sort((a, b) => a.localeCompare(b, 'tr')),
-    [cards],
-  );
+    return [...map.entries()]
+      .map(([name, items]) => ({
+        name,
+        items,
+        mine: items.filter((item) => matchesFieldCrop(item, normalizedFieldCrops)).length,
+      }))
+      .sort((a, b) => {
+        if (a.mine !== b.mine) return b.mine - a.mine;
+        return a.name.localeCompare(b.name, 'tr');
+      });
+  }, [cards, normalizedFieldCrops]);
 
-  const visibleCards = useMemo(() => {
-    const needle = normalize(query);
+  const needle = normalize(query);
 
-    return cards.filter((card) => {
-      if (category !== 'Tümü' && card.category !== category) return false;
-      if (!needle) return true;
-
-      const haystack = normalize([
-        card.title,
-        card.summary,
-        card.category,
-        ...card.crops,
-        ...(card.liveRow?.tags ?? []),
-      ].join(' '));
-
-      return haystack.includes(needle);
-    });
-  }, [cards, query, category]);
-
-  const selected = cards.find((card) => card.key === selectedKey) ?? null;
-
-  if (selected?.staticEntry) {
-    const item = selected.staticEntry;
-    return (
-      <section className="tp-knowledge" aria-labelledby="knowledge-detail-heading">
-        <article className="tp-knowledge-detail">
-          <button type="button" className="tp-knowledge-back" onClick={() => setSelectedKey(null)}>
-            ‹ Bilgi Rehberine dön
-          </button>
-          <small>{item.category}</small>
-          <h1 id="knowledge-detail-heading">{item.title}</h1>
-          <p className="tp-knowledge-detail__lead">{item.summary}</p>
-          {item.sections.map(([title, body]) => (
-            <section key={`${item.id}:${title}`}>
-              <h2>{title}</h2>
-              <p>{body}</p>
-            </section>
-          ))}
-          <p className="tp-knowledge-note">
-            Genel bilgilendirme amaçlıdır. Kesin teşhis, doz veya reçete değildir; tarla uygulamalarında analiz, yerel koşullar, yürürlükteki resmî bilgiler ve gerektiğinde yetkili uzman değerlendirmesi esas alınmalıdır.
-          </p>
-        </article>
-      </section>
+  const searchedCards = useMemo(() => {
+    if (!needle) return [];
+    return cards.filter((card) =>
+      normalize(
+        `${card.title} ${card.summary} ${card.highlights.join(' ')} ${card.details.join(' ')} ${card.category} ${card.crops.join(' ')}`,
+      ).includes(needle),
     );
-  }
+  }, [cards, needle]);
 
-  if (selected?.liveRow) {
-    const row = selected.liveRow;
-    const findings = Array.isArray(row.structured_body?.findings)
-      ? row.structured_body!.findings!.filter(Boolean)
-      : [];
-    const crops = cropNames(row);
-    const url = sourceUrl(row);
-    const detail = row.structured_body?.detail;
-    const guide = row.structured_body?.guide;
-    const guideLists = {
-      when: (guide?.when_to_check ?? []).filter(Boolean),
-      look: (guide?.what_to_look_for ?? []).filter(Boolean),
-      check: (guide?.field_check_steps ?? []).filter(Boolean),
-      manage: (guide?.management_steps ?? []).filter(Boolean),
-      prevent: (guide?.prevention ?? []).filter(Boolean),
-      avoid: (guide?.avoid ?? []).filter(Boolean),
-    };
-    const hasPracticalGuide = Boolean(
-      guide &&
-      (guide.problem_or_goal ||
-        guideLists.when.length ||
-        guideLists.look.length ||
-        guideLists.check.length ||
-        guideLists.manage.length ||
-        guideLists.prevent.length ||
-        guideLists.avoid.length),
-    );
+  const categoryCards = useMemo(() => {
+    if (!selectedCategory) return [];
+    return cards.filter((card) => card.category === selectedCategory);
+  }, [cards, selectedCategory]);
 
-    return (
-      <section className="tp-knowledge" aria-labelledby="knowledge-detail-heading">
-        <article className="tp-knowledge-detail">
-          <button type="button" className="tp-knowledge-back" onClick={() => setSelectedKey(null)}>
-            ‹ Bilgi Rehberine dön
-          </button>
+  const shownCards = needle ? searchedCards : categoryCards;
+  const cardListMode = Boolean(needle || selectedCategory);
 
-          <div className="tp-knowledge-detail__meta">
-            <span>{row.category || row.structured_body?.topic || 'Bilgi Rehberi'}</span>
-            <span className="is-approved">Admin onaylı</span>
-            {crops.map((crop) => <span key={crop}>{crop}</span>)}
-            {row.published_at ? <span>{fmtDate(row.published_at)}</span> : null}
-          </div>
-
-          <h1 id="knowledge-detail-heading">{row.title}</h1>
-          {row.excerpt ? <p className="tp-knowledge-detail__lead">{row.excerpt}</p> : null}
-
-          {hasPracticalGuide ? (
-            <>
-              {guide?.problem_or_goal ? (
-                <section>
-                  <h2>Bu rehber neyi çözmeye yardım ediyor?</h2>
-                  <p>{guide.problem_or_goal}</p>
-                </section>
-              ) : null}
-
-              {guideLists.when.length ? (
-                <section>
-                  <h2>Ne zaman kontrol et?</h2>
-                  <ul>{guideLists.when.map((item, index) => <li key={`${row.id}-when-${index}`}>{item}</li>)}</ul>
-                </section>
-              ) : null}
-
-              {guideLists.look.length ? (
-                <section>
-                  <h2>Neye bak?</h2>
-                  <ul>{guideLists.look.map((item, index) => <li key={`${row.id}-look-${index}`}>{item}</li>)}</ul>
-                </section>
-              ) : null}
-
-              {guideLists.check.length ? (
-                <section>
-                  <h2>Tarlada nasıl kontrol et?</h2>
-                  <ol>{guideLists.check.map((item, index) => <li key={`${row.id}-check-${index}`}>{item}</li>)}</ol>
-                </section>
-              ) : null}
-
-              {guideLists.manage.length ? (
-                <section>
-                  <h2>Ne yapabilirsin?</h2>
-                  <ul>{guideLists.manage.map((item, index) => <li key={`${row.id}-manage-${index}`}>{item}</li>)}</ul>
-                </section>
-              ) : null}
-
-              {guideLists.prevent.length ? (
-                <section>
-                  <h2>Önleyici adımlar</h2>
-                  <ul>{guideLists.prevent.map((item, index) => <li key={`${row.id}-prevent-${index}`}>{item}</li>)}</ul>
-                </section>
-              ) : null}
-
-              {guideLists.avoid.length ? (
-                <section>
-                  <h2>Ne yapma?</h2>
-                  <ul>{guideLists.avoid.map((item, index) => <li key={`${row.id}-avoid-${index}`}>{item}</li>)}</ul>
-                </section>
-              ) : null}
-
-              {guide?.turkey_note ? (
-                <aside className="tp-knowledge-takeaway">
-                  <strong>Türkiye için not</strong>
-                  <p>{guide.turkey_note}</p>
-                </aside>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {detail?.background ? (
-                <section>
-                  <h2>Arka plan</h2>
-                  <p>{detail.background}</p>
-                </section>
-              ) : null}
-
-              {detail?.what_happened ? (
-                <section>
-                  <h2>Ne anlatıyor?</h2>
-                  <p>{detail.what_happened}</p>
-                </section>
-              ) : null}
-
-              {findings.length ? (
-                <section>
-                  <h2>Öne çıkan bilgiler</h2>
-                  <ul>{findings.map((finding, index) => <li key={`${row.id}-finding-${index}`}>{finding}</li>)}</ul>
-                </section>
-              ) : null}
-
-              {row.body ? (
-                <section>
-                  <h2>Detay</h2>
-                  {row.body.split(/\n{2,}/).map((paragraph, index) => (
-                    <p key={`${row.id}-paragraph-${index}`}>{paragraph}</p>
-                  ))}
-                </section>
-              ) : null}
-            </>
-          )}
-
-          {row.structured_body?.practical_takeaway ? (
-            <aside className="tp-knowledge-takeaway">
-              <strong>Sahada ne anlama geliyor?</strong>
-              <p>{row.structured_body.practical_takeaway}</p>
-            </aside>
-          ) : null}
-
-          <footer className="tp-knowledge-detail__source">
-            <span>Kaynak: {sourceLabel(row)}</span>
-            {url ? <a href={url} target="_blank" rel="noreferrer">Kaynağı aç <ExternalLink size={13} /></a> : null}
-          </footer>
-
-          <p className="tp-knowledge-note">
-            Bu içerik admin onayından geçmiş Bilgi Rehberi içeriğidir. Genel bilgilendirme amaçlıdır; kesin teşhis, reçete veya tek başına uygulama kararı değildir.
-          </p>
-        </article>
-      </section>
-    );
-  }
+  const closeDetail = () => setSelectedCard(null);
 
   return (
     <section className="tp-knowledge" aria-labelledby="knowledge-heading">
       <header className="tp-knowledge-head">
         <div>
           <p className="tp-knowledge-eyebrow">BİLGİ REHBERİ</p>
-          <h1 id="knowledge-heading">Türkçe bilgi kütüphanesi</h1>
-          <p>Temel rehber kartlarıyla birlikte admin onayından geçen yeni içerikler de burada yayınlanır.</p>
+          <h1 id="knowledge-heading">
+            {selectedCategory && !needle ? selectedCategory : 'Bir konu seç'}
+          </h1>
+          <p>
+            {selectedCategory && !needle
+              ? 'Admin onaylı bilgi kartlarından birini aç.'
+              : 'Kısa konu kartlarından seçim yap; yalnız onaylanmış bilgiler gösterilir.'}
+          </p>
         </div>
-        <button type="button" className="tp-knowledge-refresh" onClick={() => void loadLiveGuide(true)} disabled={refreshing}>
-          <RefreshCw size={16} className={refreshing ? 'is-spinning' : ''} /> Yenile
+
+        <button
+          type="button"
+          className="tp-knowledge-refresh"
+          onClick={() => void loadCards(true)}
+          disabled={refreshing}
+          aria-label="Bilgi Rehberini yenile"
+        >
+          <RefreshCw size={16} className={refreshing ? 'is-spinning' : ''} />
         </button>
       </header>
 
-      {normalizedFieldCrops.length ? (
+      {selectedCategory && !needle ? (
+        <button
+          type="button"
+          className="tp-knowledge-back"
+          onClick={() => setSelectedCategory(null)}
+        >
+          <ArrowLeft size={15} />
+          Konulara dön
+        </button>
+      ) : null}
+
+      {normalizedFieldCrops.length && !selectedCategory && !needle ? (
         <div className="tp-knowledge-crop-strip" aria-label="Tarlalarımdaki ürünler">
-          <Sprout size={16} />
-          <span>Tarlalarındaki ürünler:</span>
-          {normalizedFieldCrops.map((crop) => <strong key={crop}>{crop}</strong>)}
+          <Sprout size={15} />
+          <span>Öncelik:</span>
+          {normalizedFieldCrops.slice(0, 4).map((crop) => <strong key={crop}>{crop}</strong>)}
         </div>
       ) : null}
 
-      <div className="tp-knowledge-filters">
-        <label className="tp-knowledge-search">
-          <Search size={16} />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Örn. badem, azot, NDVI, sulama, pH…"
-          />
-        </label>
-        <label>
-          <span>Konu</span>
-          <select value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option>Tümü</option>
-            {categories.map((item) => <option key={item}>{item}</option>)}
-          </select>
-        </label>
-      </div>
+      <label className="tp-knowledge-search">
+        <Search size={16} />
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Bilgi kartı ara…"
+        />
+      </label>
 
       {error ? <div className="tp-knowledge-state is-error">{error}</div> : null}
-      {loading ? <div className="tp-knowledge-state">Onaylı Bilgi Rehberi içerikleri yükleniyor…</div> : null}
+      {loading ? <div className="tp-knowledge-state">Admin onaylı kartlar yükleniyor…</div> : null}
 
-      <p role="status" className="tp-knowledge-count">
-        {visibleCards.length} rehber konusu · {liveRows.length} admin onaylı canlı içerik
-      </p>
+      {!loading && !cardListMode ? (
+        <>
+          <div className="tp-knowledge-section-title">
+            <strong>Konular</strong>
+            <span>{cards.length} onaylı kart</span>
+          </div>
 
-      <div className="tp-knowledge-grid">
-        {visibleCards.map((card) => {
-          const mine = matchesFieldCrop(card, normalizedFieldCrops);
-          return (
-            <article key={card.key} className={`tp-knowledge-card ${card.kind === 'live' ? 'is-live' : ''}`}>
-              <div className="tp-knowledge-card__meta">
-                <span>{card.category} · Rehber</span>
-                {card.kind === 'live' ? <span className="is-approved">Admin onaylı</span> : null}
-                {mine ? <span className="is-mine">Senin ürünün</span> : null}
-              </div>
-              <h2>{card.title}</h2>
-              <p>{card.summary}</p>
-              {card.crops.length ? (
-                <div className="tp-knowledge-card__crops">
-                  {card.crops.slice(0, 4).map((crop) => <span key={`${card.key}:${crop}`}>{crop}</span>)}
-                </div>
-              ) : null}
-              <footer>
+          <div className="tp-knowledge-topic-grid" role="list">
+            {categoryGroups.map((group) => (
+              <button
+                key={group.name}
+                type="button"
+                role="listitem"
+                className="tp-knowledge-topic-card"
+                onClick={() => setSelectedCategory(group.name)}
+              >
+                <span className="tp-knowledge-topic-card__count">{group.items.length}</span>
+                <strong>{group.name}</strong>
                 <small>
-                  {card.kind === 'live'
-                    ? `${card.sourceName}${card.publishedAt ? ` · ${fmtDate(card.publishedAt)}` : ''}`
-                    : 'TarlaPusula temel rehberi'}
+                  {group.mine
+                    ? `${group.mine} kart senin ürünlerinle ilgili`
+                    : 'Bilgi kartlarını aç'}
                 </small>
-                <button type="button" onClick={() => setSelectedKey(card.key)}>Bilgiyi aç</button>
-              </footer>
-            </article>
-          );
-        })}
-      </div>
+                <b aria-hidden="true">›</b>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
 
-      {!visibleCards.length ? (
+      {!loading && cardListMode ? (
+        <>
+          <div className="tp-knowledge-section-title">
+            <strong>{needle ? 'Arama sonuçları' : selectedCategory}</strong>
+            <span>{shownCards.length} kart</span>
+          </div>
+
+          <div className="tp-knowledge-card-grid">
+            {shownCards.map((card) => {
+              const mine = matchesFieldCrop(card, normalizedFieldCrops);
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  className="tp-knowledge-info-card"
+                  onClick={() => setSelectedCard(card)}
+                >
+                  <div className="tp-knowledge-info-card__top">
+                    <span>{card.category}</span>
+                    {mine ? <em>Senin ürünün</em> : null}
+                  </div>
+
+                  <strong>{card.title}</strong>
+                  <p>{card.summary}</p>
+
+                  <div className="tp-knowledge-info-card__foot">
+                    <small>{card.sourceName}</small>
+                    <b aria-hidden="true">›</b>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+
+      {!loading && !cards.length ? (
         <div className="tp-knowledge-empty">
-          <strong>Bu filtrede rehber kartı bulunamadı.</strong>
-          <p>Arama veya konu filtresini değiştir.</p>
+          <strong>Henüz yayınlanmış bilgi kartı yok.</strong>
+          <p>Admin onayladıkça kartlar burada görünür.</p>
         </div>
       ) : null}
 
-      <details className="tp-knowledge-sources">
-        <summary>Hastalık sözlüğü ({labels.length})</summary>
-        <p>PlantVillage sınıf adları yalnızca arama ve sınıflandırma sözlüğüdür; teşhis veya mücadele talimatı değildir.</p>
-        {labels.map((entry) => (
-          <article key={entry.id}>
-            <h2>{entry.titleTr}</h2>
-            <p>{entry.crops.join(' · ')}</p>
-          </article>
-        ))}
-      </details>
+      {!loading && cardListMode && !shownCards.length ? (
+        <div className="tp-knowledge-empty">
+          <strong>Bu seçimde kart bulunamadı.</strong>
+          <p>Başka bir konu seç veya aramayı değiştir.</p>
+        </div>
+      ) : null}
 
-      <details className="tp-knowledge-sources">
-        <summary>Kaynaklar ve lisans bilgisi</summary>
-        {knowledgeSources.map((source) => (
-          <article key={source.id}>
-            <h2>{source.name}</h2>
-            <p>{source.description}</p>
-            <small>{source.license} · Kaynak kontrolü: {source.checkedAt}</small>
+      {selectedCard ? (
+        <div className="tp-knowledge-detail-layer" role="presentation" onMouseDown={closeDetail}>
+          <article
+            className="tp-knowledge-detail-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedCard.title}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="tp-knowledge-detail-sheet__head">
+              <div>
+                <span>{selectedCard.category}</span>
+                <small>Admin onaylı bilgi kartı</small>
+              </div>
+              <button type="button" onClick={closeDetail} aria-label="Kapat">
+                <X size={18} />
+              </button>
+            </div>
+
+            <h2>{selectedCard.title}</h2>
+            {selectedCard.summary ? (
+              <p className="tp-knowledge-detail-sheet__summary">{selectedCard.summary}</p>
+            ) : null}
+
+            {selectedCard.fullBody && selectedCard.fullBody !== selectedCard.summary ? (
+              <div className="tp-knowledge-detail-sheet__full-body">
+                {selectedCard.fullBody}
+              </div>
+            ) : null}
+
+            {selectedCard.highlights.length ? (
+              <section>
+                <strong>Önemli noktalar</strong>
+                <ul>
+                  {selectedCard.highlights.map((item, index) => (
+                    <li key={`${selectedCard.id}:highlight:${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {selectedCard.details.length ? (
+              <section>
+                <strong>Biraz daha detay</strong>
+                <ul>
+                  {selectedCard.details.map((item, index) => (
+                    <li key={`${selectedCard.id}:detail:${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {selectedCard.crops.length ? (
+              <div className="tp-knowledge-detail-crops">
+                {selectedCard.crops.slice(0, 6).map((crop) => <span key={crop}>{crop}</span>)}
+              </div>
+            ) : null}
+
+            <footer>
+              <span>Kaynak: {selectedCard.sourceName}</span>
+              {selectedCard.sourceUrl ? (
+                <a href={selectedCard.sourceUrl} target="_blank" rel="noreferrer">
+                  Kaynağı aç <ExternalLink size={13} />
+                </a>
+              ) : null}
+            </footer>
           </article>
-        ))}
-      </details>
+        </div>
+      ) : null}
     </section>
   );
 }

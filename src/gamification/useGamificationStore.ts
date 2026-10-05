@@ -41,9 +41,9 @@ export const POINT_RULES = {
     label: 'Arkadaş Daveti',
   },
   WATCH_AD: {
-    points: 50,
+    points: 10,
     label: 'Reklam İzle',
-    dailyLimit: 3,
+    dailyLimit: 5,
   },
 } as const;
 
@@ -51,8 +51,8 @@ export type PointRuleKey = keyof typeof POINT_RULES;
 
 export const FIELD_UNLOCK_THRESHOLDS = {
   FIELD_1: 0,
-  FIELD_2: 1000,
-  FIELD_3: 2500,
+  FIELD_2: 500,
+  FIELD_3: 1200,
 } as const;
 
 export type GamificationServerState = {
@@ -76,7 +76,7 @@ export type GamificationToast = {
   id: number;
   title: string;
   points: number;
-  ruleKey: PointRuleKey;
+  ruleKey: string;
 } | null;
 
 export type GamificationState = {
@@ -98,8 +98,8 @@ const initialState: GamificationState = {
   lifetimePoints: 0,
   unlockedFields: 1,
   nextFieldNumber: 2,
-  nextThreshold: 1000,
-  remainingToNext: 1000,
+  nextThreshold: 500,
+  remainingToNext: 500,
   progressPercent: 0,
   lastAward: null,
   error: null,
@@ -145,9 +145,7 @@ export function getGamificationState() {
 export function getUnlockedFieldCount(points: number) {
   const entitlement = getEntitlementSnapshot();
 
-  if (entitlement.isPremium) {
-    return 99;
-  }
+  if (entitlement.effectivePlan === 'premium') return 999;
 
   const safePoints = Math.max(0, Number(points) || 0);
 
@@ -159,7 +157,7 @@ export function getUnlockedFieldCount(points: number) {
 export function getNextFieldUnlock(points: number) {
   const entitlement = getEntitlementSnapshot();
 
-  if (entitlement.isPremium) {
+  if (entitlement.effectivePlan === 'premium') {
     return {
       fieldNumber: null,
       requiredPoints: null,
@@ -217,7 +215,7 @@ export function canCreateField(
     void refreshEntitlements();
   }
 
-  if (entitlement.isPremium) {
+  if (entitlement.effectivePlan === 'premium') {
     return {
       allowed: true,
       nextFieldNumber,
@@ -300,8 +298,8 @@ function normalizeState(raw: any): GamificationServerState {
           points,
       ) || 0,
     ),
-    unlockedFields: entitlement.isPremium
-      ? 99
+    unlockedFields: entitlement.effectivePlan === 'premium'
+      ? 999
       : Math.max(
           1,
           Number(
@@ -455,6 +453,24 @@ export async function addPoints(
 
     throw error;
   }
+}
+
+export function showGamificationAward(
+  title: string,
+  points: number,
+  ruleKey = 'TASK_REWARD',
+) {
+  const safePoints = Math.max(0, Number(points) || 0);
+  if (!safePoints) return;
+
+  patch({
+    lastAward: {
+      id: Date.now(),
+      title: String(title || 'Pusula kazandın'),
+      points: safePoints,
+      ruleKey,
+    },
+  });
 }
 
 export function clearLastAward() {

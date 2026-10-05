@@ -90,7 +90,7 @@ export default function CropRotationPanel({ field }: Props) {
   };
 
   return (
-    <section className="tp-rotation-card" aria-label="Münavebe ve ekim nöbeti zekâsı">
+    <section className="tp-rotation-card" aria-label="Münavebe ve ekim nöbeti zekâsı" data-required-plan="premium" data-plan-feature="Münavebe / Ekim Nöbeti">
       <div className="tp-rotation-head">
         <div>
           <span>MÜNAVEBE · EKİM NÖBETİ</span>

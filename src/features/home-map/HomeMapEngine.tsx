@@ -2,6 +2,9 @@ import { shouldPlayMapOpening, openMapAtField } from '../map-opening/mapOpening'
 import { resolveOpeningTarget } from '../map-opening/openingTarget';
 import { mapRuntime } from '../../lib/mapRuntime';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEntitlementStore } from '../../entitlements/useEntitlementStore';
+import { openPlanUpgrade } from '../../entitlements/planAccess';
+import { maybeShowFreeInterstitial } from '../../monetization/adRuntime';
 import { CalendarClock, Check, Crosshair, History, Minus, Pentagon, Plus, Satellite, Undo2, X } from 'lucide-react';
 import * as maplibregl from 'maplibre-gl';
 import MapDataDate from '../map-data/components/MapDataDate';
@@ -4925,6 +4928,7 @@ export function HomeInlineLayerMap({
     summary: HomeLayerSpatialSummary | null,
   ) => void;
 }) {
+  const entitlement = useEntitlementStore();
   const history = useSatelliteHistory(field?.id ? String(field.id) : undefined, field?.parcelGeometry);
   const satelliteData = history.data ?? latestSatelliteData;
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -5052,6 +5056,8 @@ export function HomeInlineLayerMap({
   const [orchardZoneSaving, setOrchardZoneSaving] = useState(false);
   const [orchardZoneMessage, setOrchardZoneMessage] =
     useState<string | null>(null);
+  const [orchardZonePremiumPreviewOpen, setOrchardZonePremiumPreviewOpen] =
+    useState(false);
 
   useEffect(() => {
     void requestMapLayerPersistentStorage();
@@ -5064,12 +5070,16 @@ export function HomeInlineLayerMap({
   );
 
   const orchardZoneFieldId = String(field?.id ?? '').trim();
-  const orchardZoneEnabled = Boolean(
+  const orchardZoneBaseEligible = Boolean(
     orchardZoneFieldId &&
     parcelGeometry &&
     !field?.demo &&
     (field?.cropCycle ?? 'annual') === 'perennial',
   );
+  const orchardZoneEnabled =
+    orchardZoneBaseEligible && entitlement.isPremium;
+  const orchardZonePremiumLocked =
+    orchardZoneBaseEligible && !entitlement.isPremium;
 
   const orchardZoneDraftGeometry = useMemo(
     () => buildTrackingZonePolygon(orchardZoneDraftPoints),
@@ -5134,6 +5144,11 @@ export function HomeInlineLayerMap({
       const detail = (event as CustomEvent)?.detail ?? {};
       const requestedFieldId = String(detail.fieldId ?? '').trim();
       if (requestedFieldId && requestedFieldId !== orchardZoneFieldId) return;
+      if (!orchardZoneBaseEligible) return;
+      if (orchardZonePremiumLocked) {
+        setOrchardZonePremiumPreviewOpen(true);
+        return;
+      }
       if (!orchardZoneEnabled) return;
       setOrchardZoneDraftPoints([]);
       setOrchardZoneSaveGeometry(null);
@@ -5152,7 +5167,7 @@ export function HomeInlineLayerMap({
         onStart as EventListener,
       );
     };
-  }, [orchardZoneEnabled, orchardZoneFieldId]);
+  }, [orchardZoneBaseEligible, orchardZoneEnabled, orchardZoneFieldId, orchardZonePremiumLocked]);
 
   useEffect(() => {
     setOrchardZoneDrawActive(false);
@@ -5160,7 +5175,14 @@ export function HomeInlineLayerMap({
     setOrchardZoneSaveGeometry(null);
     setOrchardZoneSaveOpen(false);
     setOrchardZoneMessage(null);
+    setOrchardZonePremiumPreviewOpen(false);
   }, [orchardZoneFieldId]);
+
+  useEffect(() => {
+    if (entitlement.isPremium) {
+      setOrchardZonePremiumPreviewOpen(false);
+    }
+  }, [entitlement.isPremium]);
 
   const radarMode: 'vv' | 'vh' | 'water' | null =
     layer === 'radar-vv'
@@ -8822,6 +8844,10 @@ export function HomeInlineLayerMap({
   };
 
   const startOrchardZoneDraw = () => {
+    if (orchardZonePremiumLocked) {
+      setOrchardZonePremiumPreviewOpen(true);
+      return;
+    }
     if (!orchardZoneEnabled || !parcelGeometry) {
       setOrchardZoneMessage('Takip alanı çizmek için kayıtlı tarla sınırı gerekli.');
       return;
@@ -9708,20 +9734,43 @@ export function HomeInlineLayerMap({
           <Minus size={24} strokeWidth={2.1} />
         </button>
 
-        {orchardZoneEnabled ? (
+        {orchardZoneBaseEligible ? (
           <button
             type="button"
-            className="tp-map-control-btn tp-map-zone-draw-control"
-            onClick={() =>
+            className={[
+              'tp-map-control-btn',
+              'tp-map-zone-draw-control',
+              orchardZonePremiumLocked ? 'is-premium-locked' : '',
+            ].filter(Boolean).join(' ')}
+            onClick={() => {
+              if (orchardZonePremiumLocked) {
+                setOrchardZonePremiumPreviewOpen(true);
+                return;
+              }
               orchardZoneDrawActive
                 ? cancelOrchardZoneDraw()
-                : startOrchardZoneDraw()
+                : startOrchardZoneDraw();
+            }}
+            aria-label={
+              orchardZonePremiumLocked
+                ? 'Bahçe takip alanı Premium özelliğini önizle'
+                : orchardZoneDrawActive
+                  ? 'Bölge çizimini iptal et'
+                  : 'Bahçede takip bölgesi çiz'
             }
-            aria-label={orchardZoneDrawActive ? 'Bölge çizimini iptal et' : 'Bahçede takip bölgesi çiz'}
-            title={orchardZoneDrawActive ? 'Çizimi iptal et' : 'Takip bölgesi çiz'}
+            title={
+              orchardZonePremiumLocked
+                ? 'Bahçe Takip Alanı · Premium'
+                : orchardZoneDrawActive
+                  ? 'Çizimi iptal et'
+                  : 'Takip bölgesi çiz'
+            }
             aria-pressed={orchardZoneDrawActive}
           >
             <Pentagon size={22} strokeWidth={1.9} />
+            {orchardZonePremiumLocked ? (
+              <span className="tp-map-zone-premium-dot" aria-hidden="true">P</span>
+            ) : null}
           </button>
         ) : null}
 
@@ -9768,9 +9817,17 @@ export function HomeInlineLayerMap({
             type="button"
             className="tp-map-control-btn tp-map-history-label tp-map-satellite-history-control"
             onClick={() =>
-              layer === 'vegetation'
-                ? void history.show()
-                : void radarHistory.show()
+              void (async () => {
+                if (entitlement.effectivePlan !== 'premium') {
+                  await maybeShowFreeInterstitial('satellite_history');
+                }
+
+                if (layer === 'vegetation') {
+                  await history.show();
+                } else {
+                  await radarHistory.show();
+                }
+              })()
             }
             aria-label={
               layer === 'vegetation'
@@ -9789,6 +9846,81 @@ export function HomeInlineLayerMap({
         )}
 
       </div>
+
+      {orchardZonePremiumPreviewOpen ? (
+        <div
+          className="tp-orchard-zone-premium-preview"
+          role="dialog"
+          aria-modal="false"
+          aria-label="Bahçe Takip Alanı Premium önizlemesi"
+        >
+          <div className="tp-orchard-zone-premium-head">
+            <div>
+              <span>BAHÇE TAKİP ALANI</span>
+              <strong>Tarlanın içindeki küçük bir bölgeyi ayrı ayrı izle.</strong>
+            </div>
+            <button
+              type="button"
+              className="tp-orchard-zone-premium-close"
+              onClick={() => setOrchardZonePremiumPreviewOpen(false)}
+              aria-label="Premium önizlemeyi kapat"
+            >
+              <X size={17} />
+            </button>
+          </div>
+
+          <p>
+            Haritada en az 3 köşe seçerek özel bir takip alanı oluşturursun.
+            Pusula seçtiğin bölgeyi tarlanın geneliyle karşılaştırır; böylece
+            küçük bir stres alanının sabit mi kaldığını, daraldığını mı yoksa
+            yayılmaya mı başladığını daha kolay takip edersin.
+          </p>
+
+          <div className="tp-orchard-zone-premium-mock" aria-hidden="true">
+            <div className="tp-orchard-zone-premium-polygon">
+              <span>ÖRNEK TAKİP ALANI</span>
+              <b>Dere Kenarı</b>
+            </div>
+            <div className="tp-orchard-zone-premium-metrics">
+              <article>
+                <span>NDVI farkı</span>
+                <strong>Alan ↔ Tarla</strong>
+              </article>
+              <article>
+                <span>Radar / nem</span>
+                <strong>Değişim</strong>
+              </article>
+              <article>
+                <span>Sorun</span>
+                <strong>Yayılıyor mu?</strong>
+              </article>
+            </div>
+          </div>
+
+          <div className="tp-orchard-zone-premium-info">
+            <span>PREMIUM'DA AÇILIR</span>
+            <strong>Alan çizme + alan bazlı yorum + geçmiş karşılaştırma</strong>
+            <small>
+              Gerçek bölge verileri ücretsiz planda açılmaz; bu kart özelliğin
+              ne yaptığını göstermek için örnek önizlemedir.
+            </small>
+          </div>
+
+          <button
+            type="button"
+            className="tp-orchard-zone-premium-cta"
+            onClick={() => {
+              setOrchardZonePremiumPreviewOpen(false);
+              openPlanUpgrade({
+                requiredPlan: 'premium',
+                feature: 'Bahçe Takip Alanı / Pusula Merceği',
+              });
+            }}
+          >
+            Premium'u İncele
+          </button>
+        </div>
+      ) : null}
 
       {orchardZoneDrawActive && !orchardZoneSaveOpen ? (
         <div className="tp-orchard-zone-draw-hud" role="status">

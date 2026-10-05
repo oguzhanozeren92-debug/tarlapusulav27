@@ -304,3 +304,185 @@ html body .tp-zebra-list > :not([hidden]):nth-child(even) {
     background: var(--tp-list-row-hover) !important;
   }
 }
+
+/* =========================================================
+   V28 FINAL MONOCHROME OVERRIDES — 2026-10-02
+   Beyaz yüzey + siyah aksiyon + beyaz buton yazısı
+   ========================================================= */
+
+/* Yeni Tarla: siyah başlık üzerindeki yazı her koşulda beyaz */
+html body #root .tp-field-hero h1,
+html body #root .tp-field-hero h1 *,
+html body #root .tp-field-hero-copy h1,
+html body #root .tp-field-hero-copy h1 *{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  opacity:1!important;
+}
+
+/* Bahçe Takip Alanı: görünür katman + beyaz yazı/icon */
+html body #root .tp-map-stage .tp-orchard-zone-draw-hud,
+html body #root .tp-map-first-shell .tp-orchard-zone-draw-hud{
+  z-index:420!important;
+  bottom:112px!important;
+  background:rgba(5,6,7,.94)!important;
+  border-color:rgba(255,255,255,.28)!important;
+  color:#fff!important;
+}
+html body #root .tp-orchard-zone-draw-hud :is(span,strong,small){
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-orchard-zone-draw-actions button{
+  border-color:rgba(255,255,255,.38)!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-orchard-zone-draw-actions button svg{color:#fff!important;stroke:#fff!important}
+
+/* Güncel zayıf alanlar modal başlığı */
+html body .tp-field-tracking-portal .tp-field-tracking-head{
+  padding:15px 16px 16px!important;
+  border-bottom:0!important;
+  background:#050607!important;
+  color:#fff!important;
+}
+html body .tp-field-tracking-portal .tp-field-tracking-head :is(.tp-field-tracking-kicker,h3,p){
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body .tp-field-tracking-portal .tp-field-tracking-close{
+  border-color:rgba(255,255,255,.2)!important;
+  background:rgba(255,255,255,.08)!important;
+  color:#fff!important;
+}
+
+/* Tarla verileri modal başlığı */
+html body dialog.tp-home-data-dialog .tp-home-data-dialog-head{
+  border-bottom:0!important;
+  background:#050607!important;
+  color:#fff!important;
+}
+html body dialog.tp-home-data-dialog .tp-home-data-dialog-head :is(small,h2,p){
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body dialog.tp-home-data-dialog .tp-home-data-dialog-head button{
+  border-color:rgba(255,255,255,.2)!important;
+  background:rgba(255,255,255,.08)!important;
+  color:#fff!important;
+}
+
+/* Quick sheets / Görevlerim: siyah şerit, beyaz yazı */
+html body #root .tp-home-quick-sheet-head,
+html body #root .tp-home-tasks-head{
+  background:#050607!important;
+  color:#fff!important;
+  border-bottom:0!important;
+}
+html body #root .tp-home-quick-sheet-head :is(small,h2),
+html body #root .tp-home-tasks-head :is(small,h2){
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root :is(.tp-home-quick-close,.tp-home-quick-back,.tp-home-tasks-close,.tp-home-tasks-head-icon){
+  border-color:rgba(255,255,255,.18)!important;
+  background:rgba(255,255,255,.08)!important;
+  color:#fff!important;
+}
+
+/* Takvim: beyaz zemin + siyah aksiyonlar */
+html body #root .tp-calendar-page,
+html body #root .tp-calendar-page .tp-calendar-content{
+  background:#fff!important;
+  color:#20252b!important;
+  color-scheme:light!important;
+}
+html body #root .tp-calendar-page :is(.tp-calendar-hero,.tp-week-plan,.tp-push-card,.tp-calendar-item,.tp-calendar-empty){
+  background:#fff!important;
+  border-color:#d9dfe4!important;
+  color:#20252b!important;
+}
+html body #root .tp-calendar-page :is(h1,h2,h3,h4,strong,b,label){
+  color:#20252b!important;
+  -webkit-text-fill-color:#20252b!important;
+}
+html body #root .tp-calendar-page :is(p,small,span,li,em){
+  color:#66717b!important;
+  -webkit-text-fill-color:#66717b!important;
+}
+html body #root .tp-calendar-page
+:is(.tp-week-plan-fields button,.tp-week-plan-days button,.tp-week-plan-add,.tp-push-actions button,.tp-calendar-toolbar>button,.tp-calendar-empty button){
+  border-color:#050607!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-calendar-page .tp-week-plan-days button *{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-calendar-page .tp-week-plan-detail,
+html body #root .tp-calendar-page .tp-calendar-summary,
+html body #root .tp-calendar-page .tp-push-inline-message{
+  background:#f7f9fa!important;
+  border-color:#dce2e7!important;
+  color:#20252b!important;
+}
+
+/* Pusula AI: arka plan/kartlar aynı; bütün aksiyonlar siyah/beyaz */
+html body #root .tp-ai-page
+:is(
+  .tp-pusula-hub-action,
+  .tp-mobile-picker-trigger.tp-ai-field-select,
+  .tp-ai-modebar button,
+  .tp-ai-workspace-back,
+  .tp-pusula-synthesis-error button,
+  .tp-pusula-refresh,
+  .tp-pusula-pdf,
+  .tp-pusula-pdf-download,
+  .tp-premium-info button,
+  .tp-ai-main-photo button,
+  .tp-ai-main-analyze,
+  .tp-ai-main-picker,
+  button.tp-ai-save-history,
+  label.tp-ai-save-history,
+  .tp-ai-empty-field button
+){
+  border-color:#050607!important;
+  background:#050607!important;
+  background-image:none!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  box-shadow:none!important;
+}
+html body #root .tp-ai-page
+:is(
+  .tp-pusula-hub-action,
+  .tp-mobile-picker-trigger.tp-ai-field-select,
+  .tp-ai-modebar button,
+  .tp-ai-workspace-back,
+  .tp-pusula-synthesis-error button,
+  .tp-pusula-refresh,
+  .tp-pusula-pdf,
+  .tp-pusula-pdf-download,
+  .tp-premium-info button,
+  .tp-ai-main-photo button,
+  .tp-ai-main-analyze,
+  .tp-ai-main-picker,
+  button.tp-ai-save-history,
+  label.tp-ai-save-history,
+  .tp-ai-empty-field button
+) *{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-ai-page button:disabled{
+  border-color:#3c4147!important;
+  background:#3c4147!important;
+  color:rgba(255,255,255,.68)!important;
+  -webkit-text-fill-color:rgba(255,255,255,.68)!important;
+  opacity:1!important;
+}
+

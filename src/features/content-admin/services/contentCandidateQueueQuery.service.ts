@@ -4,7 +4,7 @@ export async function loadContentCandidateQueue(channel:QueueChannel='all',limit
  const {data,error}=await supabase.from('content_candidates').select('*')
   .order('generated_at',{ascending:false}).limit(limit);
  if(error) throw error;
- const rows=data||[];
+ const rows=(data||[]).filter((row:any)=>row.workflow_status==='pending');
  if(channel==='all') return rows;
  return rows.filter((row:any)=>{
   const subtype=String(row.structured_body?.content_subtype||'');

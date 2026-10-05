@@ -302,3 +302,56 @@
   .tp-home-tasks-intro { align-items: center; }
   .tp-home-task-summary { min-height: 60px; }
 }
+
+
+/* TASK SHEET MONO HEADER V2 */
+html body .tp-home-tasks-sheet .tp-home-tasks-head{
+  margin:0 -14px!important;
+  padding:10px 14px 12px!important;
+  border-bottom:1px solid #202020!important;
+  background:#050607!important;
+  color:#fff!important;
+}
+html body .tp-home-tasks-sheet .tp-home-tasks-head small,
+html body .tp-home-tasks-sheet .tp-home-tasks-head h2{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body .tp-home-tasks-sheet .tp-home-tasks-head small{opacity:.72!important}
+html body .tp-home-tasks-sheet .tp-home-tasks-head-icon,
+html body .tp-home-tasks-sheet .tp-home-tasks-close{
+  border:1px solid #393939!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  box-shadow:none!important;
+}
+html body .tp-home-tasks-sheet .tp-home-tasks-head-icon svg,
+html body .tp-home-tasks-sheet .tp-home-tasks-close svg{
+  color:#fff!important;
+  stroke:#fff!important;
+}
+html body .tp-home-tasks-sheet .tp-home-tasks-count{
+  border-color:#fff!important;
+  background:#fff!important;
+  color:#050607!important;
+  -webkit-text-fill-color:#050607!important;
+}
+html body .tp-home-tasks-sheet .tp-home-tasks-intro button{
+  border-color:#050607!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body .tp-home-tasks-sheet .tp-home-tasks-intro button svg{
+  color:#fff!important;
+  stroke:#fff!important;
+}
+
+
+/* QUICK CALENDAR ACTION — TASKS */
+.tp-home-tasks-sheet .tp-home-task-calendar{
+  min-height:34px;
+  border-radius:10px;
+  font-size:8px;
+}

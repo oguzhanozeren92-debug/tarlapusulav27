@@ -289,9 +289,10 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
     [mapBoundaryCandidates, previewCandidateId],
   );
 
-  const officialBoundaryActive = Boolean(
-    parcelGeometry && !parcelLookupSource.toLocaleLowerCase('tr-TR').includes('agribound'),
-  );
+  const normalizedParcelSource = parcelLookupSource.toLocaleLowerCase('tr-TR');
+  const mapBoundarySourceIsManual = normalizedParcelSource.includes('kullanıcı çizimi');
+  const mapBoundarySourceIsAutomatic = normalizedParcelSource.includes('agribound');
+  const mapBoundarySourceIsMap = mapBoundarySourceIsManual || mapBoundarySourceIsAutomatic;
 
   const searchBoundaryAtPoint = async (point: { latitude: number; longitude: number }) => {
     setMapBoundaryAnchor(point);
@@ -308,9 +309,22 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
 
   const startMapBoundarySelection = () => {
     if (mapBoundaryLoading) return;
-    setMapBoundaryAnchor(null);
+
     setPreviewCandidateId(null);
     clearMapBoundarySearch();
+
+    const knownPoint =
+      mapBoundaryAnchor ??
+      (fieldLatitude !== null && fieldLongitude !== null
+        ? { latitude: fieldLatitude, longitude: fieldLongitude }
+        : null);
+
+    if (knownPoint) {
+      void searchBoundaryAtPoint(knownPoint);
+      return;
+    }
+
+    setMapBoundaryAnchor(null);
     setMapPickMode(true);
   };
 
@@ -335,11 +349,57 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
     handleMapBoundaryAccept(previewCandidate, mapBoundaryAnchor);
   };
 
+  const acceptManualBoundary = (result: {
+    geometry: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>;
+    areaSquareMeters: number;
+    areaDecare: number;
+  }) => {
+    const geometry = result.geometry.geometry;
+    const firstCoordinate =
+      geometry.type === 'Polygon'
+        ? geometry.coordinates?.[0]?.[0]
+        : geometry.coordinates?.[0]?.[0]?.[0];
+
+    const fallbackAnchor =
+      Array.isArray(firstCoordinate) &&
+      Number.isFinite(Number(firstCoordinate[0])) &&
+      Number.isFinite(Number(firstCoordinate[1]))
+        ? {
+            longitude: Number(firstCoordinate[0]),
+            latitude: Number(firstCoordinate[1]),
+          }
+        : null;
+
+    const anchor =
+      mapBoundaryAnchor ??
+      (fieldLatitude !== null && fieldLongitude !== null
+        ? { latitude: fieldLatitude, longitude: fieldLongitude }
+        : fallbackAnchor);
+
+    if (!anchor) return;
+
+    const candidate: MapBoundaryCandidate = {
+      id: `manual-${Date.now()}`,
+      geometry: result.geometry,
+      containsAnchor: true,
+      areaM2: result.areaSquareMeters,
+      areaDecare: result.areaDecare,
+      areaDifferenceRatio: null,
+      confidence: null,
+      source: 'Kullanıcı çizimi',
+    };
+
+    setMapPickMode(false);
+    setPreviewCandidateId(null);
+    clearMapBoundarySearch();
+    handleMapBoundaryAccept(candidate, anchor);
+  };
+
   const canNext = useMemo(() => {
     if (step === 0) return Boolean(selectedProvinceId && selectedDistrictId && fieldVillage);
     if (step === 1) {
       return parcelMode === 'map'
-        ? Boolean(parcelGeometry)
+        ? Boolean(parcelGeometry && mapBoundarySourceIsMap)
         : Boolean(parcelGeometry || (fieldAda.trim() && fieldParcel.trim()));
     }
     if (step === 2) return Boolean(fieldCrop && fieldName.trim());
@@ -351,6 +411,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
     fieldVillage,
     parcelMode,
     parcelGeometry,
+    mapBoundarySourceIsMap,
     fieldAda,
     fieldParcel,
     fieldCrop,
@@ -375,6 +436,8 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
     if (!selectedProvinceId || !selectedDistrictId || !fieldVillage) return;
     setParcelMode('map');
     setMapPickMode(false);
+    setMapBoundaryAnchor(null);
+    clearMapBoundarySearch();
     setStep(1);
   };
 
@@ -438,7 +501,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
 
             <p>
               {step===0 && 'İl, ilçe ve köy/mahalleyi seç. Ardından haritayı doğru bölgeye açacağız.'}
-              {step===1 && 'Resmî ada/parsel ile ilerleyebilir veya harita üzerinden sınır adayı seçebilirsin.'}
+              {step===1 && 'Resmî ada/parsel ile ilerleyebilir veya haritada tarlanın sınırlarını kendin çizebilirsin.'}
               {step===2 && 'Ürün ve çeşit bilgisi; uydu, iklim, rehber ve Pusula önerilerini kişiselleştirir.'}
               {step===3 && 'Alan ve sezon bilgileriyle tarla profilini tamamlayıp Pusula’ya bağlayacağız.'}
             </p>
@@ -487,7 +550,14 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
       item => item.name === fieldVillage
     )?.id ?? ''
   )}
-  onChange={(value) => { handleVillageSelection(value); setPendingLocation(null); setStep(1); }}
+  onChange={(value) => {
+    handleVillageSelection(value);
+    setPendingLocation(null);
+    setParcelMode('map');
+    setMapPickMode(false);
+    setMapBoundaryAnchor(null);
+    setStep(1);
+  }}
   disabled={!selectedDistrictId || villageOptions.length === 0}
   autoOpenToken={villageOpenToken}
   searchable
@@ -513,11 +583,11 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                   disabled={!selectedProvinceId || !selectedDistrictId || !fieldVillage}
                   onClick={openMapAdd}
                 >
-                  <span>⌖</span>
-                  Haritadan Ekle
+                  <span>✏️</span>
+                  Çizimle Ekle
                 </button>
                 <div className="tp-note" style={{marginTop:7}}>
-                  İl, ilçe ve köy/mahalleyi seçtikten sonra tarlanın içine dokunarak sınır adayı arayabilirsin.
+                  İl, ilçe ve köy/mahalleyi seç. Harita o bölgeden açılır; tarlana yaklaşıp köşeleri işaretleyerek parsel sınırını çiz.
                 </div>
               </div>
             </div>
@@ -536,15 +606,14 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                 <button
                   type="button"
                   className={parcelMode==='map' ? 'active' : ''}
-                  disabled={officialBoundaryActive}
                   onClick={()=>{
                     setParcelMode('map');
-                    if (!mapBoundaryAnchor && fieldLatitude !== null && fieldLongitude !== null) {
-                      setMapBoundaryAnchor({ latitude: fieldLatitude, longitude: fieldLongitude });
-                    }
+                    setMapPickMode(false);
+                    setMapBoundaryAnchor(null);
+                    clearMapBoundarySearch();
                   }}
                 >
-                  Haritadan Ekle
+                  Çizimle Ekle
                 </button>
               </div>
 
@@ -618,7 +687,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
               ) : (
                 <>
                   <p className="tp-map-boundary-help">
-                    “Sınırları bul”a bas. İmleç değişince tarlanın içine bir kez dokun; Pusula çevredeki aday parsel sınırlarını otomatik getirir.
+                    Harita seçtiğin il / ilçe / köy çevresinden başlar. Haritada tarlana yaklaş, “Parsel Sınırını Çiz”e bas ve köşeleri sırayla işaretle. En az 3 nokta seçtikten sonra “Çizimi Bitir” de.
                   </p>
 
                   <label style={{marginBottom:10}}>
@@ -627,74 +696,57 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                       value={fieldArea}
                       onChange={e=>setFieldArea(e.target.value)}
                       inputMode="decimal"
-                      placeholder="İsteğe bağlı · örn. 18,5"
+                      placeholder="İsteğe bağlı · çizince otomatik hesaplanır"
                     />
                   </label>
 
-                  <div className={`tp-map-boundary-map ${mapPickMode ? 'is-picking' : ''}`}>
+                  <div className="tp-map-boundary-map">
                     <FieldMap
                       initialCenter={
-                        mapBoundaryAnchor
-                          ? [mapBoundaryAnchor.longitude, mapBoundaryAnchor.latitude]
-                          : fieldLongitude !== null && fieldLatitude !== null
+                        mapStartView?.center ??
+                        (
+                          fieldLongitude !== null && fieldLatitude !== null
                             ? [fieldLongitude, fieldLatitude]
-                            : mapStartView?.center ?? [35.2433, 38.9637]
+                            : [35.2433, 38.9637]
+                        )
                       }
                       initialZoom={
-                        mapBoundaryAnchor
-                          ? 15.5
-                          : fieldLongitude !== null && fieldLatitude !== null
-                            ? 15.5
-                            : mapStartView?.zoom ?? 6
+                        mapStartView?.zoom ??
+                        (
+                          fieldLongitude !== null && fieldLatitude !== null
+                            ? 13.8
+                            : 6
+                        )
                       }
-                      height={330}
-                      parcelGeometry={parcelGeometry && parcelLookupSource.toLocaleLowerCase('tr-TR').includes('agribound') ? parcelGeometry : null}
-                      candidateGeometry={previewCandidate?.geometry ?? null}
-                      selectedPoint={mapBoundaryAnchor}
-                      pointSelectionEnabled={mapPickMode}
-                      onPointSelected={selectMapPoint}
+                      height={360}
+                      parcelGeometry={parcelGeometry && mapBoundarySourceIsMap ? parcelGeometry : null}
                       sections={[]}
-                      drawEnabled={false}
+                      drawEnabled
+                      drawButtonLabel="✏️ Parsel Sınırını Çiz"
+                      constrainDrawingToParcel={false}
+                      onSectionDrawn={acceptManualBoundary}
                     />
                   </div>
 
-                  {mapStartView && !mapBoundaryAnchor && (
-                    <div className="tp-note" style={{margin:'8px 0 0'}}>
-                      Harita {mapStartView.source === 'village'
-                        ? `${selectedVillageName} çevresine`
-                        : mapStartView.source === 'district'
-                          ? `${selectedDistrictName} ilçesine`
-                          : `${selectedProvinceName} iline`} yaklaştırıldı. Tarlanı bulup sınır aramasını başlatabilirsin.
-                    </div>
-                  )}
-
-                  <div className="tp-map-boundary-actions">
-                    <button className="tp-choice" type="button" onClick={useCurrentLocation}>
-                      ⌖ Konumumu kullan
-                    </button>
-                    <button
-                      className={`tp-choice ${mapPickMode ? 'active' : ''}`}
-                      type="button"
-                      disabled={mapBoundaryLoading}
-                      onClick={startMapBoundarySelection}
-                    >
-                      {mapBoundaryLoading
-                        ? 'Sınırlar aranıyor…'
-                        : mapPickMode
-                          ? '⌖ Tarlanın içine dokun'
-                          : '⌖ Sınırları bul'}
-                    </button>
+                  <div className="tp-note" style={{margin:'8px 0 0'}}>
+                    {mapStartView
+                      ? `Harita ${
+                          mapStartView.source === 'village'
+                            ? `${selectedVillageName} çevresinden`
+                            : mapStartView.source === 'district'
+                              ? `${selectedDistrictName} ilçesinden`
+                              : `${selectedProvinceName} ilinden`
+                        } açıldı. Yakınlaştırıp parsel köşelerini çiz.`
+                      : 'Konum hazırlanıyor… Haritayı yine elle kaydırıp yakınlaştırabilirsin.'}
                   </div>
 
                   <div className="tp-found">
-                    {mapBoundaryMessage || (mapPickMode
-                      ? 'Seçim modu açık. Şimdi tarlanın içine bir kez dokun.'
-                      : mapBoundaryCandidates.length > 0
-                        ? 'Aday sınırlar hazır. Doğru alanı seçip “Bu sınırı kullan” de.'
-                        : '“Sınırları bul”a bas veya bulunduğun konumu kullan.')}
+                    {parcelGeometry && mapBoundarySourceIsMap
+                      ? '✓ Çizdiğin parsel sınırı kaydedildi. İstersen “Parsel Sınırını Çiz” ile yeniden çizebilirsin.'
+                      : 'Henüz parsel çizilmedi. Haritada tarlana yaklaş ve çizimi başlat.'}
                   </div>
 
-                  {mapBoundaryCandidates.length > 0 && (
+                  {false && mapBoundaryCandidates.length > 0 && (
                     <div className="tp-map-candidates">
                       {mapBoundaryCandidates.map((candidate,index)=>{
                         const active = candidate.id === previewCandidateId;
@@ -723,7 +775,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                     </div>
                   )}
 
-                  {previewCandidate && (
+                  {false && previewCandidate && (
                     <>
                       <div className="tp-map-warning">
                         Uydu/model tabanlı sınır adayıdır; resmî kadastro sınırı değildir. Beyaz-kesik sınırı kontrol edip yalnız doğruysa kullan.
@@ -739,9 +791,10 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                     </>
                   )}
 
-                  {parcelGeometry && parcelLookupSource.toLocaleLowerCase('tr-TR').includes('agribound') && (
+                  {parcelGeometry && mapBoundarySourceIsMap && (
                     <div className="tp-note" style={{marginTop:10}}>
                       Seçilen sınır hazır · Kaynak: {parcelLookupSource}
+                      {mapBoundarySourceIsManual ? ' · Çizdiğin sınır resmî kadastro sınırı değildir.' : ''}
                     </div>
                   )}
                 </>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../supabaseClient';
 import { collectPusulaContext } from '../services/pusulaContextRegistry';
 import {
   getOrCreatePusulaDailyBrief,
@@ -29,17 +30,15 @@ type Props = {
 type Tab = 'crop' | 'fuel' | 'fertilizer';
 
 
-const MARKET_ICON_BASES = [
-  'https://fkrqvwarxzmdrexsxtzw.supabase.co/storage/v1/object/public/ui-icons/premium',
-] as const;
+const MARKET_ICON_BUCKET = 'market-icons';
 
 const MARKET_ICON_FILES = {
-  crop: '12-urun-fiyatlari.webp',
-  fuel: '13-mazot-fiyatlari.webp',
-  fertilizer: '14-gubre-fiyatlari.webp',
-  exchange: '12-urun-fiyatlari.webp',
-  alarm: '15-fiyat-alarmi.webp',
-  analysis: '16-piyasa-analizi.webp',
+  crop: 'product-prices.webp',
+  fuel: 'fuel-prices.webp',
+  fertilizer: 'fertilizer-prices.webp',
+  exchange: 'nearby-exchange.webp',
+  alarm: 'price-alarm.webp',
+  analysis: 'market-analysis.webp',
 } as const;
 
 const MARKET_ICON_FALLBACKS = {
@@ -51,6 +50,13 @@ const MARKET_ICON_FALLBACKS = {
   analysis: 'trend',
 } as const;
 
+function marketIconUrl(name: keyof typeof MARKET_ICON_FILES) {
+  return supabase.storage
+    .from(MARKET_ICON_BUCKET)
+    .getPublicUrl(MARKET_ICON_FILES[name])
+    .data.publicUrl;
+}
+
 function MarketImageIcon({
   name,
   size = 28,
@@ -60,9 +66,9 @@ function MarketImageIcon({
   size?: number;
   className?: string;
 }) {
-  const [sourceIndex, setSourceIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
 
-  if (sourceIndex >= MARKET_ICON_BASES.length) {
+  if (failed) {
     return (
       <span
         className={className}
@@ -85,12 +91,11 @@ function MarketImageIcon({
 
   return (
     <img
-      src={`${MARKET_ICON_BASES[sourceIndex]}/${MARKET_ICON_FILES[name]}`}
+      src={marketIconUrl(name)}
       alt=""
       aria-hidden="true"
-      crossOrigin="anonymous"
       className={className}
-      onError={() => setSourceIndex((current) => current + 1)}
+      onError={() => setFailed(true)}
       style={{
         width: size,
         height: size,
@@ -119,34 +124,46 @@ const TURKISH_PRODUCT_WORD_FIXES: Array<[RegExp, string]> = [
   [/\bIC\b/g, 'İÇ'],
 ];
 
-const repairTurkishEncoding = (value: unknown) =>
-  String(value ?? '')
-    /* Kaynakta bozuk tek-karakter kodlamaları farklı byte varyantlarıyla gelebiliyor.
-       Kelime kalıbını onar; doğru yazılmış hâli de aynı doğru sonuca gider. */
-    .replace(/bu.day/gi, 'BUĞDAY')
-    .replace(/ya.l.k/gi, 'YAĞLIK')
-    .replace(/f.st..i/gi, 'FISTIĞI')
-    .replace(/ay.i.e.i/gi, 'AYÇİÇEĞİ')
-    .replace(/.erezlik/gi, 'ÇEREZLİK')
-    .replace(/k.ftelik/gi, 'KÖFTELİK')
-    .replace(/nat.rel/gi, 'NATÜREL')
-    .replace(/.z.m/gi, 'ÜZÜM')
-    .replace(/.avdar/gi, 'ÇAVDAR')
-    .replace(/.eftali/gi, 'ŞEFTALİ')
-    .replace(/.ekirdek/gi, 'ÇEKİRDEK')
-    .replace(/.eker/gi, 'ŞEKER')
-    .replace(/Äž/g, 'Ğ')
-    .replace(/ÄŸ/g, 'ğ')
+const repairTurkishEncoding = (value: unknown) => {
+  let text = String(value ?? '');
+
+  // TOBB kayıtlarının bir kısmı UTF-8 baytları ikinci kez yanlış çözülmüş
+  // biçimde geliyor. Özellikle Ğ / Ş karakterlerinde 0x9E / 0x9F kontrol
+  // karakterleri görülebiliyor: "BUÄ\u009eDAY", "EKMEKLÄ°K" vb.
+  // Hem gerçek kontrol karakterlerini hem Windows-1252 mojibake varyantlarını
+  // aynı kanonik Türkçe harfe çevir.
+  text = text
+    .replace(/Ä(?:\u009e|ž|)/g, 'Ğ')
+    .replace(/Ä(?:\u009f|Ÿ|)/g, 'ğ')
+    .replace(/Å(?:\u009e|ž|)/g, 'Ş')
+    .replace(/Å(?:\u009f|Ÿ|)/g, 'ş')
     .replace(/Ä°/g, 'İ')
     .replace(/Ä±/g, 'ı')
-    .replace(/Åž/g, 'Ş')
-    .replace(/ÅŸ/g, 'ş')
     .replace(/Ãœ/g, 'Ü')
     .replace(/Ã¼/g, 'ü')
     .replace(/Ã–/g, 'Ö')
     .replace(/Ã¶/g, 'ö')
     .replace(/Ã‡/g, 'Ç')
-    .replace(/Ã§/g, 'ç');
+    .replace(/Ã§/g, 'ç')
+    .replace(/Â/g, '');
+
+  // Kaynaktan farklı bozuk byte dizisi gelirse ürün sözlüğü ikinci emniyet.
+  return text
+    .replace(/bu(?:.|[\u0080-\u009f]){0,3}day/gi, 'BUĞDAY')
+    .replace(/ekmekl(?:.|[\u0080-\u009f]){0,3}k/gi, 'EKMEKLİK')
+    .replace(/ya(?:.|[\u0080-\u009f]){0,3}l(?:.|[\u0080-\u009f]){0,3}k/gi, 'YAĞLIK')
+    .replace(/f(?:.|[\u0080-\u009f]){0,3}st(?:.|[\u0080-\u009f]){0,3}(?:.|[\u0080-\u009f]){0,3}i/gi, 'FISTIĞI')
+    .replace(/ay(?:.|[\u0080-\u009f]){0,3}i(?:.|[\u0080-\u009f]){0,3}e(?:.|[\u0080-\u009f]){0,3}i/gi, 'AYÇİÇEĞİ')
+    .replace(/(?:.|[\u0080-\u009f])erezlik/gi, 'ÇEREZLİK')
+    .replace(/k(?:.|[\u0080-\u009f])ftelik/gi, 'KÖFTELİK')
+    .replace(/nat(?:.|[\u0080-\u009f])rel/gi, 'NATÜREL')
+    .replace(/(?:.|[\u0080-\u009f])z(?:.|[\u0080-\u009f])m/gi, 'ÜZÜM')
+    .replace(/(?:.|[\u0080-\u009f])avdar/gi, 'ÇAVDAR')
+    .replace(/(?:.|[\u0080-\u009f])eftali/gi, 'ŞEFTALİ')
+    .replace(/(?:.|[\u0080-\u009f])ekirdek/gi, 'ÇEKİRDEK')
+    .replace(/(?:.|[\u0080-\u009f])eker/gi, 'ŞEKER')
+    .replace(/[\u0080-\u009f�]/g, '');
+};
 
 const formatCropName = (value: unknown) => {
   let text = repairTurkishEncoding(value)
@@ -724,6 +741,59 @@ export default function MarketPricesScreen({
     new Set(featuredMarkets.map((row) => row.sourceName).filter(Boolean)),
   );
 
+  const latestCropAverageByProduct = useMemo(() => {
+    const grouped = new Map<string, MarketCropPrice[]>();
+
+    for (const row of data?.cropPrices ?? []) {
+      const key = normalize(row.product);
+      if (!key) continue;
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(row);
+      grouped.set(key, bucket);
+    }
+
+    const summary = new Map<
+      string,
+      {
+        product: string;
+        averagePrice: number;
+        latestDate: string | null;
+        unit: string;
+      }
+    >();
+
+    grouped.forEach((rows, key) => {
+      const latestRows = getLatestRowsByKey(rows, (row) => row.marketName);
+      const featured = getFeaturedCropMarkets(
+        latestRows,
+        location,
+        rows[0]?.product ?? '',
+      );
+
+      if (!featured.length) return;
+
+      const averagePrice =
+        featured.reduce((sum, row) => sum + row.avgPrice, 0) /
+        featured.length;
+
+      const latestDate =
+        featured
+          .map((row) => row.date)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? null;
+
+      summary.set(key, {
+        product: formatCropName(rows[0]?.product ?? ''),
+        averagePrice,
+        latestDate,
+        unit: formatCropPriceUnit(featured[0]?.unit),
+      });
+    });
+
+    return summary;
+  }, [data, location]);
+
   useEffect(() => {
     if (loading || !data || !selectedField?.id) return;
 
@@ -940,11 +1010,96 @@ export default function MarketPricesScreen({
     screen,
   ]);
 
+  useEffect(() => {
+    if (loading || latestCropAverageByProduct.size === 0) return;
+
+    try {
+      const raw =
+        window.localStorage.getItem('tp_market_price_alarms_v3') ?? '[]';
+      const alarms = JSON.parse(raw);
+
+      if (!Array.isArray(alarms) || alarms.length === 0) return;
+
+      let changed = false;
+
+      const next = alarms.map((alarm: any) => {
+        const productKey = normalize(alarm?.product);
+        const live = latestCropAverageByProduct.get(productKey);
+
+        if (!live) return alarm;
+
+        const target = Number(alarm?.targetPrice);
+        if (!Number.isFinite(target) || target <= 0) return alarm;
+
+        const reached = live.averagePrice >= target;
+        if (!reached || alarm?.triggeredAt) return alarm;
+
+        changed = true;
+
+        const title = 'TarlaPusula fiyat alarmı';
+        const body =
+          `${live.product} için ortalama fiyat ` +
+          `${formatPrice(live.averagePrice)} ${live.unit} oldu. ` +
+          `Hedef ${formatPrice(target)} TL seviyesine ulaşıldı.`;
+
+        try {
+          if (
+            'Notification' in window &&
+            Notification.permission === 'granted'
+          ) {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker
+                .getRegistration()
+                .then((registration) => {
+                  if (registration) {
+                    void registration.showNotification(title, {
+                      body,
+                      tag: `market-alarm-${productKey}`,
+                      data: { url: window.location.href },
+                    });
+                  } else {
+                    new Notification(title, {
+                      body,
+                      tag: `market-alarm-${productKey}`,
+                    });
+                  }
+                });
+            } else {
+              new Notification(title, {
+                body,
+                tag: `market-alarm-${productKey}`,
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('Fiyat alarm bildirimi gösterilemedi:', error);
+        }
+
+        return {
+          ...alarm,
+          triggeredAt: new Date().toISOString(),
+          currentPrice: Number(live.averagePrice.toFixed(2)),
+          currentUnit: live.unit,
+          currentDate: live.latestDate,
+        };
+      });
+
+      if (changed) {
+        window.localStorage.setItem(
+          'tp_market_price_alarms_v3',
+          JSON.stringify(next),
+        );
+      }
+    } catch (error) {
+      console.warn('Fiyat alarm kontrolü çalıştırılamadı:', error);
+    }
+  }, [latestCropAverageByProduct, loading]);
+
   const saveAlarm = () => {
     const target = Number(alarmTarget.replace(',', '.'));
 
     if (!alarmProduct) {
-      setAlarmMessage('Önce takip edilecek ürünü seç.');
+      setAlarmMessage('Önce takip etmek istediğin ürünü seç.');
       return;
     }
 
@@ -964,6 +1119,8 @@ export default function MarketPricesScreen({
         product: alarmProduct,
         targetPrice: target,
         createdAt: new Date().toISOString(),
+        location: location.label,
+        triggeredAt: null,
       });
 
       window.localStorage.setItem(
@@ -971,7 +1128,18 @@ export default function MarketPricesScreen({
         JSON.stringify(next),
       );
 
-      setAlarmMessage('Fiyat alarmı kaydedildi.');
+      if (
+        'Notification' in window &&
+        Notification.permission !== 'granted'
+      ) {
+        setAlarmMessage(
+          'Alarm kaydedildi. Telefon bildirimi için Takvim > Bildirimler bölümünden bildirimleri aç.',
+        );
+      } else {
+        setAlarmMessage(
+          'Alarm kaydedildi. Hedef fiyat gelirse TarlaPusula bildirim verir.',
+        );
+      }
     } catch {
       setAlarmMessage('Fiyat alarmı kaydedilemedi.');
     }
@@ -981,13 +1149,39 @@ export default function MarketPricesScreen({
     <div className="tp-market-ref-page">
       <main className="tp-market-ref-main">
         <section className="tp-market-ref-heading">
-          <div>
+          <div className="tp-market-ref-heading-copy">
             <span>PİYASA MERKEZİ</span>
             <h1>Piyasa Fiyatları</h1>
             <p>
               Bitkisel ürün, mazot ve gübre piyasasının en son kayıtlı
               fiyatlarını takip et.
             </p>
+          </div>
+
+          <div
+            className="tp-market-ref-quick-actions"
+            aria-label="Piyasa hızlı işlemleri"
+          >
+            <button
+              type="button"
+              onClick={() => void load()}
+              aria-label="Fiyatları yenile"
+              title="Yenile"
+            >
+              <Icon name="refresh" size={17} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAlarmMessage('');
+                setAlarmOpen(true);
+              }}
+              aria-label="Fiyat alarmı oluştur"
+              title="Fiyat Alarmı"
+            >
+              <Icon name="bell" size={17} />
+            </button>
           </div>
 
           <div className="tp-market-ref-heading-actions">
@@ -998,23 +1192,6 @@ export default function MarketPricesScreen({
                 <strong>{location.label}</strong>
               </span>
             </div>
-
-            <button type="button" onClick={() => void load()}>
-              <Icon name="refresh" size={15} />
-              Yenile
-            </button>
-
-            <button
-              type="button"
-              className="alarm"
-              onClick={() => {
-                setAlarmMessage('');
-                setAlarmOpen(true);
-              }}
-            >
-              <MarketImageIcon name="alarm" size={26} />
-              Fiyat Alarmı
-            </button>
           </div>
         </section>
 
@@ -1024,7 +1201,7 @@ export default function MarketPricesScreen({
             className={activeTab === 'crop' ? 'active' : ''}
             onClick={() => setActiveTab('crop')}
           >
-            <MarketImageIcon name="crop" size={30} />
+            <MarketImageIcon name="crop" size={20} />
             Ürün Fiyatları
           </button>
           <button
@@ -1032,7 +1209,7 @@ export default function MarketPricesScreen({
             className={activeTab === 'fuel' ? 'active' : ''}
             onClick={() => setActiveTab('fuel')}
           >
-            <MarketImageIcon name="fuel" size={30} />
+            <MarketImageIcon name="fuel" size={20} />
             Mazot Fiyatları
           </button>
           <button
@@ -1040,7 +1217,7 @@ export default function MarketPricesScreen({
             className={activeTab === 'fertilizer' ? 'active' : ''}
             onClick={() => setActiveTab('fertilizer')}
           >
-            <MarketImageIcon name="fertilizer" size={30} />
+            <MarketImageIcon name="fertilizer" size={20} />
             Gübre Fiyatları
           </button>
 
@@ -1066,11 +1243,12 @@ export default function MarketPricesScreen({
                   <div>
                     <span>YAKIN / REFERANS TİCARET BORSALARI</span>
                     <h2>
-                      {selectedCrop || 'Ürün'} · En Son Kayıtlı Fiyat
+                      {selectedCrop || 'Ürün'} · Son Kayıtlı Fiyat
                     </h2>
                   </div>
 
                   <select
+                    className="tp-market-ref-dark-select"
                     value={selectedCrop}
                     onChange={(event) => {
                       setSelectedCrop(event.target.value);
@@ -1096,9 +1274,9 @@ export default function MarketPricesScreen({
                     <strong>{selectedCropBadge.text}</strong>
                   </div>
                   <p>
-                    Bu tablo “şu anki fiyatı” değil, her borsada bulunan
-                    <b> en son kayıtlı fiyatı </b>
-                    gösterir.
+                    Bu tablo anlık borsa ekranı değildir. Her borsada bulunan
+                    <b> en son kayıtlı fiyat </b>
+                    gösterilir.
                   </p>
                 </div>
 
@@ -1190,7 +1368,7 @@ export default function MarketPricesScreen({
 
                 <footer className="tp-market-ref-crop-footer">
                   <div>
-                    <small>3 Borsa Ortalaması</small>
+                    <small>Yakın 3 borsa ortalaması</small>
                     <strong>
                       {latestCropAverage == null
                         ? '—'
@@ -1201,7 +1379,7 @@ export default function MarketPricesScreen({
                   </div>
 
                   <div>
-                    <small>En Son Kayıt Tarihi</small>
+                    <small>Son kayıt tarihi</small>
                     <strong>{formatDate(selectedCropLatestDate)}</strong>
                   </div>
 
@@ -1217,53 +1395,29 @@ export default function MarketPricesScreen({
               </article>
 
               <article className="tp-market-ref-card fuel-preview">
-                <header className="tp-market-ref-card-head">
+                <header className="tp-market-ref-card-head tp-market-ref-card-head--compact">
                   <div>
                     <span>MAZOT / MOTORİN</span>
                     <h2>
-                      {latestFuelSummary?.city || location.city || 'Türkiye'} · En Son Kayıtlı Motorin
+                      {latestFuelSummary?.city || location.city || 'Türkiye'} · Son Kayıtlı Motorin Fiyatı
                     </h2>
                   </div>
 
-                  <div className="tp-market-ref-fuel-tools">
-                    <button
-                      type="button"
-                      className="tp-market-ref-fuel-refresh"
-                      onClick={() => void load()}
-                      disabled={loading}
-                      aria-label="Mazot verisini güncelle"
-                      title="Mazot verisini yeniden kontrol et"
-                    >
-                      <Icon name="refresh" size={13} />
-                      {loading ? 'Güncelleniyor' : 'Güncelle'}
-                    </button>
-
-                    <div className="tp-market-ref-big-price">
-                      <strong>
-                        {latestFuelSummary
-                          ? formatPrice(latestFuelSummary.averagePrice)
-                          : '—'}
-                      </strong>
-                      <span>{latestFuelSummary?.unit ?? 'TL/L'} · ortalama</span>
-                      <small>{formatDate(latestFuelSummary?.date)}</small>
-                    </div>
+                  <div className="tp-market-ref-big-price">
+                    <strong>
+                      {latestFuelSummary
+                        ? formatPrice(latestFuelSummary.averagePrice)
+                        : '—'}
+                    </strong>
+                    <span>{latestFuelSummary?.unit ?? 'TL/L'} · il ortalaması</span>
+                    <small>{formatDate(latestFuelSummary?.date)}</small>
                   </div>
                 </header>
 
-                <div className="tp-market-ref-trend-grid">
+                <div className="tp-market-ref-trend-grid tp-market-ref-trend-grid--single">
                   <div>
                     <header>
-                      <span>7 Kayıtlık Eğilim</span>
-                    </header>
-                    <MiniTrend
-                      rows={fuelHistory7}
-                      unit={latestFuelSummary?.unit ?? 'TL/L'}
-                    />
-                  </div>
-
-                  <div>
-                    <header>
-                      <span>30 Kayıtlık Eğilim</span>
+                      <span>Aylık eğilim · son 30 kayıt</span>
                     </header>
                     <MiniTrend
                       rows={fuelHistory30}
@@ -1282,7 +1436,9 @@ export default function MarketPricesScreen({
                         <span>
                           {formatPrice(row.averagePrice)} {row.unit}
                         </span>
-                        <small>{formatDate(row.date)} · {row.brandCount} marka</small>
+                        <small>
+                          {formatDate(row.date)} · {row.brandCount} marka
+                        </small>
                       </article>
                     ))}
                   </div>
@@ -1370,6 +1526,7 @@ export default function MarketPricesScreen({
                   </p>
                   <button
                     type="button"
+                    className="tp-market-ref-black-button"
                     onClick={() => {
                       setAlarmMessage('');
                       setAlarmOpen(true);
@@ -1558,6 +1715,7 @@ export default function MarketPricesScreen({
             <label>
               <span>Ürün</span>
               <select
+                className="tp-market-ref-dark-select"
                 value={alarmProduct}
                 onChange={(event) =>
                   setAlarmProduct(event.target.value)
@@ -1577,6 +1735,7 @@ export default function MarketPricesScreen({
             <label>
               <span>Hedef fiyat (TL)</span>
               <input
+                className="tp-market-ref-dark-input"
                 inputMode="decimal"
                 value={alarmTarget}
                 onChange={(event) =>
@@ -1601,7 +1760,7 @@ export default function MarketPricesScreen({
               </button>
               <button
                 type="button"
-                className="primary"
+                className="primary tp-market-ref-black-button"
                 onClick={saveAlarm}
               >
                 <MarketImageIcon name="alarm" size={24} />

@@ -118,6 +118,46 @@ export async function testR2Connection() {
   }
 }
 
+async function uploadToSupabaseFallback(
+  namespace: R2Namespace,
+  cleanPathValue: string,
+  file: Blob,
+  contentType: string,
+) {
+  if (!supabase) {
+    throw new Error('Supabase bağlantısı hazır değil.');
+  }
+
+  // AI ve saha fotoğrafı bucket'ları Supabase'te de private + kullanıcı bazlı RLS ile var.
+  // R2 erişimi veya tarayıcı CORS'u aksarsa analiz akışını tamamen durdurmuyoruz.
+  const supportedFallbackBuckets = new Set<R2Namespace>([
+    'field-activity-photos',
+    'field-observation-photos',
+  ]);
+
+  if (!supportedFallbackBuckets.has(namespace)) {
+    throw new Error('Bu dosya türü için yedek depolama kullanılamıyor.');
+  }
+
+  const { error } = await supabase.storage
+    .from(namespace)
+    .upload(cleanPathValue, file, {
+      contentType,
+      upsert: false,
+      cacheControl: '3600',
+    });
+
+  if (error) {
+    throw new Error(
+      `Yedek fotoğraf yükleme başarısız: ${error.message || 'Supabase Storage hatası.'}`,
+    );
+  }
+
+  // İşaretsiz path = legacy/private Supabase Storage.
+  // analyze-field-image bunu zaten destekliyor.
+  return cleanPathValue;
+}
+
 export async function uploadPrivateFile(
   namespace: R2Namespace,
   path: string,
@@ -127,29 +167,16 @@ export async function uploadPrivateFile(
   const clean = cleanPath(path);
   const type = contentType || file.type || 'application/octet-stream';
 
-  // StackBlitz / geliştirme testinde önce sunucunun R2'ye gerçekten erişebildiğini
-  // doğrula. Böylece secret/bucket hatasını tarayıcı CORS hatasından ayırıyoruz.
-  if (import.meta.env.DEV) {
-    const health = await testR2Connection();
-
-    if (!health.ok) {
-      throw new Error(
-        `Cloudflare R2 sunucu testi başarısız${health.stage ? ` (${health.stage})` : ''}: ` +
-          `${health.error || 'R2 secret, bucket ve yetkilerini kontrol et.'}`,
-      );
-    }
-  }
-
-  const [signed] = await sign('upload', namespace, [clean], [type]);
-
-  if (!signed?.url) {
-    throw new Error('R2 yükleme bağlantısı hazırlanamadı.');
-  }
-
-  let response: Response;
-
   try {
-    response = await fetch(signed.url, {
+    // Önce R2. Eski DEV healthcheck artık yüklemeyi bloklamıyor;
+    // imzalı gerçek yükleme isteği doğrudan deneniyor.
+    const [signed] = await sign('upload', namespace, [clean], [type]);
+
+    if (!signed?.url) {
+      throw new Error('R2 yükleme bağlantısı hazırlanamadı.');
+    }
+
+    const response = await fetch(signed.url, {
       method: 'PUT',
       mode: 'cors',
       credentials: 'omit',
@@ -158,51 +185,38 @@ export async function uploadPrivateFile(
       },
       body: file,
     });
-  } catch (error) {
-    let host = 'Cloudflare R2';
-    try {
-      host = new URL(signed.url).host;
-    } catch {
-      // Signed URL hata mesajına eklenmez; imza gizli kalır.
-    }
 
-    console.error('R2 doğrudan yükleme isteği başarısız:', {
-      host,
-      namespace,
-      path: clean,
-      error,
-    });
-
-    const health = await testR2Connection();
-
-    if (health.ok) {
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
       throw new Error(
-        'Cloudflare R2 sunucu bağlantısı sağlam, ancak tarayıcı yüklemeyi engelliyor. ' +
-          'Bucket CORS ayarını kontrol et.',
+        `Cloudflare R2 yükleme başarısız (HTTP ${response.status})${
+          details ? `: ${details.slice(0, 160)}` : ''
+        }`,
       );
     }
 
-    throw new Error(
-      `Cloudflare R2 sunucu testi başarısız${health.stage ? ` (${health.stage})` : ''}: ` +
-        `${health.error || 'R2 yapılandırmasını kontrol et.'}`,
+    return markR2Path(clean);
+  } catch (r2Error) {
+    console.warn(
+      'R2 yüklemesi tamamlanamadı; private Supabase Storage yedeği deneniyor:',
+      r2Error,
     );
+
+    try {
+      return await uploadToSupabaseFallback(namespace, clean, file, type);
+    } catch (fallbackError) {
+      const r2Message =
+        r2Error instanceof Error ? r2Error.message : 'R2 yükleme hatası';
+      const fallbackMessage =
+        fallbackError instanceof Error
+          ? fallbackError.message
+          : 'Yedek depolama hatası';
+
+      throw new Error(
+        `Fotoğraf yüklenemedi. R2: ${r2Message} · Yedek: ${fallbackMessage}`,
+      );
+    }
   }
-
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    console.error('R2 yükleme HTTP hatası:', {
-      status: response.status,
-      namespace,
-      path: clean,
-      details: details.slice(0, 300),
-    });
-
-    throw new Error(
-      `Cloudflare R2 yükleme başarısız (HTTP ${response.status}).`,
-    );
-  }
-
-  return markR2Path(clean);
 }
 
 export async function getPrivateFileUrl(

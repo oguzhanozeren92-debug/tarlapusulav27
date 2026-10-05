@@ -3,6 +3,7 @@ import './HomeScreen.css';
 import './ClassicPusula.css';
 import { onboardingStyles } from '../../styles/onboardingStyles';
 import { useGamificationStore } from '../../gamification/useGamificationStore';
+import { openPlanUpgrade } from '../../entitlements/planAccess';
 import AppDrawer from '../../components/AppDrawer';
 import PusulaPointsModal from '../../components/PusulaPointsModal';
 import ClassicBottomNav from '../../components/ClassicBottomNav';
@@ -1542,6 +1543,15 @@ export default function HomeScreen(props: HomeScreenProps) {
               aria-modal="true"
               aria-labelledby="tp-field-gate-title"
             >
+              <button
+                type="button"
+                className="tp-field-gate-x"
+                onClick={() => setFieldGateNotice(null)}
+                aria-label="Kapat"
+              >
+                ×
+              </button>
+
               <small>TARLA HAKKI</small>
               <h3 id="tp-field-gate-title">
                 {fieldGateNotice.reason === 'configured_limit'
@@ -1551,10 +1561,10 @@ export default function HomeScreen(props: HomeScreenProps) {
 
               <p>
                 {fieldGateNotice.reason === 'configured_limit'
-                  ? 'Şimdilik hesabında tanımlı en yüksek tarla sayısına ulaştın.'
+                  ? 'Ücretsiz plandaki tarla hakkını kullandın. Premium ile sınırsız tarla ve tüm gelişmiş özellikleri açabilirsin.'
                   : `Yeni tarla eklemek için toplam ${Number(
                       fieldGateNotice.requiredPoints ?? 0
-                    ).toLocaleString('tr-TR')} P gerekiyor.`}
+                    ).toLocaleString('tr-TR')} P gerekiyor. İstersen puanlarını inceleyebilir veya Premium'a geçebilirsin.`}
               </p>
 
               {fieldGateNotice.reason !== 'configured_limit' && (
@@ -1571,17 +1581,24 @@ export default function HomeScreen(props: HomeScreenProps) {
               <div className="tp-field-gate-actions">
                 <button
                   type="button"
-                  className="tp-field-gate-close"
-                  onClick={() => setFieldGateNotice(null)}
+                  className="tp-field-gate-premium"
+                  onClick={() => {
+                    setFieldGateNotice(null);
+                    openPlanUpgrade({
+                      requiredPlan: 'premium',
+                      feature: 'Sınırsız tarla ve Premium özellikler',
+                    });
+                  }}
                 >
-                  Kapat
+                  Premium Ol
                 </button>
+
                 <button
                   type="button"
                   className="tp-field-gate-points"
                   onClick={() => {
                     setFieldGateNotice(null);
-                    setScreen?.('pointsHub');
+                    window.setTimeout(() => setPointsOpen(true), 0);
                   }}
                 >
                   Puanlarımı Gör

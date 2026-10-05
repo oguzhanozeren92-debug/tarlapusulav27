@@ -253,3 +253,246 @@ body:has(.tp-orchard-zone-save-backdrop) .tp-mf-ndvi-strip {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* V28 — BAHÇE TAKİP VE FOTO AKSİYONLARI */
+.tp-map-stage .tp-orchard-zone-draw-hud,.tp-map-first-shell .tp-orchard-zone-draw-hud{
+  z-index:420!important;bottom:112px!important;background:rgba(5,6,7,.94)!important;color:#fff!important
+}
+.tp-orchard-zone-draw-hud :is(span,strong,small){color:#fff!important;-webkit-text-fill-color:#fff!important}
+.tp-orchard-zone-draw-actions button{background:#050607!important;border-color:rgba(255,255,255,.38)!important;color:#fff!important}
+.tp-orchard-zone-draw-actions button svg{color:#fff!important;stroke:#fff!important}
+.tp-ndvi-photo-portal :is(.tp-ndvi-photo-close,.tp-ndvi-photo-location-head button,.tp-ndvi-photo-pickers button,.tp-ndvi-photo-later,.tp-ndvi-photo-upload){
+  border-color:#050607!important;background:#050607!important;color:#fff!important;-webkit-text-fill-color:#fff!important
+}
+
+
+/* =========================================================
+   BAHÇE TAKİP ALANI — ÜCRETSİZ KULLANICI PREMIUM ÖNİZLEMESİ
+   Gerçek çizim/veri açılmaz; özelliğin ne yaptığı anlaşılır.
+   ========================================================= */
+.tp-map-zone-draw-control{
+  position:relative!important;
+}
+.tp-map-zone-draw-control.is-premium-locked{
+  border-color:#111!important;
+  background:#fff!important;
+  color:#111!important;
+}
+.tp-map-zone-premium-dot{
+  position:absolute;
+  right:-4px;
+  top:-4px;
+  width:17px;
+  height:17px;
+  display:grid;
+  place-items:center;
+  border:2px solid #fff;
+  border-radius:999px;
+  background:#111;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:7px!important;
+  font-weight:950!important;
+  line-height:1!important;
+  pointer-events:none;
+}
+
+.tp-orchard-zone-premium-preview{
+  position:absolute;
+  left:10px;
+  right:58px;
+  bottom:108px;
+  z-index:520!important;
+  padding:13px;
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:16px;
+  background:
+    radial-gradient(circle at 90% 0%,rgba(255,255,255,.10),transparent 34%),
+    rgba(5,6,7,.96);
+  color:#fff;
+  box-shadow:0 18px 38px rgba(0,0,0,.42);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+}
+.tp-orchard-zone-premium-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.tp-orchard-zone-premium-head>div{
+  min-width:0;
+}
+.tp-orchard-zone-premium-head span{
+  display:block;
+  color:#aeb5bb!important;
+  -webkit-text-fill-color:#aeb5bb!important;
+  font-size:8px!important;
+  font-weight:950!important;
+  letter-spacing:.09em!important;
+}
+.tp-orchard-zone-premium-head strong{
+  display:block;
+  max-width:270px;
+  margin-top:3px;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:14px!important;
+  line-height:1.18!important;
+}
+.tp-orchard-zone-premium-close{
+  flex:0 0 32px;
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:9px;
+  background:#111;
+  color:#fff;
+}
+.tp-orchard-zone-premium-close svg{
+  color:#fff!important;
+  stroke:#fff!important;
+}
+.tp-orchard-zone-premium-preview>p{
+  margin:9px 0 0;
+  color:#d0d4d8!important;
+  -webkit-text-fill-color:#d0d4d8!important;
+  font-size:10px!important;
+  line-height:1.45!important;
+}
+.tp-orchard-zone-premium-mock{
+  margin-top:10px;
+  padding:8px;
+  border:1px solid #2b2e31;
+  border-radius:13px;
+  background:#0d0f11;
+}
+.tp-orchard-zone-premium-polygon{
+  position:relative;
+  min-height:58px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:9px 12px 9px 38px;
+  overflow:hidden;
+  border:1px dashed rgba(255,255,255,.34);
+  border-radius:11px;
+  background:
+    linear-gradient(145deg,transparent 0 22%,rgba(255,255,255,.05) 22% 23%,transparent 23% 48%,rgba(255,255,255,.05) 48% 49%,transparent 49%),
+    #14171a;
+}
+.tp-orchard-zone-premium-polygon::before{
+  content:'';
+  position:absolute;
+  left:9px;
+  top:12px;
+  width:24px;
+  height:30px;
+  border:2px solid #fff;
+  clip-path:polygon(15% 28%,78% 4%,100% 64%,58% 100%,0 76%);
+  opacity:.9;
+}
+.tp-orchard-zone-premium-polygon span{
+  color:#929aa1!important;
+  -webkit-text-fill-color:#929aa1!important;
+  font-size:7px!important;
+  font-weight:900!important;
+  letter-spacing:.08em!important;
+}
+.tp-orchard-zone-premium-polygon b{
+  margin-top:2px;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:12px!important;
+}
+.tp-orchard-zone-premium-metrics{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:5px;
+  margin-top:6px;
+}
+.tp-orchard-zone-premium-metrics article{
+  min-width:0;
+  padding:7px;
+  border:1px solid #272a2d;
+  border-radius:9px;
+  background:#111315;
+}
+.tp-orchard-zone-premium-metrics span{
+  display:block;
+  color:#8f979e!important;
+  -webkit-text-fill-color:#8f979e!important;
+  font-size:7px!important;
+}
+.tp-orchard-zone-premium-metrics strong{
+  display:block;
+  margin-top:3px;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:9px!important;
+  line-height:1.15!important;
+}
+.tp-orchard-zone-premium-info{
+  margin-top:8px;
+  padding:9px 10px;
+  border-radius:11px;
+  background:#fff;
+  color:#111;
+}
+.tp-orchard-zone-premium-info span{
+  display:block;
+  color:#6a7279!important;
+  -webkit-text-fill-color:#6a7279!important;
+  font-size:7px!important;
+  font-weight:950!important;
+  letter-spacing:.08em!important;
+}
+.tp-orchard-zone-premium-info strong{
+  display:block;
+  margin-top:3px;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  font-size:10px!important;
+  line-height:1.25!important;
+}
+.tp-orchard-zone-premium-info small{
+  display:block;
+  margin-top:4px;
+  color:#596168!important;
+  -webkit-text-fill-color:#596168!important;
+  font-size:8px!important;
+  line-height:1.35!important;
+}
+.tp-orchard-zone-premium-cta{
+  width:100%;
+  min-height:38px;
+  margin-top:8px;
+  border:1px solid #fff;
+  border-radius:11px;
+  background:#fff;
+  color:#050607!important;
+  -webkit-text-fill-color:#050607!important;
+  font-size:10px!important;
+  font-weight:950!important;
+}
+.tp-orchard-zone-premium-cta:active{
+  transform:translateY(1px);
+}
+
+@media(max-width:560px){
+  .tp-orchard-zone-premium-preview{
+    left:8px;
+    right:52px;
+    bottom:106px;
+    padding:11px;
+  }
+  .tp-orchard-zone-premium-head strong{
+    font-size:13px!important;
+  }
+  .tp-orchard-zone-premium-metrics{
+    gap:4px;
+  }
+}

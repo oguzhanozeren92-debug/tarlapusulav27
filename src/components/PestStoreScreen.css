@@ -3701,3 +3701,62 @@
   color:#fff!important;
   -webkit-text-fill-color:#fff!important;
 }
+
+
+/* ===== Depom beyaz/gri final toolbar fix ===== */
+html body #root .tp-peststore-page .tp-depot-v4-tabs button,
+html body #root .tp-peststore-page .tp-depot-v4-toolbar label,
+html body #root .tp-peststore-page .tp-depot-v4-toolbar button{
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  background:#eef0f3!important;
+  background-color:#eef0f3!important;
+  background-image:none!important;
+  border:1px solid #cfd5dd!important;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+  opacity:1!important;
+}
+html body #root .tp-peststore-page .tp-depot-v4-tabs button.active{
+  background:#e5e8ec!important;
+  background-color:#e5e8ec!important;
+  border-color:#c3cad3!important;
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+}
+html body #root .tp-peststore-page .tp-depot-v4-toolbar label *,
+html body #root .tp-peststore-page .tp-depot-v4-toolbar button *,
+html body #root .tp-peststore-page .tp-depot-v4-tabs button *{
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+}
+html body #root .tp-peststore-page .tp-depot-v4-toolbar input,
+html body #root .tp-peststore-page .tp-depot-v4-toolbar select{
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+}
+html body #root .tp-peststore-page .tp-depot-v4-toolbar input::placeholder{
+  color:#3b4148!important;
+  -webkit-text-fill-color:#3b4148!important;
+  opacity:1!important;
+}
+html body #root .tp-peststore-page .tp-depot-v4-health-detail.tp-depot-v4-health-detail{
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  background:#050607!important;
+  background-color:#050607!important;
+  background-image:none!important;
+  border:1px solid #050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  opacity:1!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+}
+html body #root .tp-peststore-page .tp-depot-v4-health-detail.tp-depot-v4-health-detail *,
+html body #root .tp-peststore-page .tp-depot-v4-health-detail.tp-depot-v4-health-detail svg{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}

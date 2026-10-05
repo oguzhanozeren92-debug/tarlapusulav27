@@ -1,6 +1,7 @@
 import { ArrowLeft, Menu } from 'lucide-react';
 import type { Field, Screen } from '../types';
 import PublishedAgriNewsBridge from '../features/content-public/PublishedAgriNewsBridge';
+import ClassicBottomNav from './ClassicBottomNav';
 import './AgriNewsScreen.css';
 
 export interface AgriNewsScreenProps {
@@ -40,6 +41,11 @@ export default function AgriNewsScreen({ setScreen, setSideMenuOpen }: AgriNewsS
       <main className="tp-agri-news-main tp-agri-news-main--live">
         <PublishedAgriNewsBridge onOpenSupport={openSupportCalculator} />
       </main>
+
+      <ClassicBottomNav
+        activeScreen={screen}
+        setScreen={setScreen}
+      />
     </div>
   );
 }

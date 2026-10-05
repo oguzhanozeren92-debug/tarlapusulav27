@@ -1631,3 +1631,445 @@
     font-size:22px;
   }
 }
+
+/* =========================================================
+   MARKET V10 — COMPACT QUICK ACTIONS + 3 BLACK MARKET TABS
+   ---------------------------------------------------------
+   Yalnız üst hızlı işlemler ve 3 ana piyasa sekmesini etkiler.
+   Diğer kart / tablo / veri stillerine dokunmaz.
+   ========================================================= */
+
+.tp-market-ref-heading{
+  position:relative;
+}
+
+.tp-market-ref-heading-copy{
+  min-width:0;
+}
+
+.tp-market-ref-heading-copy p{
+  max-width:calc(100% - 92px);
+}
+
+/* Yenile + Fiyat Alarmı artık başlığın sağ üstünde küçük ikonlar. */
+.tp-market-ref-quick-actions{
+  position:absolute;
+  top:0;
+  right:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+html body #root .tp-market-ref-page .tp-market-ref-quick-actions>button{
+  width:34px !important;
+  height:34px !important;
+  min-width:34px !important;
+  min-height:34px !important;
+  display:grid !important;
+  place-items:center !important;
+  padding:0 !important;
+  border:1px solid #050607 !important;
+  border-radius:10px !important;
+  background:#050607 !important;
+  background-image:none !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  box-shadow:none !important;
+  cursor:pointer !important;
+}
+
+html body #root .tp-market-ref-page .tp-market-ref-quick-actions>button svg{
+  color:#ffffff !important;
+  stroke:#ffffff !important;
+}
+
+html body #root .tp-market-ref-page .tp-market-ref-quick-actions>button:active{
+  transform:scale(.96);
+}
+
+/* Büyük aksiyonlar buradan kalktığı için konum tek başına tam genişlikte. */
+.tp-market-ref-heading-actions{
+  width:100%;
+}
+
+.tp-market-ref-heading-actions .tp-market-ref-location{
+  width:100%;
+}
+
+/* Üç piyasa türü her ekranda tek satır. */
+html body #root .tp-market-ref-page .tp-market-ref-tabs{
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:7px !important;
+}
+
+html body #root .tp-market-ref-page .tp-market-ref-tabs>button{
+  min-width:0 !important;
+  min-height:42px !important;
+  justify-content:center !important;
+  gap:5px !important;
+  padding:0 7px !important;
+  border:1px solid #050607 !important;
+  border-radius:11px !important;
+  background:#050607 !important;
+  background-image:none !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  font:800 9px/1.1 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  white-space:nowrap !important;
+  box-shadow:none !important;
+}
+
+html body #root .tp-market-ref-page .tp-market-ref-tabs>button.active{
+  border-color:#050607 !important;
+  background:#050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.38) !important;
+}
+
+html body #root .tp-market-ref-page .tp-market-ref-tabs>button img,
+html body #root .tp-market-ref-page .tp-market-ref-tabs>button>span{
+  width:20px !important;
+  height:20px !important;
+  flex:0 0 20px !important;
+}
+
+html body #root .tp-market-ref-page .tp-market-ref-tabs>button svg{
+  color:#ffffff !important;
+  stroke:#ffffff !important;
+}
+
+/* Veri kaynağı bilgisi üç butonun altında ayrı satırda kalsın. */
+.tp-market-ref-source-state{
+  grid-column:1 / -1 !important;
+  min-width:0 !important;
+  justify-content:flex-start !important;
+  min-height:22px !important;
+  padding:0 2px !important;
+}
+
+@media(max-width:720px){
+  .tp-market-ref-heading{
+    gap:9px !important;
+  }
+
+  .tp-market-ref-heading-copy{
+    width:100%;
+    padding-right:82px;
+  }
+
+  .tp-market-ref-heading-copy p{
+    max-width:100%;
+  }
+
+  .tp-market-ref-quick-actions{
+    top:0;
+    right:0;
+  }
+
+  html body #root .tp-market-ref-page .tp-market-ref-quick-actions>button{
+    width:32px !important;
+    height:32px !important;
+    min-width:32px !important;
+    min-height:32px !important;
+    border-radius:9px !important;
+  }
+
+  .tp-market-ref-heading-actions{
+    display:block !important;
+  }
+
+  .tp-market-ref-location{
+    width:100% !important;
+    min-height:42px !important;
+  }
+
+  html body #root .tp-market-ref-page .tp-market-ref-tabs{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:6px !important;
+    margin-bottom:10px !important;
+    padding-bottom:8px !important;
+  }
+
+  html body #root .tp-market-ref-page .tp-market-ref-tabs>button{
+    min-height:40px !important;
+    gap:4px !important;
+    padding:0 5px !important;
+    border-radius:10px !important;
+    font-size:8px !important;
+    letter-spacing:-.015em !important;
+  }
+
+  html body #root .tp-market-ref-page .tp-market-ref-tabs>button img,
+  html body #root .tp-market-ref-page .tp-market-ref-tabs>button>span{
+    width:17px !important;
+    height:17px !important;
+    flex-basis:17px !important;
+  }
+
+  .tp-market-ref-source-state{
+    min-height:20px !important;
+    font-size:8px !important;
+  }
+}
+
+@media(max-width:370px){
+  html body #root .tp-market-ref-page .tp-market-ref-tabs>button{
+    padding:0 3px !important;
+    font-size:7.4px !important;
+    gap:3px !important;
+  }
+
+  html body #root .tp-market-ref-page .tp-market-ref-tabs>button img,
+  html body #root .tp-market-ref-page .tp-market-ref-tabs>button>span{
+    width:15px !important;
+    height:15px !important;
+    flex-basis:15px !important;
+  }
+}
+
+
+
+/* =========================================================
+   MARKET V12 — V10 KORUNUR + OKUNAKLILIK / ALARM / AYLIK GRAFİK
+   ========================================================= */
+
+.tp-market-ref-dark-select,
+.tp-market-ref-dark-input {
+  background:#050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  border:1px solid #050607 !important;
+  box-shadow:none !important;
+}
+
+.tp-market-ref-dark-select option {
+  background:#050607 !important;
+  color:#ffffff !important;
+}
+
+.tp-market-ref-black-button {
+  border:1px solid #050607 !important;
+  background:#050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+}
+
+.tp-market-ref-black-button svg,
+.tp-market-ref-black-button img,
+.tp-market-ref-black-button span {
+  color:#ffffff !important;
+}
+
+.tp-market-ref-card-head--compact {
+  align-items:flex-start;
+}
+
+.tp-market-ref-card-head--compact .tp-market-ref-big-price {
+  margin-left:auto;
+}
+
+.tp-market-ref-trend-grid--single {
+  grid-template-columns:minmax(0,1fr) !important;
+}
+
+.tp-market-ref-card-head h2 {
+  font-size:22px !important;
+  line-height:1.15 !important;
+}
+
+.tp-market-ref-card-head > div > span,
+.tp-market-ref-side-stack article > span,
+.tp-market-ref-date-banner strong,
+.tp-market-ref-crop-footer small,
+.tp-market-ref-nearby > span,
+.tp-market-mini-chart-head strong,
+.tp-market-mini-chart-head span,
+.tp-market-ref-modal label > span {
+  font-size:11px !important;
+}
+
+.tp-market-ref-date-banner p,
+.tp-market-ref-side-stack article p,
+.tp-market-ref-disclaimer,
+.tp-market-ref-notice,
+.tp-market-ref-empty p,
+.tp-market-ref-inline-empty {
+  font-size:12px !important;
+  line-height:1.55 !important;
+}
+
+.tp-market-ref-table-wrap th {
+  font-size:11px !important;
+  line-height:1.3 !important;
+}
+
+.tp-market-ref-table-wrap td {
+  font-size:13px !important;
+  line-height:1.45 !important;
+}
+
+.tp-market-ref-table-wrap td strong,
+.tp-market-ref-table-wrap td.average {
+  font-size:14px !important;
+}
+
+.tp-market-ref-table-wrap td small,
+.tp-market-ref-age,
+.tp-market-ref-source {
+  font-size:11px !important;
+}
+
+.tp-market-ref-market-name strong {
+  font-size:14px !important;
+}
+
+.tp-market-ref-market-name small {
+  font-size:11px !important;
+}
+
+.tp-market-ref-crop-footer strong {
+  font-size:26px !important;
+  line-height:1.1 !important;
+}
+
+.tp-market-ref-big-price strong {
+  font-size:48px !important;
+  line-height:1 !important;
+}
+
+.tp-market-ref-big-price span {
+  font-size:14px !important;
+}
+
+.tp-market-ref-big-price small {
+  font-size:12px !important;
+}
+
+.tp-market-mini-chart {
+  padding:14px !important;
+}
+
+.tp-market-ref-side-stack article button,
+.tp-market-ref-modal footer button.primary {
+  min-height:42px !important;
+  font-size:13px !important;
+  font-weight:800 !important;
+}
+
+@media(max-width:720px) {
+  .tp-market-ref-card-head h2 {
+    font-size:18px !important;
+  }
+
+  .tp-market-ref-card-head > div > span,
+  .tp-market-ref-side-stack article > span,
+  .tp-market-ref-date-banner strong,
+  .tp-market-ref-crop-footer small,
+  .tp-market-ref-nearby > span,
+  .tp-market-mini-chart-head strong,
+  .tp-market-mini-chart-head span,
+  .tp-market-ref-modal label > span {
+    font-size:10px !important;
+  }
+
+  .tp-market-ref-date-banner p,
+  .tp-market-ref-side-stack article p,
+  .tp-market-ref-disclaimer,
+  .tp-market-ref-notice,
+  .tp-market-ref-empty p,
+  .tp-market-ref-inline-empty {
+    font-size:11px !important;
+  }
+
+  .tp-market-ref-table-wrap th {
+    font-size:10px !important;
+  }
+
+  .tp-market-ref-table-wrap td {
+    font-size:12px !important;
+  }
+
+  .tp-market-ref-table-wrap td strong,
+  .tp-market-ref-table-wrap td.average,
+  .tp-market-ref-market-name strong {
+    font-size:13px !important;
+  }
+
+  .tp-market-ref-table-wrap td small,
+  .tp-market-ref-age,
+  .tp-market-ref-source,
+  .tp-market-ref-market-name small {
+    font-size:10px !important;
+  }
+
+  .tp-market-ref-crop-footer strong {
+    font-size:22px !important;
+  }
+
+  .tp-market-ref-big-price {
+    width:100%;
+    align-items:flex-start !important;
+  }
+
+  .tp-market-ref-big-price strong {
+    font-size:38px !important;
+  }
+
+  .tp-market-ref-big-price span {
+    font-size:13px !important;
+  }
+
+  .tp-market-ref-big-price small {
+    font-size:11px !important;
+  }
+}
+
+
+/* =========================================================
+   MARKET V13 — TÜRKÇE SELECT + ALARM SON OTORİTE
+   ========================================================= */
+
+/* Windows/Chrome native açılır listenin de koyu paleti tercih etmesini iste. */
+html body #root .tp-market-ref-page select.tp-market-ref-dark-select {
+  color-scheme: dark !important;
+  background-color:#050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  border-color:#050607 !important;
+}
+
+html body #root .tp-market-ref-page select.tp-market-ref-dark-select option {
+  background:#050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+}
+
+/* WhiteAppTheme sonradan yüklense bile Alarm Ayarla açık renge dönemeyecek. */
+html body #root .tp-market-ref-page
+.tp-market-ref-side-stack article
+button.tp-market-ref-black-button,
+html body #root .tp-market-ref-modal
+button.tp-market-ref-black-button,
+html body #root .tp-market-ref-modal
+button.primary.tp-market-ref-black-button {
+  background:#050607 !important;
+  background-color:#050607 !important;
+  background-image:none !important;
+  border-color:#050607 !important;
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  opacity:1 !important;
+  box-shadow:none !important;
+}
+
+html body #root .tp-market-ref-page
+.tp-market-ref-side-stack article
+button.tp-market-ref-black-button *,
+html body #root .tp-market-ref-modal
+button.tp-market-ref-black-button * {
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+}

@@ -1,0 +1,16 @@
+.tp-drawer-support-footer{
+  margin-top:auto; padding:14px 0 4px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.tp-drawer-socials{display:flex;gap:8px;align-items:center}
+.tp-drawer-socials a,.tp-drawer-socials button{
+  width:36px;height:36px;padding:0;display:grid;place-items:center;border:1px solid rgba(255,255,255,.22);
+  border-radius:50%;background:rgba(0,0,0,.26);color:#fff;cursor:pointer;text-decoration:none;
+}
+.tp-drawer-socials svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tp-drawer-socials a:first-child svg,.tp-drawer-socials button:first-child svg{fill:currentColor;stroke:none}
+.tp-drawer-report-button{
+  min-height:40px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.72);
+  border-radius:999px;background:#fff;color:#111;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.2);
+}
+.tp-drawer-report-button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:520px){.tp-drawer-support-footer{padding-top:12px}.tp-drawer-report-button{padding:0 12px}}

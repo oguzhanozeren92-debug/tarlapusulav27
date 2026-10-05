@@ -157,6 +157,7 @@
           -webkit-backdrop-filter:blur(9px)
         }
         .tp-field-gate-modal{
+          position:relative;
           width:min(100%,430px);
           border:1px solid rgba(168,199,158,.28);
           border-radius:22px;
@@ -165,6 +166,28 @@
             radial-gradient(circle at 88% 8%,rgba(95,188,111,.10),transparent 30%),
             linear-gradient(160deg,rgba(11,22,15,.99),rgba(4,9,6,.995));
           box-shadow:0 24px 70px rgba(0,0,0,.52),inset 0 1px rgba(255,255,255,.025)
+        }
+        .tp-field-gate-x{
+          position:absolute;
+          top:12px;
+          right:12px;
+          width:34px;
+          height:34px;
+          display:grid;
+          place-items:center;
+          padding:0;
+          border:1px solid rgba(104,116,128,.22);
+          border-radius:11px;
+          background:rgba(255,255,255,.72);
+          color:#20252b;
+          font-size:23px;
+          font-weight:500;
+          line-height:1;
+          cursor:pointer;
+          box-shadow:0 4px 12px rgba(15,23,42,.08)
+        }
+        .tp-field-gate-x:hover{
+          background:#fff
         }
         .tp-field-gate-modal small{
           display:block;
@@ -218,10 +241,14 @@
           font-weight:850;
           cursor:pointer
         }
-        .tp-field-gate-close{
-          border:1px solid rgba(205,177,102,.20);
-          background:rgba(255,255,255,.025);
-          color:#c7c2b7
+        .tp-field-gate-premium{
+          border:1px solid #050607;
+          background:#050607;
+          color:#fff;
+          box-shadow:0 6px 18px rgba(15,23,42,.16)
+        }
+        .tp-field-gate-premium:hover{
+          background:#191b1e
         }
         .tp-field-gate-points{
           border:1px solid rgba(116,201,139,.28);

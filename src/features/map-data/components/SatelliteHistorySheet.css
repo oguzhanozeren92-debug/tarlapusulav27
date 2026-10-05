@@ -911,3 +911,11 @@
     height:42px
   }
 }
+
+/* V28 — UYDU GEÇMİŞİ SİYAH AKSİYONLAR */
+.tp-satellite-history :is(.tp-satellite-history-close,.tp-satellite-compare-toggle,.tp-satellite-history-list-toggle){
+  border-color:#050607!important;background:#050607!important;color:#fff!important;-webkit-text-fill-color:#fff!important
+}
+.tp-satellite-history :is(.tp-satellite-history-close,.tp-satellite-compare-toggle,.tp-satellite-history-list-toggle) svg{
+  color:#fff!important;stroke:#fff!important
+}

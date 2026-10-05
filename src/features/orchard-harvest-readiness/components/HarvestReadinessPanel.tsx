@@ -1,5 +1,6 @@
 import type { Field } from '../../../types';
 import { useHarvestReadiness } from '../hooks/useHarvestReadiness';
+import QuickCalendarButton from '../../calendar/components/QuickCalendarButton';
 import './HarvestReadinessPanel.css';
 
 type Props = { field: Field | null | undefined };
@@ -57,6 +58,18 @@ export default function HarvestReadinessPanel({ field }: Props) {
               <small>Fenoloji/ağaç kaydı</small>
             </article>
           </div>
+
+          {data.expectedHarvestDate && (data.daysToExpectedHarvest == null || data.daysToExpectedHarvest >= 0) ? (
+            <QuickCalendarButton
+              className="tp-harvest-ready-calendar"
+              fieldId={String(field.id)}
+              reminderType="Hasat"
+              title="Hasat planı"
+              reminderDate={data.expectedHarvestDate}
+              notes={`${data.headline} · ${data.meaning}`}
+              label="Hasadı takvime ekle"
+            />
+          ) : null}
 
           <div className="tp-harvest-ready-weather">
             <div className="tp-harvest-ready-weather-head">

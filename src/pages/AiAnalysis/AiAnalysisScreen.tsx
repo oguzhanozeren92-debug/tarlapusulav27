@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MobileWheelPicker from '../../components/MobileWheelPicker';
 import ClassicBottomNav from '../../components/ClassicBottomNav';
+import PusulaLoadingOverlay from '../../components/PusulaLoadingOverlay';
 import {
   synthesizeFieldObservations,
   type FieldSynthesisResult,
@@ -14,6 +15,7 @@ import { getPusulaPdfJob, requestPusulaPdf, subscribePusulaPdfJob } from '../../
 import { PUSULAPDF_STAGE_LABEL, type PusulaPdfJob } from '../../features/pusula-pdf/types.async';
 import type { WeeklyPusulaReport } from '../../features/pusula-pdf/types';
 import OfficialVerificationCard from '../../features/official-verification/components/OfficialVerificationCard';
+import QuickCalendarButton from '../../features/calendar/components/QuickCalendarButton';
 import type {
   AiAccessStatus,
   AiFieldAnalysis,
@@ -72,9 +74,152 @@ const PUSULA_AI_EXTRA_STYLES = `
   .tp-ai-page .tp-pusula-synthesis-error span{font-size:11px!important;line-height:1.45!important}
   .tp-ai-page .tp-pusula-synthesis-error button{justify-self:start!important;margin-top:2px!important;padding:8px 11px!important;border:1px solid #111820!important;border-radius:10px!important;background:#111820!important;color:#fff!important;font-size:10px!important;font-weight:800!important}
   .tp-ai-page .tp-ai-page-error{border:1px solid #ead0d0!important;border-radius:12px!important;background:#fff6f6!important;color:#6f3434!important;font-size:11px!important;line-height:1.45!important}
+  .tp-ai-page .tp-ai-page-error{display:grid!important;gap:4px!important}
+  .tp-ai-page .tp-ai-page-error strong{color:#742f2f!important;font-size:11px!important}
+  .tp-ai-page .tp-ai-page-error span{color:#6f3434!important;font-size:10px!important;line-height:1.45!important;overflow-wrap:anywhere!important}
+  .tp-ai-page .tp-ai-page-error small{color:#8a5555!important;font-size:9px!important;line-height:1.35!important}
+  .tp-ai-page .tp-ai-upload-status{margin:8px 0!important;padding:9px 10px!important;border:1px solid #dfe3e6!important;border-radius:10px!important;background:#f7f8f9!important;color:#56616b!important;font-size:9px!important;font-weight:750!important;line-height:1.35!important}
   .tp-ai-page .tp-ai-bottom-nav .tp-ai-nav-main{background:#111820!important;border-color:#111820!important;color:#fff!important}
   .tp-ai-page .tp-ai-bottom-nav .tp-ai-nav-main>span{display:grid!important;place-items:center!important;background:#fff!important;color:#111820!important;font-weight:900!important;font-size:13px!important}
 
+
+  /* Pusula AI araçları — rapor ve fotoğrafı net ayır */
+  .tp-ai-page .tp-ai-tool-sections{
+    display:grid!important;
+    gap:10px!important;
+    margin-top:15px!important;
+  }
+  .tp-ai-page .tp-ai-tool-card{
+    display:grid!important;
+    gap:11px!important;
+    padding:13px!important;
+    border:1px solid #dfe3e7!important;
+    border-radius:16px!important;
+    background:#fff!important;
+    box-shadow:none!important;
+  }
+  .tp-ai-page .tp-ai-tool-card-head{
+    display:flex!important;
+    align-items:flex-start!important;
+    justify-content:space-between!important;
+    gap:10px!important;
+  }
+  .tp-ai-page .tp-ai-tool-card-head>div{
+    min-width:0!important;
+    display:grid!important;
+    gap:4px!important;
+  }
+  .tp-ai-page .tp-ai-tool-kicker{
+    color:#aa843e!important;
+    -webkit-text-fill-color:#aa843e!important;
+    font-size:8px!important;
+    font-weight:900!important;
+    letter-spacing:.13em!important;
+  }
+  .tp-ai-page .tp-ai-tool-card-head strong{
+    color:#111820!important;
+    -webkit-text-fill-color:#111820!important;
+    font-size:14px!important;
+    line-height:1.25!important;
+  }
+  .tp-ai-page .tp-ai-tool-card-head small{
+    color:#6f7983!important;
+    -webkit-text-fill-color:#6f7983!important;
+    font-size:9.5px!important;
+    line-height:1.45!important;
+  }
+  .tp-ai-page .tp-ai-tool-primary{
+    appearance:none!important;
+    width:100%!important;
+    min-height:54px!important;
+    display:grid!important;
+    grid-template-columns:30px minmax(0,1fr)!important;
+    align-items:center!important;
+    gap:9px!important;
+    padding:9px 11px!important;
+    border:1px solid #050607!important;
+    border-radius:12px!important;
+    background:#050607!important;
+    color:#fff!important;
+    text-align:left!important;
+    cursor:pointer!important;
+  }
+  .tp-ai-page .tp-ai-tool-primary>span:first-child{
+    width:30px!important;
+    height:30px!important;
+    display:grid!important;
+    place-items:center!important;
+    border-radius:9px!important;
+    background:#fff!important;
+    color:#050607!important;
+    -webkit-text-fill-color:#050607!important;
+    font-size:14px!important;
+  }
+  .tp-ai-page .tp-ai-tool-primary-copy{
+    min-width:0!important;
+    display:grid!important;
+    gap:2px!important;
+  }
+  .tp-ai-page .tp-ai-tool-primary-copy strong{
+    color:#fff!important;
+    -webkit-text-fill-color:#fff!important;
+    font-size:11px!important;
+    line-height:1.25!important;
+  }
+  .tp-ai-page .tp-ai-tool-primary-copy small{
+    color:rgba(255,255,255,.72)!important;
+    -webkit-text-fill-color:rgba(255,255,255,.72)!important;
+    font-size:8.5px!important;
+    line-height:1.35!important;
+  }
+  .tp-ai-page .tp-ai-tool-primary:disabled{
+    background:#3c4147!important;
+    border-color:#3c4147!important;
+    opacity:1!important;
+    cursor:wait!important;
+  }
+  .tp-ai-page .tp-ai-tool-history{
+    appearance:none!important;
+    min-height:42px!important;
+    display:grid!important;
+    grid-template-columns:22px minmax(0,1fr) auto auto!important;
+    align-items:center!important;
+    gap:7px!important;
+    padding:7px 9px!important;
+    border:1px solid #050607!important;
+    border-radius:11px!important;
+    background:#050607!important;
+    color:#fff!important;
+    text-align:left!important;
+    cursor:pointer!important;
+  }
+  .tp-ai-page .tp-ai-tool-history>span,
+  .tp-ai-page .tp-ai-tool-history>strong,
+  .tp-ai-page .tp-ai-tool-history>small,
+  .tp-ai-page .tp-ai-tool-history>b{
+    color:#fff!important;
+    -webkit-text-fill-color:#fff!important;
+  }
+  .tp-ai-page .tp-ai-tool-history>span{
+    font-size:13px!important;
+    text-align:center!important;
+  }
+  .tp-ai-page .tp-ai-tool-history>strong{
+    font-size:10px!important;
+  }
+  .tp-ai-page .tp-ai-tool-history>small{
+    font-size:8px!important;
+    opacity:.72!important;
+  }
+  .tp-ai-page .tp-ai-tool-history>b{
+    font-size:8px!important;
+    opacity:.82!important;
+  }
+  .tp-ai-page .tp-ai-tool-history:disabled{
+    background:#3c4147!important;
+    border-color:#3c4147!important;
+    opacity:1!important;
+  }
 
   .tp-ai-page .tp-pusula-pdf-ready{margin-top:10px;padding:12px 13px;border:1px solid #dfe3e7;border-radius:14px;background:#f7f8f9;display:grid;gap:3px}
   .tp-ai-page .tp-pusula-pdf-ready strong{font-size:12px;color:#111820}.tp-ai-page .tp-pusula-pdf-ready span,.tp-ai-page .tp-pusula-pdf-ready small{font-size:10px;color:#69737d;line-height:1.4}
@@ -247,6 +392,7 @@ type AiAnalysisScreenProps = {
   activityPhotoPreview: string;
   activityPhoto: File | null;
   activityNotes: string;
+  activityMessage: string;
   setActivityNotes: Setter<string>;
 
   aiAnalyzing: boolean;
@@ -319,6 +465,451 @@ const PUSULA_HUB_FINAL_STYLES = String.raw`
 .tp-ai-page .tp-pusula-pdf-complete{padding-top:9px!important;border-top:1px solid #e2e6e9!important;color:#4f5964!important;font-size:9px!important;line-height:1.4!important}
 .tp-ai-page .tp-pusula-pdf-download{appearance:none!important;width:100%!important;min-height:40px!important;border:0!important;border-radius:10px!important;background:#111820!important;color:#fff!important;font-size:10px!important;font-weight:900!important;letter-spacing:.02em!important;cursor:pointer!important}
 .tp-ai-page .tp-pusula-pdf-download:disabled{opacity:.55!important;cursor:wait!important}
+
+/* PusulaPDF hazır kartı — sade premium sunum */
+.tp-ai-page .tp-pusula-pdf-ready--premium{
+  margin-top:12px!important;
+  padding:16px!important;
+  gap:14px!important;
+  border:1px solid #e1e5e8!important;
+  border-radius:18px!important;
+  background:#fff!important;
+  box-shadow:0 8px 24px rgba(17,24,32,.06)!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-head{
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-copy{
+  min-width:0!important;
+  display:grid!important;
+  gap:4px!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-kicker{
+  color:#aa843e!important;
+  -webkit-text-fill-color:#aa843e!important;
+  font-size:8px!important;
+  font-weight:900!important;
+  letter-spacing:.14em!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-copy>strong{
+  color:#111820!important;
+  -webkit-text-fill-color:#111820!important;
+  font-size:16px!important;
+  line-height:1.25!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-copy>small{
+  color:#747e88!important;
+  -webkit-text-fill-color:#747e88!important;
+  font-size:9.5px!important;
+  font-weight:700!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-status{
+  flex:0 0 auto!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:5px!important;
+  min-height:29px!important;
+  padding:0 9px!important;
+  border-radius:999px!important;
+  background:#050607!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-status span,
+.tp-ai-page .tp-pusula-pdf-premium-status strong{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:8px!important;
+  font-weight:900!important;
+  letter-spacing:.06em!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-missing{
+  display:grid!important;
+  gap:8px!important;
+  padding:12px!important;
+  border:1px solid #e3e7ea!important;
+  border-radius:13px!important;
+  background:#f6f7f8!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-missing>div{
+  display:grid!important;
+  gap:4px!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-missing strong{
+  color:#252c33!important;
+  -webkit-text-fill-color:#252c33!important;
+  font-size:10px!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-missing small{
+  color:#6f7983!important;
+  -webkit-text-fill-color:#6f7983!important;
+  font-size:9px!important;
+  line-height:1.45!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-missing>span{
+  width:fit-content!important;
+  padding:4px 7px!important;
+  border-radius:7px!important;
+  background:#fff!important;
+  color:#555f69!important;
+  -webkit-text-fill-color:#555f69!important;
+  font-size:8px!important;
+  font-weight:800!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-complete{
+  display:flex!important;
+  align-items:center!important;
+  gap:9px!important;
+  padding:11px 12px!important;
+  border:1px solid #e3e7ea!important;
+  border-radius:13px!important;
+  background:#f6f7f8!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-complete>span{
+  width:28px!important;
+  height:28px!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:50%!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-complete>div{
+  display:grid!important;
+  gap:2px!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-complete strong{
+  color:#252c33!important;
+  -webkit-text-fill-color:#252c33!important;
+  font-size:10px!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-complete small{
+  color:#6f7983!important;
+  -webkit-text-fill-color:#6f7983!important;
+  font-size:8.5px!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-note{
+  margin:0!important;
+  color:#7b858e!important;
+  -webkit-text-fill-color:#7b858e!important;
+  font-size:9px!important;
+  line-height:1.45!important;
+}
+.tp-ai-page .tp-pusula-pdf-premium-open{
+  min-height:44px!important;
+  border-radius:12px!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:11px!important;
+}
+
+/* PUSULA TOOL CARDS V3 — isolated mobile layout */
+html body #root .tp-ai-page .tp-ai-tool-sections{
+  box-sizing:border-box!important;
+  width:100%!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:12px!important;
+  margin:14px 0 0!important;
+  padding:0!important;
+  -webkit-text-size-adjust:100%!important;
+  text-size-adjust:100%!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card{
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  display:block!important;
+  margin:0!important;
+  padding:14px!important;
+  overflow:hidden!important;
+  border:1px solid #dde2e6!important;
+  border-radius:16px!important;
+  background:#fff!important;
+  color:#111820!important;
+  box-shadow:0 4px 14px rgba(17,24,32,.035)!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  -webkit-text-size-adjust:100%!important;
+  text-size-adjust:100%!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head{
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:start!important;
+  gap:10px!important;
+  margin:0!important;
+  padding:0!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head>div{
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-kicker{
+  display:block!important;
+  width:auto!important;
+  margin:0 0 5px!important;
+  padding:0!important;
+  color:#707983!important;
+  -webkit-text-fill-color:#707983!important;
+  font-size:8px!important;
+  font-weight:900!important;
+  line-height:1.15!important;
+  letter-spacing:.12em!important;
+  text-transform:uppercase!important;
+  white-space:normal!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head strong{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+  padding:0!important;
+  color:#111820!important;
+  -webkit-text-fill-color:#111820!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  line-height:1.22!important;
+  letter-spacing:-.02em!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head small{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  margin:6px 0 0!important;
+  padding:0!important;
+  color:#66717b!important;
+  -webkit-text-fill-color:#66717b!important;
+  font-size:10px!important;
+  font-weight:550!important;
+  line-height:1.45!important;
+  letter-spacing:0!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-premium-badge{
+  align-self:start!important;
+  justify-self:end!important;
+  margin:0!important;
+  padding:5px 7px!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:7px!important;
+  font-weight:900!important;
+  line-height:1!important;
+  letter-spacing:.08em!important;
+  white-space:nowrap!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary{
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:58px!important;
+  height:auto!important;
+  display:grid!important;
+  grid-template-columns:34px minmax(0,1fr)!important;
+  align-items:center!important;
+  gap:10px!important;
+  margin:12px 0 0!important;
+  padding:10px 12px!important;
+  border:1px solid #050607!important;
+  border-radius:13px!important;
+  background:#050607!important;
+  background-image:none!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  box-shadow:none!important;
+  text-align:left!important;
+  white-space:normal!important;
+  overflow:hidden!important;
+  cursor:pointer!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary>span:first-child{
+  box-sizing:border-box!important;
+  width:34px!important;
+  min-width:34px!important;
+  height:34px!important;
+  min-height:34px!important;
+  display:grid!important;
+  place-items:center!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:10px!important;
+  background:#fff!important;
+  color:#050607!important;
+  -webkit-text-fill-color:#050607!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  line-height:1!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary-copy{
+  box-sizing:border-box!important;
+  min-width:0!important;
+  width:100%!important;
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary-copy>strong{
+  display:block!important;
+  width:100%!important;
+  margin:0!important;
+  padding:0!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:12px!important;
+  font-weight:900!important;
+  line-height:1.25!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary-copy>small{
+  display:block!important;
+  width:100%!important;
+  margin:3px 0 0!important;
+  padding:0!important;
+  color:rgba(255,255,255,.72)!important;
+  -webkit-text-fill-color:rgba(255,255,255,.72)!important;
+  font-size:9px!important;
+  font-weight:550!important;
+  line-height:1.35!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled{
+  border-color:#cfd4d9!important;
+  background:#dfe3e7!important;
+  color:#4e5861!important;
+  -webkit-text-fill-color:#4e5861!important;
+  opacity:1!important;
+  cursor:not-allowed!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled>span:first-child{
+  background:#fff!important;
+  color:#4e5861!important;
+  -webkit-text-fill-color:#4e5861!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled .tp-ai-tool-primary-copy>strong,
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled .tp-ai-tool-primary-copy>small{
+  color:#4e5861!important;
+  -webkit-text-fill-color:#4e5861!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-history{
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:50px!important;
+  height:auto!important;
+  display:grid!important;
+  grid-template-columns:28px minmax(0,1fr) auto!important;
+  grid-template-areas:"icon title action" "icon meta action"!important;
+  align-items:center!important;
+  column-gap:9px!important;
+  row-gap:2px!important;
+  margin:8px 0 0!important;
+  padding:9px 11px!important;
+  border:1px solid #050607!important;
+  border-radius:12px!important;
+  background:#050607!important;
+  background-image:none!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  text-align:left!important;
+  overflow:hidden!important;
+  cursor:pointer!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-history>span{
+  grid-area:icon!important;
+  width:28px!important;
+  height:28px!important;
+  display:grid!important;
+  place-items:center!important;
+  margin:0!important;
+  padding:0!important;
+  border-radius:9px!important;
+  background:#fff!important;
+  color:#050607!important;
+  -webkit-text-fill-color:#050607!important;
+  font-size:13px!important;
+  line-height:1!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-history>strong{
+  grid-area:title!important;
+  display:block!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:11px!important;
+  font-weight:900!important;
+  line-height:1.2!important;
+  white-space:normal!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-history>small{
+  grid-area:meta!important;
+  display:block!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  color:rgba(255,255,255,.68)!important;
+  -webkit-text-fill-color:rgba(255,255,255,.68)!important;
+  font-size:8.5px!important;
+  line-height:1.25!important;
+  white-space:normal!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-history>b{
+  grid-area:action!important;
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  font-size:9px!important;
+  font-weight:900!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card--photo{
+  margin-top:0!important;
+}
+@media(max-width:420px){
+  html body #root .tp-ai-page .tp-ai-tool-card{padding:13px!important;border-radius:15px!important}
+  html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head strong{font-size:14px!important}
+  html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head small{font-size:9.5px!important}
+  html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary{min-height:56px!important}
+}
+
+
+/* QUICK CALENDAR ACTION — PUSULAPDF */
+html body #root .tp-ai-page .tp-ai-pdf-calendar{
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-height:42px!important;
+  margin:8px 0 0!important;
+  border-radius:11px!important;
+  font-size:9px!important;
+}
+
 `;
 
 export default function AiAnalysisScreen({
@@ -338,6 +929,7 @@ export default function AiAnalysisScreen({
   activityPhotoPreview,
   activityPhoto,
   activityNotes,
+  activityMessage,
   setActivityNotes,
   aiAnalyzing,
   aiAnalysisError,
@@ -367,7 +959,7 @@ export default function AiAnalysisScreen({
   const aiNoteBlock = cmsBlockFor('aiAnalysis', 'note');
   const aiAnalyzeBlock = cmsBlockFor('aiAnalysis', 'analyze-button');
 
-  // Geliştirme aşamasında fotoğraf teşhisinde günlük/reklam hakkı uygulanmıyor.
+  // Analiz düğmesi görünür kalır; Free kullanıcı ödüllü reklamla, Premium reklamsız devam eder.
   const canAnalyze = true;
 
   const {
@@ -441,11 +1033,18 @@ export default function AiAnalysisScreen({
     });
   };
 
-  const synthesisField = selectedField ?? realFields[0] ?? null;
+  // Eski/eksik kayıtlar Pusula AI ekranını tamamen düşürmesin.
+  const safeRealFields = Array.isArray(realFields) ? realFields : [];
+  const safeFieldWeather =
+    fieldWeather && typeof fieldWeather === 'object'
+      ? fieldWeather
+      : {};
+
+  const synthesisField = selectedField ?? safeRealFields[0] ?? null;
 
   const synthesisWeather =
     synthesisField
-      ? fieldWeather[String(synthesisField.id)] ?? null
+      ? safeFieldWeather[String(synthesisField.id)] ?? null
       : null;
 
 
@@ -1039,6 +1638,32 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
 
   const [tpAiMode, setTpAiMode] = useState<'hub' | 'photo' | 'field'>('hub');
 
+  const safePusulaPdfMissing = Array.isArray(
+    pusulaPdfReport?.report_data?.missing,
+  )
+    ? pusulaPdfReport!.report_data.missing
+    : [];
+
+  const safeSynthesisLikelyCauses = Array.isArray(
+    synthesisResult?.likelyCauses,
+  )
+    ? synthesisResult!.likelyCauses
+    : [];
+
+  const safeSynthesisEvidence = Array.isArray(
+    synthesisResult?.evidence,
+  )
+    ? synthesisResult!.evidence
+    : [];
+
+  const safeAiObservations = Array.isArray(aiAnalysis?.observations)
+    ? aiAnalysis!.observations
+    : [];
+
+  const safeAiRecommendations = Array.isArray(aiAnalysis?.recommendations)
+    ? aiAnalysis!.recommendations
+    : [];
+
 
   return (
     <>
@@ -1085,20 +1710,27 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
 
             <div className="tp-pusula-hub-field">
               <span>ANALİZ EDİLECEK TARLA</span>
-              {realFields.length > 0 ? (
+              {safeRealFields.length > 0 ? (
                 <MobileWheelPicker
                   className="tp-ai-field-select"
                   title="Analiz edilecek tarla"
                   value={selectedField ? String(selectedField.id) : ''}
                   placeholder="Tarla seç"
                   searchable
-                  options={realFields.map((field) => ({
-                    value: String(field.id),
-                    label: field.name,
-                    subtitle: `${field.crop} • ${field.area.toLocaleString('tr-TR')} da`,
-                  }))}
+                  options={safeRealFields.map((field) => {
+                    const area = Number((field as any)?.area);
+                    const areaLabel = Number.isFinite(area)
+                      ? area.toLocaleString('tr-TR')
+                      : 'Alan bilgisi yok';
+
+                    return {
+                      value: String(field.id),
+                      label: String(field.name ?? 'Adsız tarla'),
+                      subtitle: `${String(field.crop ?? 'Ürün bilgisi yok')} • ${areaLabel}${Number.isFinite(area) ? ' da' : ''}`,
+                    };
+                  })}
                   onChange={(value) => {
-                    const field = realFields.find(
+                    const field = safeRealFields.find(
                       (item) => String(item.id) === value,
                     );
                     setSelectedField(field ?? null);
@@ -1113,55 +1745,102 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
               )}
             </div>
 
-            <div className="tp-pusula-hub-actions">
-              <button
-                type="button"
-                className={`tp-pusula-hub-action ${isPremiumPlan ? '' : 'is-premium-locked'}`}
-                onClick={queuePusulaPdf}
-                disabled={synthesisLoading || !synthesisField || pusulaPdfStatus === 'loading'}
-                aria-disabled={pusulaPdfStatus === 'loading'}
-              >
-                <span>✦</span>
-                <strong>
-                  {pusulaPdfStatus === 'loading' ? (pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : 'Haftalık rapor hazırlanıyor') : pusulaPdfStatus === 'ready' ? 'Bu Haftanın Raporu Hazır' : 'Haftalık Pusula Tarla Raporu'}
+            <div className="tp-ai-tool-sections">
+              <section className="tp-ai-tool-card tp-ai-tool-card--report">
+                <div className="tp-ai-tool-card-head">
+                  <div>
+                    <span className="tp-ai-tool-kicker">PUSULAPDF</span>
+                    <strong>7 Günlük Tarla Raporu</strong>
+                    <small>
+                      Son 7 günlük tarla verilerini tek PDF'te toplar. Her 7 günde bir yenilenir.
+                    </small>
+                  </div>
                   {!isPremiumPlan ? <b className="tp-premium-badge">PREMIUM</b> : null}
-                </strong>
-                <small>
-                  {pusulaPdfStatus === 'loading'
-                    ? 'Arka planda hazırlanıyor. Bu ekrandan çıkabilirsin; hazır olduğunda bildirim altyapısına bağlanacak.'
-                    : pusulaPdfStatus === 'ready'
-                      ? (pusulaPdfNextAt ? `Bu haftanın kapsamlı raporu hazır · yeni rapor ${new Date(pusulaPdfNextAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} sonrası` : 'Bu haftanın kapsamlı raporu hazır.')
-                      : 'Uydu, hava, toprak, sulama, riskler ve Pusula önerilerini tek kapsamlı PDF raporunda birleştir.'}
-                </small>
-              </button>
+                </div>
 
-              {isPremiumPlan ? (
                 <button
                   type="button"
-                  className="tp-pusula-hub-action"
-                  onClick={() => setPusulaPdfHistoryOpen((value) => !value)}
-                  disabled={!synthesisField}
+                  className="tp-ai-tool-primary"
+                  onClick={queuePusulaPdf}
+                  disabled={synthesisLoading || !synthesisField || pusulaPdfStatus === 'loading'}
+                  aria-disabled={pusulaPdfStatus === 'loading'}
                 >
-                  <span>◷</span>
-                  <strong>Eski Raporlarım</strong>
-                  <small>{pusulaPdfHistory.length ? `${pusulaPdfHistory.length} rapor arşivde` : 'Geçmiş haftalık raporlarını burada göreceksin.'}</small>
+                  <span>✦</span>
+                  <span className="tp-ai-tool-primary-copy">
+                    <strong>
+                      {pusulaPdfStatus === 'loading'
+                        ? (pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : '7 günlük rapor hazırlanıyor')
+                        : pusulaPdfStatus === 'ready'
+                          ? '7 günlük raporun hazır'
+                          : '7 günlük raporu hazırla'}
+                    </strong>
+                    <small>
+                      {pusulaPdfStatus === 'loading'
+                        ? 'Hazırlama arka planda sürüyor.'
+                        : pusulaPdfStatus === 'ready'
+                          ? (pusulaPdfNextAt
+                              ? `Yeni rapor ${new Date(pusulaPdfNextAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} tarihinden sonra hazırlanabilir.`
+                              : 'Bu rapor son 7 günlük dönemi kapsıyor.')
+                          : 'Uydu, hava, toprak, sulama, risk ve tarla kayıtlarını birleştirir.'}
+                    </small>
+                  </span>
                 </button>
-              ) : null}
 
-              <button
-                type="button"
-                className="tp-pusula-hub-action primary"
-                onClick={() => {
-                  setTpAiMode('photo');
-                  requestAnimationFrame(() => {
-                    document.querySelector('.tp-ai-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  });
-                }}
-              >
-                <span>⌁</span>
-                <strong>Fotoğrafla İncele</strong>
-                <small>Belirtiyi fotoğrafla incele.</small>
-              </button>
+                {isPremiumPlan ? (
+                  <button
+                    type="button"
+                    className="tp-ai-tool-history"
+                    onClick={() => setPusulaPdfHistoryOpen((value) => !value)}
+                    disabled={!synthesisField}
+                  >
+                    <span>◷</span>
+                    <strong>Geçmiş raporlar</strong>
+                    <small>{pusulaPdfHistory.length ? `${pusulaPdfHistory.length} rapor` : 'Henüz rapor yok'}</small>
+                    <b>{pusulaPdfHistoryOpen ? 'Kapat' : 'Aç'}</b>
+                  </button>
+                ) : null}
+
+                {isPremiumPlan && synthesisField?.id && pusulaPdfNextAt ? (
+                  <QuickCalendarButton
+                    className="tp-ai-pdf-calendar"
+                    fieldId={String(synthesisField.id)}
+                    reminderType="Diğer"
+                    title="Yeni PusulaPDF raporu"
+                    reminderDate={pusulaPdfNextAt}
+                    notes="7 günlük PusulaPDF raporu bu tarihten sonra yeniden hazırlanabilir."
+                    label="Rapor tarihini hatırlat"
+                  />
+                ) : null}
+              </section>
+
+              <section className="tp-ai-tool-card tp-ai-tool-card--photo">
+                <div className="tp-ai-tool-card-head">
+                  <div>
+                    <span className="tp-ai-tool-kicker">PUSULA AI</span>
+                    <strong>Fotoğraf Analizi</strong>
+                    <small>
+                      Yaprak, meyve veya sorunlu bölgenin fotoğrafını yükle; Pusula tarla bilgilerinle birlikte incelesin.
+                    </small>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="tp-ai-tool-primary"
+                  onClick={() => {
+                    setTpAiMode('photo');
+                    requestAnimationFrame(() => {
+                      document.querySelector('.tp-ai-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                  }}
+                >
+                  <span>⌁</span>
+                  <span className="tp-ai-tool-primary-copy">
+                    <strong>Fotoğrafla İncele</strong>
+                    <small>Galeriden seç veya yeni fotoğraf çek.</small>
+                  </span>
+                </button>
+              </section>
             </div>
             {isPremiumPlan && pusulaPdfHistoryOpen ? (
               <div className="tp-pusula-pdf-ready">
@@ -1186,52 +1865,55 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
             ) : null}
 
             {pusulaPdfStatus === 'ready' && pusulaPdfReport ? (
-              <div className="tp-pusula-pdf-ready" aria-live="polite">
-                <div className="tp-pusula-pdf-ready-head">
-                  <div className="tp-pusula-pdf-ready-copy">
-                    <span>7 GÜNLÜK SNAPSHOT</span>
-                    <strong>PUSULAPDF verisi hazır</strong>
+              <div className="tp-pusula-pdf-ready tp-pusula-pdf-ready--premium" aria-live="polite">
+                <div className="tp-pusula-pdf-premium-head">
+                  <div className="tp-pusula-pdf-premium-copy">
+                    <span className="tp-pusula-pdf-premium-kicker">PUSULAPDF</span>
+                    <strong>Haftalık rapor hazır</strong>
+                    <small>
+                      {formatPusulaPdfDate(pusulaPdfReport.period_start)} – {formatPusulaPdfDate(pusulaPdfReport.period_end)}
+                    </small>
                   </div>
-                  <div className="tp-pusula-pdf-ready-period">
-                    {formatPusulaPdfDate(pusulaPdfReport.period_start)} → {formatPusulaPdfDate(pusulaPdfReport.period_end)}
+                  <div className="tp-pusula-pdf-premium-status" aria-label="Rapor hazır">
+                    <span>✓</span>
+                    <strong>HAZIR</strong>
                   </div>
                 </div>
 
-                {pusulaPdfReport.report_data.missing.length > 0 ? (
-                  <div className="tp-pusula-pdf-missing">
-                    <span>Eksik veri kaynakları · {pusulaPdfReport.report_data.missing.length}</span>
-                    <div className="tp-pusula-pdf-missing-list">
-                      {pusulaPdfReport.report_data.missing.map((source) => (
-                        <span className="tp-pusula-pdf-missing-chip" key={source}>
-                          {pusulaPdfMissingLabels[source] ?? source}
-                        </span>
-                      ))}
+                {safePusulaPdfMissing.length > 0 ? (
+                  <div className="tp-pusula-pdf-premium-missing">
+                    <div>
+                      <strong>Raporda olmayan {safePusulaPdfMissing.length} kayıt</strong>
+                      <small>
+                        {safePusulaPdfMissing
+                          .map((source) => pusulaPdfMissingLabels[source] ?? source)
+                          .join(' · ')}
+                      </small>
                     </div>
+                    <span>Bu alanlar uydurulmaz.</span>
                   </div>
                 ) : (
-                  <div className="tp-pusula-pdf-complete">
-                    Tüm bağlı veri kaynakları snapshot içine alındı.
+                  <div className="tp-pusula-pdf-premium-complete">
+                    <span>✓</span>
+                    <div>
+                      <strong>Tüm kayıtlar hazır</strong>
+                      <small>Bağlı veri kaynaklarının tamamı rapora dahil edildi.</small>
+                    </div>
                   </div>
                 )}
 
-                <small className="tp-pusula-pdf-note">
-                  Eksik alanlar için değer üretilmez; rapor yalnızca mevcut gerçek kayıtları kullanır.
-                </small>
-                <div className="tp-pusula-pdf-complete">
-                  <div className="tp-pusula-pdf-ready-row">
-                    <span>✓ Arka planda tamamlandı</span>
-                    <strong>%100</strong>
-                  </div>
-                  <button
-                    type="button"
-                    className="tp-pusula-pdf-download"
-                    onClick={() => void handleReadyPusulaPdf()}
-                    disabled={pusulaPdfDownloading}
-                  >
-                    {pusulaPdfDownloading ? 'PDF açılıyor…' : 'PDF’yi Aç / İndir'}
-                  </button>
-                  <small>Hazır snapshot kullanılır; tekrar veri toplanmaz.</small>
-                </div>
+                <p className="tp-pusula-pdf-premium-note">
+                  Rapor yalnızca mevcut gerçek tarla kayıtlarını kullanır.
+                </p>
+
+                <button
+                  type="button"
+                  className="tp-pusula-pdf-download tp-pusula-pdf-premium-open"
+                  onClick={() => void handleReadyPusulaPdf()}
+                  disabled={pusulaPdfDownloading}
+                >
+                  {pusulaPdfDownloading ? 'PDF açılıyor…' : 'PDF’yi Aç'}
+                </button>
               </div>
             ) : null}
             {pusulaPdfStatus === 'error' && pusulaPdfError ? <div className="tp-ai-page-error" style={{ marginTop: 10, padding: 11 }}>PUSULAPDF: {pusulaPdfError}</div> : null}
@@ -1342,11 +2024,11 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   </div>
                 )}
 
-                {synthesisResult.likelyCauses.length > 0 && (
+                {safeSynthesisLikelyCauses.length > 0 && (
                   <div className="tp-pusula-section">
                     <span className="tp-pusula-section-title">NE OLABİLİR?</span>
                     <div className="tp-pusula-causes">
-                      {synthesisResult.likelyCauses.map((item, index) => (
+                      {safeSynthesisLikelyCauses.map((item, index) => (
                         <article className="tp-pusula-cause" key={`pusula-cause-${index}`}>
                           <strong>{item.title}</strong>
                           <p>{item.reason}</p>
@@ -1356,11 +2038,11 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   </div>
                 )}
 
-                {synthesisResult.evidence.length > 0 && (
+                {safeSynthesisEvidence.length > 0 && (
                   <div className="tp-pusula-section">
                     <span className="tp-pusula-section-title">BUNU NEDEN SÖYLÜYORUM?</span>
                     <div className="tp-pusula-evidence">
-                      {synthesisResult.evidence.map((item, index) => (
+                      {safeSynthesisEvidence.map((item, index) => (
                         <div className="tp-pusula-evidence-row" key={`pusula-evidence-${index}`}>
                           <strong>{item.layerLabel}</strong>
                           <span>{item.finding}</span>
@@ -1370,7 +2052,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   </div>
                 )}
 
-                {synthesisResult.evidence.length > 0 && (
+                {safeSynthesisEvidence.length > 0 && (
                   <div
                     style={{
                       marginTop: 16,
@@ -1393,7 +2075,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                       PUSULA'NIN KULLANDIĞI VERİLER
                     </span>
 
-                    {synthesisResult.evidence.slice(0, 6).map((item, index) => (
+                    {safeSynthesisEvidence.slice(0, 6).map((item, index) => (
                       <p
                         key={`pusula-data-${index}`}
                         style={{
@@ -1474,7 +2156,6 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     <input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       onChange={(e) =>
                         void handleActivityPhotoChange(e.target.files?.[0])
                       }
@@ -1501,7 +2182,6 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   onChange={(e) =>
                     void handleActivityPhotoChange(e.target.files?.[0])
                   }
@@ -1520,11 +2200,18 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
 
 
 
+            {activityMessage && !aiAnalysisError ? (
+              <div className="tp-ai-upload-status" role="status">
+                {activityMessage}
+              </div>
+            ) : null}
+
             <button
               className="tp-ai-main-analyze"
               type="button"
               onClick={() => void handleAiAnalyzeActivityPhoto()}
-              disabled={aiAnalyzing || !selectedField || !activityPhoto}
+              disabled={aiAnalyzing}
+              aria-disabled={!selectedField || (!activityPhoto && !activityPhotoPreview)}
             >
               <span>{aiAnalyzing ? '◌' : '✦'}</span>
               {aiAnalyzing
@@ -1532,14 +2219,25 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 : cmsText(aiAnalyzeBlock, 'AI ile Analiz Et')}
             </button>
 
+            {!activityPhoto && activityPhotoPreview && !aiAnalyzing ? (
+              <div className="tp-ai-upload-status" role="status">
+                Fotoğraf önizlemesi mevcut. Dosya belleği kaybolduysa Pusula onu önizlemeden geri yüklemeyi deneyecek.
+              </div>
+            ) : null}
+
             {aiAnalysisError && (
-              <div className="tp-ai-error tp-ai-page-error">
-                Fotoğraf analizi şu anda tamamlanamadı. Fotoğrafın ve seçili tarlan korunuyor; biraz sonra yeniden deneyebilirsin.
+              <div className="tp-ai-error tp-ai-page-error" role="alert">
+                <strong>Analiz tamamlanamadı</strong>
+                <span>{aiAnalysisError}</span>
+                <small>
+                  Fotoğrafın ve seçili tarlan korunuyor. Hata depolama kaynaklıysa yedek yükleme otomatik denenir.
+                </small>
               </div>
             )}
 
             {aiAnalysis && (
               <div
+                id="tp-ai-analysis-result"
                 className={`tp-ai-result tp-ai-page-result tp-ai-${aiAnalysis.status}`}
               >
                 <div className="tp-ai-result-head">
@@ -1566,10 +2264,10 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   <strong>{aiAnalysis.possibleIssue}</strong>
                 </div>
 
-                {aiAnalysis.observations.length > 0 && (
+                {safeAiObservations.length > 0 && (
                   <div className="tp-ai-list">
                     <span>Fotoğrafta görülenler</span>
-                    {aiAnalysis.observations.map((item, index) => (
+                    {safeAiObservations.map((item, index) => (
                       <p key={`main-ai-obs-${index}`}>• {item}</p>
                     ))}
                   </div>
@@ -1587,7 +2285,6 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                       <input
                         type="file"
                         accept="image/*"
-                        capture="environment"
                         disabled={aiAnalyzing}
                         style={{ display: 'none' }}
                         onChange={(event) => {
@@ -1603,10 +2300,10 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   </div>
                 ) : (
                   <>
-                    {aiAnalysis.recommendations.length > 0 && (
+                    {safeAiRecommendations.length > 0 && (
                       <div className="tp-ai-list">
                         <span>Önerilen adımlar</span>
-                        {aiAnalysis.recommendations.map((item, index) => (
+                        {safeAiRecommendations.map((item, index) => (
                           <p key={`main-ai-rec-${index}`}>• {item}</p>
                         ))}
                       </div>
@@ -1672,6 +2369,12 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
           activeScreen="aiAnalysis"
           setScreen={setScreen}
           onOpenCalendar={openCalendarScreen}
+        />
+
+        <PusulaLoadingOverlay
+          open={aiAnalyzing}
+          label="Pusula fotoğrafı inceliyor…"
+          hint="Fotoğraf, ürün ve tarla kayıtların birlikte değerlendiriliyor."
         />
       </div>
     </>

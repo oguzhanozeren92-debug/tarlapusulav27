@@ -5,6 +5,7 @@ import App from './App.tsx';
 import AdminUiRuntime from './features/admin-ui/AdminUiRuntime';
 import InAppAdminMode from './features/admin-mode/InAppAdminMode';
 import AppNotificationBridge from './features/admin-mode/AppNotificationBridge';
+import AppActivityTracker from './features/notifications/components/AppActivityTracker';
 import HomeMapLayerLoadingBridge from './features/home-map/components/HomeMapLayerLoadingBridge';
 import './styles/TarlaPusulaTheme.css';
 import './styles/MobileAppShell.css';
@@ -12,6 +13,8 @@ import './styles/WhiteAppTheme.css';
 import './styles/MonochromeUI.css';
 import './styles/MapReadabilityFix.css';
 import './styles/HomeFieldsSheetWhiteAccent.css';
+import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
+import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 
 if (window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')) {
   try {
@@ -28,7 +31,10 @@ createRoot(document.getElementById('root')!).render(
       <HomeMapLayerLoadingBridge />
       <AdminUiRuntime />
       <AppNotificationBridge />
+      <AppActivityTracker />
       <InAppAdminMode />
+      <PusulaPointsCelebration />
+      <PlanUpgradeModal />
     </>
   </StrictMode>,
 );

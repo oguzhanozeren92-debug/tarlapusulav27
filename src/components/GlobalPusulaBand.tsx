@@ -15,6 +15,7 @@ type GlobalPusulaBandProps = {
   screen: string;
   title?: string | null;
   fieldName?: string | null;
+  /** Legacy uyumluluk: global ana menü bandında geri oku artık çizilmez. */
   onBack?: () => void;
   onMenu?: () => void;
   onOpenAi?: () => void;
@@ -580,15 +581,17 @@ function readCachedWeatherPusula(expectedFieldName?: string | null) {
 /**
  * Sol menü ekranlarının ortak üst başlığı.
  * Masaüstü/mobil ortak düzen:
- *   ←  ☰  Sayfa adı        [Pusula tam merkezde]
+ *   ☰  BÖLÜM ADI           [Pusula tam merkezde]   [hava] [puan]
  *
+ * Ana menü ekranlarında geri oku kullanılmaz. Hamburger sola geçer,
+ * yanında küçük altın bölüm etiketi görünür.
  * Pusula tek logodur ve mevcut PusulaGuide animasyonunu kullanır.
  */
 export default function GlobalPusulaBand({
   screen,
   title,
   fieldName,
-  onBack,
+  onBack: _onBack,
   onMenu,
   onOpenAi,
   onNavigate,
@@ -1682,7 +1685,7 @@ export default function GlobalPusulaBand({
       <style>{`
         .tp-global-page-header{
           position:fixed!important;
-          z-index:2147482000!important;
+          z-index:2147483647!important;
           top:0!important;
           left:50%!important;
           transform:translateX(-50%)!important;
@@ -1698,6 +1701,8 @@ export default function GlobalPusulaBand({
           backdrop-filter:blur(18px)!important;
           -webkit-backdrop-filter:blur(18px)!important;
           overflow:visible!important;
+          isolation:isolate!important;
+          pointer-events:auto!important;
         }
 
         .tp-global-page-left{
@@ -1705,9 +1710,9 @@ export default function GlobalPusulaBand({
           z-index:3!important;
           display:flex!important;
           align-items:center!important;
-          gap:7px!important;
+          gap:8px!important;
           min-width:0!important;
-          max-width:calc(50% - 34px)!important;
+          max-width:calc(50% - 42px)!important;
         }
 
         .tp-global-page-back,
@@ -1747,14 +1752,17 @@ export default function GlobalPusulaBand({
 
         .tp-global-page-title{
           min-width:0!important;
+          max-width:132px!important;
           margin:0!important;
           padding:0!important;
-          color:#eee4d0!important;
-          font-family:'Cinzel',serif!important;
-          font-size:17px!important;
-          font-weight:700!important;
-          line-height:1.1!important;
-          letter-spacing:-.01em!important;
+          color:#b08a43!important;
+          -webkit-text-fill-color:#b08a43!important;
+          font-family:Inter,system-ui,sans-serif!important;
+          font-size:10.5px!important;
+          font-weight:850!important;
+          line-height:1.05!important;
+          letter-spacing:.085em!important;
+          text-transform:uppercase!important;
           white-space:nowrap!important;
           overflow:hidden!important;
           text-overflow:ellipsis!important;
@@ -1789,12 +1797,13 @@ export default function GlobalPusulaBand({
         }
 
         .tp-global-weather-glass{
-          min-width:164px!important;
-          padding:0 10px!important;
+          min-width:148px!important;
+          width:148px!important;
+          padding:0 8px!important;
           display:grid!important;
-          grid-template-columns:26px minmax(0,1fr) 27px!important;
+          grid-template-columns:24px minmax(0,1fr) 24px!important;
           align-items:center!important;
-          gap:7px!important;
+          gap:5px!important;
           cursor:pointer!important;
           text-align:left!important;
         }
@@ -1941,17 +1950,51 @@ export default function GlobalPusulaBand({
         .tp-global-pusula-anchor.tp-pusula-has-message::before{
           content:"";
           position:absolute;
-          inset:-9px;
+          inset:-13px;
           border-radius:50%;
           pointer-events:none;
-          background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,.07) 42%,transparent 72%);
-          filter:blur(5px);
-          animation:tp-pusula-message-glow 2.8s ease-in-out infinite;
+          z-index:0;
+          background:
+            radial-gradient(
+              circle,
+              rgba(255,255,255,.44) 0%,
+              rgba(255,255,255,.24) 30%,
+              rgba(255,255,255,.10) 52%,
+              transparent 74%
+            );
+          filter:blur(7px);
+          animation:tp-pusula-message-glow 2.35s ease-in-out infinite;
+        }
+
+        .tp-global-pusula-anchor.tp-pusula-has-message::after{
+          content:"";
+          position:absolute;
+          inset:-5px;
+          border-radius:50%;
+          pointer-events:none;
+          z-index:0;
+          border:1px solid rgba(255,255,255,.30);
+          box-shadow:
+            0 0 9px rgba(255,255,255,.62),
+            0 0 18px rgba(255,255,255,.30),
+            0 0 30px rgba(255,255,255,.15);
+          animation:tp-pusula-message-ring 2.35s ease-in-out infinite;
+        }
+
+        .tp-global-pusula-anchor.tp-pusula-has-message .tp-global-pusula-stage{
+          filter:
+            drop-shadow(0 0 7px rgba(255,255,255,.46))
+            drop-shadow(0 0 13px rgba(255,255,255,.18));
         }
 
         @keyframes tp-pusula-message-glow{
-          0%,100%{opacity:.18;transform:scale(1)}
-          50%{opacity:.42;transform:scale(1.12)}
+          0%,100%{opacity:.40;transform:scale(.98)}
+          50%{opacity:.82;transform:scale(1.10)}
+        }
+
+        @keyframes tp-pusula-message-ring{
+          0%,100%{opacity:.34;transform:scale(.98)}
+          50%{opacity:.72;transform:scale(1.07)}
         }
 
         .tp-global-pusula-anchor.tp-depot-pusula-active{
@@ -1962,6 +2005,7 @@ export default function GlobalPusulaBand({
 
         .tp-global-pusula-stage{
           position:relative!important;
+          z-index:1!important;
           width:50px!important;
           height:50px!important;
           display:block!important;
@@ -2210,15 +2254,31 @@ export default function GlobalPusulaBand({
             grid-template-columns:1fr 1fr!important;
           }
 
-          .tp-global-page-title{display:none!important;}
-          .tp-global-page-left{max-width:82px!important;}
-          .tp-global-page-right{right:8px!important;gap:5px!important;}
+          .tp-global-page-left{
+            max-width:142px!important;
+            gap:6px!important;
+          }
+          .tp-global-page-title{
+            display:block!important;
+            max-width:92px!important;
+            color:#b08a43!important;
+            -webkit-text-fill-color:#b08a43!important;
+            font-size:9px!important;
+            font-weight:850!important;
+            line-height:1!important;
+            letter-spacing:.075em!important;
+            text-transform:uppercase!important;
+          }
+          .tp-global-page-right{
+            right:6px!important;
+            gap:4px!important;
+          }
           .tp-global-weather-glass{
-            min-width:100px!important;
-            width:100px!important;
-            padding:0 6px!important;
-            grid-template-columns:20px minmax(0,1fr)!important;
-            gap:5px!important;
+            min-width:84px!important;
+            width:84px!important;
+            padding:0 5px!important;
+            grid-template-columns:18px minmax(0,1fr)!important;
+            gap:4px!important;
           }
           .tp-global-weather-glass>.tp-3d-sun{display:none!important;}
           .tp-global-weather-copy small{display:none!important;}
@@ -2228,18 +2288,31 @@ export default function GlobalPusulaBand({
             align-items:flex-start!important;
             gap:2px!important;
           }
-          .tp-global-weather-copy strong{font-size:11px!important;}
+          .tp-global-weather-copy strong{font-size:10.5px!important;}
           .tp-global-weather-copy em{
-            max-width:61px!important;
-            font-size:7px!important;
+            max-width:48px!important;
+            font-size:6.5px!important;
           }
-          .tp-3d-location-icon{width:22px!important;height:22px!important;}
-          .tp-global-points-glass{min-width:54px!important;width:54px!important;padding:0 5px!important;gap:3px!important;}
+          .tp-3d-location-icon{width:19px!important;height:19px!important;}
+          .tp-global-points-glass{
+            min-width:52px!important;
+            width:52px!important;
+            padding:0 4px!important;
+            gap:2px!important;
+          }
           .tp-global-points-copy small{display:none!important;}
           .tp-global-points-copy strong{font-size:10px!important;}
           .tp-3d-star{width:21px!important;height:21px!important;}
           .tp-pusula-later{grid-column:1/-1!important;}
         }
+
+        @media(max-width:380px){
+          .tp-global-page-left{max-width:126px!important;}
+          .tp-global-page-title{max-width:76px!important;font-size:8px!important;}
+          .tp-global-weather-glass{min-width:78px!important;width:78px!important;}
+          .tp-global-points-glass{min-width:49px!important;width:49px!important;}
+        }
+
       `}</style>
 
       {!interactiveOpen && (
@@ -2253,16 +2326,6 @@ export default function GlobalPusulaBand({
 
       <header className="tp-global-page-header">
         <div className="tp-global-page-left">
-          <button
-            type="button"
-            className="tp-global-page-back"
-            onClick={onBack}
-            aria-label="Geri dön"
-            title="Geri"
-          >
-            ←
-          </button>
-
           <button
             type="button"
             className="tp-global-page-menu"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { FIELD_UNLOCK_THRESHOLDS, useGamificationStore } from '../gamification/useGamificationStore';
 import './PusulaIntroTrailer.css';
 
 const INTRO_STORAGE_KEY = 'tp_pusula_intro_seen_v1';
@@ -123,10 +124,15 @@ function LockIcon({ open }: { open?: boolean }) {
 }
 
 function SceneThree() {
+  const gamification = useGamificationStore();
+  const points = Math.max(0, Number(gamification.points) || 0);
+  const field2Open = points >= FIELD_UNLOCK_THRESHOLDS.FIELD_2;
+  const field3Open = points >= FIELD_UNLOCK_THRESHOLDS.FIELD_3;
+
   return (
     <div className="tp-intro-visual tp-intro-visual-points">
       <div className="tp-intro-points-head">
-        <span>420 P</span>
+        <span>{points.toLocaleString('tr-TR')} P</span>
         <small>Toplam puanın</small>
       </div>
 
@@ -135,17 +141,27 @@ function SceneThree() {
           <div className="tp-intro-unlock-icon"><LockIcon open /></div>
           <div><strong>1. Tarla</strong><small>Açık</small></div>
         </article>
-        <article>
-          <div className="tp-intro-unlock-icon"><LockIcon /></div>
-          <div><strong>2. Tarla</strong><small>1.000 P</small></div>
+
+        <article className={field2Open ? 'is-open' : ''}>
+          <div className="tp-intro-unlock-icon"><LockIcon open={field2Open} /></div>
+          <div>
+            <strong>2. Tarla</strong>
+            <small>{field2Open ? 'Açık' : `${FIELD_UNLOCK_THRESHOLDS.FIELD_2.toLocaleString('tr-TR')} P`}</small>
+          </div>
         </article>
-        <article>
-          <div className="tp-intro-unlock-icon"><LockIcon /></div>
-          <div><strong>3. Tarla</strong><small>2.500 P</small></div>
+
+        <article className={field3Open ? 'is-open' : ''}>
+          <div className="tp-intro-unlock-icon"><LockIcon open={field3Open} /></div>
+          <div>
+            <strong>3. Tarla</strong>
+            <small>{field3Open ? 'Açık' : `${FIELD_UNLOCK_THRESHOLDS.FIELD_3.toLocaleString('tr-TR')} P`}</small>
+          </div>
         </article>
       </div>
 
-      <div className="tp-intro-points-note">Puan harcanmaz · Biriktikçe kilit açar</div>
+      <div className="tp-intro-points-note">
+        Puan harcanmaz · {FIELD_UNLOCK_THRESHOLDS.FIELD_2.toLocaleString('tr-TR')} P'de 2. tarla · {FIELD_UNLOCK_THRESHOLDS.FIELD_3.toLocaleString('tr-TR')} P'de 3. tarla
+      </div>
     </div>
   );
 }

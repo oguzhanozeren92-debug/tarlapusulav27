@@ -63,13 +63,6 @@ export function useHomeIrrigationDecision(field: any | null | undefined) {
 
         if (cancelled) return;
 
-        console.info('[TarlaPusula] Sulama Motoru sonucu:', {
-          fieldKey,
-          decision: result?.decision ?? null,
-          irrigationStatus: result?.irrigationStatus ?? null,
-          confidence: result?.confidence ?? null,
-        });
-
         setState({
           fieldKey,
           status: 'ready',

@@ -41,6 +41,11 @@ import {
 } from '../../fields/services/fieldProfileCompletion.service';
 import { createFieldOperation } from '../../field-operations/services/fieldOperation.service';
 import SwipeDismissNotification from '../../notifications/components/SwipeDismissNotification';
+import QuickCalendarButton from '../../calendar/components/QuickCalendarButton';
+import {
+  calendarDateAfterDays,
+  normalizeCalendarDate,
+} from '../../calendar/services/quickCalendar.service';
 import {
   hideNotificationLocally,
   isNotificationHidden,
@@ -431,6 +436,58 @@ function localIsoDate() {
   return `${y}-${m}-${d}`;
 }
 
+function decisionCalendarDate(
+  decision: HomeTodayDecision,
+  irrigationDecision?: IrrigationDecisionResult | null,
+) {
+  const metadata = decision.task?.metadata ?? {};
+  const metadataDate = [
+    metadata.dueDate,
+    metadata.due_date,
+    metadata.reminderDate,
+    metadata.reminder_date,
+    metadata.nextPhotoDueAt,
+    metadata.next_photo_due_at,
+    metadata.targetDate,
+    metadata.target_date,
+  ]
+    .map(normalizeCalendarDate)
+    .find(Boolean);
+
+  if (metadataDate) return metadataDate;
+
+  const source = inferDecisionSource(decision);
+  const decisionField = decisionFieldId(decision);
+  const irrigationMatches =
+    source === 'irrigation' &&
+    irrigationDecision &&
+    (!decisionField || String(irrigationDecision.fieldId) === String(decisionField));
+
+  if (
+    irrigationMatches &&
+    resolveDecisionKind(decision) === 'upcoming' &&
+    Number.isFinite(Number(irrigationDecision.waterBalance?.daysToStressThreshold))
+  ) {
+    return calendarDateAfterDays(
+      Math.max(1, Math.ceil(Number(irrigationDecision.waterBalance?.daysToStressThreshold))),
+    );
+  }
+
+  return null;
+}
+
+function decisionReminderType(decision: HomeTodayDecision) {
+  const source = inferDecisionSource(decision);
+  const text = decisionSearchText(decision);
+
+  if (source === 'irrigation' || text.includes('sulama')) return 'Sulama';
+  if (decision.target === 'spray_weather' || text.includes('ilaçlama')) return 'İlaçlama';
+  if (text.includes('gübre')) return 'Gübreleme';
+  if (text.includes('hasat')) return 'Hasat';
+  if (text.includes('ekim') || text.includes('dikim')) return 'Ekim / Dikim';
+  return 'Saha Kontrolü';
+}
+
 function decisionActionLabel(
   decision: HomeTodayDecision,
   kind: TodayDecisionKind,
@@ -524,6 +581,9 @@ export default function HomeQuickSheets({
   const currentIsNdviAnomaly = isNdviAnomalyDecision(currentDecision);
   const currentIsWorseningNdviFollowUp =
     isWorseningNdviFollowUpDecision(currentDecision);
+  const currentCalendarDate = currentDecision
+    ? decisionCalendarDate(currentDecision, irrigationDecision)
+    : null;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -1083,6 +1143,22 @@ export default function HomeQuickSheets({
               <span aria-hidden="true">→</span>
             </button>
           )}
+
+          {currentCalendarDate &&
+          currentFieldId &&
+          currentDecision.target !== 'calendar' &&
+          currentKind !== 'avoid' &&
+          !currentMissingKind ? (
+            <QuickCalendarButton
+              className="tp-home-today-calendar-action"
+              fieldId={currentFieldId}
+              reminderType={decisionReminderType(currentDecision)}
+              title={currentDecision.title}
+              reminderDate={currentCalendarDate}
+              notes={currentDecision.detail}
+              label="Takvime ekle"
+            />
+          ) : null}
         </div>
       )}
 

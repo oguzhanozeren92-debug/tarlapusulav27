@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { useFieldTasks } from '../hooks/useFieldTasks';
 import type { FieldTask } from '../services/fieldTasks.service';
 import TaskMapPanel from '../../task-map/components/TaskMapPanel';
+import QuickCalendarButton from '../../calendar/components/QuickCalendarButton';
 import { buildTaskMapSnapshot } from '../../task-map/services/taskMap.service';
 import './HomeTasksSheet.css';
 
@@ -103,6 +104,19 @@ function actionLabel(task: FieldTask) {
   if (isSurfaceWaterMeasurementTask(task)) return 'Ölçümü ekle';
   if (isGrowthStageObservationTask(task)) return 'Gözlemi kaydet';
   return isPhotoCheckTask(task) ? 'Kontrol et ve fotoğraf yükle' : 'Göreve git';
+}
+
+function taskReminderType(task: FieldTask) {
+  const text = `${task.title} ${task.description ?? ''} ${task.actionTarget ?? ''}`
+    .toLocaleLowerCase('tr-TR');
+
+  if (text.includes('sulama')) return 'Sulama';
+  if (text.includes('ilaç')) return 'İlaçlama';
+  if (text.includes('gübre')) return 'Gübreleme';
+  if (text.includes('hasat')) return 'Hasat';
+  if (text.includes('ekim') || text.includes('dikim')) return 'Ekim / Dikim';
+  if (text.includes('budama')) return 'Budama';
+  return 'Saha Kontrolü';
 }
 
 function compactDescription(task: FieldTask) {
@@ -336,6 +350,18 @@ export default function HomeTasksSheet({
                     {task.description ? <p>{task.description}</p> : null}
 
                     <div className="tp-home-task-actions">
+                      {task.dueDate ? (
+                        <QuickCalendarButton
+                          className="tp-home-task-calendar"
+                          fieldId={task.fieldId || fieldId}
+                          reminderType={taskReminderType(task)}
+                          title={taskTitle(task)}
+                          reminderDate={task.dueDate}
+                          notes={task.description}
+                          label="Takvime ekle"
+                        />
+                      ) : null}
+
                       <button
                         type="button"
                         className="tp-home-task-later"

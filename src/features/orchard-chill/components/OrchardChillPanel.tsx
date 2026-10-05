@@ -1,4 +1,6 @@
 import type { Field } from '../../../types';
+import { useEntitlementStore } from '../../../entitlements/useEntitlementStore';
+import { openPlanUpgrade } from '../../../entitlements/planAccess';
 import { useOrchardChill } from '../hooks/useOrchardChill';
 import PollinationWindowPanel from '../../orchard-pollination/components/PollinationWindowPanel';
 import FruitLoadRadarPanel from '../../orchard-fruit-load/components/FruitLoadRadarPanel';
@@ -14,12 +16,93 @@ function metric(value: number | null | undefined, suffix: string) {
 }
 
 export default function OrchardChillPanel({ field }: Props) {
-  const chill = useOrchardChill(field);
+  const entitlement = useEntitlementStore();
+
+  const eligibleField =
+    entitlement.isPremium &&
+    field &&
+    !field.demo &&
+    (field.cropCycle ?? 'annual') === 'perennial'
+      ? field
+      : null;
+
+  // Ücretsiz kullanıcıda Premium hesaplamayı arka planda çalıştırmıyoruz.
+  const chill = useOrchardChill(eligibleField);
   const snapshot = chill.snapshot;
 
   if (!field) return null;
-  if (field.demo || (snapshot && snapshot.status === 'not_applicable')) return null;
+  if (field.demo) return null;
   if ((field.cropCycle ?? 'annual') !== 'perennial') return null;
+
+  if (!entitlement.isPremium) {
+    return (
+      <section className="tp-chill-premium-preview" aria-label="Premium meyve soğuklama özelliği">
+        <div className="tp-chill-premium-top">
+          <div>
+            <span className="tp-chill-premium-kicker">KIŞ DİNLENMESİ · MGM BİSİP REFERANSI</span>
+            <h3>Ağaç yeterince soğuk gördü mü?</h3>
+          </div>
+          <span className="tp-chill-premium-badge">
+            <span aria-hidden="true">◆</span>
+            PREMIUM
+          </span>
+        </div>
+
+        <p className="tp-chill-premium-intro">
+          Badem, elma, kiraz, şeftali gibi çok yıllık meyveler ilkbaharda düzenli uyanabilmek
+          için kış boyunca yeterli serinlik biriktirmelidir. TarlaPusula bu özelliği
+          tarlanın saatlik sıcaklıkları ve MGM BİSİP referansıyla takip eder.
+        </p>
+
+        <div className="tp-chill-premium-mock" aria-hidden="true">
+          <article>
+            <span>Birikmiş soğuk</span>
+            <strong>••• saat</strong>
+            <small>Tarla konumundan hesaplanır</small>
+          </article>
+          <article>
+            <span>Çeşit ihtiyacı</span>
+            <strong>Resmî eşik</strong>
+            <small>Doğrulanabilen çeşitle karşılaştırılır</small>
+          </article>
+          <article>
+            <span>Kalan ihtiyaç</span>
+            <strong>Takip edilir</strong>
+            <small>Uyanma dönemine yaklaşırken yorumlanır</small>
+          </article>
+        </div>
+
+        <div className="tp-chill-premium-why">
+          <span>NE İŞE YARAR?</span>
+          <strong>Kış dinlenmesinin yeterli olup olmadığını erkenden anlamana yardımcı olur.</strong>
+          <p>
+            Birikmiş soğuklama, seçili çeşit için doğrulanabilen ihtiyaç eşiği, MGM istasyon
+            referansı ve teknik modeller tek yerde gösterilir.
+          </p>
+        </div>
+
+        <div className="tp-chill-premium-footer">
+          <div>
+            <span>Premium ile açılır</span>
+            <small>Soğuklama takibi · çeşit karşılaştırması · MGM BİSİP referansı</small>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              openPlanUpgrade({
+                requiredPlan: 'premium',
+                feature: 'Meyve Soğuklama Takibi · MGM BİSİP',
+              })
+            }
+          >
+            Premium'u İncele
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (snapshot && snapshot.status === 'not_applicable') return null;
 
   const classicHours = snapshot?.localMetrics?.classicHours ?? null;
   const hasVarietyRequirement = Boolean(
@@ -28,7 +111,11 @@ export default function OrchardChillPanel({ field }: Props) {
   );
 
   return (
-    <>
+    <div
+      data-required-plan="premium"
+      data-plan-feature="Bahçe / BİSİP Soğuklama"
+      style={{ display: 'contents' }}
+    >
       <section className="tp-chill-card" aria-label="Meyve soğuklama durumu">
         <div className="tp-chill-head">
           <div>
@@ -113,6 +200,6 @@ export default function OrchardChillPanel({ field }: Props) {
       <FruitLoadRadarPanel field={field} />
       <HarvestReadinessPanel field={field} />
       <OrchardQualityPanel field={field} />
-    </>
+    </div>
   );
 }

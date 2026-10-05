@@ -770,3 +770,56 @@ html body .tp-v1 .tp-map-first-shell
   display: none !important;
 }
 
+
+
+/* HOME QUICK SHEETS MONO HEADER V2 */
+html body .tp-home-quick-sheet .tp-home-quick-sheet-head{
+  margin:0 -16px!important;
+  padding:0 16px!important;
+  border-bottom:1px solid #202020!important;
+  border-radius:24px 24px 0 0!important;
+  background:#050607!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+html body .tp-home-quick-sheet .tp-home-quick-sheet-head small,
+html body .tp-home-quick-sheet .tp-home-quick-sheet-head h2{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body .tp-home-quick-sheet .tp-home-quick-sheet-head small{opacity:.72!important}
+html body .tp-home-quick-sheet .tp-home-quick-sheet-icon,
+html body .tp-home-quick-sheet .tp-home-quick-close,
+html body .tp-home-quick-sheet .tp-home-quick-back{
+  border:1px solid #393939!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  box-shadow:none!important;
+}
+html body .tp-home-quick-sheet .tp-home-quick-sheet-icon svg,
+html body .tp-home-quick-sheet .tp-home-quick-close svg,
+html body .tp-home-quick-sheet .tp-home-quick-back svg{
+  color:#fff!important;
+  stroke:#fff!important;
+}
+html body .tp-home-quick-sheet .tp-home-notification-tools button{
+  border:1px solid #050607!important;
+  background:#050607!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body .tp-home-quick-sheet .tp-home-notification-tools button svg{
+  color:#fff!important;
+  stroke:#fff!important;
+}
+
+
+/* QUICK CALENDAR ACTION — TODAY */
+.tp-home-quick-sheet .tp-home-today-calendar-action{
+  width:100%;
+  min-height:42px;
+  margin-top:8px;
+  border-radius:12px;
+  font-size:9px;
+}

@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { addPoints } from '../../../gamification/useGamificationStore';
+import { showRewardedAdAndClaim } from '../../../monetization/adRuntime';
+import { getEntitlementSnapshot } from '../../../entitlements/useEntitlementStore';
 import { normalizeAiAccessStatus } from '../../../utils/aiAccessUtils';
 import {
   deletePrivateFile,
@@ -102,25 +104,68 @@ export function useFieldActivities({
   };
 
   const compressActivityPhoto = async (file: File): Promise<Blob> => {
-    const image = await createImageBitmap(file);
     const maxSide = 1600;
-    const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
-    const width = Math.max(1, Math.round(image.width * scale));
-    const height = Math.max(1, Math.round(image.height * scale));
+
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
     const context = canvas.getContext('2d');
     if (!context) {
-      image.close();
       throw new Error('Fotoğraf hazırlanamadı.');
     }
-    context.drawImage(image, 0, 0, width, height);
-    image.close();
+
+    let width = 0;
+    let height = 0;
+
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+        width = Math.max(1, Math.round(bitmap.width * scale));
+        height = Math.max(1, Math.round(bitmap.height * scale));
+
+        canvas.width = width;
+        canvas.height = height;
+        context.drawImage(bitmap, 0, 0, width, height);
+        bitmap.close();
+      } catch (bitmapError) {
+        console.warn(
+          'createImageBitmap kullanılamadı; klasik Image çözümlemesine geçiliyor:',
+          bitmapError,
+        );
+      }
+    }
+
+    if (!width || !height) {
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const element = new Image();
+          element.onload = () => resolve(element);
+          element.onerror = () =>
+            reject(new Error('Fotoğraf tarayıcı tarafından açılamadı.'));
+          element.src = objectUrl;
+        });
+
+        const scale = Math.min(
+          1,
+          maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height),
+        );
+        width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+        height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+
+        canvas.width = width;
+        canvas.height = height;
+        context.drawImage(image, 0, 0, width, height);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Fotoğraf sıkıştırılamadı.'))),
+        (blob) =>
+          blob
+            ? resolve(blob)
+            : reject(new Error('Fotoğraf JPEG formatına hazırlanamadı.')),
         'image/jpeg',
         0.82,
       );
@@ -178,14 +223,45 @@ export function useFieldActivities({
   };
 
   const handleAiAnalyzeActivityPhoto = async () => {
-    if (!selectedField || !activityPhoto) {
-      setAiAnalysisError('Önce analiz edilecek bir fotoğraf seç.');
+    if (!selectedField) {
+      setAiAnalysisError('Önce analiz yapılacak tarlayı seç.');
+      return;
+    }
+
+    let photoForAnalysis: File | null = activityPhoto;
+
+    // HMR / ekran geçişi sonrası File state kaybolup önizleme kalabiliyor.
+    // Önizleme hâlâ okunabiliyorsa dosyayı yeniden üret.
+    if (!photoForAnalysis && activityPhotoPreview) {
+      try {
+        const response = await fetch(activityPhotoPreview);
+        if (response.ok) {
+          const blob = await response.blob();
+          photoForAnalysis = new File(
+            [blob],
+            `pusula-ai-${Date.now()}.jpg`,
+            {
+              type: blob.type || 'image/jpeg',
+              lastModified: Date.now(),
+            },
+          );
+        }
+      } catch (previewError) {
+        console.warn('AI fotoğrafı önizlemeden geri yüklenemedi:', previewError);
+      }
+    }
+
+    if (!photoForAnalysis) {
+      setAiAnalysisError(
+        'Fotoğraf dosyası artık tarayıcıda mevcut değil. Fotoğrafı bir kez yeniden seç.',
+      );
       return;
     }
 
     setAiAnalyzing(true);
     setAiAnalysisError('');
-    setAiAnalysis(null);
+    // Başarılı mevcut sonucu yeni istek daha başlamadan silme.
+    // Fotoğraf değiştiğinde handleActivityPhotoChange zaten sonucu temizliyor.
     setAiHistorySaveStatus('idle');
     setAiHistorySaveMessage('');
     setAiHistorySavedPoints(0);
@@ -199,28 +275,140 @@ export function useFieldActivities({
       if (userError) throw userError;
       if (!user) throw new Error('Oturum bulunamadı.');
 
+      const entitlement = getEntitlementSnapshot();
+
+      // Kullanıcı Free ise reklam ekrandayken yerel fotoğraf hazırlığını arkada bitir.
+      // Böylece reklam kapanınca yalnız yükleme + AI çağrısı kalır.
+      // AI sağlayıcısını reklam doğrulanmadan başlatmıyoruz; ödül sistemi suistimal edilemesin.
+      setActivityMessage('Fotoğraf hazırlanıyor…');
+
+      const preparedPhotoPromise = (async () => {
+        const compressedPhoto = await compressActivityPhoto(photoForAnalysis);
+
+        let photoRewardHash =
+          `${photoForAnalysis.name}:${photoForAnalysis.size}:${photoForAnalysis.lastModified}`;
+
+        try {
+          if (globalThis.crypto?.subtle) {
+            const digest = await globalThis.crypto.subtle.digest(
+              'SHA-256',
+              await compressedPhoto.arrayBuffer(),
+            );
+
+            photoRewardHash = Array.from(new Uint8Array(digest))
+              .map((value) => value.toString(16).padStart(2, '0'))
+              .join('');
+          }
+        } catch (hashError) {
+          console.warn('AI analiz fotoğraf hash değeri üretilemedi:', hashError);
+        }
+
+        return {
+          compressedPhoto,
+          photoRewardHash,
+        };
+      })();
+
+      const {
+        compressedPhoto,
+        photoRewardHash,
+      } = await preparedPhotoPromise;
+
+      // Aynı fotoğraf + aynı tarla + aynı ürün/not bağlamı daha önce başarıyla
+      // analiz edildiyse modeli tekrar çağırma. Böylece aynı fotoğraf bir sefer
+      // teşhis koyup bir sefer "emin değilim" demez; reklam ve AI kotası da boşa gitmez.
+      try {
+        const { data: cachedRows, error: cacheError } = await supabase.rpc(
+          'tp_find_cached_ai_image_analysis',
+          {
+            p_field_id: String(selectedField.id),
+            p_photo_hash: photoRewardHash,
+            p_task_type: 'disease_pest_diagnosis',
+            p_notes: activityNotes.trim() || null,
+            p_crop: selectedField.crop || null,
+          },
+        );
+
+        if (cacheError) {
+          console.warn('AI fotoğraf önbelleği okunamadı; yeni analizle devam ediliyor:', cacheError);
+        } else {
+          const cached = Array.isArray(cachedRows) ? cachedRows[0] : cachedRows;
+
+          if (cached?.analysis) {
+            setAiAnalysis(cached.analysis as AiFieldAnalysis);
+            setAiAnalysisError('');
+            setActivityMessage('Bu fotoğraf daha önce analiz edilmişti · aynı doğrulanmış sonuç gösteriliyor.');
+
+            window.setTimeout(() => {
+              document
+                .getElementById('tp-ai-analysis-result')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 120);
+
+            return;
+          }
+        }
+      } catch (cacheLookupError) {
+        console.warn('AI fotoğraf önbelleği kontrol edilemedi:', cacheLookupError);
+      }
+
       const { data: accessData, error: accessError } = await supabase.rpc('check_ai_access');
       if (accessError) throw accessError;
       const accessRow = Array.isArray(accessData) ? accessData[0] : accessData;
       if (accessRow) setAiAccessStatus(normalizeAiAccessStatus(accessRow));
-      if (!accessRow?.allowed) {
-        throw new Error('Bugünkü ücretsiz AI analiz hakkını kullandın.');
-      }
 
-      const compressedPhoto = await compressActivityPhoto(activityPhoto);
-      let photoRewardHash = `${activityPhoto.name}:${activityPhoto.size}:${activityPhoto.lastModified}`;
-      try {
-        if (globalThis.crypto?.subtle) {
-          const digest = await globalThis.crypto.subtle.digest('SHA-256', await compressedPhoto.arrayBuffer());
-          photoRewardHash = Array.from(new Uint8Array(digest))
-            .map((value) => value.toString(16).padStart(2, '0'))
-            .join('');
+      // Ücretsiz planda fotoğraf analizi reklam desteklidir.
+      // Gerçek Free hesapta backend de reward credit ister.
+      // TEST ÜCRETSİZ görünümünde de frontend reklam akışını gösterir.
+      const shouldShowRewardedAd =
+        entitlement.effectivePlan !== 'premium' &&
+        (
+          !accessRow?.allowed ||
+          String(accessRow?.access_source ?? '') !== 'rewarded_ad'
+        );
+
+      if (shouldShowRewardedAd) {
+        const adResult = await showRewardedAdAndClaim('ai_extra_analysis');
+
+        if (!adResult.completed) {
+          throw new Error('AI analizini açmak için ödüllü reklamı tamamlamalısın.');
         }
-      } catch (hashError) {
-        console.warn('AI analiz fotoğraf hash değeri üretilemedi:', hashError);
+
+        if (!adResult.claim?.awarded && adResult.claim?.reason === 'daily_limit') {
+          throw new Error('Bugünkü reklam ödülü sınırına ulaştın.');
+        }
+
+        if (!adResult.claim?.awarded) {
+          throw new Error('Reklam tamamlandı ancak ödül doğrulanamadı.');
+        }
+
+        // Gerçek Free hesapta bu claim 1 AI analiz kredisi de üretir.
+        if (
+          String(accessRow?.plan ?? '').toLowerCase() === 'free' &&
+          !adResult.claim?.aiCreditGranted
+        ) {
+          throw new Error('AI analiz hakkı reklam ödülüne eklenemedi.');
+        }
+
+        const { data: retryData, error: retryError } = await supabase.rpc('check_ai_access');
+        if (retryError) throw retryError;
+        const retryRow = Array.isArray(retryData) ? retryData[0] : retryData;
+        if (retryRow) setAiAccessStatus(normalizeAiAccessStatus(retryRow));
+
+        // Gerçek Free hesap için backend krediyi görmeli.
+        // TEST ÜCRETSİZ + gerçek Premium hesapta backend doğal olarak Premium yetkisini görür.
+        if (
+          String(retryRow?.plan ?? '').toLowerCase() === 'free' &&
+          !retryRow?.allowed
+        ) {
+          throw new Error('Reklam tamamlandı ancak AI analiz hakkı henüz açılamadı.');
+        }
+
+        setActivityMessage('Reklam tamamlandı · +10 P · Pusula AI başlıyor…');
       }
 
       const rawPath = `${user.id}/${selectedField.id}/ai/${Date.now()}-${crypto.randomUUID()}.jpg`;
+      setActivityMessage('Fotoğraf güvenli alana yükleniyor…');
       uploadedPath = await uploadPrivateFile(
         'field-activity-photos',
         rawPath,
@@ -246,15 +434,42 @@ export function useFieldActivities({
           field_name: selectedField.name || null,
           climate_context: climateContext,
           task_type: 'disease_pest_diagnosis',
+          photo_hash: photoRewardHash,
         })
         .select('id')
         .single();
       if (jobError) throw jobError;
       jobId = String(job.id);
 
-      const { data, error } = await supabase.functions.invoke('analyze-field-image', {
-        body: { jobId },
+      setActivityMessage('Pusula AI görüntüyü inceliyor… Genellikle 10–50 saniye sürer.');
+
+      const developerPreviewPlan =
+        entitlement.canOverride && entitlement.developerMode === 'premium'
+          ? 'premium'
+          : null;
+
+      const analysisRequest = supabase.functions.invoke('analyze-field-image', {
+        body: {
+          jobId,
+          developerPreviewPlan,
+        },
       });
+
+      const timeoutRequest = new Promise<never>((_, reject) => {
+        window.setTimeout(() => {
+          reject(
+            new Error(
+              'Pusula AI 60 saniye içinde sonuç veremedi. Analizi tekrar deneyebilirsin.',
+            ),
+          );
+        }, 60_000);
+      });
+
+      const { data, error } = await Promise.race([
+        analysisRequest,
+        timeoutRequest,
+      ]);
+
       if (error) throw error;
       if (data?.access) setAiAccessStatus(normalizeAiAccessStatus(data.access));
       if (data?.limitReached) throw new Error(data?.message ?? 'AI analiz hakkı bulunmuyor.');
@@ -342,6 +557,13 @@ export function useFieldActivities({
       };
 
       setAiAnalysis(normalizedAnalysis);
+      setActivityMessage('Analiz tamamlandı.');
+
+      window.setTimeout(() => {
+        document
+          .getElementById('tp-ai-analysis-result')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
 
       const observationPointId = String(
         aiObservationContextRef.current?.observationPointId ?? '',
@@ -364,7 +586,12 @@ export function useFieldActivities({
       void loadAiAccessStatus();
     } catch (error) {
       console.error('Pusula AI görsel teşhis hatası:', error);
-      setAiAnalysisError(error instanceof Error ? error.message : 'Fotoğraf Pusula AI ile analiz edilemedi.');
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Fotoğraf Pusula AI ile analiz edilemedi.';
+      setAiAnalysisError(message);
+      setActivityMessage(message);
       if (uploadedPath && !jobId) {
         await deletePrivateFile(
           'field-activity-photos',

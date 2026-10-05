@@ -19,6 +19,7 @@ import {
   getFieldEventCandidateFeedback,
   markFieldEventCandidateSeen,
 } from '../services/fieldEventCandidateFeedback.service';
+import { queueFirstFieldActivityPush } from '../../notifications/services/smartPush.service';
 
 const RECENT_EVENT_DAYS = 60;
 const OPERATION_LOOKBACK_DAYS = 120;
@@ -123,6 +124,13 @@ export function usePusulaFieldEventPrompt(args: {
         setCandidate(null);
         setNeedsAttention(false);
         return;
+      }
+
+      if (!feedback) {
+        void queueFirstFieldActivityPush({
+          fieldId,
+          event: nextCandidate,
+        });
       }
 
       const coveredBy = findCoveredOperation(nextCandidate, operations);

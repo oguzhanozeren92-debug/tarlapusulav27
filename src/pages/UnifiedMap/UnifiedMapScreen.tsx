@@ -1508,15 +1508,9 @@ function VegetationGeoMap({
     else map.once('load', updateTrees);
   }, [orchardTreePoints, showOrchardTrees]);
 
-  const satelliteDate = formatSatelliteDate(ndvi?.latestImageDate);
-
   return (
     <div style={styles.radarMapShell}>
       <div ref={containerRef} style={styles.radarMapCanvas} />
-
-      {satelliteDate ? (
-        <div style={styles.satelliteDateBadge}>{satelliteDate}</div>
-      ) : null}
     </div>
   );
 }
@@ -2451,6 +2445,7 @@ export default function UnifiedMapScreen({
   const [orchardTreeTotalCount, setOrchardTreeTotalCount] = useState(0);
   const [orchardTreeState, setOrchardTreeState] = useState<LoadState>('idle');
   const [showOrchardTrees, setShowOrchardTrees] = useState(false);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
 
   const [ndvi, setNdvi] = useState<SatelliteHealthResult | null>(null);
   const [ndviState, setNdviState] = useState<LoadState>('idle');
@@ -2507,6 +2502,26 @@ export default function UnifiedMapScreen({
   useEffect(() => {
     if (selectedFieldId) setFieldId(String(selectedFieldId));
   }, [selectedFieldId]);
+
+  useEffect(() => {
+    if (!mapFullscreen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMapFullscreen(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.setTimeout(() => window.dispatchEvent(new Event('resize')), 40);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      window.setTimeout(() => window.dispatchEvent(new Event('resize')), 40);
+    };
+  }, [mapFullscreen]);
 
   useEffect(() => {
     // If HomeScreen opened a specific layer, keep it.
@@ -2961,6 +2976,11 @@ export default function UnifiedMapScreen({
           ? 'Takip edilmeli'
           : 'Kontrol gerekli';
 
+  const toggleMapFullscreen = () => {
+    setMapFullscreen((current) => !current);
+    window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+  };
+
   const openGroup = (group: MapGroup) => {
     if (group === 'vegetation') {
       setSection('vegetation');
@@ -3019,6 +3039,120 @@ export default function UnifiedMapScreen({
           opacity:.88;
         }
         .tp-unified-map-page .maplibregl-canvas{outline:none;}
+
+        .tp-unified-map-stage.is-fullscreen{
+          position:fixed!important;
+          inset:0!important;
+          z-index:10050!important;
+          width:100vw!important;
+          height:100svh!important;
+          min-height:100svh!important;
+          border-radius:0!important;
+          overflow:hidden!important;
+          background:#020804!important;
+        }
+        .tp-unified-map-stage.is-fullscreen > div:first-child{
+          height:100svh!important;
+          min-height:100svh!important;
+        }
+        .tp-unified-map-stage.is-fullscreen .maplibregl-map,
+        .tp-unified-map-stage.is-fullscreen .maplibregl-canvas-container,
+        .tp-unified-map-stage.is-fullscreen .maplibregl-canvas{
+          height:100%!important;
+        }
+        .tp-unified-map-stage.is-fullscreen .maplibregl-ctrl-top-right{
+          top:62px!important;
+          right:10px!important;
+          z-index:100!important;
+          pointer-events:auto!important;
+        }
+        .tp-unified-map-stage.is-fullscreen .maplibregl-control-container,
+        .tp-unified-map-stage.is-fullscreen .maplibregl-ctrl,
+        .tp-unified-map-stage.is-fullscreen .maplibregl-ctrl button{
+          pointer-events:auto!important;
+        }
+        .tp-map-fullscreen-button{
+          position:absolute;
+          top:14px;
+          right:14px;
+          z-index:110;
+          width:42px;
+          height:42px;
+          display:grid;
+          place-items:center;
+          border:1px solid rgba(255,255,255,.22);
+          border-radius:12px;
+          background:rgba(4,13,6,.92);
+          color:#fff;
+          font:850 18px/1 Inter,system-ui,sans-serif;
+          box-shadow:0 10px 26px rgba(0,0,0,.28);
+          backdrop-filter:blur(12px);
+          -webkit-backdrop-filter:blur(12px);
+          cursor:pointer;
+          pointer-events:auto;
+          touch-action:manipulation;
+        }
+        .tp-stage-overlay-stack{
+          position:absolute;
+          left:15px;
+          top:15px;
+          z-index:90;
+          width:min(330px,calc(100% - 88px));
+          display:grid;
+          gap:8px;
+          pointer-events:none;
+        }
+        .tp-stage-date-badge{
+          width:max-content;
+          max-width:100%;
+          padding:7px 10px;
+          border:1px solid rgba(34,197,94,.34);
+          border-radius:10px;
+          background:rgba(4,13,6,.92);
+          color:#eaffef;
+          font:850 8.5px/1.2 Inter,system-ui,sans-serif;
+          letter-spacing:.06em;
+          box-shadow:0 8px 20px rgba(0,0,0,.25);
+          backdrop-filter:blur(10px);
+          -webkit-backdrop-filter:blur(10px);
+        }
+        .tp-stage-overlay-stack .tp-stage-pusula-card{
+          display:grid;
+          grid-template-columns:38px minmax(0,1fr);
+          gap:9px;
+          padding:10px 11px;
+          border:1px solid rgba(34,197,94,.34);
+          border-radius:13px;
+          background:rgba(4,13,6,.90);
+          box-shadow:0 10px 28px rgba(0,0,0,.28);
+          backdrop-filter:blur(12px);
+          -webkit-backdrop-filter:blur(12px);
+        }
+        .tp-stage-overlay-stack .tp-stage-pusula-kicker{
+          display:block;
+          margin-bottom:3px;
+          color:rgba(167,243,208,.50);
+          font:850 7px/1.2 Inter,system-ui,sans-serif;
+          letter-spacing:.12em;
+        }
+        .tp-stage-parcel-status{
+          position:absolute;
+          left:15px;
+          bottom:15px;
+          z-index:85;
+          pointer-events:none;
+        }
+        @media(max-width:640px){
+          .tp-stage-overlay-stack{
+            left:9px;
+            top:9px;
+            width:min(265px,calc(100% - 70px));
+            gap:6px;
+          }
+          .tp-map-fullscreen-button{top:9px;right:9px;width:40px;height:40px}
+          .tp-stage-parcel-status{left:9px;bottom:9px}
+          .tp-unified-map-stage.is-fullscreen .maplibregl-ctrl-top-right{top:58px!important;right:8px!important}
+        }
         @media (max-width:760px){
           .tp-unified-map-page .maplibregl-ctrl-top-right{top:124px;right:8px;}
         }
@@ -3302,22 +3436,44 @@ export default function UnifiedMapScreen({
             <span style={styles.sourceCount}>{sourceCount}/5 veri kaynağı hazır</span>
           </div>
 
-          <div style={styles.stage}>
+          <div
+            className={`tp-unified-map-stage${mapFullscreen ? ' is-fullscreen' : ''}`}
+            style={styles.stage}
+          >
             {renderVisual()}
 
-            <div style={styles.mapInfoPanel}>
-              <div style={styles.mapInfoIcon}>{layerUi.icon}</div>
-              <div style={styles.mapInfoCopy}>
-                <strong style={styles.mapInfoTitle}>{layerUi.title}</strong>
-                <p style={styles.mapInfoText}>{layerUi.description}</p>
-                <span style={styles.mapInfoSource}>{layerUi.source}</span>
+            <button
+              type="button"
+              className="tp-map-fullscreen-button"
+              onClick={toggleMapFullscreen}
+              aria-label={mapFullscreen ? 'Tam ekrandan çık' : 'Haritayı tam ekran aç'}
+              title={mapFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
+            >
+              {mapFullscreen ? '×' : '⛶'}
+            </button>
+
+            <div className="tp-stage-overlay-stack">
+              {section === 'vegetation' && ndviView === 'ndvi' && ndvi?.latestImageDate ? (
+                <div className="tp-stage-date-badge">
+                  GÜNCEL UYDU · {formatSatelliteDate(ndvi.latestImageDate)}
+                </div>
+              ) : null}
+
+              {renderStageLegend()}
+
+              <div className="tp-stage-pusula-card">
+                <div style={styles.mapInfoIcon}>{layerUi.icon}</div>
+                <div style={styles.mapInfoCopy}>
+                  <span className="tp-stage-pusula-kicker">PUSULA KATMAN YORUMU</span>
+                  <strong style={styles.mapInfoTitle}>{layerUi.title}</strong>
+                  <p style={styles.mapInfoText}>{layerUi.description}</p>
+                  <span style={styles.mapInfoSource}>{layerUi.source}</span>
+                </div>
               </div>
             </div>
 
-            <div style={styles.legendDock}>
-              {renderStageLegend()}
-
-              {section === 'vegetation' && ndviView === 'ndvi' && ndvi && (
+            {section === 'vegetation' && ndviView === 'ndvi' && ndvi && (
+              <div className="tp-stage-parcel-status">
                 <div style={styles.parcelStatusLegend}>
                   <div style={styles.parcelStatusTitle}>PARSEL DURUMU</div>
                   <div style={styles.parcelStatusRow}>
@@ -3336,8 +3492,8 @@ export default function UnifiedMapScreen({
                     <strong>{ndvi.stressedPercent != null ? `%${Math.round(Number(ndvi.stressedPercent))}` : '—'}</strong>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </section>
 

@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import type { Screen } from '../types';
 import { supabase } from '../supabaseClient';
 import { useGamificationStore } from '../gamification/useGamificationStore';
+import DrawerSupportFooter from './DrawerSupportFooter';
 import PusulaPointsModal from './PusulaPointsModal';
+import drawerFieldBg from '../assets/login-bg.webp';
 
 type AppDrawerProps = {
   open: boolean;
@@ -38,7 +41,7 @@ type DrawerItem = {
   target: Screen;
   image?: string;
   fallback?: string;
-  iconType?: 'soil';
+  iconType?: 'soil' | 'calendar';
 };
 
 const ITEMS: DrawerItem[] = [
@@ -49,7 +52,7 @@ const ITEMS: DrawerItem[] = [
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/weather.webp`,
   },
   {
-    label: 'Depo',
+    label: 'Depom',
     target: 'inventoryHub' as Screen,
     image: `${DRAWER_MENU_FALLBACK_BASE}/inventory.webp`,
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/inventory.webp`,
@@ -61,16 +64,15 @@ const ITEMS: DrawerItem[] = [
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/prices.webp`,
   },
   {
-    label: 'Tarım Gündemi',
-    target: 'agendaHub' as Screen,
-    image: `${DRAWER_MENU_FALLBACK_BASE}/support.webp`,
-    fallback: `${DRAWER_MENU_FALLBACK_BASE}/support.webp`,
-  },
-  {
     label: 'Bilgi Rehberi',
     target: 'pestGuideHub' as Screen,
     image: `${DRAWER_MENU_FALLBACK_BASE}/guide.webp`,
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/guide.webp`,
+  },
+  {
+    label: 'Takvim',
+    target: 'calendar' as Screen,
+    iconType: 'calendar',
   },
   {
     label: 'Bildirimler',
@@ -86,7 +88,73 @@ const ITEMS: DrawerItem[] = [
   },
 ];
 
+let pusulaPointsRoot: Root | null = null;
+let pusulaPointsContainer: HTMLDivElement | null = null;
+
+function closeDirectPusulaPointsModal() {
+  const root = pusulaPointsRoot;
+  const container = pusulaPointsContainer;
+
+  pusulaPointsRoot = null;
+  pusulaPointsContainer = null;
+
+  if (root) {
+    root.unmount();
+  }
+
+  container?.remove();
+}
+
+function openDirectPusulaPointsModal(points?: number | null) {
+  closeDirectPusulaPointsModal();
+
+  const container = document.createElement('div');
+  container.id = 'tp-direct-pusula-points-root';
+  document.body.appendChild(container);
+
+  const root = createRoot(container);
+
+  pusulaPointsContainer = container;
+  pusulaPointsRoot = root;
+
+  root.render(
+    <PusulaPointsModal
+      open
+      points={points}
+      onClose={closeDirectPusulaPointsModal}
+    />,
+  );
+}
+
 function DrawerIcon({ item }: { item: DrawerItem }) {
+  if (item.iconType === 'calendar') {
+    return (
+      <span className="tp-premium-drawer-icon tp-premium-drawer-icon-calendar" aria-hidden="true">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <defs>
+            <linearGradient id="tpCalendarPage" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="100%" stopColor="#e6eaee" />
+            </linearGradient>
+            <linearGradient id="tpCalendarTop" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#727b84" />
+              <stop offset="100%" stopColor="#343a40" />
+            </linearGradient>
+          </defs>
+          <rect x="7" y="8.5" width="34" height="32" rx="7" fill="url(#tpCalendarPage)" stroke="#aeb5bc" strokeWidth="1.6" />
+          <path d="M7.8 18.2h32.4v-3.1c0-3.4-2.7-6.1-6.1-6.1H13.9c-3.4 0-6.1 2.7-6.1 6.1v3.1Z" fill="url(#tpCalendarTop)" />
+          <path d="M16 6.5v6.2M32 6.5v6.2" fill="none" stroke="#2d3338" strokeWidth="3.2" strokeLinecap="round" />
+          <rect x="12.5" y="22.5" width="6" height="5.5" rx="1.3" fill="#707982" />
+          <rect x="21" y="22.5" width="6" height="5.5" rx="1.3" fill="#b0b7bd" />
+          <rect x="29.5" y="22.5" width="6" height="5.5" rx="1.3" fill="#707982" />
+          <rect x="12.5" y="31" width="6" height="5.5" rx="1.3" fill="#b0b7bd" />
+          <rect x="21" y="31" width="6" height="5.5" rx="1.3" fill="#5b646c" />
+          <rect x="29.5" y="31" width="6" height="5.5" rx="1.3" fill="#b0b7bd" />
+        </svg>
+      </span>
+    );
+  }
+
   if (item.iconType === 'soil') {
     return (
       <span className="tp-premium-drawer-icon tp-premium-drawer-icon-soil" aria-hidden="true">
@@ -134,7 +202,6 @@ export default function AppDrawer({
   const [resolvedName, setResolvedName] = useState(
     String(profileName || '').trim() || 'Üretici',
   );
-  const [pointsOpen, setPointsOpen] = useState(false);
 
   useEffect(() => {
     const explicitName = String(profileName || '').trim();
@@ -535,6 +602,25 @@ export default function AppDrawer({
             drop-shadow(0 4px 6px rgba(0,0,0,.22));
         }
 
+        /* CALENDAR ICON — premium monochrome drawer family */
+        .tp-premium-drawer-icon-calendar{
+          border-color:#cbd1d6!important;
+          background:
+            radial-gradient(circle at 50% 18%,rgba(255,255,255,.95),transparent 52%),
+            linear-gradient(180deg,#f8fafb 0%,#e7ebee 100%)!important;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.96),
+            inset 0 -1px 0 rgba(91,100,108,.12),
+            0 4px 10px rgba(17,24,39,.10)!important;
+        }
+
+        .tp-premium-drawer-icon-calendar svg{
+          width:36px!important;
+          height:36px!important;
+          overflow:visible!important;
+          filter:drop-shadow(0 2px 2px rgba(17,24,39,.16))!important;
+        }
+
         .tp-premium-drawer-icon-soil{
           border-color:rgba(197,205,214,.62);
           background:
@@ -702,6 +788,77 @@ export default function AppDrawer({
           color:#20252b!important;
         }
 
+
+        /* DRAWER FOOTER CLEANUP V2 */
+        body:has(.tp-premium-drawer) .tp-admin-entry{
+          display:none!important;
+        }
+
+        .tp-premium-drawer .tp-premium-drawer-logout{
+          box-sizing:border-box!important;
+          width:100%!important;
+          min-height:48px!important;
+          margin:12px 0 0!important;
+          padding:0 13px!important;
+          display:grid!important;
+          grid-template-columns:32px minmax(0,1fr)!important;
+          align-items:center!important;
+          justify-content:stretch!important;
+          gap:10px!important;
+          border:1px solid #050607!important;
+          border-radius:14px!important;
+          background:#050607!important;
+          background-image:none!important;
+          color:#fff!important;
+          -webkit-text-fill-color:#fff!important;
+          box-shadow:none!important;
+          text-align:left!important;
+          font-size:12px!important;
+          font-weight:850!important;
+          letter-spacing:0!important;
+        }
+
+        .tp-premium-drawer .tp-premium-drawer-logout-icon{
+          width:32px!important;
+          height:32px!important;
+          border-radius:9px!important;
+          object-fit:cover!important;
+          filter:grayscale(1) contrast(1.08)!important;
+        }
+
+        .tp-premium-drawer .tp-premium-drawer-foot-art{
+          box-sizing:border-box!important;
+          min-height:0!important;
+          height:auto!important;
+          margin:9px 0 0!important;
+          padding:9px 4px 3px!important;
+          overflow:visible!important;
+          border-radius:0!important;
+          border-top:1px solid rgba(255,255,255,.13)!important;
+          background:none!important;
+        }
+
+        .tp-premium-drawer .tp-premium-drawer-foot-art::before{
+          display:none!important;
+          content:none!important;
+        }
+
+        .tp-premium-drawer .tp-premium-drawer-foot-art span{
+          position:static!important;
+          inset:auto!important;
+          width:auto!important;
+          display:block!important;
+          margin:0!important;
+          color:rgba(255,255,255,.58)!important;
+          -webkit-text-fill-color:rgba(255,255,255,.58)!important;
+          text-align:center!important;
+          font-size:7.5px!important;
+          line-height:1.35!important;
+          font-weight:850!important;
+          letter-spacing:.18em!important;
+          white-space:normal!important;
+        }
+
         @media(max-width:520px){
           .tp-premium-drawer{
             width:min(92vw,360px);
@@ -785,7 +942,12 @@ export default function AppDrawer({
         <button
           type="button"
           className="tp-premium-points tp-premium-points-opd"
-          onClick={() => setPointsOpen(true)}
+          onClick={() => {
+            // Drawer kapanmadan önce bağımsız modal root'unu body'ye monte et.
+            // Böylece drawer'ın unmount olması puan ekranını etkileyemez.
+            openDirectPusulaPointsModal(shownPoints);
+            onClose();
+          }}
           aria-label="Pusula puanı, seviyeler ve puan geçmişini aç"
         >
           <span className="tp-premium-points-opd-emblem" aria-hidden="true">
@@ -836,6 +998,8 @@ export default function AppDrawer({
           })}
         </nav>
 
+        <DrawerSupportFooter screen={String(activeScreen ?? '')} />
+
         <button
           type="button"
           className="tp-premium-drawer-logout"
@@ -856,12 +1020,6 @@ export default function AppDrawer({
           <span>DAHA VERİMLİ YARINLAR İÇİN</span>
         </div>
       </aside>
-
-      <PusulaPointsModal
-        open={pointsOpen}
-        onClose={() => setPointsOpen(false)}
-        points={shownPoints}
-      />
     </>
   );
 }

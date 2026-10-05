@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Clock3, LockKeyhole, Sprout, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { useEntitlementStore } from '../entitlements/useEntitlementStore';
+import { showRewardedAdAndClaim } from '../monetization/adRuntime';
 
 type PusulaPointsModalProps = {
   open: boolean;
@@ -28,8 +31,8 @@ type PointRule = {
 
 const FALLBACK_THRESHOLDS: PointThreshold[] = [
   { field_number: 1, required_points: 0 },
-  { field_number: 2, required_points: 1000 },
-  { field_number: 3, required_points: 2500 },
+  { field_number: 2, required_points: 500 },
+  { field_number: 3, required_points: 1200 },
 ];
 
 const LEVEL_NAMES: Record<number, string> = {
@@ -42,17 +45,19 @@ const CSS = String.raw`
 .tp-points-modal-backdrop{
   position:fixed;
   inset:0;
-  z-index:10040;
+  z-index:2147483000;
   border:0;
   padding:0;
-  background:rgba(10,14,18,.58);
-  backdrop-filter:blur(7px);
-  -webkit-backdrop-filter:blur(7px);
+  background:
+    radial-gradient(circle at 50% 78%,rgba(255,255,255,.08),transparent 34%),
+    linear-gradient(180deg,rgba(4,5,7,.78) 0%,rgba(8,10,12,.72) 48%,rgba(3,4,6,.86) 100%);
+  backdrop-filter:blur(12px) saturate(.68) contrast(.94);
+  -webkit-backdrop-filter:blur(12px) saturate(.68) contrast(.94);
 }
 
 .tp-points-modal{
   position:fixed;
-  z-index:10050;
+  z-index:2147483100;
   left:50%;
   top:50%;
   transform:translate(-50%,-50%);
@@ -65,7 +70,7 @@ const CSS = String.raw`
   border-radius:24px;
   background:#fff;
   color:#171b20;
-  box-shadow:0 28px 80px rgba(15,23,42,.28);
+  box-shadow:0 30px 90px rgba(0,0,0,.46),0 0 0 1px rgba(255,255,255,.22);
   font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 
@@ -212,6 +217,69 @@ const CSS = String.raw`
   height:100%;
   border-radius:999px;
   background:#111827;
+}
+
+.tp-points-ad-reward{
+  margin:10px 16px 0;
+  padding:12px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  border:1px solid #dfe4e8;
+  border-radius:15px;
+  background:#111827;
+  color:#fff;
+}
+
+.tp-points-ad-reward-copy small{
+  display:block;
+  color:#aeb7c2;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+
+.tp-points-ad-reward-copy strong{
+  display:block;
+  margin-top:3px;
+  color:#fff;
+  font-size:12px;
+}
+
+.tp-points-ad-reward-copy span{
+  display:block;
+  margin-top:4px;
+  color:#cbd2da;
+  font-size:8px;
+  line-height:1.35;
+}
+
+.tp-points-ad-reward button{
+  min-width:118px;
+  min-height:42px;
+  padding:0 12px;
+  border:1px solid #fff;
+  border-radius:12px;
+  background:#fff;
+  color:#111827;
+  font-size:10px;
+  font-weight:950;
+  cursor:pointer;
+}
+
+.tp-points-ad-reward button:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
+.tp-points-ad-reward-message{
+  grid-column:1 / -1;
+  padding-top:7px;
+  border-top:1px solid rgba(255,255,255,.14);
+  color:#d5dbe1;
+  font-size:8px;
+  line-height:1.35;
 }
 
 .tp-points-tabs{
@@ -453,6 +521,7 @@ const CSS = String.raw`
   }
 
   .tp-points-progress,
+  .tp-points-ad-reward,
   .tp-points-tabs{
     margin-left:12px;
     margin-right:12px;
@@ -508,8 +577,11 @@ export default function PusulaPointsModal({
   const [loading, setLoading] = useState(false);
   const [remotePoints, setRemotePoints] = useState<number | null>(null);
   const [thresholds, setThresholds] = useState<PointThreshold[]>(FALLBACK_THRESHOLDS);
+  const entitlement = useEntitlementStore();
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [rules, setRules] = useState<Record<string, string>>({});
+  const [adRewardLoading, setAdRewardLoading] = useState(false);
+  const [adRewardMessage, setAdRewardMessage] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -649,9 +721,76 @@ export default function PusulaPointsModal({
       )
     : 100;
 
-  if (!open) return null;
+  const todayKey = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Istanbul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 
-  return (
+  const todayAdCount = transactions.filter((item) => {
+    if (item.rule_key !== 'WATCH_AD') return false;
+    const key = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Istanbul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(item.created_at));
+    return key === todayKey;
+  }).length;
+
+  const adDailyLimit = 5;
+  const canWatchRewardedAd =
+    entitlement.effectivePlan !== 'premium' && todayAdCount < adDailyLimit;
+
+  const handleWatchRewardedAd = async () => {
+    if (!canWatchRewardedAd || adRewardLoading) return;
+    setAdRewardLoading(true);
+    setAdRewardMessage('');
+    try {
+      const result = await showRewardedAdAndClaim('points_hub');
+      const claim = result.claim;
+      if (!result.completed) {
+        setAdRewardMessage('Reklam tamamlanmadığı için puan eklenmedi.');
+        return;
+      }
+      if (!claim?.awarded) {
+        setAdRewardMessage(
+          claim?.reason === 'daily_limit'
+            ? 'Bugünkü reklam puanı sınırına ulaştın.'
+            : 'Bu reklam için puan daha önce işlendi.',
+        );
+        return;
+      }
+
+      setRemotePoints(claim.lifetimePoints || claim.points);
+      setTransactions((current) => [
+        {
+          id: `ad-${Date.now()}`,
+          rule_key: 'WATCH_AD',
+          points: claim.awardedPoints,
+          metadata: { source_label: 'Ödüllü reklam' },
+          created_at: new Date().toISOString(),
+        },
+        ...current,
+      ]);
+      setAdRewardMessage(
+        `+${claim.awardedPoints} P kazandın · Bugün ${claim.dailyCount}/${claim.dailyLimit}`,
+      );
+    } catch (error) {
+      setAdRewardMessage(
+        error instanceof Error
+          ? error.message
+          : 'Reklam ödülü şu anda tamamlanamadı.',
+      );
+    } finally {
+      setAdRewardLoading(false);
+    }
+  };
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal(
     <>
       <style>{CSS}</style>
       <button
@@ -718,6 +857,32 @@ export default function PusulaPointsModal({
             <i style={{ width: `${progress}%` }} />
           </div>
         </div>
+
+        {entitlement.effectivePlan !== 'premium' ? (
+          <div className="tp-points-ad-reward">
+            <div className="tp-points-ad-reward-copy">
+              <small>ÖDÜLLÜ REKLAM</small>
+              <strong>Reklam izle · +10 Pusula Puanı</strong>
+              <span>Günde en fazla 5 kez. Premium kullanıcıda reklam gösterilmez.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleWatchRewardedAd()}
+              disabled={!canWatchRewardedAd || adRewardLoading}
+            >
+              {adRewardLoading
+                ? 'Hazırlanıyor…'
+                : canWatchRewardedAd
+                  ? `İzle · ${todayAdCount}/${adDailyLimit}`
+                  : 'Bugün tamam'}
+            </button>
+            {adRewardMessage ? (
+              <div className="tp-points-ad-reward-message" role="status">
+                {adRewardMessage}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="tp-points-tabs" role="tablist" aria-label="Pusula puanı sekmeleri">
           <button
@@ -806,6 +971,7 @@ export default function PusulaPointsModal({
           )}
         </div>
       </section>
-    </>
+    </>,
+    document.body,
   );
 }

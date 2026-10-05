@@ -7,7 +7,7 @@ type CandidateLike = {
 };
 
 export default function CandidateQueueSummary({ candidates }: { candidates: CandidateLike[] }) {
-  const pending=candidates.filter(x=>x.workflow_status==='pending'||x.workflow_status==='held');
+  const pending=candidates.filter(x=>x.workflow_status==='pending');
   const news=pending.filter(x=>x.candidate_type==='news').length;
   const article=pending.filter(x=>x.content_subtype==='article').length;
   const guide=pending.filter(x=>x.candidate_type!=='news'&&x.content_subtype!=='article').length;

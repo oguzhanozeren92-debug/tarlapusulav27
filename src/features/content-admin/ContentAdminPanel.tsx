@@ -55,6 +55,10 @@ type StructuredBody = {
   crop_priority?: number | null;
   producer_practicality_score?: number | null;
   discovery_mode?: string | null;
+  translation_status?: string | null;
+  producer_summary_status?: string | null;
+  admin_visibility?: string | null;
+  queue_block_reason?: string | null;
 };
 
 type Candidate = {
@@ -255,6 +259,22 @@ const apiProviderUrl = (provider: SourceDraft['apiProvider']) => {
 const commaList = (value: string) =>
   value.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 20);
 
+const makeManualExcerpt = (value: string, max = 420) => {
+  const text = value.replace(/\s+/g, ' ').trim();
+  if (text.length <= max) return text;
+  const clipped = text.slice(0, max);
+  const sentenceEnd = Math.max(
+    clipped.lastIndexOf('. '),
+    clipped.lastIndexOf('! '),
+    clipped.lastIndexOf('? '),
+  );
+  if (sentenceEnd >= Math.floor(max * 0.58)) {
+    return clipped.slice(0, sentenceEnd + 1).trim();
+  }
+  const wordEnd = clipped.lastIndexOf(' ');
+  return `${clipped.slice(0, wordEnd > 0 ? wordEnd : max).trim()}…`;
+};
+
 const SAFE_IMAGE_LICENSES = new Set(['cc0', 'pdm', 'by', 'by-sa', 'cc-by', 'cc-by-sa', 'public-domain', 'public_domain', 'admin-upload']);
 
 const fmtDate = (value: string | null | undefined) => {
@@ -378,6 +398,7 @@ export default function ContentAdminPanel() {
         supabase
           .from('content_candidates')
           .select('*')
+          .eq('workflow_status', 'pending')
           .order('generated_at', { ascending: false })
           .limit(300),
         supabase
@@ -436,7 +457,22 @@ export default function ContentAdminPanel() {
   const queue = useMemo(() => {
     const needle = searchText.trim().toLocaleLowerCase('tr-TR');
     return candidates.filter((candidate) => {
-      if (!['pending', 'held'].includes(candidate.workflow_status)) return false;
+      if (candidate.workflow_status !== 'pending') return false;
+
+      const translationStatus = String(
+        candidate.structured_body?.translation_status ?? '',
+      ).toLocaleLowerCase('tr-TR');
+
+      const producerSummaryStatus = String(
+        candidate.structured_body?.producer_summary_status ?? '',
+      ).toLocaleLowerCase('tr-TR');
+
+      const backgroundOnly =
+        candidate.structured_body?.admin_visibility === 'background_only' ||
+        ['processing', 'pending_ai', 'failed_auto', 'blocked'].includes(translationStatus) ||
+        ['processing', 'pending_ai', 'blocked'].includes(producerSummaryStatus);
+
+      if (backgroundOnly) return false;
       if (coverageFilter?.list === 'queue' && !coverageFilter.ids.includes(candidate.id)) return false;
       if (queueFilter === 'news' && candidate.candidate_type !== 'news') return false;
       if (queueFilter === 'article' && !isArticleCandidate(candidate)) return false;
@@ -644,6 +680,14 @@ export default function ContentAdminPanel() {
       setMessage('Yüklediğin görselin kullanım hakkını onaylaman gerekiyor.');
       return;
     }
+    if (manualDraft.kind === 'news') {
+      const manualSourceName = manualDraft.sourceName.trim();
+      const manualSourceUrl = manualDraft.sourceUrl.trim();
+      if (!manualSourceName || !/^https?:\/\//i.test(manualSourceUrl)) {
+        setMessage('Manuel haberde kaynak adı ve orijinal kaynak bağlantısı zorunlu.');
+        return;
+      }
+    }
 
     setWorkingId('__manual__');
     setMessage('Manuel içerik hazırlanıyor…');
@@ -655,6 +699,12 @@ export default function ContentAdminPanel() {
       const now = new Date().toISOString();
       const article = manualDraft.kind === 'article';
       const guide = manualDraft.kind === 'guide';
+      if (article) {
+        const manualYear = manualDraft.eventDate ? Number(manualDraft.eventDate.slice(0, 4)) : NaN;
+        if (!Number.isFinite(manualYear) || manualYear < 2010) {
+          throw new Error('Manuel makale için tarih 2010 veya sonrası olmalı.');
+        }
+      }
       const eventDate = manualDraft.eventDate ? new Date(`${manualDraft.eventDate}T00:00:00Z`).toISOString() : null;
       const sourceRefs = manualDraft.sourceUrl.trim()
         ? [{
@@ -662,6 +712,7 @@ export default function ContentAdminPanel() {
             url: manualDraft.sourceUrl.trim(),
             language: 'tr',
             published_at: eventDate,
+            attribution_required: manualDraft.kind === 'news',
           }]
         : [];
       const words = body.split(/\s+/).filter(Boolean).length;
@@ -673,7 +724,7 @@ export default function ContentAdminPanel() {
           content_subtype: article ? 'article' : guide ? 'guide' : 'general',
           title,
           slug: slugify(title, crypto.randomUUID()),
-          excerpt: manualDraft.summary.trim() || body.slice(0, 420),
+          excerpt: manualDraft.summary.trim() || makeManualExcerpt(body),
           body,
           tags: commaList(manualDraft.tags),
           crop_tags: commaList(manualDraft.crops),
@@ -886,6 +937,27 @@ export default function ContentAdminPanel() {
       let contentId = candidate.target_content_id;
       const article = isArticleCandidate(candidate);
       const guide = isGuideCandidate(candidate);
+      if (candidate.candidate_type === 'news') {
+        const firstSource = candidate.source_refs?.[0];
+        const sourceLabel =
+          typeof firstSource?.source_name === 'string'
+            ? firstSource.source_name.trim()
+            : '';
+        const sourceLink =
+          typeof firstSource?.url === 'string'
+            ? firstSource.url.trim()
+            : '';
+        if (!sourceLabel || !/^https?:\/\//i.test(sourceLink)) {
+          throw new Error('Haber yayınlanamaz: kaynak adı ve orijinal kaynak bağlantısı zorunlu.');
+        }
+      }
+      if (article) {
+        const sourceDateRaw = candidate.source_refs?.[0]?.published_at ?? candidate.event_date;
+        const sourceYear = sourceDateRaw ? new Date(String(sourceDateRaw)).getUTCFullYear() : NaN;
+        if (!Number.isFinite(sourceYear) || sourceYear < 2010) {
+          throw new Error('Makale yayınlanamaz: kaynak yayın yılı 2010 veya sonrası olmalı.');
+        }
+      }
       if (guide) {
         const imageProgress = guideImageProgress(candidate);
         if (!imageProgress.ready) {
@@ -1290,8 +1362,8 @@ export default function ContentAdminPanel() {
       </header>
 
       <div className="tp-content-admin__stats">
-        <article><strong>{candidates.filter((item) => ['pending', 'held'].includes(item.workflow_status)).length}</strong><span>Onay bekleyen</span></article>
-        <article><strong>{candidates.filter((item) => ['pending', 'held'].includes(item.workflow_status) && isArticleCandidate(item)).length}</strong><span>Ar-Ge adayı</span></article>
+        <article><strong>{candidates.length}</strong><span>Onay bekleyen</span></article>
+        <article><strong>{candidates.filter((item) => isArticleCandidate(item)).length}</strong><span>Ar-Ge adayı</span></article>
         <article><strong>{published.filter((item) => item.status === 'published').length}</strong><span>Yayında</span></article>
         <article><strong>{sources.filter((item) => item.active).length}</strong><span>Aktif kaynak</span></article>
       </div>
