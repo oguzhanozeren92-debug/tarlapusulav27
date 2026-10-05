@@ -4,7 +4,6 @@ import { Bell, CloudSun, MapPin, Menu, Star } from 'lucide-react';
 import PusulaGuide, { type PusulaInsight } from '../assets/pusula/PusulaGuide';
 import { supabase } from '../supabaseClient';
 import { useGamificationStore } from '../gamification/useGamificationStore';
-import { playMobileFeedback } from '../mobile/nativeFeedback';
 
 const PUSULA_BODY_SRC =
   'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/compass-body.webp';
@@ -1421,7 +1420,6 @@ export default function GlobalPusulaBand({
   }, [screen]);
 
   const handlePusulaClick = () => {
-    void playMobileFeedback('pusula');
     if (screen === 'inventoryHub') {
       setHasDepotSignal(false);
 
@@ -2331,10 +2329,7 @@ export default function GlobalPusulaBand({
           <button
             type="button"
             className="tp-global-page-menu"
-            onClick={() => {
-              void playMobileFeedback('menu');
-              onMenu?.();
-            }}
+            onClick={onMenu}
             aria-label="Menüyü aç"
             title="Menü"
           >
