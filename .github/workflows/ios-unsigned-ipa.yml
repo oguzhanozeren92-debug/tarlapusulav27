@@ -1,0 +1,64 @@
+name: iOS Unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/ios-unsigned-ipa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and sync web assets
+        run: |
+          npm run build
+          npx cap sync ios
+
+      - name: Build unsigned iPhone app
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build-ios
+          xcodebuild             -project ios/App/App.xcodeproj             -scheme App             -configuration Debug             -sdk iphoneos             -derivedDataPath build-ios             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             build
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PATH="build-ios/Build/Products/Debug-iphoneos/App.app"
+          test -d "$APP_PATH"
+          rm -rf Payload TarlaPusula-Unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP_PATH" "Payload/TarlaPusula.app"
+          zip -qry TarlaPusula-Unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TarlaPusula-iOS-Unsigned-IPA
+          path: TarlaPusula-Unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
