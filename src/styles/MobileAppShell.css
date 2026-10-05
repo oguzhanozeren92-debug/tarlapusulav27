@@ -200,3 +200,133 @@ html.tp-native-app [role='button'] {
     padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
   }
 }
+
+
+/* =========================================================
+   NATIVE MOBILE REVISION V2
+   iPhone gerçek cihaz: safe-area + başparmak erişimi + daha sıkı app header.
+   Yalnız native Capacitor kabuğunda çalışır.
+   ========================================================= */
+@media (max-width: 600px) {
+  html.tp-native-app {
+    --tp-native-safe-top: env(safe-area-inset-top, 0px);
+    --tp-native-header-row: 70px;
+  }
+
+  html.tp-native-app .tp-v1-header {
+    box-sizing: border-box !important;
+    height: calc(var(--tp-native-header-row) + var(--tp-native-safe-top)) !important;
+    min-height: calc(var(--tp-native-header-row) + var(--tp-native-safe-top)) !important;
+    padding:
+      calc(var(--tp-native-safe-top) + 8px)
+      10px
+      8px !important;
+    align-items: flex-end !important;
+  }
+
+  html.tp-native-app .tp-v1-header .tp-menu-btn,
+  html.tp-native-app .tp-v1-header .tp-header-right {
+    transform: none !important;
+    align-self: flex-end !important;
+  }
+
+  html.tp-native-app .tp-v1-header .tp-menu-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    border-radius: 14px !important;
+  }
+
+  html.tp-native-app .tp-v1-header .tp-ui3d-menu {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  html.tp-native-app .tp-brand-pusula-wrap {
+    top: auto !important;
+    bottom: 10px !important;
+    transform: translateX(-50%) !important;
+  }
+
+  html.tp-native-app .tp-brand-pusula-anchor {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  html.tp-native-app .tp-v1-header .tp-header-weather {
+    min-width: 62px !important;
+    width: 62px !important;
+    height: 46px !important;
+    border-radius: 14px !important;
+  }
+
+  html.tp-native-app .tp-v1-header .tp-score {
+    min-width: 58px !important;
+    width: 58px !important;
+    height: 46px !important;
+    border-radius: 14px !important;
+  }
+
+  html.tp-native-app .tp-global-page-header {
+    box-sizing: border-box !important;
+    height: calc(var(--tp-native-header-row) + var(--tp-native-safe-top)) !important;
+    min-height: calc(var(--tp-native-header-row) + var(--tp-native-safe-top)) !important;
+    padding:
+      calc(var(--tp-native-safe-top) + 8px)
+      10px
+      8px !important;
+    align-items: flex-end !important;
+  }
+
+  html.tp-native-app .tp-global-page-left {
+    transform: none !important;
+    align-self: flex-end !important;
+  }
+
+  html.tp-native-app .tp-global-page-menu {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    border-radius: 14px !important;
+  }
+
+  html.tp-native-app .tp-global-page-right {
+    top: auto !important;
+    bottom: 8px !important;
+    transform: none !important;
+  }
+
+  html.tp-native-app
+    .tp-global-pusula-anchor:not(.tp-depot-pusula-active) {
+    top: auto !important;
+    bottom: 9px !important;
+    transform: translateX(-50%) !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  html.tp-native-app .tp-global-weather-glass,
+  html.tp-native-app .tp-global-points-glass {
+    height: 46px !important;
+    border-radius: 14px !important;
+  }
+
+  html.tp-native-app .tp-main {
+    padding-top: 10px !important;
+  }
+
+  /* iOS'ta butonlar parmağa daha doğal tepki versin. */
+  html.tp-native-app button:active,
+  html.tp-native-app [role='button']:active {
+    transform: scale(.97);
+  }
+
+  html.tp-native-app .tp-brand-pusula-anchor:active,
+  html.tp-native-app .tp-global-pusula-anchor:active {
+    transform: translateX(-50%) scale(.94) !important;
+  }
+}

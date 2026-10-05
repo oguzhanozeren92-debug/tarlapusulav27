@@ -17,11 +17,13 @@ import './styles/MapReadabilityFix.css';
 import './styles/HomeFieldsSheetWhiteAccent.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
+import { installNativeFeedback } from './mobile/nativeFeedback';
 
 const nativePlatform = Capacitor.getPlatform();
 if (Capacitor.isNativePlatform()) {
   document.documentElement.classList.add('tp-native-app', `tp-native-${nativePlatform}`);
   document.body?.classList.add('tp-native-app');
+  installNativeFeedback();
 }
 
 if (window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')) {
