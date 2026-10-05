@@ -7,6 +7,7 @@ import InAppAdminMode from './features/admin-mode/InAppAdminMode';
 import AppNotificationBridge from './features/admin-mode/AppNotificationBridge';
 import AppActivityTracker from './features/notifications/components/AppActivityTracker';
 import HomeMapLayerLoadingBridge from './features/home-map/components/HomeMapLayerLoadingBridge';
+import PremiumFeedbackLayer from './features/premium-feedback/PremiumFeedbackLayer';
 import './styles/TarlaPusulaTheme.css';
 import './styles/MobileAppShell.css';
 import './styles/WhiteAppTheme.css';
@@ -28,6 +29,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <>
       <App />
+      <PremiumFeedbackLayer />
       <HomeMapLayerLoadingBridge />
       <AdminUiRuntime />
       <AppNotificationBridge />

@@ -46,8 +46,13 @@ export function persistHomeNotifications(input: {
 
     const nowIso = new Date().toISOString();
 
+    const newDangerNotifications: HomeSystemNotification[] = [];
+
     informationNotifications.forEach((item) => {
       const existing = byId.get(item.id);
+      if (!existing && item.severity === 'danger') {
+        newDangerNotifications.push(item);
+      }
       byId.set(item.id, {
         id: item.id,
         fieldId: input.fieldId,
@@ -81,6 +86,14 @@ export function persistHomeNotifications(input: {
         detail: { notifications: next },
       }),
     );
+
+    if (newDangerNotifications.length > 0) {
+      window.dispatchEvent(
+        new CustomEvent('tp:premium-feedback', {
+          detail: { tone: 'critical' },
+        }),
+      );
+    }
   } catch (error) {
     console.warn('[notifications] Sistem bildirim kuyruğu güncellenemedi:', error);
   }
