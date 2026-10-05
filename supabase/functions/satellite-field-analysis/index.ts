@@ -65,10 +65,16 @@ const buildTimeRange = (daysBack: number): TimeRange => {
   };
 };
 
-const buildDayTimeRange = (date: string): TimeRange => ({
-  from: `${date}T00:00:00Z`,
-  to: `${date}T23:59:59Z`,
-});
+const buildDayTimeRange = (date: string): TimeRange => {
+  const start = new Date(`${date}T00:00:00Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+
+  return {
+    from: start.toISOString(),
+    to: end.toISOString(),
+  };
+};
 
 const getToken = async () => {
   const clientId = Deno.env.get('COPERNICUS_CLIENT_ID')?.trim();
@@ -158,7 +164,6 @@ const fetchSceneList = async (
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      Accept: 'application/json',
     },
     body: JSON.stringify({
       collections: ['sentinel-2-l2a'],
@@ -171,7 +176,7 @@ const fetchSceneList = async (
   if (!response.ok) {
     const detail = await response.text();
     console.error('Catalog API error:', response.status, detail);
-    throw new Error('Uydu tarih listesi alınamadı.');
+    throw new Error(`Uydu tarih listesi alınamadı (${response.status}).`);
   }
 
   const data = await response.json();
@@ -259,13 +264,19 @@ function evaluatePixel(sample) {
 }
 `;
 
-const NDVI_STATS_SCRIPT = `
+const INDEX_STATS_SCRIPT = `
 //VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["B04", "B08", "SCL", "dataMask"] }],
+    input: [{
+      bands: ["B03", "B04", "B05", "B08", "B11", "SCL", "dataMask"]
+    }],
     output: [
-      { id: "default", bands: 1, sampleType: "FLOAT32" },
+      { id: "ndvi", bands: 1, sampleType: "FLOAT32" },
+      { id: "ndmi", bands: 1, sampleType: "FLOAT32" },
+      { id: "ndre", bands: 1, sampleType: "FLOAT32" },
+      { id: "savi", bands: 1, sampleType: "FLOAT32" },
+      { id: "gndvi", bands: 1, sampleType: "FLOAT32" },
       { id: "dataMask", bands: 1 }
     ]
   };
@@ -273,13 +284,34 @@ function setup() {
 function validPixel(scl) {
   return !(scl === 0 || scl === 1 || scl === 3 || scl === 8 || scl === 9 || scl === 10 || scl === 11);
 }
+function ratio(a, b) {
+  const d = a + b;
+  return d === 0 ? 0 : (a - b) / d;
+}
 function evaluatePixel(sample) {
-  let valid = sample.dataMask === 1 && validPixel(sample.SCL);
-  if (!valid) return { default: [0], dataMask: [0] };
-  let denom = sample.B08 + sample.B04;
-  if (denom === 0) return { default: [0], dataMask: [0] };
+  const valid = sample.dataMask === 1 && validPixel(sample.SCL);
+  if (!valid) {
+    return {
+      ndvi: [0], ndmi: [0], ndre: [0], savi: [0], gndvi: [0], dataMask: [0]
+    };
+  }
+
+  const ndvi = ratio(sample.B08, sample.B04);
+  const ndmi = ratio(sample.B08, sample.B11);
+  const ndre = ratio(sample.B08, sample.B05);
+  const gndvi = ratio(sample.B08, sample.B03);
+
+  const saviDenom = sample.B08 + sample.B04 + 0.5;
+  const savi = saviDenom === 0
+    ? 0
+    : 1.5 * (sample.B08 - sample.B04) / saviDenom;
+
   return {
-    default: [(sample.B08 - sample.B04) / denom],
+    ndvi: [ndvi],
+    ndmi: [ndmi],
+    ndre: [ndre],
+    savi: [savi],
+    gndvi: [gndvi],
     dataMask: [1]
   };
 }
@@ -378,11 +410,13 @@ const fetchStatistics = async (
       aggregation: {
         timeRange,
         aggregationInterval: { of: 'P1D' },
-        resx: 10,
-        resy: 10,
-        evalscript: NDVI_STATS_SCRIPT,
+        // CRS84 koordinatlarında sayısal resx/resy derece olarak yorumlanabildiği için
+        // bazı parsellerde Sentinel Hub 1500 m/pixel sınırını aşıyordu.
+        // Sabit örnek matrisi kullanarak her parselde güvenli ve tutarlı çözünürlük üret.
+        width: 512,
+        height: 512,
+        evalscript: INDEX_STATS_SCRIPT,
       },
-      calculations: { default: {} },
     }),
   });
 
@@ -395,17 +429,32 @@ const fetchStatistics = async (
   return response.json();
 };
 
+const extractOutputStats = (item: any, outputId: string) => {
+  const stats = item?.outputs?.[outputId]?.bands?.B0?.stats;
+  if (!stats) return null;
+
+  const sampleCount = safeNumber(stats.sampleCount) ?? 0;
+  const noDataCount = safeNumber(stats.noDataCount) ?? 0;
+  const mean = safeNumber(stats.mean);
+
+  if (sampleCount <= noDataCount || mean === null) return null;
+
+  return {
+    mean,
+    min: safeNumber(stats.min),
+    max: safeNumber(stats.max),
+  };
+};
+
+const rounded = (value: number | null, digits = 3) =>
+  value === null ? null : Number(value.toFixed(digits));
+
 const extractStatistics = (data: any) => {
   const intervals = Array.isArray(data?.data) ? data.data : [];
-  const valid = intervals.filter((item: any) => {
-    const stats = item?.outputs?.default?.bands?.B0?.stats;
-    if (!stats) return false;
 
-    const sampleCount = safeNumber(stats.sampleCount) ?? 0;
-    const noDataCount = safeNumber(stats.noDataCount) ?? 0;
-
-    return sampleCount > noDataCount && safeNumber(stats.mean) !== null;
-  });
+  const valid = intervals.filter((item: any) =>
+    extractOutputStats(item, 'ndvi') !== null,
+  );
 
   if (!valid.length) {
     return {
@@ -413,22 +462,32 @@ const extractStatistics = (data: any) => {
       ndviAverage: null,
       ndviMin: null,
       ndviMax: null,
+      ndmiAverage: null,
+      ndreAverage: null,
+      saviAverage: null,
+      gndviAverage: null,
     };
   }
 
   const latest = valid[valid.length - 1];
-  const stats = latest.outputs.default.bands.B0.stats;
-  const mean = safeNumber(stats.mean);
-  const min = safeNumber(stats.min);
-  const max = safeNumber(stats.max);
+
+  const ndvi = extractOutputStats(latest, 'ndvi');
+  const ndmi = extractOutputStats(latest, 'ndmi');
+  const ndre = extractOutputStats(latest, 'ndre');
+  const savi = extractOutputStats(latest, 'savi');
+  const gndvi = extractOutputStats(latest, 'gndvi');
 
   return {
     latestImageDate: latest.interval?.from
       ? String(latest.interval.from).slice(0, 10)
       : null,
-    ndviAverage: mean === null ? null : Number(mean.toFixed(3)),
-    ndviMin: min === null ? null : Number(min.toFixed(3)),
-    ndviMax: max === null ? null : Number(max.toFixed(3)),
+    ndviAverage: rounded(ndvi?.mean ?? null),
+    ndviMin: rounded(ndvi?.min ?? null),
+    ndviMax: rounded(ndvi?.max ?? null),
+    ndmiAverage: rounded(ndmi?.mean ?? null),
+    ndreAverage: rounded(ndre?.mean ?? null),
+    saviAverage: rounded(savi?.mean ?? null),
+    gndviAverage: rounded(gndvi?.mean ?? null),
   };
 };
 
@@ -630,6 +689,10 @@ Deno.serve(async (req) => {
       ndviAverage: statistics.ndviAverage,
       ndviMin: statistics.ndviMin,
       ndviMax: statistics.ndviMax,
+      ndmiAverage: statistics.ndmiAverage,
+      ndreAverage: statistics.ndreAverage,
+      saviAverage: statistics.saviAverage,
+      gndviAverage: statistics.gndviAverage,
       ndviImage: `data:image/png;base64,${ndviBase64}`,
       trueColorImage: `data:image/png;base64,${trueColorBase64}`,
       healthyPercent: null,
@@ -656,4 +719,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
