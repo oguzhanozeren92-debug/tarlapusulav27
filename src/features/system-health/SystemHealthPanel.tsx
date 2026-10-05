@@ -31,7 +31,7 @@ export default function SystemHealthPanel() {
     setError('');
     setSnapshot(null);
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('admin-system-health', { body: {} });
+      const { data, error: invokeError } = await supabase.functions.invoke('admin-control-center', { body: { action: 'system_health' } });
       if (invokeError || !data || !Array.isArray(data.cards) || typeof data.checkedAt !== 'string') {
         throw new Error('Sistem sağlığı bilgisi alınamadı. Oturumunuzu ve sunucu bağlantısını kontrol edin; yeni fonksiyon henüz yayınlanmamış olabilir.');
       }
