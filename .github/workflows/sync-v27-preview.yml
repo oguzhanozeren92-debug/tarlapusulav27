@@ -1,0 +1,83 @@
+name: Sync v27 preview
+
+on:
+  push:
+    branches:
+      - preview-v27
+    paths:
+      - '.github/workflows/sync-v27-preview.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync-v27:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout preview branch
+        uses: actions/checkout@v4
+        with:
+          ref: preview-v27
+          fetch-depth: 0
+
+      - name: Download v27 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/v27 /tmp/v27.zip
+          curl -L --fail --retry 3 \
+            https://github.com/oguzhanozeren92-debug/tarlapusulav27/archive/refs/heads/main.zip \
+            -o /tmp/v27.zip
+          mkdir -p /tmp/v27
+          unzip -q /tmp/v27.zip -d /tmp/v27
+
+      - name: Mirror v27 into preview branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$(find /tmp/v27 -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            "$SRC/" ./
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Build v27
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Configure Vercel to serve prebuilt dist
+        shell: bash
+        run: |
+          cat > vercel.json <<'JSON'
+          {
+            "$schema": "https://openapi.vercel.sh/vercel.json",
+            "installCommand": "",
+            "buildCommand": "echo 'Using prebuilt TarlaPusula v27 dist'",
+            "outputDirectory": "dist"
+          }
+          JSON
+
+      - name: Commit preview mirror and dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "oguzhanozeren92-debug"
+          git config user.email "oguzhanozeren92@gmail.com"
+          git add -A -f dist vercel.json
+          if git diff --cached --quiet; then
+            echo "Preview already matches v27."
+            exit 0
+          fi
+          git commit -m "preview: sync and prebuild v27"
+          git push origin HEAD:preview-v27
+
+# manual preview refresh: fields sheet + map layer loading restored
