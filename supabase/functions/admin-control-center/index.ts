@@ -319,9 +319,9 @@ Deno.serve(async (req) => {
     if (action === "overview" || action === "list_users") {
       const users = await buildUsers();
       const [candidateCount, publishedCount, sourceCount, notificationCount] = await Promise.all([
-        admin.from("content_candidates").select("id", { count: "exact", head: true }).eq("status", "pending_review"),
+        admin.from("content_candidates").select("id", { count: "exact", head: true }).eq("workflow_status", "pending"),
         admin.from("content_items").select("id", { count: "exact", head: true }).eq("status", "published"),
-        admin.from("content_sources").select("id", { count: "exact", head: true }).eq("is_active", true),
+        admin.from("content_sources").select("id", { count: "exact", head: true }).eq("active", true),
         admin.from("app_notifications").select("id", { count: "exact", head: true }),
       ]);
       return json({
