@@ -65,16 +65,10 @@ const buildTimeRange = (daysBack: number): TimeRange => {
   };
 };
 
-const buildDayTimeRange = (date: string): TimeRange => {
-  const start = new Date(`${date}T00:00:00Z`);
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-
-  return {
-    from: start.toISOString(),
-    to: end.toISOString(),
-  };
-};
+const buildDayTimeRange = (date: string): TimeRange => ({
+  from: `${date}T00:00:00Z`,
+  to: `${date}T23:59:59Z`,
+});
 
 const getToken = async () => {
   const clientId = Deno.env.get('COPERNICUS_CLIENT_ID')?.trim();
