@@ -115,3 +115,88 @@ body .tp-field-detail-page .tp-field-fab-wrap {
     font-size: max(16px, 1em) !important;
   }
 }
+
+
+/* =========================================================
+   NATIVE MOBILE REVISION V1
+   Gerçek iPhone / Android kabuğunda web-preview hissini azaltır.
+   Web/Vercel görünümünü değiştirmez.
+   ========================================================= */
+html.tp-native-app,
+html.tp-native-app body,
+html.tp-native-app #root {
+  min-height: 100dvh;
+}
+
+html.tp-native-app body {
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.tp-native-app button,
+html.tp-native-app [role='button'] {
+  touch-action: manipulation;
+}
+
+@media (max-width: 600px) {
+  /* Ana sayfa: başparmak erişimi için üst kontrolleri aşağı al. */
+  html.tp-native-app .tp-v1-header {
+    height: 92px !important;
+    min-height: 92px !important;
+    padding-inline: 10px !important;
+  }
+
+  html.tp-native-app .tp-v1-header .tp-menu-btn {
+    transform: translateY(10px) !important;
+  }
+
+  html.tp-native-app .tp-v1-header .tp-header-right {
+    transform: translateY(10px) !important;
+  }
+
+  html.tp-native-app .tp-brand-pusula-wrap {
+    top: calc(50% + 10px) !important;
+  }
+
+  html.tp-native-app .tp-brand-pusula-anchor {
+    width: 50px !important;
+    height: 50px !important;
+  }
+
+  /* Diğer ekranlar: global bar korunur, dokunma öğeleri daha aşağı oturur. */
+  html.tp-native-app .tp-global-page-left {
+    transform: translateY(8px) !important;
+  }
+
+  html.tp-native-app .tp-global-page-right {
+    transform: translateY(calc(-50% + 8px)) !important;
+  }
+
+  html.tp-native-app
+    .tp-global-pusula-anchor:not(.tp-depot-pusula-active) {
+    top: calc(50% + 8px) !important;
+  }
+
+  html.tp-native-app .tp-global-pusula-anchor,
+  html.tp-native-app .tp-global-pusula-stage,
+  html.tp-native-app .tp-global-pusula-stage img,
+  html.tp-native-app .tp-global-pusula-anchor img {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  html.tp-native-app .tp-global-page-menu,
+  html.tp-native-app .tp-menu-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* Alt navigasyon iPhone home indicator ile çakışmasın. */
+  html.tp-native-app body .tp-v1 .tp-bottom,
+  html.tp-native-app body .tp-field-detail-page .tp-field-detail-bottom,
+  html.tp-native-app body .bottomNav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+}

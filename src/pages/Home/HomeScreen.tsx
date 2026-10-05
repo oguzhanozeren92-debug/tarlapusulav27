@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { playMobileFeedback } from '../../mobile/nativeFeedback';
 import './HomeScreen.css';
 import './ClassicPusula.css';
 import { onboardingStyles } from '../../styles/onboardingStyles';
@@ -1184,7 +1185,10 @@ export default function HomeScreen(props: HomeScreenProps) {
         <header className="tp-v1-header">
           <button
             className="tp-menu-btn"
-            onClick={() => setSideMenuOpen(true)}
+            onClick={() => {
+              void playMobileFeedback('menu');
+              setSideMenuOpen(true);
+            }}
             aria-label="Menüyü aç"
           >
             <HomeNavIcon name="menu" className="tp-ui3d-menu" />
@@ -1213,6 +1217,7 @@ export default function HomeScreen(props: HomeScreenProps) {
                   : 'Pusula'
               }
               onClick={() => {
+                void playMobileFeedback('pusula');
                 if (fieldEventPrompt.candidate) fieldEventPrompt.openPrompt();
               }}
             >
@@ -1251,7 +1256,10 @@ export default function HomeScreen(props: HomeScreenProps) {
               className="tp-score"
               aria-label={`Pusula puanı ${headerPointsLabel}`}
               title="Pusula Puanı"
-              onClick={() => setPointsOpen(true)}
+              onClick={() => {
+                void playMobileFeedback('points');
+                setPointsOpen(true);
+              }}
             >
               <span className="tp-score-opd-emblem" aria-hidden="true">
                 <Ui3DIcon name="points" className="tp-ui3d-score-opd-source" />

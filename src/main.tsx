@@ -1,4 +1,5 @@
 import { StrictMode } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
@@ -16,6 +17,12 @@ import './styles/MapReadabilityFix.css';
 import './styles/HomeFieldsSheetWhiteAccent.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
+
+const nativePlatform = Capacitor.getPlatform();
+if (Capacitor.isNativePlatform()) {
+  document.documentElement.classList.add('tp-native-app', `tp-native-${nativePlatform}`);
+  document.body?.classList.add('tp-native-app');
+}
 
 if (window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')) {
   try {
