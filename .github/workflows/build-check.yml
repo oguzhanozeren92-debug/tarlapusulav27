@@ -17,6 +17,10 @@ on:
       - 'tsconfig*.json'
   workflow_dispatch:
 
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
