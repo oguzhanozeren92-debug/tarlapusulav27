@@ -25,7 +25,7 @@ Her offering içinde RevenueCat standard **Monthly** ve **Annual** package tiple
 - gelişmiş uydu ve uydu geçmişi
 - gelişmiş Pusula AI
 - sulama optimizasyonu
-- gelişmiş bildirimler / raporlar / widget
+- gelişmiş bildirimler / raporlar
 - Kuru Tarım
 - reklamsız
 
