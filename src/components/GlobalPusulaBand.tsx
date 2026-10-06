@@ -1685,7 +1685,11 @@ export default function GlobalPusulaBand({
       <style>{`
         .tp-global-page-header{
           position:fixed!important;
-          z-index:2147483647!important;
+          /* Layer contract:
+             bottom nav < global header < Pusula animation < drawer.
+             Do not use the CSS maximum here; PusulaGuide must be able to
+             animate above the header without the logo disappearing. */
+          z-index:2147482000!important;
           top:0!important;
           left:50%!important;
           transform:translateX(-50%)!important;
