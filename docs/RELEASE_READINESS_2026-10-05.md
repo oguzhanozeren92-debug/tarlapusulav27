@@ -14,6 +14,9 @@ Son kontrol: 2026-10-06
 - [x] Native push altyapısı mevcut: cihaz token kaydı, APNs/FCM taşıması, Android kanal/ikon ve bildirime tıklayınca uygulama içi yönlendirme.
 - [x] PusulaPDF native dosya paylaşımı mevcut.
 - [x] OAuth/deep-link native giriş dönüş köprüsü mevcut.
+- [x] Sign in with Apple uygulama kodu, entitlement ve Xcode capability hazır; gerçek Apple Developer provider yapılandırması üyelik aktivasyonunu bekliyor.
+- [x] iOS App Store release build APNs ortamı production olarak zorlanıyor.
+- [x] iOS legacy armv7 cihaz kısıtı kaldırıldı; export compliance beyanı Info.plist içinde tanımlı.
 
 ## Para kazanma ve abonelik
 
@@ -21,21 +24,31 @@ Son kontrol: 2026-10-06
 - [x] Plan ekranı App Store / Google Play satın alma akışına bağlandı.
 - [x] Uygulama yaşam döngüsünde abonelik entitlement yenilemesi mevcut.
 - [x] Abonelik yönetimi / geri yükleme native akışta mevcut.
+- [x] Abonelik ekranında otomatik yenileme açıklaması, Gizlilik Politikası ve Kullanım Koşulları bağlantıları mevcut.
+- [x] Signed iOS/Android release workflow'ları RevenueCat public key eksikse fail ediyor.
 - [x] Google AdMob rewarded + interstitial native köprüsü mevcut.
 - [x] Android üretim reklam birimleri bağlı.
 - [x] iOS üretim reklam birimleri bağlı.
 - [x] Debug/native test derlemelerinde Google test reklamları zorlanıyor; üretim reklam kimliklerinin test sırasında yanlışlıkla kullanılması engelleniyor.
 - [x] UMP reklam gizlilik seçenekleri Ücretsiz native kullanıcı için mevcut.
 - [x] Rewarded reklam ödül doğrulaması için sunucu tarafı SSV akışı mevcut.
+- [x] Signed Android release workflow'u Firebase `google-services.json` secret'ı eksikse veya package id `com.tarlapusula.app` ile eşleşmiyorsa fail ediyor.
+- [x] iOS/Android CI, RevenueCat ve AdMob native pluginlerinin platforma gerçekten bağlandığını doğrulayan release guard içeriyor.
 
 ## Gizlilik ve güvenlik
 
 - [x] Herkese açık Gizlilik Politikası mevcut: `/privacy-policy.html`.
+- [x] Gizlilik Politikası Supabase, Cloudflare R2, Gemini/Cloudflare AI, AdMob/UMP, RevenueCat ve Vercel veri akışlarını açıklar.
+- [x] Uygulama içi kalıcı hesap silme akışı mevcut: Ayarlar -> Hesabımı Sil.
+- [x] Google Play için uygulama dışında erişilebilen self-service hesap silme sayfası mevcut: `/account-deletion`.
+- [x] Hesap silme backend'i JWT doğrulamalı Edge Function üzerinden çalışır; kullanıcıya bağlı veriler ve kullanıcı dosyaları temizleme kapsamındadır.
+- [x] Herkese açık Kullanım Koşulları mevcut: `/terms-of-use.html`.
+- [x] Herkese açık mağaza Support URL adayı mevcut: `/support.html`.
 - [x] iOS Privacy Manifest mevcut.
 - [x] Supabase RLS ve güvenlik denetimleri düzenli çalıştırılabiliyor.
 - [!] Supabase Auth leaked-password protection Free planda açılamıyor; Supabase Pro+ özelliği olduğu için mevcut planda yayın bloklayıcısı olarak değerlendirilmiyor.
 - [ ] KVKK Aydınlatma Metni, veri sorumlusunun gerçek kimlik/iletişim bilgileriyle yayımlanmalı.
-- [ ] Kullanım Koşulları / hizmet şartları, işletmeci kimliği ve uyuşmazlık/iletişim bilgileri kesinleştikten sonra yayımlanmalı.
+- [!] Kullanım Koşulları teknik olarak yayımlandı; ancak halka açık ticari yayın öncesinde işletmeci/veri sorumlusu gerçek kimliği ve kalıcı kurumsal iletişim bilgisiyle hukuki metinler son kez kesinleştirilmeli.
 - [ ] SECURITY DEFINER uyarıları fonksiyon bazında denetlenmeli; topluca yetki kaldırılmamalı çünkü bazı RPC'ler istemci akışının bilinçli parçası.
 
 ## Mağaza yayını için kalan gerçek bloklayıcılar
@@ -44,7 +57,7 @@ Son kontrol: 2026-10-06
 - [ ] Google Play Console üzerinde gerçek uygulama kaydı, signing/upload key ve imzalı AAB üretimi tamamlanmalı.
 - [ ] RevenueCat ürünleri App Store Connect ve Google Play ürün kimlikleriyle production ortamında eşleştirilmeli ve gerçek sandbox/test satın alımı doğrulanmalı.
 - [ ] App Store / Play Console veri güvenliği-gizlilik formları, uygulamanın gerçek veri akışlarıyla doldurulmalı.
-- [ ] KVKK Aydınlatma Metni ve Kullanım Koşulları uygulama içinden erişilebilir hale getirilmeli.
+- [ ] KVKK Aydınlatma Metni gerçek veri sorumlusu kimlik/iletişim bilgileriyle tamamlanmalı ve uygulama içinden erişilebilir hale getirilmeli. Kullanım Koşulları abonelik ekranından erişilebilir durumda.
 - [ ] En az bir gerçek Android ve bir gerçek iOS cihazda oturumlu uçtan uca smoke turu yapılmalı.
 - [ ] Push notification gerçek cihaz tokenı ile arka plan/kapalı uygulama senaryosunda doğrulanmalı.
 - [ ] Rewarded ve interstitial reklamlar gerçek cihazda TEST reklamlarıyla akış bazında doğrulanmalı.
@@ -52,7 +65,7 @@ Son kontrol: 2026-10-06
 
 ## Operasyonel notlar
 
-- Vercel'in son otomatik deployment denemelerinden biri build-rate-limit nedeniyle reddedildi. Bu durum kod derleme hatası değildir; GitHub build ve Android native build aynı kaynakta başarılıdır. Web production güncelliği ayrıca kontrol edilmelidir.
+- Vercel production son kontrollerde güncel `main` commitlerini `READY` olarak yayınlıyor; Gizlilik Politikası ve hesap silme URL'leri production domain üzerinde 200 OK doğrulandı.
 - Supabase Free planda leaked-password protection için ücretli plana geçiş zorunluluğu vardır; yalnız bu özellik için şu aşamada plan yükseltme kararı alınmadı.
 - Fiziksel Android cihaz olmaması geliştirmeyi durdurmuyor; GitHub Actions APK üretebiliyor. Ancak halka açık mağaza yayını öncesinde fiziksel cihaz doğrulaması yine zorunlu kabul ediliyor.
 
