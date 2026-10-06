@@ -80,6 +80,8 @@ TarlaPusula bir tarımsal karar destek aracıdır. Uydu, hava, yapay zekâ ve di
   https://tarlapusulav27.vercel.app/account-deletion
 - Terms:
   https://tarlapusulav27.vercel.app/terms-of-use.html
+- KVKK Aydınlatma:
+  https://tarlapusulav27.vercel.app/kvkk-aydinlatma.html
 - Support:
   https://tarlapusulav27.vercel.app/support.html
   - production deploy pending Vercel daily-limit reset
