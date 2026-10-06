@@ -36,7 +36,7 @@ export function isNativeOAuthAvailable() {
 }
 
 export async function startNativeOAuth(
-  provider: 'google' | 'facebook',
+  provider: 'google' | 'facebook' | 'apple',
 ) {
   if (!isNativeOAuthAvailable()) {
     throw new Error('Native giriş sistemi bu cihazda kullanılamıyor.');
