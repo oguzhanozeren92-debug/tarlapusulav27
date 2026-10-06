@@ -562,6 +562,103 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  useEffect(() => {
+    const handleNativeNotificationOpen = (event: Event) => {
+      const detail =
+        (event as CustomEvent<Record<string, unknown>>).detail ?? {};
+
+      const fieldId = String(
+        detail.fieldId ?? detail.field_id ?? '',
+      ).trim();
+      const target = String(
+        detail.target ??
+          detail.actionTarget ??
+          detail.action_target ??
+          '',
+      ).trim();
+      const source = String(detail.source ?? '').trim();
+      const url = String(detail.url ?? '').trim();
+
+      const shouldOpenSatellite =
+        source === 'satellite' ||
+        /(?:open=ndvi|satellite|vegetation|ndvi)/i.test(url) ||
+        /(?:satellite|ndvi|vegetation)/i.test(target);
+
+      if (shouldOpenSatellite && fieldId) {
+        setMapFieldId(fieldId);
+        setUnifiedMapSection('vegetation');
+        setUnifiedMapOpen(true);
+        setScreen('home');
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        return;
+      }
+
+      if (target === 'calendar') {
+        setScreen('calendar');
+        void loadCalendarReminders();
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        return;
+      }
+
+      if (
+        target === 'notificationsHub' ||
+        target === 'notifications'
+      ) {
+        setScreen('notificationsHub');
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        return;
+      }
+
+      if (fieldId) {
+        const field = realFields.find(
+          (item) => String(item.id) === fieldId,
+        );
+
+        if (field) {
+          openFieldDetail(field, {
+            actionTarget: target || null,
+          });
+          return;
+        }
+      }
+
+      const directScreens: Screen[] = [
+        'home',
+        'weatherHub',
+        'marketHub',
+        'supportHub',
+        'agendaHub',
+        'nutritionHub',
+        'pestGuideHub',
+        'producerMarketHub',
+        'fieldNotebookHub',
+        'settingsHub',
+        'notificationsHub',
+      ];
+
+      if (directScreens.includes(target as Screen)) {
+        setScreen(target as Screen);
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        return;
+      }
+
+      setScreen('notificationsHub');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    };
+
+    window.addEventListener(
+      'tp:native-notification-open',
+      handleNativeNotificationOpen as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'tp:native-notification-open',
+        handleNativeNotificationOpen as EventListener,
+      );
+    };
+  }, [realFields]);
+
   const openFieldStatusFromDetail = () => {
     if (!selectedField) return;
     setFieldStatusRequest({
