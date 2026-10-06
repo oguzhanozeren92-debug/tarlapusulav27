@@ -391,7 +391,11 @@ export default function HomeScreen(props: HomeScreenProps) {
           decisionPhenology.stage,
           decisionPhenology.stageLabel ?? '',
           decisionPhenology.confidence ?? '',
-          ...(decisionPhenology.basis ?? []),
+          ...(Array.isArray(decisionPhenology.basis)
+            ? decisionPhenology.basis
+            : decisionPhenology.basis
+              ? [String(decisionPhenology.basis)]
+              : []),
         ].join('|')
       : '';
 
