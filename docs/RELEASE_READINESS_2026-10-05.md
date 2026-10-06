@@ -51,7 +51,8 @@ Son kontrol: 2026-10-06
 - [x] Storage privacy audit tamamlandı: kullanıcı fotoğraf/rapor bucket'ları private ve sahiplik kontrollü; public bucket'lar uygulama/CMS assetleriyle sınırlı.
 - [x] 13 RLS/no-policy tablosu denetlendi: anon/authenticated CRUD yetkisi yok; service-role-only/internal kullanım doğrulandı.
 - [!] Supabase Auth leaked-password protection Free planda açılamıyor; Supabase Pro+ özelliği olduğu için mevcut planda yayın bloklayıcısı olarak değerlendirilmiyor.
-- [ ] KVKK Aydınlatma Metni, veri sorumlusunun gerçek kimlik/iletişim bilgileriyle yayımlanmalı.
+- [x] KVKK Aydınlatma Metni gövdesi uygulamanın gerçek veri akışına göre hazırlandı: `docs/KVKK_AYDINLATMA_METNI_2026-10-06.md`.
+- [ ] KVKK metnine gerçek veri sorumlusu kimliği + kalıcı gizlilik/destek iletişimi girilip public sayfa olarak yayımlanmalı.
 - [!] Kullanım Koşulları teknik olarak yayımlandı; ancak halka açık ticari yayın öncesinde işletmeci/veri sorumlusu gerçek kimliği ve kalıcı kurumsal iletişim bilgisiyle hukuki metinler son kez kesinleştirilmeli.
 - [x] SECURITY DEFINER fonksiyonları tek tek denetlendi. Trigger RPC dış erişimi kapatıldı; PusulaPDF sahiplik/Premium kontrolü ve puan RPC server doğrulaması sertleştirildi. Kalan authenticated SECURITY DEFINER RPC'ler bilinçli, kullanıcı-sınırlı gateway olarak belgelendi.
 
@@ -59,14 +60,15 @@ Son kontrol: 2026-10-06
 
 - [x] Türkçe mağaza listeleme metinleri hazırlandı (`docs/STORE_LISTING_TR_2026-10-06.md`).
 - [x] Store submission adım adım checklist hazırlandı (`docs/STORE_SUBMISSION_CHECKLIST_2026-10-06.md`).
+- [x] App Store Privacy + Google Play Data Safety cevap taslağı hazırlandı (`docs/STORE_PRIVACY_DECLARATIONS_2026-10-06.md`).
+- [x] KVKK Aydınlatma Metni release taslağı hazırlandı (`docs/KVKK_AYDINLATMA_METNI_2026-10-06.md`).
 
 ## Mağaza yayını için kalan gerçek bloklayıcılar
 
 - [ ] Apple Developer / App Store Connect üzerinde gerçek uygulama kaydı, Bundle ID, sertifika/provisioning ve imzalı archive/TestFlight akışı tamamlanmalı.
 - [ ] Google Play Console üzerinde gerçek uygulama kaydı, signing/upload key ve imzalı AAB üretimi tamamlanmalı.
 - [ ] RevenueCat ürünleri App Store Connect ve Google Play ürün kimlikleriyle production ortamında eşleştirilmeli ve gerçek sandbox/test satın alımı doğrulanmalı.
-- [x] App Store Privacy + Google Play Data Safety cevap taslağı gerçek uygulama/SDK veri akışlarıyla hazırlandı (`docs/STORE_PRIVACY_DECLARATIONS_2026-10-06.md`). Console'da Publish/Submit Apple/Google hesap adımları açılınca yapılacak.
-- [ ] KVKK Aydınlatma Metni gerçek veri sorumlusu kimlik/iletişim bilgileriyle tamamlanmalı ve uygulama içinden erişilebilir hale getirilmeli. Kullanım Koşulları abonelik ekranından erişilebilir durumda.
+- [ ] KVKK/Privacy/Terms içindeki işletmeci kimliği ve kalıcı iletişim alanları gerçek bilgilerle tamamlanmalı; public KVKK sayfası yayınlanmalı.
 - [ ] En az bir gerçek Android ve bir gerçek iOS cihazda oturumlu uçtan uca smoke turu yapılmalı.
 - [ ] Push notification gerçek cihaz tokenı ile arka plan/kapalı uygulama senaryosunda doğrulanmalı.
 - [ ] Rewarded ve interstitial reklamlar gerçek cihazda TEST reklamlarıyla akış bazında doğrulanmalı.
@@ -102,4 +104,4 @@ Son kontrol: 2026-10-06
 
 Teknik web beta ve native CI açısından **GO**.
 
-Halka açık App Store / Google Play ticari yayını için kod tarafındaki ana köprüler hazırdır; kalan kritik işler artık ağırlıklı olarak **mağaza imzalama/console kurulumu, hukuki kimlik metinleri ve gerçek cihaz sandbox smoke testleri**dir.
+Halka açık App Store / Google Play ticari yayını için kod tarafındaki ana köprüler hazırdır; kalan kritik işler artık ağırlıklı olarak **mağaza imzalama/console kurulumu, gerçek kimlik/iletişimle hukuki final ve gerçek cihaz sandbox smoke testleri**dir.
