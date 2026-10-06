@@ -9818,7 +9818,7 @@ export function HomeInlineLayerMap({
             className="tp-map-control-btn tp-map-history-label tp-map-satellite-history-control"
             onClick={() =>
               void (async () => {
-                if (entitlement.effectivePlan !== 'premium') {
+                if (entitlement.effectivePlan === 'free') {
                   await maybeShowFreeInterstitial('satellite_history');
                 }
 
