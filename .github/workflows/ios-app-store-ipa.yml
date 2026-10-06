@@ -50,16 +50,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate signing secrets
+      - name: Resolve signing mode
         shell: bash
         run: |
           set -euo pipefail
-          for name in \
-            IOS_DISTRIBUTION_P12_B64 \
-            IOS_DISTRIBUTION_P12_PASSWORD \
-            IOS_APP_STORE_PROFILE_B64 \
-            APPLE_TEAM_ID \
-            VITE_REVENUECAT_IOS_PUBLIC_KEY
+
+          for name in APPLE_TEAM_ID VITE_REVENUECAT_IOS_PUBLIC_KEY
           do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub secret for $name"
@@ -67,21 +63,66 @@ jobs:
             fi
           done
 
-      - name: Validate App Store Connect upload secrets
-        if: ${{ inputs.upload_to_testflight }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          MANUAL_READY=true
+          for name in \
+            IOS_DISTRIBUTION_P12_B64 \
+            IOS_DISTRIBUTION_P12_PASSWORD \
+            IOS_APP_STORE_PROFILE_B64
+          do
+            if [ -z "${!name:-}" ]; then
+              MANUAL_READY=false
+            fi
+          done
+
+          API_READY=true
           for name in \
             APP_STORE_CONNECT_API_KEY_ID \
             APP_STORE_CONNECT_API_ISSUER_ID \
             APP_STORE_CONNECT_API_KEY_P8_B64
           do
             if [ -z "${!name:-}" ]; then
-              echo "::error::TestFlight upload requested but GitHub secret $name is missing"
-              exit 1
+              API_READY=false
             fi
           done
+
+          if [ "$MANUAL_READY" = true ]; then
+            echo "IOS_SIGNING_MODE=manual" >> "$GITHUB_ENV"
+            echo "Using manual Apple Distribution certificate + provisioning profile."
+          elif [ "$API_READY" = true ]; then
+            echo "IOS_SIGNING_MODE=automatic" >> "$GITHUB_ENV"
+            echo "Using App Store Connect API key with Xcode automatic signing."
+          else
+            echo "::error::No complete iOS signing method is configured."
+            echo "::error::Provide either the P12/profile secrets or the App Store Connect API key trio."
+            exit 1
+          fi
+
+          if [ "${{ inputs.upload_to_testflight }}" = "true" ] && [ "$API_READY" != true ]; then
+            echo "::error::TestFlight upload requires the App Store Connect API key trio."
+            exit 1
+          fi
+
+      - name: Prepare App Store Connect API key
+        if: ${{ env.IOS_SIGNING_MODE == 'automatic' || inputs.upload_to_testflight }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASC_KEY_PATH="$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          export ASC_KEY_PATH
+
+          python3 - <<'PY'
+          import base64
+          import os
+
+          raw = os.environ.get("APP_STORE_CONNECT_API_KEY_P8_B64", "")
+          if not raw:
+              raise SystemExit("missing APP_STORE_CONNECT_API_KEY_P8_B64")
+          with open(os.environ["ASC_KEY_PATH"], "wb") as fh:
+              fh.write(base64.b64decode(raw))
+          PY
+
+          chmod 600 "$ASC_KEY_PATH"
+          echo "ASC_KEY_PATH=$ASC_KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -93,6 +134,7 @@ jobs:
         run: npm ci
 
       - name: Install Apple distribution certificate and provisioning profile
+        if: ${{ env.IOS_SIGNING_MODE == 'manual' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -186,12 +228,46 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf build-ios-appstore
-          xcodebuild             -project ios/App/App.xcodeproj             -scheme App             -configuration Release             -destination 'generic/platform=iOS'             -archivePath build-ios-appstore/TarlaPusula.xcarchive             DEVELOPMENT_TEAM="$APPLE_TEAM_ID"             CODE_SIGN_STYLE=Manual             CODE_SIGN_IDENTITY="Apple Distribution"             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"             MARKETING_VERSION="$IOS_VERSION_NAME"             CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER"             archive
+
+          if [ "$IOS_SIGNING_MODE" = "manual" ]; then
+            xcodebuild \
+              -project ios/App/App.xcodeproj \
+              -scheme App \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath build-ios-appstore/TarlaPusula.xcarchive \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CODE_SIGN_STYLE=Manual \
+              CODE_SIGN_IDENTITY="Apple Distribution" \
+              PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+              MARKETING_VERSION="$IOS_VERSION_NAME" \
+              CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
+              archive
+          else
+            xcodebuild \
+              -project ios/App/App.xcodeproj \
+              -scheme App \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath build-ios-appstore/TarlaPusula.xcarchive \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CODE_SIGN_STYLE=Automatic \
+              MARKETING_VERSION="$IOS_VERSION_NAME" \
+              CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath "$ASC_KEY_PATH" \
+              -authenticationKeyID "$APP_STORE_CONNECT_API_KEY_ID" \
+              -authenticationKeyIssuerID "$APP_STORE_CONNECT_API_ISSUER_ID" \
+              archive
+          fi
 
       - name: Create export options
         shell: bash
         run: |
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          set -euo pipefail
+
+          if [ "$IOS_SIGNING_MODE" = "manual" ]; then
+            cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -214,13 +290,48 @@ jobs:
           </dict>
           </plist>
           EOF
+          else
+            cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+          fi
 
       - name: Export signed IPA
         shell: bash
         run: |
           set -euo pipefail
           rm -rf build-ios-export
-          xcodebuild             -exportArchive             -archivePath build-ios-appstore/TarlaPusula.xcarchive             -exportPath build-ios-export             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+          if [ "$IOS_SIGNING_MODE" = "manual" ]; then
+            xcodebuild \
+              -exportArchive \
+              -archivePath build-ios-appstore/TarlaPusula.xcarchive \
+              -exportPath build-ios-export \
+              -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+          else
+            xcodebuild \
+              -exportArchive \
+              -archivePath build-ios-appstore/TarlaPusula.xcarchive \
+              -exportPath build-ios-export \
+              -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath "$ASC_KEY_PATH" \
+              -authenticationKeyID "$APP_STORE_CONNECT_API_KEY_ID" \
+              -authenticationKeyIssuerID "$APP_STORE_CONNECT_API_ISSUER_ID"
+          fi
 
       - name: Verify signed IPA
         shell: bash
@@ -248,22 +359,9 @@ jobs:
           test -n "$IPA_PATH"
 
           ASC_KEY_DIR="$HOME/.appstoreconnect/private_keys"
-          ASC_KEY_PATH="$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
           mkdir -p "$ASC_KEY_DIR"
-          export ASC_KEY_PATH
-
-          python3 - <<'PY'
-          import base64
-          import os
-
-          raw = os.environ.get("APP_STORE_CONNECT_API_KEY_P8_B64", "")
-          if not raw:
-              raise SystemExit("missing APP_STORE_CONNECT_API_KEY_P8_B64")
-          with open(os.environ["ASC_KEY_PATH"], "wb") as fh:
-              fh.write(base64.b64decode(raw))
-          PY
-
-          chmod 600 "$ASC_KEY_PATH"
+          cp "$ASC_KEY_PATH" "$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          chmod 600 "$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
 
           xcrun altool \
             --upload-app \
@@ -292,6 +390,9 @@ jobs:
           rm -f "$RUNNER_TEMP/ExportOptions.plist"
           if [ -n "${APP_STORE_CONNECT_API_KEY_ID:-}" ]; then
             rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          fi
+          if [ -n "${ASC_KEY_PATH:-}" ]; then
+            rm -f "$ASC_KEY_PATH"
           fi
           if [ -n "${KEYCHAIN_PATH:-}" ]; then
             security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
