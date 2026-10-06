@@ -19,6 +19,7 @@ Son kontrol: 2026-10-06
 - [x] iOS legacy armv7 cihaz kısıtı kaldırıldı; export compliance beyanı Info.plist içinde tanımlı.
 - [x] İlk App Store sürümü gereksiz iPad/landscape inceleme yüzeyini azaltmak için iPhone + portrait hedefiyle sınırlandı.
 - [x] Signed iOS workflow provisioning profile ve final IPA içinde Sign in with Apple entitlement'ını doğruluyor.
+- [x] TestFlight upload otomasyonu hazır: App Store Connect API key sağlandığında verified IPA doğrudan App Store Connect'e yüklenebilir.
 
 ## Para kazanma ve abonelik
 
