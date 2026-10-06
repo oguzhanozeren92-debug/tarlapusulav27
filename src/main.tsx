@@ -18,6 +18,7 @@ import './styles/HomeFieldsSheetWhiteAccent.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 import { installNativeFeedback } from './mobile/nativeFeedback';
+import NativePushBridge from './mobile/NativePushBridge';
 
 const nativePlatform = Capacitor.getPlatform();
 if (Capacitor.isNativePlatform()) {
@@ -43,6 +44,7 @@ createRoot(document.getElementById('root')!).render(
       <AdminUiRuntime />
       <AppNotificationBridge />
       <AppActivityTracker />
+      <NativePushBridge />
       <InAppAdminMode />
       <PusulaPointsCelebration />
       <PlanUpgradeModal />
