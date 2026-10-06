@@ -184,7 +184,7 @@ function estimateNdviFromImage(src: string): Promise<ImageNdviEstimate | null> {
 export default function SatelliteHistorySheet(props: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const entitlement = useEntitlementStore();
-  const isPremium = entitlement.isPremium;
+  const hasAdvancedHistory = entitlement.effectivePlan !== 'free';
 
   const [compareMode, setCompareMode] = useState(false);
   const [freePreviewDate, setFreePreviewDate] = useState<string | null>(null);
@@ -198,12 +198,12 @@ export default function SatelliteHistorySheet(props: Props) {
 
   const currentDate = props.dates[0] ?? null;
   const activeDate =
-    !isPremium && freePreviewDate
+    !hasAdvancedHistory && freePreviewDate
       ? freePreviewDate
       : props.selectedDate ?? currentDate;
   const activeImage = activeDate ? getSatelliteHistoryPreview(activeDate) : null;
   const isFreeHistoricalPreview =
-    !isPremium &&
+    !hasAdvancedHistory &&
     Boolean(activeDate) &&
     Boolean(currentDate) &&
     activeDate !== currentDate;
@@ -257,13 +257,13 @@ export default function SatelliteHistorySheet(props: Props) {
   }, [props.open]);
 
   useEffect(() => {
-    if (isPremium) {
+    if (hasAdvancedHistory) {
       setFreePreviewDate(null);
     } else {
       setCompareMode(false);
       setCompareDates([]);
     }
-  }, [isPremium]);
+  }, [hasAdvancedHistory]);
 
   useEffect(() => {
     setZoom(1);
@@ -284,7 +284,7 @@ export default function SatelliteHistorySheet(props: Props) {
     let cancelled = false;
 
     async function loadMetrics() {
-      if (!isPremium || !props.getHistoryData) return;
+      if (!hasAdvancedHistory || !props.getHistoryData) return;
       const targets = compareMode ? compareDates.filter(Boolean) : activeDate ? [activeDate] : [];
       const missing = targets.filter((date) => !(date in metricsByDate));
 
@@ -369,7 +369,7 @@ export default function SatelliteHistorySheet(props: Props) {
   const resetZoom = () => setZoom(1);
 
   const toggleCompareMode = () => {
-    if (!isPremium) {
+    if (!hasAdvancedHistory) {
       const teaserDate = props.dates.find((date) => date !== currentDate) ?? null;
       if (teaserDate) {
         requestPreview(teaserDate);
@@ -400,7 +400,7 @@ export default function SatelliteHistorySheet(props: Props) {
   };
 
   const selectDate = (date: string, index: number) => {
-    if (!isPremium) {
+    if (!hasAdvancedHistory) {
       requestPreview(date);
       setFreePreviewDate(index === 0 ? null : date);
       setHistoryListOpen(false);
@@ -534,13 +534,13 @@ export default function SatelliteHistorySheet(props: Props) {
         <span>Son 180 gün</span>
         <button
           type="button"
-          className={`tp-satellite-compare-toggle ${compareMode ? 'active' : ''} ${!isPremium ? 'is-free-locked' : ''}`}
+          className={`tp-satellite-compare-toggle ${compareMode ? 'active' : ''} ${!hasAdvancedHistory ? 'is-free-locked' : ''}`}
           onClick={toggleCompareMode}
-          aria-disabled={!isPremium}
-          title={!isPremium ? 'Karşılaştırma Premium planda açılır' : undefined}
+          aria-disabled={!hasAdvancedHistory}
+          title={!hasAdvancedHistory ? 'Karşılaştırma Premium planda açılır' : undefined}
         >
-          {!isPremium ? <Lock size={13} /> : <GitCompareArrows size={15} />}
-          {!isPremium
+          {!hasAdvancedHistory ? <Lock size={13} /> : <GitCompareArrows size={15} />}
+          {!hasAdvancedHistory
             ? 'Premium karşılaştırma'
             : compareMode
               ? 'Kapat'
@@ -548,7 +548,7 @@ export default function SatelliteHistorySheet(props: Props) {
         </button>
       </div>
 
-      {!isPremium ? (
+      {!hasAdvancedHistory ? (
         <aside className="tp-satellite-free-preview-note" aria-label="Ücretsiz uydu geçmişi önizlemesi">
           <span className="tp-satellite-free-preview-icon" aria-hidden="true">
             <Lock size={15} />
@@ -756,7 +756,7 @@ export default function SatelliteHistorySheet(props: Props) {
               aria-controls="tp-satellite-history-date-list"
             >
               <span>
-                {!isPremium
+                {!hasAdvancedHistory
                   ? 'Geçmiş görüntüler · önizleme'
                   : compareMode
                     ? 'Tarihleri seç'
@@ -768,7 +768,7 @@ export default function SatelliteHistorySheet(props: Props) {
             <span>
               {historyListOpen
                 ? `${props.dates.length} tarih`
-                : !isPremium
+                : !hasAdvancedHistory
                   ? 'dokun · bulanık önizle'
                   : 'sağa kaydır'}
             </span>
@@ -800,9 +800,9 @@ export default function SatelliteHistorySheet(props: Props) {
                     : props.selectedDate
                       ? props.selectedDate === date
                       : isCurrent;
-                  const isFreeLockedDate = !isPremium && !isCurrent;
+                  const isFreeLockedDate = !hasAdvancedHistory && !isCurrent;
                   const isFreeTeaserSelected =
-                    !isPremium && freePreviewDate === date;
+                    !hasAdvancedHistory && freePreviewDate === date;
 
                   return (
                     <button
@@ -866,9 +866,9 @@ export default function SatelliteHistorySheet(props: Props) {
                   ? props.selectedDate === date
                   : isCurrent;
 
-              const isFreeLockedDate = !isPremium && !isCurrent;
+              const isFreeLockedDate = !hasAdvancedHistory && !isCurrent;
               const isFreeTeaserSelected =
-                !isPremium && freePreviewDate === date;
+                !hasAdvancedHistory && freePreviewDate === date;
 
               return (
                 <button
