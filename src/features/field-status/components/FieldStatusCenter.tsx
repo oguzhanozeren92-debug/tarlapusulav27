@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Activity,
@@ -119,6 +119,38 @@ const EMPTY_SIGNALS: FieldScientificSignals = {
   rscm: null,
   dataConfidence: null,
 };
+
+class PlantTabErrorBoundary extends Component<
+  { children: ReactNode; resetKey: string },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('[TarlaPusula] Bitki sekmesi render hatası:', error);
+  }
+
+  componentDidUpdate(prevProps: { children: ReactNode; resetKey: string }) {
+    if (this.state.failed && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ failed: false });
+    }
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="tp-field-status-empty error" role="alert">
+          Bitki verilerinden biri görüntülenemedi. Tarla kaydı korunuyor; sekmeyi kapatıp yeniden açabilir veya veriyi yenileyebilirsin.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const TABS: Array<{ key: FieldStatusTabKey; label: string }> = [
   { key: 'summary', label: 'Özet' },
@@ -2084,7 +2116,8 @@ export default function FieldStatusCenter({
           )}
 
           {tab === 'plant' && (
-            <div className="tp-field-status-stack">
+            <PlantTabErrorBoundary resetKey={`${fieldId}:${recordsRefreshNonce}:${String(phenology?.stage ?? '')}`}>
+              <div className="tp-field-status-stack">
               <section className="tp-field-status-section-head simple">
                 <div>
                   <span>BİTKİ DURUMU</span>
@@ -2227,7 +2260,8 @@ export default function FieldStatusCenter({
                 </div>
               </details>
 
-            </div>
+              </div>
+            </PlantTabErrorBoundary>
           )}
 
           {tab === 'crop' && (
