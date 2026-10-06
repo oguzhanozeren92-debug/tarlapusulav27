@@ -4,6 +4,12 @@ import { supabase } from '../../../supabaseClient';
 import { urlBase64ToUint8Array } from '../../../utils/fileUtils';
 import { calendarLocalDate } from '../services/weeklyFieldPlan';
 import type { CalendarReminder, Field, Screen } from '../../../types';
+import {
+  disableNativePushNotifications,
+  enableNativePushNotifications,
+  getNativePushStatus,
+  isNativePushPlatform,
+} from '../../../mobile/nativePush';
 
 type UseCalendarControllerOptions = {
   realFields: Field[];
@@ -61,6 +67,28 @@ export function useCalendarController({
   };
 
   const checkPushNotificationStatus = async () => {
+    if (isNativePushPlatform()) {
+      try {
+        const status = await getNativePushStatus();
+        setPushSupported(status.supported);
+        setPushEnabled(status.enabled);
+
+        if (status.permission === 'denied') {
+          setPushMessage(
+            'Bildirim izni telefonda kapalı. Ayarlar → TarlaPusula → Bildirimler bölümünden açabilirsin.',
+          );
+        } else if (status.permission === 'granted') {
+          setPushMessage('Telefon bildirimleri açık.');
+        } else {
+          setPushMessage('');
+        }
+      } catch (error) {
+        console.warn('Native bildirim durumu kontrol edilemedi:', error);
+        setPushEnabled(false);
+      }
+      return;
+    }
+
     const supported =
       'serviceWorker' in navigator &&
       'PushManager' in window &&
@@ -99,6 +127,16 @@ export function useCalendarController({
     setPushMessage('');
 
     try {
+      if (isNativePushPlatform()) {
+        await enableNativePushNotifications();
+        setPushSupported(true);
+        setPushEnabled(true);
+        setPushMessage(
+          'Telefon bildirimleri açık. Tarla, hava, uydu ve Pusula uyarıları cihazına gelebilir.',
+        );
+        return;
+      }
+
       const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY?.trim();
       if (!vapidPublicKey) {
         setPushEnabled(false);
@@ -173,6 +211,13 @@ export function useCalendarController({
     setPushMessage('');
 
     try {
+      if (isNativePushPlatform()) {
+        await disableNativePushNotifications();
+        setPushEnabled(false);
+        setPushMessage('Telefon bildirimleri kapatıldı.');
+        return;
+      }
+
       const registration = await navigator.serviceWorker.getRegistration();
       const subscription = await registration?.pushManager.getSubscription();
 
