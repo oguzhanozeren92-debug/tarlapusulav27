@@ -99,7 +99,6 @@ function cardFeatures(plan: 'free' | 'plus' | 'premium') {
       'Gelişmiş Pusula AI',
       'Sulama optimizasyonu',
       'Gelişmiş bildirimler ve raporlar',
-      'Gelişmiş widget',
       'Kuru Tarım',
     ];
   }
