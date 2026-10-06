@@ -54,9 +54,11 @@ export default function AppShell({
   const shellTitle =
     screen === 'pestGuideHub'
       ? 'Bilgi Rehberi'
-      : menuItems.find(
-          (item) => String(item.screen) === String(screen),
-        )?.label ?? null;
+      : screen === 'calendar'
+        ? 'Takvim'
+        : menuItems.find(
+            (item) => String(item.screen) === String(screen),
+          )?.label ?? null;
 
   return (
     <>
