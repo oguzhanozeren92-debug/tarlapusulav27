@@ -311,7 +311,7 @@ export default function SatelliteHistorySheet(props: Props) {
     activeDate,
     compareDates,
     compareMode,
-    isPremium,
+    hasAdvancedHistory,
     metricsByDate,
     props.getHistoryData,
   ]);
