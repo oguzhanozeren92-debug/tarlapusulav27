@@ -330,3 +330,27 @@ html.tp-native-app [role='button'] {
     transform: translateX(-50%) scale(.94) !important;
   }
 }
+
+
+/* =========================================================
+   NATIVE MOBILE REVISION V3
+   Klavye açıldığında sabit alt navigasyonu klavyenin arkasına bindirme.
+   ========================================================= */
+html.tp-native-app {
+  --tp-native-keyboard-height: 0px;
+}
+
+html.tp-native-app.tp-native-keyboard-open body .tp-v1 .tp-bottom,
+html.tp-native-app.tp-native-keyboard-open body .tp-field-detail-page .tp-field-detail-bottom,
+html.tp-native-app.tp-native-keyboard-open body .bottomNav {
+  display: none !important;
+}
+
+html.tp-native-app.tp-native-keyboard-open body {
+  min-height: calc(100dvh - var(--tp-native-keyboard-height));
+}
+
+html.tp-native-app.tp-native-keyboard-open
+  :is(input, textarea, select):focus {
+  scroll-margin-bottom: 28px;
+}
