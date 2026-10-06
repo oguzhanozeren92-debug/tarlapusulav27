@@ -38,12 +38,12 @@ Son güncelleme: 2026-10-06
 
 - [x] Apple Developer Program membership ACTIVE; valid through 06 Oct 2027.
 
-1. Certificates, Identifiers & Profiles → Identifiers
-2. App ID / Explicit Bundle ID: `com.tarlapusula.app`
-3. Capabilities:
-   - Push Notifications
-   - Sign in with Apple
-   - In-App Purchase
+1. [x] Certificates, Identifiers & Profiles → Identifiers
+2. [x] App ID / Explicit Bundle ID: `com.tarlapusula.app`
+3. [x] Capabilities:
+   - [x] Push Notifications
+   - [x] Sign in with Apple
+   - [x] In-App Purchase
 4. Sign in with Apple provider configuration
 5. App Store Connect app record oluştur
 6. Apple Distribution certificate üret
