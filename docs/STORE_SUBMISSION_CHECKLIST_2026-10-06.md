@@ -129,7 +129,7 @@ Kod/repo tarafında hukuki metnin gövdesi hazırdır. Halka açık ticari yayı
 
 - [x] `public/app-ads.txt` oluşturuldu.
 - [x] Publisher ID: `pub-9321324588059191`
-- [ ] Production deploy sonrası `https://tarlapusulav27.vercel.app/app-ads.txt` HTTP 200 doğrula.
+- [x] `https://tarlapusulav27.vercel.app/app-ads.txt` production HTTP 200 doğrulandı.
 - [ ] App Store / Google Play developer website alanında TarlaPusula web domainini kullan.
 - [ ] Uygulama mağazada listelendikten sonra AdMob → app-ads.txt durumunu Verified olarak kontrol et.
 
@@ -138,12 +138,8 @@ Kod/repo tarafında hukuki metnin gövdesi hazırdır. Halka açık ticari yayı
 - [x] privacy-policy.html production 200
 - [x] terms-of-use.html production 200
 - [x] account-deletion production 200
-- [ ] support.html production 200
-  - Repo source hazır.
-  - 2026-10-06: Hobby günlük 100 deployment limiti doldu.
-  - Limit reset sonrası latest main production deploy + HTTP 200 kontrolü.
-- [ ] kvkk-aydinlatma.html production 200
-  - Repo source hazır; production deployment doğrulaması bekliyor.
+- [x] support.html production 200 doğrulandı.
+- [x] kvkk-aydinlatma.html production 200 doğrulandı.
 
 ## H. Release gate
 
@@ -158,5 +154,5 @@ Public release **GO** ancak aşağıdakilerin tamamı geçince:
 - Sign in with Apple production login
 - Privacy/Data Safety forms
 - Legal identity/contact final ✓
-- KVKK public page + legal cross-links (source ✓, production 200 pending)
-- Support URL 200
+- KVKK public page + legal cross-links ✓
+- Support URL 200 ✓
