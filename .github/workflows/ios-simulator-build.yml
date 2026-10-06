@@ -18,6 +18,8 @@ permissions:
 jobs:
   ios:
     runs-on: macos-15
+    env:
+      VITE_ADMOB_TEST_MODE: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
