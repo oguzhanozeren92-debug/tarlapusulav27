@@ -1,28 +1,15 @@
-# TarlaPusula — KVKK Aydınlatma Metni Taslağı
+# TarlaPusula — KVKK Aydınlatma Metni
 
 Son güncelleme: 2026-10-06
-
-> Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamındaki aydınlatma yükümlülüğü için TarlaPusula'nın mevcut uygulama/veri akışına göre hazırlanmış yayın öncesi taslaktır.
-> **Halka açık yayından önce aşağıdaki kimlik/iletişim alanları gerçek bilgilerle doldurulmalıdır.**
-> Bu dosya hukuki danışmanlık yerine geçmez; ticari yayın öncesinde gerektiğinde hukuk danışmanı tarafından son kez gözden geçirilmelidir.
-
-## Yayın öncesi doldurulacak alanlar
-
-- Veri sorumlusu gerçek kişi / ticari unvan: `__DATA_CONTROLLER_NAME__`
-- KVKK ve gizlilik iletişim e-postası: `__PRIVACY_EMAIL__`
-- İletişim / tebligat adresi (varsa): `__CONTACT_ADDRESS__`
-
----
 
 # KVKK Aydınlatma Metni
 
 ## 1. Veri sorumlusu
 
-6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel verileriniz, TarlaPusula hizmetinin işletmecisi ve veri sorumlusu **__DATA_CONTROLLER_NAME__** tarafından aşağıda açıklanan kapsamda işlenebilir.
+6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel verileriniz, TarlaPusula hizmetinin işletmecisi ve veri sorumlusu **Oğuzhan Özeren** tarafından aşağıda açıklanan kapsamda işlenebilir.
 
 Kişisel veri ve gizlilik talepleri için iletişim:
-- E-posta: **__PRIVACY_EMAIL__**
-- Adres: **__CONTACT_ADDRESS__**
+- E-posta: **tarlapusula@gmail.com**
 
 ## 2. İşlenen kişisel veri kategorileri
 
@@ -127,7 +114,7 @@ haklarına sahipsiniz.
 
 ## 10. Başvuru yöntemi
 
-KVKK kapsamındaki taleplerinizi kimliğinizi doğrulamaya elverişli bilgilerle birlikte **__PRIVACY_EMAIL__** adresine veya yukarıda belirtilen iletişim kanalına iletebilirsiniz.
+KVKK kapsamındaki taleplerinizi kimliğinizi doğrulamaya elverişli bilgilerle birlikte **tarlapusula@gmail.com** adresine veya yukarıda belirtilen iletişim kanalına iletebilirsiniz.
 
 Başvurular, 6698 sayılı Kanun ve Veri Sorumlusuna Başvuru Usul ve Esasları Hakkında Tebliğ kapsamındaki usul ve sürelerde değerlendirilir.
 
