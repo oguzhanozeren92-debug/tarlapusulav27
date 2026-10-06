@@ -34,7 +34,9 @@ Son güncelleme: 2026-10-06
 - [x] Turkish store listing copy draft
 - [x] KVKK Aydınlatma Metni release taslağı (`docs/KVKK_AYDINLATMA_METNI_2026-10-06.md`)
 
-## B. Apple membership ACTIVE olur olmaz
+## B. Apple membership — ACTIVE (06 Oct 2026)
+
+- [x] Apple Developer Program membership ACTIVE; valid through 06 Oct 2027.
 
 1. Certificates, Identifiers & Profiles → Identifiers
 2. App ID / Explicit Bundle ID: `com.tarlapusula.app`
