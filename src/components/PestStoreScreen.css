@@ -3359,20 +3359,12 @@
   justify-content:center;
   overflow:hidden;
   isolation:isolate;
+  background:transparent!important;
 }
 
 .tp-depot-v4-sheet-layer::before{
-  content:'';
-  position:absolute;
-  inset:-28px;
-  z-index:0;
-  background:
-    linear-gradient(rgba(12,14,15,.30),rgba(12,14,15,.44)),
-    url('https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/depot-icons/warehouse.webp') center 42% / cover no-repeat;
-  filter:blur(18px) saturate(.72) brightness(.72);
-  transform:scale(1.10);
-  opacity:.92;
-  pointer-events:none;
+  content:none!important;
+  display:none!important;
 }
 
 .tp-depot-v4-sheet-backdrop{
@@ -3380,9 +3372,9 @@
   inset:0;
   z-index:1;
   border:0;
-  background:rgba(12,14,15,.34);
-  -webkit-backdrop-filter:blur(10px) saturate(.78);
-  backdrop-filter:blur(10px) saturate(.78);
+  background:rgba(12,14,15,.22)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(.82) brightness(.82)!important;
+  backdrop-filter:blur(14px) saturate(.82) brightness(.82)!important;
 }
 
 .tp-depot-v4-sheet{
