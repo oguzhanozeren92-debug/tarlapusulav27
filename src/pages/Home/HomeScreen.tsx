@@ -1707,8 +1707,12 @@ export default function HomeScreen(props: HomeScreenProps) {
                   type="button"
                   className="tp-field-gate-points"
                   onClick={() => {
+                    // Puan modalını aynı kullanıcı etkileşimi içinde aç.
+                    // Özellikle mobil Safari'de modal kapat -> setTimeout ->
+                    // modal aç zinciri kaybolabildiği için iki state'i tek
+                    // render döngüsünde değiştiriyoruz.
+                    setPointsOpen(true);
                     setFieldGateNotice(null);
-                    window.setTimeout(() => setPointsOpen(true), 0);
                   }}
                 >
                   Puanlarımı Gör
