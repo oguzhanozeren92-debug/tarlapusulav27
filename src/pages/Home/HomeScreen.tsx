@@ -287,6 +287,90 @@ export default function HomeScreen(props: HomeScreenProps) {
   }, [fieldKey]);
 
   const [operationQuestionVisible, setOperationQuestionVisible] = useState(false);
+
+  useEffect(() => {
+    const handleNativeBack = (event: Event) => {
+      const detail =
+        (event as CustomEvent<{ handled?: boolean }>).detail ?? {};
+
+      if (detail.handled) return;
+
+      if (fieldStatusOpen) {
+        detail.handled = true;
+        setFieldStatusOpen(false);
+        return;
+      }
+
+      if (irrigationRecordOpen) {
+        detail.handled = true;
+        setIrrigationRecordOpen(false);
+        return;
+      }
+
+      if (fieldsSheetOpen) {
+        detail.handled = true;
+        setFieldsSheetOpen(false);
+        return;
+      }
+
+      if (quickSheet) {
+        detail.handled = true;
+        setQuickSheet(null);
+        return;
+      }
+
+      if (tasksOpen) {
+        detail.handled = true;
+        setTasksOpen(false);
+        return;
+      }
+
+      if (pointsOpen) {
+        detail.handled = true;
+        setPointsOpen(false);
+        return;
+      }
+
+      if (soilMenuOpen) {
+        detail.handled = true;
+        setSoilMenuOpen(false);
+        return;
+      }
+
+      if (climateMenuOpen) {
+        detail.handled = true;
+        setClimateMenuOpen(false);
+        return;
+      }
+
+      if (operationQuestionVisible) {
+        detail.handled = true;
+        setOperationQuestionVisible(false);
+      }
+    };
+
+    window.addEventListener(
+      'tp:native-back',
+      handleNativeBack as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'tp:native-back',
+        handleNativeBack as EventListener,
+      );
+    };
+  }, [
+    fieldStatusOpen,
+    irrigationRecordOpen,
+    fieldsSheetOpen,
+    quickSheet,
+    tasksOpen,
+    pointsOpen,
+    soilMenuOpen,
+    climateMenuOpen,
+    operationQuestionVisible,
+  ]);
   const homeIrrigation = useHomeIrrigationDecision(homeField);
   const homeNutrient = useHomeNutrientContext(homeField);
   const homePhenology = useHomePhenologyInsight(homeField);
