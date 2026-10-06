@@ -34,6 +34,7 @@ declare global {
 
 export type RewardedAdClaimResult = {
   ok: boolean;
+  pending?: boolean;
   awarded: boolean;
   awardedPoints: number;
   reason: string;
@@ -284,31 +285,51 @@ async function runAd(kind: 'rewarded' | 'interstitial', placement: AdPlacement) 
   return { completed: false, shown: false } satisfies BridgeAdResult;
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 async function claimAdReward(placement: AdPlacement, ad: BridgeAdResult) {
   if (!ad.completed || !ad.provider || !ad.transactionId) {
     return null;
   }
 
-  const { data, error } = await supabase.functions.invoke<RewardedAdClaimResult>(
-    'rewarded-ad-claim',
-    {
-      body: {
-        placement,
-        provider: ad.provider,
-        transactionId: ad.transactionId,
-        verificationPayload: ad.verificationPayload ?? {},
-        metadata: {
-          source: 'tarlapusula_ad_runtime',
+  const attempts = ad.provider === 'admob_ssv' ? 9 : 1;
+  let lastData: RewardedAdClaimResult | null = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const { data, error } = await supabase.functions.invoke<RewardedAdClaimResult>(
+      'rewarded-ad-claim',
+      {
+        body: {
+          placement,
+          provider: ad.provider,
+          transactionId: ad.transactionId,
+          verificationPayload: ad.verificationPayload ?? {},
+          metadata: {
+            source: 'tarlapusula_ad_runtime',
+          },
         },
       },
-    },
-  );
+    );
 
-  if (error) throw error;
-  if (!data?.ok) {
-    throw new Error((data as any)?.error ?? 'Reklam ödülü doğrulanamadı.');
+    if (error) throw error;
+    if (!data?.ok) {
+      throw new Error((data as any)?.error ?? 'Reklam ödülü doğrulanamadı.');
+    }
+
+    lastData = data;
+
+    if (!data.pending) {
+      return data;
+    }
+
+    if (attempt < attempts - 1) {
+      await delay(700);
+    }
   }
-  return data;
+
+  return lastData;
 }
 
 export async function showRewardedAdAndClaim(placement: AdPlacement) {
@@ -358,15 +379,11 @@ export async function maybeShowFreeInterstitial(placement: AdPlacement) {
     lastAt: Date.now(),
   });
 
-  if (!ad.completed) {
-    return { shown: true, rewarded: false };
-  }
-
-  try {
-    const claim = await claimAdReward(placement, ad);
-    return { shown: true, rewarded: Boolean(claim?.awarded), claim };
-  } catch (error) {
-    console.warn('[TarlaPusula Ads] Reklam tamamlandı fakat puan ödülü işlenemedi:', error);
-    return { shown: true, rewarded: false };
-  }
+  // Interstitial reklam puan kazandırmaz. Puan yalnız kullanıcının
+  // isteyerek başlattığı rewarded reklam + doğrulanmış SSV ile verilir.
+  return {
+    shown: true,
+    rewarded: false,
+    completed: Boolean(ad.completed),
+  };
 }
