@@ -93,6 +93,7 @@ jobs:
           PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/profile.plist")
           PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/profile.plist")
           PROFILE_APS=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$RUNNER_TEMP/profile.plist" 2>/dev/null || true)
+          PROFILE_APPLE_SIGNIN=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.applesignin:0' "$RUNNER_TEMP/profile.plist" 2>/dev/null || true)
 
           if [ "$PROFILE_TEAM" != "$APPLE_TEAM_ID" ]; then
             echo "::error::Provisioning profile Team ID does not match APPLE_TEAM_ID"
@@ -109,6 +110,11 @@ jobs:
 
           if [ "$PROFILE_APS" != "production" ]; then
             echo "::error::App Store provisioning profile must contain aps-environment=production"
+            exit 1
+          fi
+
+          if [ "$PROFILE_APPLE_SIGNIN" != "Default" ]; then
+            echo "::error::App Store provisioning profile must contain Sign in with Apple entitlement"
             exit 1
           fi
 
@@ -192,7 +198,9 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           codesign -d --entitlements :- "$APP_PATH" 2> "$RUNNER_TEMP/signed-entitlements.plist"
           APS_ENV=$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$RUNNER_TEMP/signed-entitlements.plist")
+          SIGNED_APPLE_SIGNIN=$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.applesignin:0' "$RUNNER_TEMP/signed-entitlements.plist" 2>/dev/null || true)
           test "$APS_ENV" = "production"
+          test "$SIGNED_APPLE_SIGNIN" = "Default"
 
       - name: Upload signed IPA
         uses: actions/upload-artifact@v4

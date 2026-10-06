@@ -17,6 +17,8 @@ Son kontrol: 2026-10-06
 - [x] Sign in with Apple uygulama kodu, entitlement ve Xcode capability hazır; gerçek Apple Developer provider yapılandırması üyelik aktivasyonunu bekliyor.
 - [x] iOS App Store release build APNs ortamı production olarak zorlanıyor.
 - [x] iOS legacy armv7 cihaz kısıtı kaldırıldı; export compliance beyanı Info.plist içinde tanımlı.
+- [x] İlk App Store sürümü gereksiz iPad/landscape inceleme yüzeyini azaltmak için iPhone + portrait hedefiyle sınırlandı.
+- [x] Signed iOS workflow provisioning profile ve final IPA içinde Sign in with Apple entitlement'ını doğruluyor.
 
 ## Para kazanma ve abonelik
 
@@ -46,6 +48,7 @@ Son kontrol: 2026-10-06
 - [x] Herkese açık mağaza Support URL adayı mevcut: `/support.html`.
 - [x] iOS Privacy Manifest mevcut.
 - [x] Supabase RLS ve güvenlik denetimleri düzenli çalıştırılabiliyor.
+- [x] Storage privacy audit tamamlandı: kullanıcı fotoğraf/rapor bucket'ları private ve sahiplik kontrollü; public bucket'lar uygulama/CMS assetleriyle sınırlı.
 - [x] 13 RLS/no-policy tablosu denetlendi: anon/authenticated CRUD yetkisi yok; service-role-only/internal kullanım doğrulandı.
 - [!] Supabase Auth leaked-password protection Free planda açılamıyor; Supabase Pro+ özelliği olduğu için mevcut planda yayın bloklayıcısı olarak değerlendirilmiyor.
 - [ ] KVKK Aydınlatma Metni, veri sorumlusunun gerçek kimlik/iletişim bilgileriyle yayımlanmalı.
