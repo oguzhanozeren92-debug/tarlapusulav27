@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { HomeDecisionEvent, HomeDecisionTarget } from '../../decision/types/homeDecision';
 import type { EarthSearchNdviStats } from '../../home-map/services/earthSearchNdvi.service';
+import { weakerRelativeNdviZones } from '../../home-map/services/relativeNdviZones';
 import { getNdviDisplayPercentages } from '../../home-map/utils/ndviPercentages';
 import KnowledgeQuickView from '../../knowledge/components/KnowledgeQuickView';
 import KnowledgeEvidenceSources from '../../knowledge/components/KnowledgeEvidenceSources';
@@ -1301,41 +1302,19 @@ type NdviRelativeWeakArea = {
   relativeHealth: number | null;
 };
 
-function relativeWeakVegetationAreas(result: any): NdviRelativeWeakArea[] {
-  const findings =
-    result?.context?.ndvi?.spatial?.findings;
+function relativeWeakVegetationAreas(
+  ndviStats: EarthSearchNdviStats | null | undefined,
+): NdviRelativeWeakArea[] {
+  if (!ndviStats) return [];
 
-  if (!Array.isArray(findings)) return [];
-
-  return findings
-    .map((finding: any): NdviRelativeWeakArea & { status: string } => ({
-      area: cleanText(finding?.area ?? finding?.direction),
-      mean: numberOrNull(finding?.ndvi?.mean),
-      fieldMean: numberOrNull(finding?.ndvi?.fieldMean),
-      delta: numberOrNull(finding?.ndvi?.deltaFromFieldMean),
-      relativeHealth: numberOrNull(finding?.ndvi?.relativeHealth),
-      status: cleanText(finding?.ndvi?.relativeStatus).toLocaleLowerCase('tr-TR'),
-    }))
-    .filter((item: any) => {
-      if (!item.area) return false;
-
-      // Yeni GeoBlaze akışında yalnızca anlamlı eşik aşılmış gerçek bölge farkı.
-      if (item.status) return item.status === 'weaker';
-
-      // Eski kayıtlarda geriye dönük uyumluluk.
-      return (
-        (item.delta != null && item.delta <= -0.04) ||
-        (item.delta == null && item.relativeHealth != null && item.relativeHealth < 0.32)
-      );
-    })
-    .sort((a: any, b: any) => {
-      if (a.delta != null && b.delta != null) return a.delta - b.delta;
-      return Number(a.relativeHealth ?? 0.5) - Number(b.relativeHealth ?? 0.5);
-    })
-    .slice(0, 3)
-    .map(({ status: _status, ...item }: any) => item);
+  return weakerRelativeNdviZones(ndviStats.relativeZones).map((zone) => ({
+    area: zone.area,
+    mean: numberOrNull(zone.mean),
+    fieldMean: numberOrNull(ndviStats.mean),
+    delta: numberOrNull(zone.deltaFromFieldMean),
+    relativeHealth: numberOrNull(zone.relativeHealth),
+  }));
 }
-
 
 
 function resolvedSpatialImportantArea(result: any) {
@@ -1750,8 +1729,8 @@ export default function HomeMapPusulaStrip({
   );
 
   const relativeWeakAreas = useMemo(
-    () => relativeWeakVegetationAreas(result),
-    [result],
+    () => relativeWeakVegetationAreas(ndviStats),
+    [ndviStats],
   );
 
   const compactText = useMemo(() => {
