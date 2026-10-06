@@ -103,6 +103,84 @@ export function useAuthOnboardingController({
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+
+    const finishNativeAuth = async () => {
+      setAuthLoading(true);
+      setAuthMessage('');
+
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError) throw userError;
+        if (!alive || !user) return;
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('onboarding_completed')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+        if (!alive) return;
+
+        if (profile?.onboarding_completed) {
+          setScreen('home');
+        } else {
+          startOnboarding();
+        }
+      } catch (error) {
+        if (!alive) return;
+        console.error('Native sosyal giriş tamamlanamadı:', error);
+        setAuthMessage(
+          error instanceof Error
+            ? error.message
+            : 'Sosyal giriş tamamlanamadı.',
+        );
+      } finally {
+        if (alive) setAuthLoading(false);
+      }
+    };
+
+    const handleComplete = () => {
+      void finishNativeAuth();
+    };
+
+    const handleError = (event: Event) => {
+      const detail =
+        (event as CustomEvent<{ message?: string }>).detail ?? {};
+      setAuthLoading(false);
+      setAuthMessage(
+        String(detail.message || 'Sosyal giriş tamamlanamadı.'),
+      );
+    };
+
+    window.addEventListener(
+      'tp:native-auth-complete',
+      handleComplete,
+    );
+    window.addEventListener(
+      'tp:native-auth-error',
+      handleError as EventListener,
+    );
+
+    return () => {
+      alive = false;
+      window.removeEventListener(
+        'tp:native-auth-complete',
+        handleComplete,
+      );
+      window.removeEventListener(
+        'tp:native-auth-error',
+        handleError as EventListener,
+      );
+    };
+  }, []);
+
   const saveOnboarding = async () => {
     if (isNewUserPreview) {
       setAuthMessage('');
