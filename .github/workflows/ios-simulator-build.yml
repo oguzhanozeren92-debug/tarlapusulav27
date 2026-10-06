@@ -12,6 +12,10 @@ on:
       - 'package-lock.json'
       - 'capacitor.config.ts'
 
+concurrency:
+  group: ios-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
