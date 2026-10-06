@@ -1,5 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import {
+  listNativePushUserIds,
+  sendNativePushToUser,
+} from "../_shared/nativePush.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,14 +38,11 @@ async function sendToUser(
     .eq("enabled", true);
 
   if (error) throw error;
-  if (!subscriptions?.length) {
-    return { sent: 0, failed: 0, noSubscriptions: true };
-  }
 
-  let sent = 0;
-  let failed = 0;
+  let webSent = 0;
+  let webFailed = 0;
 
-  for (const row of subscriptions) {
+  for (const row of subscriptions ?? []) {
     try {
       await webpush.sendNotification(
         row.subscription,
@@ -51,7 +52,7 @@ async function sendToUser(
           urgency: options.critical ? "high" : "normal",
         },
       );
-      sent++;
+      webSent++;
 
       await supabaseAdmin
         .from("push_subscriptions")
@@ -61,19 +62,40 @@ async function sendToUser(
         })
         .eq("id", row.id);
     } catch (error: any) {
-      failed++;
+      webFailed++;
       console.error("Web Push gönderim hatası:", {
         statusCode: error?.statusCode,
         body: error?.body,
       });
 
       if (error?.statusCode === 404 || error?.statusCode === 410) {
-        await supabaseAdmin.from("push_subscriptions").delete().eq("id", row.id);
+        await supabaseAdmin
+          .from("push_subscriptions")
+          .delete()
+          .eq("id", row.id);
       }
     }
   }
 
-  return { sent, failed, noSubscriptions: false };
+  const native = await sendNativePushToUser(
+    supabaseAdmin,
+    userId,
+    payload,
+    options,
+  );
+
+  const sent = webSent + native.sent;
+  const failed = webFailed + native.failed;
+  const hasWeb = Boolean(subscriptions?.length);
+  const hasNative = native.registered > 0;
+
+  return {
+    sent,
+    failed,
+    noSubscriptions: !hasWeb && !hasNative,
+    webSent,
+    nativeSent: native.sent,
+  };
 }
 
 async function getRequestUser(req: Request) {
@@ -161,12 +183,14 @@ async function processNdviMapUpdates(force = false) {
 
   if (subscriptionError) throw subscriptionError;
 
+  const nativeUserIds = await listNativePushUserIds(supabaseAdmin, 500);
   const userIds = Array.from(
-    new Set(
-      (subscriptionRows ?? [])
+    new Set([
+      ...(subscriptionRows ?? [])
         .map((row: any) => String(row.user_id ?? ""))
         .filter(Boolean),
-    ),
+      ...nativeUserIds,
+    ]),
   );
 
   if (!userIds.length) {
@@ -526,6 +550,11 @@ async function dispatchAppNotification(job: any) {
       url: "/",
       notificationId: id,
       fieldId: fieldId || null,
+      target: cleanText(job.target, 80) || "notificationsHub",
+      actionTarget: cleanText(
+        job.data?.actionTarget ?? job.data?.action_target,
+        120,
+      ) || null,
       category,
       source: cleanText(job.source, 60) || "system",
       critical,
@@ -789,12 +818,14 @@ async function processFieldActivityUpdates(cronSecret: string, force = false) {
     .limit(500);
   if (subscriptionError) throw subscriptionError;
 
+  const nativeUserIds = await listNativePushUserIds(supabaseAdmin, 500);
   const userIds = Array.from(
-    new Set(
-      (subscriptionRows ?? [])
+    new Set([
+      ...(subscriptionRows ?? [])
         .map((row: any) => String(row.user_id ?? ""))
         .filter(Boolean),
-    ),
+      ...nativeUserIds,
+    ]),
   );
   if (!userIds.length) {
     return { checked: 0, seeded: 0, queued: 0, covered: 0, skipped: 0, failed: 0 };
