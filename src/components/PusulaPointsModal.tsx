@@ -863,7 +863,7 @@ export default function PusulaPointsModal({
             <div className="tp-points-ad-reward-copy">
               <small>ÖDÜLLÜ REKLAM</small>
               <strong>Reklam izle · +10 Pusula Puanı</strong>
-              <span>Günde en fazla 5 kez. Premium kullanıcıda reklam gösterilmez.</span>
+              <span>Günde en fazla 5 kez. Plus ve Premium kullanıcıda reklam gösterilmez.</span>
             </div>
             <button
               type="button"
