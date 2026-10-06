@@ -146,6 +146,7 @@ export function getUnlockedFieldCount(points: number) {
   const entitlement = getEntitlementSnapshot();
 
   if (entitlement.effectivePlan === 'premium') return 999;
+  if (entitlement.effectivePlan === 'plus') return 10;
 
   const safePoints = Math.max(0, Number(points) || 0);
 
@@ -157,7 +158,10 @@ export function getUnlockedFieldCount(points: number) {
 export function getNextFieldUnlock(points: number) {
   const entitlement = getEntitlementSnapshot();
 
-  if (entitlement.effectivePlan === 'premium') {
+  if (
+    entitlement.effectivePlan === 'premium' ||
+    entitlement.effectivePlan === 'plus'
+  ) {
     return {
       fieldNumber: null,
       requiredPoints: null,
@@ -222,6 +226,19 @@ export function canCreateField(
       requiredPoints: 0,
       remainingPoints: 0,
       reason: 'premium' as const,
+    };
+  }
+
+  if (entitlement.effectivePlan === 'plus') {
+    return {
+      allowed: nextFieldNumber <= 10,
+      nextFieldNumber,
+      requiredPoints: 0,
+      remainingPoints: 0,
+      reason:
+        nextFieldNumber <= 10
+          ? ('plus' as const)
+          : ('configured_limit' as const),
     };
   }
 
@@ -300,7 +317,9 @@ function normalizeState(raw: any): GamificationServerState {
     ),
     unlockedFields: entitlement.effectivePlan === 'premium'
       ? 999
-      : Math.max(
+      : entitlement.effectivePlan === 'plus'
+        ? 10
+        : Math.max(
           1,
           Number(
             raw?.unlocked_fields ??
