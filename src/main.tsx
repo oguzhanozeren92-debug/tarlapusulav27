@@ -18,6 +18,7 @@ import './styles/HomeFieldsSheetWhiteAccent.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 import { installNativeFeedback } from './mobile/nativeFeedback';
+import { installNativeAdsBridge } from './mobile/nativeAds';
 import NativePushBridge from './mobile/NativePushBridge';
 import NativeAuthBridge from './mobile/NativeAuthBridge';
 import NativeShellBridge from './mobile/NativeShellBridge';
@@ -31,6 +32,7 @@ if (Capacitor.isNativePlatform()) {
   document.documentElement.classList.add('tp-native-app', `tp-native-${nativePlatform}`);
   document.body?.classList.add('tp-native-app');
   installNativeFeedback();
+  installNativeAdsBridge();
 }
 
 if (window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')) {
