@@ -37,6 +37,7 @@ import NdviObservationPhotoModal from '../field-observations/components/NdviObse
 import NdviObservationTimelineModal from '../field-observations/components/NdviObservationTimelineModal';
 import FieldObservationPointsModal from '../field-observations/components/FieldObservationPointsModal';
 import type { EarthSearchNdviStats } from './services/earthSearchNdvi.service';
+import { ndviAbsoluteRgb } from './services/ndviDisplayPolicy';
 import {
   findRelativeNdviZone,
   weakerRelativeNdviZones,
@@ -1316,24 +1317,9 @@ function clamp01(value: number) {
 }
 
 function ndviValueToColor(value: number) {
-  const v = clamp01(value);
-
-  // IMPORTANT: Map colours and GeoBlaze percentages use the same absolute
-  // NDVI classes. This prevents a relatively "better" pixel from turning
-  // green when it is still below the absolute healthy threshold.
-  if (v < 0.30) {
-    return { r: 230, g: 48, b: 35 };
-  }
-
-  if (v < 0.60) {
-    return { r: 242, g: 174, b: 24 };
-  }
-
-  if (v < 0.80) {
-    return { r: 112, g: 191, b: 61 };
-  }
-
-  return { r: 13, g: 122, b: 46 };
+  // Bütün haritalarda aynı mutlak sınıflar:
+  // düşük < .30, orta .30-.59, yüksek >= .60.
+  return ndviAbsoluteRgb(clamp01(value));
 }
 
 function renderedNdviScore(r: number, g: number, b: number) {
