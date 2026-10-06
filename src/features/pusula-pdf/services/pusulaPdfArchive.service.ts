@@ -2,6 +2,10 @@ import { supabase } from '../../../supabaseClient';
 import { getPrivateFileUrl, uploadPrivateFile } from '../../../services/r2Storage';
 import type { WeeklyPusulaReport } from '../types';
 import { generatePusulaPdf } from './pusulaPdfRenderer.service';
+import {
+  openRemoteFileInWeb,
+  shareRemoteFileOnDevice,
+} from '../../../mobile/nativeFileShare';
 
 function safePart(value: unknown) {
   return String(value ?? 'report').toLocaleLowerCase('tr-TR')
@@ -40,8 +44,26 @@ export async function ensurePusulaPdfArchived(report: WeeklyPusulaReport) {
 export async function openArchivedPusulaPdf(report: WeeklyPusulaReport) {
   const storedPath = await ensurePusulaPdfArchived(report);
   const url = await getPrivateFileUrl('reports', storedPath);
-  if (!url) throw new Error('Rapor bağlantısı hazırlanamadı.');
-  const opened = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!opened) window.location.href = url;
+
+  if (!url) {
+    throw new Error('Rapor bağlantısı hazırlanamadı.');
+  }
+
+  const fieldName = safePart(report.report_data?.field?.name || 'tarla');
+  const periodEnd = safePart(report.period_end || report.generated_at || report.id);
+  const fileName = `TarlaPusula-${fieldName}-${periodEnd}.pdf`;
+
+  const nativeResult = await shareRemoteFileOnDevice({
+    url,
+    fileName,
+    title: 'TarlaPusula · Tarla Analiz Raporu',
+    text: `${report.report_data?.field?.name || 'Tarla'} için TarlaPusula raporu`,
+    dialogTitle: 'Raporu paylaş / kaydet',
+  });
+
+  if (!nativeResult.handled) {
+    openRemoteFileInWeb(url);
+  }
+
   return storedPath;
 }
