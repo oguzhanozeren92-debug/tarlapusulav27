@@ -42,6 +42,7 @@ jobs:
       APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
       APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
       APP_STORE_CONNECT_API_KEY_P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
+      APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
       IOS_VERSION_NAME: ${{ inputs.version_name }}
       IOS_BUILD_NUMBER: ${{ inputs.build_number }}
       KEYCHAIN_PASSWORD: temporary-ci-keychain-password
@@ -77,13 +78,16 @@ jobs:
           API_READY=true
           for name in \
             APP_STORE_CONNECT_API_KEY_ID \
-            APP_STORE_CONNECT_API_ISSUER_ID \
-            APP_STORE_CONNECT_API_KEY_P8_B64
+            APP_STORE_CONNECT_API_ISSUER_ID
           do
             if [ -z "${!name:-}" ]; then
               API_READY=false
             fi
           done
+
+          if [ -z "${APP_STORE_CONNECT_API_KEY_P8:-}" ] && [ -z "${APP_STORE_CONNECT_API_KEY_P8_B64:-}" ]; then
+            API_READY=false
+          fi
 
           if [ "$MANUAL_READY" = true ]; then
             echo "IOS_SIGNING_MODE=manual" >> "$GITHUB_ENV"
@@ -93,7 +97,7 @@ jobs:
             echo "Using App Store Connect API key with Xcode automatic signing."
           else
             echo "::error::No complete iOS signing method is configured."
-            echo "::error::Provide either the P12/profile secrets or the App Store Connect API key trio."
+            echo "::error::Provide either the P12/profile secrets or the App Store Connect API key ID + issuer + private key secret."
             exit 1
           fi
 
@@ -114,11 +118,18 @@ jobs:
           import base64
           import os
 
-          raw = os.environ.get("APP_STORE_CONNECT_API_KEY_P8_B64", "")
-          if not raw:
-              raise SystemExit("missing APP_STORE_CONNECT_API_KEY_P8_B64")
+          raw_text = os.environ.get("APP_STORE_CONNECT_API_KEY_P8", "")
+          raw_b64 = os.environ.get("APP_STORE_CONNECT_API_KEY_P8_B64", "")
+
+          if raw_text:
+              payload = raw_text.encode("utf-8")
+          elif raw_b64:
+              payload = base64.b64decode(raw_b64)
+          else:
+              raise SystemExit("missing App Store Connect private key secret")
+
           with open(os.environ["ASC_KEY_PATH"], "wb") as fh:
-              fh.write(base64.b64decode(raw))
+              fh.write(payload)
           PY
 
           chmod 600 "$ASC_KEY_PATH"
