@@ -360,10 +360,7 @@ export default function AuthScreens({
         return;
       }
 
-      const redirectTo =
-        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-          ? `${window.location.origin}/`
-          : 'https://tarlapusulav25.vercel.app/';
+      const redirectTo = `${window.location.origin}/`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
