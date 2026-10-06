@@ -11,6 +11,9 @@ import type { AdPlacement } from '../monetization/adRuntime';
 const ANDROID_PRODUCTION_REWARDED_ID =
   'ca-app-pub-9321324588059191/4148774701';
 
+const ANDROID_PRODUCTION_INTERSTITIAL_ID =
+  'ca-app-pub-9321324588059191/9017958001';
+
 const TEST_UNITS = {
   android: {
     rewarded: 'ca-app-pub-3940256099942544/5224354917',
@@ -45,7 +48,9 @@ function platformUnits() {
   const rewardedProd =
     env(`VITE_ADMOB_${prefix}_REWARDED_ID`) ||
     (platform === 'android' ? ANDROID_PRODUCTION_REWARDED_ID : '');
-  const interstitialProd = env(`VITE_ADMOB_${prefix}_INTERSTITIAL_ID`);
+  const interstitialProd =
+    env(`VITE_ADMOB_${prefix}_INTERSTITIAL_ID`) ||
+    (platform === 'android' ? ANDROID_PRODUCTION_INTERSTITIAL_ID : '');
 
   return {
     rewarded: forceTesting || !rewardedProd
