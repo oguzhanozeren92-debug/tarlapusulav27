@@ -29,6 +29,7 @@ jobs:
       VITE_REVENUECAT_ANDROID_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_ANDROID_PUBLIC_KEY }}
       VITE_ADMOB_TEST_MODE: 'false'
       ANDROID_UPLOAD_KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+      GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
       TP_ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
       TP_ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
       TP_ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
@@ -44,7 +45,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in             ANDROID_UPLOAD_KEYSTORE_B64             TP_ANDROID_UPLOAD_STORE_PASSWORD             TP_ANDROID_UPLOAD_KEY_ALIAS             TP_ANDROID_UPLOAD_KEY_PASSWORD
+          for name in \
+            ANDROID_UPLOAD_KEYSTORE_B64 \
+            TP_ANDROID_UPLOAD_STORE_PASSWORD \
+            TP_ANDROID_UPLOAD_KEY_ALIAS \
+            TP_ANDROID_UPLOAD_KEY_PASSWORD \
+            VITE_REVENUECAT_ANDROID_PUBLIC_KEY \
+            GOOGLE_SERVICES_JSON_B64
           do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub secret for $name"
@@ -67,12 +74,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Restore upload keystore
+      - name: Restore upload keystore and Firebase config
         shell: bash
         run: |
           set -euo pipefail
           printf '%s' "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 --decode > "$TP_ANDROID_UPLOAD_STORE_FILE"
           chmod 600 "$TP_ANDROID_UPLOAD_STORE_FILE"
+
+          printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > android/app/google-services.json
+          chmod 600 android/app/google-services.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("android/app/google-services.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          packages = {
+              client.get("client_info", {})
+                    .get("android_client_info", {})
+                    .get("package_name")
+              for client in data.get("client", [])
+          }
+          if "com.tarlapusula.app" not in packages:
+              raise SystemExit(
+                  "::error::google-services.json does not contain com.tarlapusula.app"
+              )
+          PY
 
       - name: Build and sync production web assets
         run: |
@@ -101,7 +129,9 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Remove restored keystore
+      - name: Remove restored signing and Firebase material
         if: always()
         shell: bash
-        run: rm -f "$TP_ANDROID_UPLOAD_STORE_FILE"
+        run: |
+          rm -f "$TP_ANDROID_UPLOAD_STORE_FILE"
+          rm -f android/app/google-services.json
