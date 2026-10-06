@@ -13,6 +13,7 @@ import type {
   NdviObservationTarget,
 } from '../types/fieldObservation';
 import type { EarthSearchNdviRelativeZone } from '../../home-map/services/earthSearchNdvi.service';
+import { weakerRelativeNdviZones } from '../../home-map/services/relativeNdviZones';
 
 type Props = {
   open: boolean;
@@ -155,15 +156,14 @@ export default function FieldObservationPointsModal({
   }, [open]);
 
   const weakerZones = useMemo(
-    () => relativeZones.filter((zone) => zone?.status === 'weaker'),
-    [relativeZones],
+    () => weakerRelativeNdviZones(relativeZones),
+    [weakerZones],
   );
 
   const weakerAreaKeys = useMemo(
     () =>
       new Set(
-        relativeZones
-          .filter((zone) => zone?.status === 'weaker')
+        weakerZones
           .map((zone) => normalizeAreaKey(zone?.area))
           .filter(Boolean),
       ),
