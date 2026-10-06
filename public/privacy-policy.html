@@ -133,9 +133,11 @@
     <p>
       TarlaPusula'nın çalışması için sınırlı ölçüde üçüncü taraf altyapılar kullanılabilir.
       Bunlara, kullanım bağlamına göre, Supabase (kimlik doğrulama/veritabanı/Edge Functions),
+      Cloudflare R2 (kullanıcı tarafından yüklenen bazı fotoğraf ve dosyaların nesne depolaması),
+      Google Gemini ve/veya Cloudflare AI hizmetleri (kullanıcının başlattığı Pusula AI ve görsel analiz işlemleri),
       Google AdMob ve User Messaging Platform (reklam ve izin yönetimi),
       RevenueCat (mobil abonelik doğrulama) ve Vercel (web uygulaması barındırma) dahildir.
-      Bu sağlayıcılar kendi gizlilik koşullarına tabi olabilir.
+      Bu sağlayıcılar kendi gizlilik ve veri işleme koşullarına tabi olabilir.
     </p>
 
     <h2>8. Verilerin paylaşılması</h2>
@@ -156,6 +158,12 @@
     <p>
       Kullanıcılar cihaz izinlerini iOS/Android ayarlarından değiştirebilir; reklam gizlilik tercihlerini
       uygulama içinden tekrar açabilir; aboneliklerini App Store veya Google Play üzerinden yönetebilir.
+      TarlaPusula hesabı, uygulamadaki <strong>Ayarlar → Hesabımı Sil</strong> akışından kalıcı olarak silinebilir.
+      Bu işlem TarlaPusula'daki kullanıcı hesabı ile kullanıcıya bağlı tarla, analiz, bildirim ve kullanıcı dosyalarının
+      silinmesini başlatır. Aktif App Store veya Google Play aboneliği varsa hesabı silmek mağaza aboneliğini
+      otomatik olarak iptal etmez; abonelik ayrıca ilgili mağaza hesabından yönetilmelidir.
+      Apple, Google, RevenueCat veya diğer hizmet sağlayıcıların yasal/finansal kayıtları kendi saklama
+      yükümlülükleri kapsamında ayrıca tutulabilir.
       Hesap/veri konularındaki talepler uygulama içindeki destek ve geri bildirim kanalı üzerinden iletilebilir.
       Uygulanabilir mevzuata göre erişim, düzeltme, silme veya işleme itirazı gibi ek haklar bulunabilir.
     </p>
