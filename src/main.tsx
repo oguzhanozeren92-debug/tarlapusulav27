@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
+import AccountDeletionPage from './pages/AccountDeletion/AccountDeletionPage';
 import AdminUiRuntime from './features/admin-ui/AdminUiRuntime';
 import InAppAdminMode from './features/admin-mode/InAppAdminMode';
 import AppNotificationBridge from './features/admin-mode/AppNotificationBridge';
@@ -43,22 +44,33 @@ if (window.location.pathname === '/admin' || window.location.pathname.startsWith
   }
 }
 
+const accountDeletionMode =
+  !Capacitor.isNativePlatform() &&
+  (
+    window.location.pathname === '/account-deletion' ||
+    new URLSearchParams(window.location.search).get('accountDeletion') === '1'
+  );
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <>
-      <App />
-      <PremiumFeedbackLayer />
-      <HomeMapLayerLoadingBridge />
-      <AdminUiRuntime />
-      <AppNotificationBridge />
-      <AppActivityTracker />
-      <NativePushBridge />
-      <NativeAuthBridge />
-      <NativeShellBridge />
-      <NativePurchasesBridge />
-      <InAppAdminMode />
-      <PusulaPointsCelebration />
-      <PlanUpgradeModal />
-    </>
+    {accountDeletionMode ? (
+      <AccountDeletionPage />
+    ) : (
+      <>
+        <App />
+        <PremiumFeedbackLayer />
+        <HomeMapLayerLoadingBridge />
+        <AdminUiRuntime />
+        <AppNotificationBridge />
+        <AppActivityTracker />
+        <NativePushBridge />
+        <NativeAuthBridge />
+        <NativeShellBridge />
+        <NativePurchasesBridge />
+        <InAppAdminMode />
+        <PusulaPointsCelebration />
+        <PlanUpgradeModal />
+      </>
+    )}
   </StrictMode>,
 );
