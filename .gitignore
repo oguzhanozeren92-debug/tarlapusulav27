@@ -17,6 +17,7 @@ dist-ssr
 *.jks
 *.keystore
 *.p12
+*.p8
 *.mobileprovision
 android/app/upload-keystore.jks
 
