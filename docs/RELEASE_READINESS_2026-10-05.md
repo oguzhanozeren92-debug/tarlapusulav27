@@ -52,8 +52,8 @@ Son kontrol: 2026-10-06
 - [x] 13 RLS/no-policy tablosu denetlendi: anon/authenticated CRUD yetkisi yok; service-role-only/internal kullanım doğrulandı.
 - [!] Supabase Auth leaked-password protection Free planda açılamıyor; Supabase Pro+ özelliği olduğu için mevcut planda yayın bloklayıcısı olarak değerlendirilmiyor.
 - [x] KVKK Aydınlatma Metni gövdesi uygulamanın gerçek veri akışına göre hazırlandı: `docs/KVKK_AYDINLATMA_METNI_2026-10-06.md`.
-- [ ] KVKK metnine gerçek veri sorumlusu kimliği + kalıcı gizlilik/destek iletişimi girilip public sayfa olarak yayımlanmalı.
-- [!] Kullanım Koşulları teknik olarak yayımlandı; ancak halka açık ticari yayın öncesinde işletmeci/veri sorumlusu gerçek kimliği ve kalıcı kurumsal iletişim bilgisiyle hukuki metinler son kez kesinleştirilmeli.
+- [x] KVKK metni veri sorumlusu **Oğuzhan Özeren** ve **tarlapusula@gmail.com** ile finalleştirildi; public sayfa + Privacy/Terms/Support çapraz bağlantıları repoda hazır.
+- [x] Kullanım Koşulları ve Gizlilik Politikası işletmeci/veri sorumlusu ve kalıcı iletişim bilgisiyle finalleştirildi.
 - [x] SECURITY DEFINER fonksiyonları tek tek denetlendi. Trigger RPC dış erişimi kapatıldı; PusulaPDF sahiplik/Premium kontrolü ve puan RPC server doğrulaması sertleştirildi. Kalan authenticated SECURITY DEFINER RPC'ler bilinçli, kullanıcı-sınırlı gateway olarak belgelendi.
 
 ## Mağaza metadata hazırlığı
@@ -68,7 +68,7 @@ Son kontrol: 2026-10-06
 - [ ] Apple Developer / App Store Connect üzerinde gerçek uygulama kaydı, Bundle ID, sertifika/provisioning ve imzalı archive/TestFlight akışı tamamlanmalı.
 - [ ] Google Play Console üzerinde gerçek uygulama kaydı, signing/upload key ve imzalı AAB üretimi tamamlanmalı.
 - [ ] RevenueCat ürünleri App Store Connect ve Google Play ürün kimlikleriyle production ortamında eşleştirilmeli ve gerçek sandbox/test satın alımı doğrulanmalı.
-- [ ] KVKK/Privacy/Terms içindeki işletmeci kimliği ve kalıcı iletişim alanları gerçek bilgilerle tamamlanmalı; public KVKK sayfası yayınlanmalı.
+- [ ] Hukuki sayfaların latest `main` sürümü production'a deploy edilip `/support.html` ve `/kvkk-aydinlatma.html` için HTTP 200 doğrulanmalı.
 - [ ] En az bir gerçek Android ve bir gerçek iOS cihazda oturumlu uçtan uca smoke turu yapılmalı.
 - [ ] Push notification gerçek cihaz tokenı ile arka plan/kapalı uygulama senaryosunda doğrulanmalı.
 - [ ] Rewarded ve interstitial reklamlar gerçek cihazda TEST reklamlarıyla akış bazında doğrulanmalı.
@@ -104,4 +104,4 @@ Son kontrol: 2026-10-06
 
 Teknik web beta ve native CI açısından **GO**.
 
-Halka açık App Store / Google Play ticari yayını için kod tarafındaki ana köprüler hazırdır; kalan kritik işler artık ağırlıklı olarak **mağaza imzalama/console kurulumu, gerçek kimlik/iletişimle hukuki final ve gerçek cihaz sandbox smoke testleri**dir.
+Halka açık App Store / Google Play ticari yayını için kod tarafındaki ana köprüler hazırdır; kalan kritik işler artık ağırlıklı olarak **mağaza imzalama/console kurulumu, production legal-page deployment doğrulaması ve gerçek cihaz sandbox smoke testleri**dir.
