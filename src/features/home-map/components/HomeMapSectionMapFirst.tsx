@@ -114,18 +114,32 @@ const CSS = String.raw`
 }
 
 .tp-map-first-shell .tp-field-select-box::after{
-  content:''!important;
+  content:none!important;
+  display:none!important;
+}
+
+.tp-map-first-shell .tp-field-chevron{
   position:absolute!important;
-  right:11px!important;
+  right:6px!important;
   top:50%!important;
-  width:7px!important;
-  height:7px!important;
-  border-right:1.7px solid rgba(226,232,240,.78)!important;
-  border-bottom:1.7px solid rgba(226,232,240,.78)!important;
-  transform:translateY(-68%) rotate(45deg)!important;
-  transform-origin:center!important;
+  width:26px!important;
+  height:26px!important;
+  display:grid!important;
+  place-items:center!important;
+  transform:translateY(-50%)!important;
+  border:1px solid rgba(17,24,39,.10)!important;
+  border-radius:9px!important;
+  background:linear-gradient(180deg,#ffffff,#f3f4f6)!important;
+  color:#1f2937!important;
+  box-shadow:0 1px 2px rgba(15,23,42,.05),inset 0 1px 0 rgba(255,255,255,.95)!important;
   pointer-events:none!important;
-  opacity:.92!important;
+  font-size:0!important;
+}
+
+.tp-map-first-shell .tp-field-chevron svg{
+  width:15px!important;
+  height:15px!important;
+  stroke:currentColor!important;
 }
 
 .tp-map-first-shell .tp-field-pin{
