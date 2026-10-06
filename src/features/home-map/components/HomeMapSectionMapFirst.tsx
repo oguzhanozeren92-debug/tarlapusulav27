@@ -3873,14 +3873,29 @@ export default function HomeMapSectionMapFirst(
             type="button"
             className="tp-mf-operation-toolbar"
             onClick={() => {
+              const hasField = Boolean(props.homeField?.id);
+
+              if (!hasField) {
+                props.onAddField?.();
+                return;
+              }
+
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(
                   new CustomEvent('tp:home-map-open-field-operation'),
                 );
               }
             }}
-            aria-label="Tarla işlemi ekle"
-            title="Tarlada yaptığın işlemi kaydet"
+            aria-label={
+              props.homeField?.id
+                ? 'Tarla işlemi ekle'
+                : 'Tarla ekle ve işlem kaydetmeye başla'
+            }
+            title={
+              props.homeField?.id
+                ? 'Tarlada yaptığın işlemi kaydet'
+                : 'Önce bir tarla ekle'
+            }
           >
             <span aria-hidden="true">🚜</span>
           </button>,
