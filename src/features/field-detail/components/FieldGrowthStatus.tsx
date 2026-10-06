@@ -33,9 +33,18 @@ export function FieldGrowthStatusView({
   contextMessage = null,
   timeSeriesMessage = null,
 }: FieldGrowthStatusViewProps) {
+  const basisItems = useMemo(() => {
+    const raw = (phenology as any)?.basis;
+    if (Array.isArray(raw)) {
+      return raw.map((item) => String(item ?? '').trim()).filter(Boolean);
+    }
+    if (raw === null || raw === undefined || raw === '') return [];
+    return [String(raw).trim()].filter(Boolean);
+  }, [phenology]);
+
   const sourceLabel = useMemo(() => {
-    const evidence = (phenology?.basis ?? [])
-      .map((item) => String(item ?? '').toLocaleLowerCase('tr-TR'))
+    const evidence = basisItems
+      .map((item) => item.toLocaleLowerCase('tr-TR'))
       .join(' ');
 
     if (evidence.includes('saha gözlemi')) return 'Saha gözlemi + modeller';
@@ -48,7 +57,7 @@ export function FieldGrowthStatusView({
       return 'Ürün takvimi + sezon';
     }
     return 'Sezon + gelişim verisi';
-  }, [field?.cropCycle, field?.crop_cycle, phenology?.basis]);
+  }, [basisItems, field?.cropCycle, field?.crop_cycle]);
 
   const usable = Boolean(
     phenology &&
@@ -89,14 +98,8 @@ export function FieldGrowthStatusView({
           </div>
         ) : null}
 
-        {usable && (phenology?.basis ?? []).length > 0 ? (
-          <small>
-            {(phenology?.basis ?? [])
-              .map((item) => String(item ?? '').trim())
-              .filter(Boolean)
-              .slice(0, 2)
-              .join(' · ')}
-          </small>
+        {usable && basisItems.length > 0 ? (
+          <small>{basisItems.slice(0, 2).join(' · ')}</small>
         ) : null}
       </div>
     </section>
