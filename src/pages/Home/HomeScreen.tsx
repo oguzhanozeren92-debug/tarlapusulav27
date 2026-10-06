@@ -1507,16 +1507,26 @@ export default function HomeScreen(props: HomeScreenProps) {
                       detail: {
                         fieldId: String(homeField?.id ?? ''),
                         layer: activeHomeLayer,
+                        /*
+                         * NDVI'da alan seçimini AI sonucundan değil doğrudan
+                         * HomeInlineLayerMap'in güncel relativeZones verisinden
+                         * yapıyoruz. Böylece kart, harita ve takip ekranı aynı
+                         * weaker hücreleri gösterir.
+                         */
                         importantArea:
-                          homePusulaResult?.analysis?.importantArea ?? null,
+                          activeHomeLayer === 'vegetation'
+                            ? null
+                            : homePusulaResult?.analysis?.importantArea ?? null,
                         spatial:
                           activeHomeLayer === 'vegetation'
-                            ? homePusulaResult?.context?.ndvi?.spatial ?? null
+                            ? null
                             : activeHomeLayer === 'radar-vv' ||
                                 activeHomeLayer === 'radar-vh' ||
                                 activeHomeLayer === 'radar-water'
                               ? homePusulaResult?.context?.radar?.spatial ?? null
                               : null,
+                        relativeMode:
+                          activeHomeLayer === 'vegetation' ? 'all' : undefined,
                       },
                     }),
                   );
