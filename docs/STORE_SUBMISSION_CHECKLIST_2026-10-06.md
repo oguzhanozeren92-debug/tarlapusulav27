@@ -46,19 +46,23 @@ Son güncelleme: 2026-10-06
 5. App Store Connect app record oluştur
 6. Apple Distribution certificate üret
 7. App Store provisioning profile üret
-8. GitHub Secrets:
+8. GitHub signing Secrets:
    - `IOS_DISTRIBUTION_P12_B64`
    - `IOS_DISTRIBUTION_P12_PASSWORD`
    - `IOS_APP_STORE_PROFILE_B64`
    - `APPLE_TEAM_ID`
    - `VITE_REVENUECAT_IOS_PUBLIC_KEY`
-9. Signed App Store IPA workflow çalıştır
-10. TestFlight upload
-11. Sandbox subscription test
-12. App Privacy formunu `STORE_PRIVACY_DECLARATIONS_2026-10-06.md` ile doldur
-13. Store listing metinlerini `STORE_LISTING_TR_2026-10-06.md` ile doldur
-14. Reviewer test hesabı ekle
-15. Gerçek iPhone smoke test geçir
+9. App Store Connect API key oluştur ve GitHub Secrets ekle:
+   - `APP_STORE_CONNECT_API_KEY_ID`
+   - `APP_STORE_CONNECT_API_ISSUER_ID`
+   - `APP_STORE_CONNECT_API_KEY_P8_B64`
+10. **iOS App Store Signed IPA** workflow'u çalıştır; ilk signing doğrulamasında gerekirse `upload_to_testflight=false`
+11. Bir sonraki artan build number ile `upload_to_testflight=true` çalıştır → otomatik TestFlight upload
+12. Sandbox subscription test
+13. App Privacy formunu `STORE_PRIVACY_DECLARATIONS_2026-10-06.md` ile doldur
+14. Store listing metinlerini `STORE_LISTING_TR_2026-10-06.md` ile doldur
+15. Reviewer test hesabı ekle
+16. Gerçek iPhone smoke test geçir
 
 ## C. Android cihaz doğrulaması yapılınca
 
