@@ -15,6 +15,11 @@ import {
 } from '../../mobile/nativeAuth';
 import './Auth.css';
 
+const appleSignInEnabled =
+  String(import.meta.env.VITE_APPLE_SIGN_IN_ENABLED || '')
+    .trim()
+    .toLowerCase() === 'true';
+
 type AuthScreensProps = {
   screen: Screen;
   setScreen: Dispatch<SetStateAction<Screen>>;
@@ -209,7 +214,7 @@ export default function AuthScreens({
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryPasswordConfirm, setRecoveryPasswordConfirm] = useState('');
   const [recoveryLoading, setRecoveryLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | 'apple' | null>(null);
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const [recoveryComplete, setRecoveryComplete] = useState(false);
   const [rememberSession, setRememberSession] = useState(() => {
@@ -349,7 +354,7 @@ export default function AuthScreens({
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+  const handleSocialLogin = async (provider: 'google' | 'facebook' | 'apple') => {
     setAuthMessage('');
     setSocialLoading(provider);
 
@@ -374,7 +379,9 @@ export default function AuthScreens({
       setAuthMessage(
         provider === 'google'
           ? 'Google ile giriş şu anda başlatılamadı.'
-          : 'Facebook ile giriş şu anda başlatılamadı.',
+          : provider === 'facebook'
+            ? 'Facebook ile giriş şu anda başlatılamadı.'
+            : 'Apple ile giriş şu anda başlatılamadı.',
       );
     }
   };
@@ -532,9 +539,18 @@ export default function AuthScreens({
                   >
                     <FacebookIcon />
                   </button>
-                  <button type="button" className="tp-authv2-social-button tp-authv2-social-button--apple" aria-label="Apple ile devam et" title="Apple ile giriş yakında" disabled>
-                    <AppleIcon />
-                  </button>
+                  {appleSignInEnabled ? (
+                    <button
+                      type="button"
+                      className="tp-authv2-social-button tp-authv2-social-button--apple"
+                      aria-label="Apple ile devam et"
+                      title="Apple ile devam et"
+                      disabled={socialLoading !== null}
+                      onClick={() => void handleSocialLogin('apple')}
+                    >
+                      <AppleIcon />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
