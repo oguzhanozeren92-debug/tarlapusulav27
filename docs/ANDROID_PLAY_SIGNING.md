@@ -18,6 +18,7 @@ The workflow `.github/workflows/android-play-aab.yml` expects these GitHub Actio
 - `ANDROID_UPLOAD_STORE_PASSWORD`
 - `ANDROID_UPLOAD_KEY_ALIAS`
 - `ANDROID_UPLOAD_KEY_PASSWORD`
+- `GOOGLE_SERVICES_JSON_B64` (Firebase `google-services.json`, Base64 encoded; must contain `com.tarlapusula.app`)
 - `VITE_REVENUECAT_ANDROID_PUBLIC_KEY`
 - `VITE_REVENUECAT_IOS_PUBLIC_KEY`
 
@@ -68,3 +69,16 @@ Supply:
 The workflow restores the keystore only inside the ephemeral GitHub runner, builds the signed release AAB, verifies its signature, uploads the AAB as a workflow artifact, then deletes the temporary keystore.
 
 The normal **Android Release AAB Compile** workflow remains an unsigned release-configuration compile gate and does not require signing secrets.
+
+
+## Firebase push configuration
+
+The signed Play workflow requires `GOOGLE_SERVICES_JSON_B64`.
+This is intentional: a Play artifact must not be produced as "ready" while Android FCM push is unconfigured.
+
+Create/download the Firebase Android app configuration for package
+`com.tarlapusula.app`, encode the entire `google-services.json` as Base64,
+and save it as the GitHub Actions repository secret `GOOGLE_SERVICES_JSON_B64`.
+
+The workflow restores the file only inside the ephemeral runner, verifies that it contains
+`com.tarlapusula.app`, builds the AAB, and deletes the file afterward.
