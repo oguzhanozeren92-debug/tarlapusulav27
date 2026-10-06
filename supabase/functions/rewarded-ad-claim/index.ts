@@ -284,10 +284,38 @@ function parseAdMobCustomData(value: string) {
   return { placement, nonce };
 }
 
+function isAdMobVerificationProbe(req: Request) {
+  const url = new URL(req.url);
+  const params = url.searchParams;
+  const userAgent = String(req.headers.get('user-agent') || '');
+
+  return (
+    userAgent === 'Google-AdMob-Reward-Verification' &&
+    params.get('ad_network') === '5450213213286189855' &&
+    params.get('ad_unit') === '1234567890' &&
+    params.get('transaction_id') === '123456789' &&
+    !params.get('user_id') &&
+    !params.get('custom_data')
+  );
+}
+
 async function processAdMobSsv(
   req: Request,
   admin: ReturnType<typeof createClient>,
 ) {
+  // AdMob dashboard's "Verify URL" tool sends a signed connectivity probe
+  // with fixed dummy identifiers and no user/custom data. It must receive 2xx,
+  // but it must never create a reward receipt or award points.
+  if (isAdMobVerificationProbe(req)) {
+    return json(
+      {
+        ok: true,
+        verificationProbe: true,
+      },
+      200,
+    );
+  }
+
   const validSignature = await verifyAdMobSignature(req);
 
   if (!validSignature) {
