@@ -583,11 +583,11 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                   disabled={!selectedProvinceId || !selectedDistrictId || !fieldVillage}
                   onClick={openMapAdd}
                 >
-                  <span>✏️</span>
-                  Çizimle Ekle
+                  <span>⌖</span>
+                  Haritadan Bul
                 </button>
                 <div className="tp-note" style={{marginTop:7}}>
-                  İl, ilçe ve köy/mahalleyi seç. Harita o bölgeden açılır; tarlana yaklaşıp köşeleri işaretleyerek parsel sınırını çiz.
+                  İl, ilçe ve köy/mahalleyi seç. Harita o bölgeden açılır; sınırı otomatik aratabilir, konumdan bulabilir veya kendin çizebilirsin.
                 </div>
               </div>
             </div>
@@ -613,7 +613,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                     clearMapBoundarySearch();
                   }}
                 >
-                  Çizimle Ekle
+                  Haritadan Bul
                 </button>
               </div>
 
@@ -687,8 +687,47 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
               ) : (
                 <>
                   <p className="tp-map-boundary-help">
-                    Harita seçtiğin il / ilçe / köy çevresinden başlar. Haritada tarlana yaklaş, “Parsel Sınırını Çiz”e bas ve köşeleri sırayla işaretle. En az 3 nokta seçtikten sonra “Çizimi Bitir” de.
+                    Harita seçtiğin il / ilçe / köy çevresinden başlar. “Sınırları Bul” ile tarlanın içine dokunup uydu/model sınır adaylarını getir; istersen konumundan bul veya “Parsel Sınırını Çiz” ile kendin çiz.
                   </p>
+
+                  <div
+                    className="tp-map-boundary-actions"
+                    style={{
+                      display:'grid',
+                      gridTemplateColumns:'1fr 1fr',
+                      gap:8,
+                      marginBottom:10,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`tp-choice ${mapPickMode ? 'active' : ''}`}
+                      disabled={mapBoundaryLoading}
+                      onClick={startMapBoundarySelection}
+                      style={{margin:0}}
+                    >
+                      {mapBoundaryLoading
+                        ? 'Sınırlar aranıyor…'
+                        : mapPickMode
+                          ? '⌖ Tarlanın içine dokun'
+                          : '⌖ Sınırları Bul'}
+                    </button>
+                    <button
+                      type="button"
+                      className="tp-choice"
+                      disabled={mapBoundaryLoading}
+                      onClick={useCurrentLocation}
+                      style={{margin:0}}
+                    >
+                      ◎ Konumdan Bul
+                    </button>
+                  </div>
+
+                  {mapBoundaryMessage ? (
+                    <div className="tp-found" style={{marginBottom:10}}>
+                      {mapBoundaryMessage}
+                    </div>
+                  ) : null}
 
                   <label style={{marginBottom:10}}>
                     Alanı biliyorsan (dekar)
@@ -702,6 +741,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
 
                   <div className="tp-map-boundary-map">
                     <FieldMap
+                      key={`add-field-map:${mapStartLocationKey || 'default'}`}
                       initialCenter={
                         mapStartView?.center ??
                         (
@@ -720,6 +760,10 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                       }
                       height={360}
                       parcelGeometry={parcelGeometry && mapBoundarySourceIsMap ? parcelGeometry : null}
+                      candidateGeometry={previewCandidate?.geometry ?? null}
+                      selectedPoint={mapBoundaryAnchor}
+                      pointSelectionEnabled={mapPickMode}
+                      onPointSelected={selectMapPoint}
                       sections={[]}
                       drawEnabled
                       drawButtonLabel="✏️ Parsel Sınırını Çiz"
@@ -736,17 +780,19 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                             : mapStartView.source === 'district'
                               ? `${selectedDistrictName} ilçesinden`
                               : `${selectedProvinceName} ilinden`
-                        } açıldı. Yakınlaştırıp parsel köşelerini çiz.`
+                        } açıldı. Tarlana yaklaş; sınırı aratabilir veya kendin çizebilirsin.`
                       : 'Konum hazırlanıyor… Haritayı yine elle kaydırıp yakınlaştırabilirsin.'}
                   </div>
 
                   <div className="tp-found">
                     {parcelGeometry && mapBoundarySourceIsMap
-                      ? '✓ Çizdiğin parsel sınırı kaydedildi. İstersen “Parsel Sınırını Çiz” ile yeniden çizebilirsin.'
-                      : 'Henüz parsel çizilmedi. Haritada tarlana yaklaş ve çizimi başlat.'}
+                      ? `✓ Parsel sınırı seçildi. Kaynak: ${parcelLookupSource || 'Harita'}`
+                      : mapPickMode
+                        ? 'Tarlanın iç kısmına bir kez dokun; Pusula yakın sınır adaylarını arayacak.'
+                        : 'Henüz sınır seçilmedi. “Sınırları Bul”, “Konumdan Bul” veya manuel çizimi kullanabilirsin.'}
                   </div>
 
-                  {false && mapBoundaryCandidates.length > 0 && (
+                  {mapBoundaryCandidates.length > 0 && (
                     <div className="tp-map-candidates">
                       {mapBoundaryCandidates.map((candidate,index)=>{
                         const active = candidate.id === previewCandidateId;
@@ -775,7 +821,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                     </div>
                   )}
 
-                  {false && previewCandidate && (
+                  {previewCandidate && (
                     <>
                       <div className="tp-map-warning">
                         Uydu/model tabanlı sınır adayıdır; resmî kadastro sınırı değildir. Beyaz-kesik sınırı kontrol edip yalnız doğruysa kullan.
@@ -795,6 +841,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                     <div className="tp-note" style={{marginTop:10}}>
                       Seçilen sınır hazır · Kaynak: {parcelLookupSource}
                       {mapBoundarySourceIsManual ? ' · Çizdiğin sınır resmî kadastro sınırı değildir.' : ''}
+                      {mapBoundarySourceIsAutomatic ? ' · Uydu/model adayıdır; resmî kadastro sınırı değildir.' : ''}
                     </div>
                   )}
                 </>
