@@ -59,6 +59,7 @@ function createTarlaPusulaSupabaseClient(): SupabaseClient {
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
+          flowType: 'pkce',
           storageKey: 'tarlapusula-auth',
         },
       },
