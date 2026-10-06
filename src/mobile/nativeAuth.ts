@@ -11,13 +11,13 @@ function publicWebUrl() {
   const configured = String(
     import.meta.env.VITE_PUBLIC_APP_URL ||
       import.meta.env.VITE_APP_URL ||
-      'https://tarlapusulav25.vercel.app/',
+      'https://tarlapusulav27.vercel.app/',
   ).trim();
 
   try {
     return new URL(configured.endsWith('/') ? configured : `${configured}/`);
   } catch {
-    return new URL('https://tarlapusulav25.vercel.app/');
+    return new URL('https://tarlapusulav27.vercel.app/');
   }
 }
 
