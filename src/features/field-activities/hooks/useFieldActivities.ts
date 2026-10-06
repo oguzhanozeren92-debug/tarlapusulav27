@@ -361,7 +361,7 @@ export function useFieldActivities({
       // Gerçek Free hesapta backend de reward credit ister.
       // TEST ÜCRETSİZ görünümünde de frontend reklam akışını gösterir.
       const shouldShowRewardedAd =
-        entitlement.effectivePlan !== 'premium' &&
+        entitlement.effectivePlan === 'free' &&
         (
           !accessRow?.allowed ||
           String(accessRow?.access_source ?? '') !== 'rewarded_ad'
