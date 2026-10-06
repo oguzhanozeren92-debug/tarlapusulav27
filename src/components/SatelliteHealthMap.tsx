@@ -5,6 +5,10 @@ import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { SatelliteHealthResult } from '../lib/satelliteService';
 import { createSatelliteRasterSource, vividSatellitePaint } from '../lib/mapStyle';
+import {
+  NDVI_ABSOLUTE_COLORS,
+  NDVI_ABSOLUTE_LABELS,
+} from '../features/home-map/services/ndviDisplayPolicy';
 
 type Props = {
   data: SatelliteHealthResult;
@@ -258,8 +262,8 @@ export default function SatelliteHealthMap({
         <div className="tp-health-title">
           <span className="tp-health-live" />
           <div>
-            <strong>Uydu Sağlık Haritası</strong>
-            <small>Normal uydu görüntüsü üzerinde NDVI analizi</small>
+            <strong>Uydu NDVI Haritası</strong>
+            <small>Mutlak NDVI sınıfları · Sentinel-2</small>
           </div>
         </div>
 
@@ -289,16 +293,16 @@ export default function SatelliteHealthMap({
           <>
             <div className="tp-health-legend">
               <div className="tp-health-legend-head">
-                <strong>Bitki Sağlığı</strong>
+                <strong>NDVI Düzeyi</strong>
                 <span>NDVI</span>
               </div>
 
               <div className="tp-health-gradient" />
 
               <div className="tp-health-labels">
-                <span>Stresli</span>
-                <span>Kontrol</span>
-                <span>Sağlıklı</span>
+                <span>{NDVI_ABSOLUTE_LABELS.low}</span>
+                <span>{NDVI_ABSOLUTE_LABELS.medium}</span>
+                <span>{NDVI_ABSOLUTE_LABELS.high}</span>
               </div>
             </div>
 
@@ -494,12 +498,12 @@ export default function SatelliteHealthMap({
           border-radius:999px;
           background:linear-gradient(
             90deg,
-            #c83c32 0%,
-            #e36d32 20%,
-            #e7bd35 43%,
-            #88b94e 66%,
-            #2f8b48 84%,
-            #176436 100%
+            ${NDVI_ABSOLUTE_COLORS.low} 0%,
+            ${NDVI_ABSOLUTE_COLORS.low} 29.9%,
+            ${NDVI_ABSOLUTE_COLORS.medium} 30%,
+            ${NDVI_ABSOLUTE_COLORS.medium} 59.9%,
+            ${NDVI_ABSOLUTE_COLORS.high} 60%,
+            ${NDVI_ABSOLUTE_COLORS.high} 100%
           );
         }
 
