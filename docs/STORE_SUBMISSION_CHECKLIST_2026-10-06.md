@@ -45,7 +45,7 @@ Son güncelleme: 2026-10-06
    - [x] Sign in with Apple
    - [x] In-App Purchase
 4. Sign in with Apple provider configuration
-5. App Store Connect app record oluştur
+5. [x] App Store Connect app record oluştur
 6. Apple Distribution certificate üret
 7. App Store provisioning profile üret
 8. GitHub signing Secrets:
