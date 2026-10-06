@@ -16,15 +16,16 @@ import QuickCalendarButton from '../../calendar/components/QuickCalendarButton';
 import { buildTaskMapSnapshot } from '../../task-map/services/taskMap.service';
 import './HomeTasksSheet.css';
 
+type FieldTasksController = ReturnType<typeof useFieldTasks>;
+
 type Props = {
   open: boolean;
   fieldId: string;
   fieldName: string;
   onClose: () => void;
   onAction: (task: FieldTask) => void;
+  controller?: FieldTasksController;
 };
-
-const WATER_MEASUREMENT_FOCUS_KEY = 'tp_focus_field_water_measurement';
 
 function sourceLabel(source: string) {
   if (source === 'pusula-experiment') return 'PUSULA DENEYİ';
@@ -129,58 +130,19 @@ function compactDescription(task: FieldTask) {
     : firstSentence;
 }
 
-function scrollToPusulaQuestion(attempt = 0) {
-  const node = document.querySelector('.tp-pusula-question') as HTMLElement | null;
-  if (node) {
-    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
-
-  if (attempt < 5) {
-    window.setTimeout(() => scrollToPusulaQuestion(attempt + 1), 140);
-  }
-}
-
-function openProductionTab(attempt = 0) {
-  const buttons = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('.tp-field-detail-tabs button'),
-  );
-  const production = buttons.find(
-    (button) => button.textContent?.trim().toLocaleLowerCase('tr-TR') === 'üretim',
-  );
-
-  if (production) {
-    production.click();
-    return;
-  }
-
-  if (attempt < 7) {
-    window.setTimeout(() => openProductionTab(attempt + 1), 120);
-  }
-}
-
-function markWaterMeasurementFocus(fieldId: string) {
-  try {
-    window.sessionStorage.setItem(
-      WATER_MEASUREMENT_FOCUS_KEY,
-      JSON.stringify({ fieldId, createdAt: Date.now() }),
-    );
-  } catch {
-    // sessionStorage kapalıysa normal tarla detayı yönlendirmesi yine çalışır.
-  }
-}
-
 export default function HomeTasksSheet({
   open,
   fieldId,
   fieldName,
   onClose,
   onAction,
+  controller,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const localController = useFieldTasks(fieldId, open && !controller);
   const { tasks, loading, error, message, refresh, complete, dismiss } =
-    useFieldTasks(fieldId, open);
+    controller ?? localController;
   const taskMapSnapshot = useMemo(
     () => buildTaskMapSnapshot(fieldId, tasks),
     [fieldId, tasks],
@@ -219,20 +181,6 @@ export default function HomeTasksSheet({
   };
 
   const openTask = (task: FieldTask) => {
-    if (isIrrigationMethodTask(task)) {
-      close();
-      window.setTimeout(() => scrollToPusulaQuestion(), 80);
-      return;
-    }
-
-    if (isSurfaceWaterMeasurementTask(task)) {
-      markWaterMeasurementFocus(task.fieldId || fieldId);
-      close();
-      onAction(task);
-      window.setTimeout(() => openProductionTab(), 100);
-      return;
-    }
-
     close();
     onAction(task);
   };
