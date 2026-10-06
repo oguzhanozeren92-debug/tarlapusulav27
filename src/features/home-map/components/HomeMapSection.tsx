@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Bell, ClipboardList, Gauge, ListTodo, Map as MapIcon, MapPin, Plus } from 'lucide-react';
+import { Bell, ChevronDown, ClipboardList, Gauge, ListTodo, Map as MapIcon, MapPin, Plus } from 'lucide-react';
 import FieldMap from '../../../components/FieldMap';
 import {
   formatHomeSatelliteDate,
@@ -158,7 +158,9 @@ export default function HomeMapSection({
                 {!realFields?.length && <option value="" disabled>Önce bir tarla ekle</option>}
                 {realFields?.filter(Boolean).map((field: any) => <option key={String(field.id)} value={String(field.id)}>{titleCaseEachWordTr(field.name || 'Adsız Tarla')}</option>)}
               </select>
-              <span className="tp-field-chevron">⌄</span>
+              <span className="tp-field-chevron" aria-hidden="true">
+                <ChevronDown size={16} strokeWidth={2.2} />
+              </span>
             </div>
             <small>{homeField?.crop || 'Ürün belirtilmedi'} · {homeField?.area || '—'} da</small>
           </div>
