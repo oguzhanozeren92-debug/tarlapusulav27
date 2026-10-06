@@ -52,12 +52,17 @@ Son kontrol: 2026-10-06
 - [!] Kullanım Koşulları teknik olarak yayımlandı; ancak halka açık ticari yayın öncesinde işletmeci/veri sorumlusu gerçek kimliği ve kalıcı kurumsal iletişim bilgisiyle hukuki metinler son kez kesinleştirilmeli.
 - [x] SECURITY DEFINER fonksiyonları tek tek denetlendi. Trigger RPC dış erişimi kapatıldı; PusulaPDF sahiplik/Premium kontrolü ve puan RPC server doğrulaması sertleştirildi. Kalan authenticated SECURITY DEFINER RPC'ler bilinçli, kullanıcı-sınırlı gateway olarak belgelendi.
 
+## Mağaza metadata hazırlığı
+
+- [x] Türkçe mağaza listeleme metinleri hazırlandı (`docs/STORE_LISTING_TR_2026-10-06.md`).
+- [x] Store submission adım adım checklist hazırlandı (`docs/STORE_SUBMISSION_CHECKLIST_2026-10-06.md`).
+
 ## Mağaza yayını için kalan gerçek bloklayıcılar
 
 - [ ] Apple Developer / App Store Connect üzerinde gerçek uygulama kaydı, Bundle ID, sertifika/provisioning ve imzalı archive/TestFlight akışı tamamlanmalı.
 - [ ] Google Play Console üzerinde gerçek uygulama kaydı, signing/upload key ve imzalı AAB üretimi tamamlanmalı.
 - [ ] RevenueCat ürünleri App Store Connect ve Google Play ürün kimlikleriyle production ortamında eşleştirilmeli ve gerçek sandbox/test satın alımı doğrulanmalı.
-- [ ] App Store / Play Console veri güvenliği-gizlilik formları, uygulamanın gerçek veri akışlarıyla doldurulmalı.
+- [x] App Store Privacy + Google Play Data Safety cevap taslağı gerçek uygulama/SDK veri akışlarıyla hazırlandı (`docs/STORE_PRIVACY_DECLARATIONS_2026-10-06.md`). Console'da Publish/Submit Apple/Google hesap adımları açılınca yapılacak.
 - [ ] KVKK Aydınlatma Metni gerçek veri sorumlusu kimlik/iletişim bilgileriyle tamamlanmalı ve uygulama içinden erişilebilir hale getirilmeli. Kullanım Koşulları abonelik ekranından erişilebilir durumda.
 - [ ] En az bir gerçek Android ve bir gerçek iOS cihazda oturumlu uçtan uca smoke turu yapılmalı.
 - [ ] Push notification gerçek cihaz tokenı ile arka plan/kapalı uygulama senaryosunda doğrulanmalı.
