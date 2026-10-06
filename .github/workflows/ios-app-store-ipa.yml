@@ -124,6 +124,20 @@ jobs:
           npm run build
           npx cap sync ios
 
+      - name: Verify critical native plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx cap ls ios | tee "$RUNNER_TEMP/cap-ios-plugins.txt"
+          grep -Fq '@revenuecat/purchases-capacitor' "$RUNNER_TEMP/cap-ios-plugins.txt" || {
+            echo "::error::RevenueCat native plugin is not installed for ios"
+            exit 1
+          }
+          grep -Fq '@capacitor-community/admob' "$RUNNER_TEMP/cap-ios-plugins.txt" || {
+            echo "::error::AdMob native plugin is not installed for ios"
+            exit 1
+          }
+
       - name: Archive signed App Store build
         shell: bash
         run: |
