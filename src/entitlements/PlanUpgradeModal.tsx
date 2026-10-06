@@ -18,6 +18,7 @@ import {
 } from './planAccess';
 import {
   getNativeStorePrices,
+  manageNativeStoreSubscription,
   nativeStorePurchasesConfigured,
   nativeStorePurchasesSupported,
   purchaseStorePlan,
@@ -283,6 +284,18 @@ export default function PlanUpgradeModal() {
     }
   };
 
+  const manageSubscription = async () => {
+    try {
+      await manageNativeStoreSubscription();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Abonelik yönetimi açılamadı.',
+      );
+    }
+  };
+
   const restore = async () => {
     if (!nativeStorePurchasesSupported()) {
       setMessage('Satın alımları geri yükleme mobil uygulamada kullanılabilir.');
@@ -432,6 +445,11 @@ export default function PlanUpgradeModal() {
               <RotateCcw size={13} />
               {restoreLoading ? 'Kontrol ediliyor…' : 'Satın alımları geri yükle'}
             </button>
+            {entitlement.effectivePlan !== 'free' && nativeStorePurchasesSupported() ? (
+              <button type="button" disabled={restoreLoading || purchaseLoading !== null} onClick={() => void manageSubscription()}>
+                Aboneliği yönet
+              </button>
+            ) : null}
           </div>
 
           {message ? <div className="tp-plan-gate-message">{message}</div> : null}
