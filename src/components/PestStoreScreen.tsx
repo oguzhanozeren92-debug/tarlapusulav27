@@ -1337,7 +1337,13 @@ export default function PestStoreScreen({
         </div>
       )}
 
-      <div className="tp-peststore-content">
+      <div
+        className={
+          addSheetOpen
+            ? 'tp-peststore-content tp-depot-sheet-bg-blur'
+            : 'tp-peststore-content'
+        }
+      >
         <main className="tp-peststore-main">
           
           <section className="tp-depot-v4-head">
