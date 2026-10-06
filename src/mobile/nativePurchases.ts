@@ -1,7 +1,9 @@
+import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import {
   LOG_LEVEL,
   Purchases,
+  STORE_REPLACEMENT_MODE,
   type CustomerInfo,
   type PurchasesOffering,
   type PurchasesPackage,
@@ -75,6 +77,18 @@ function activePlanFromCustomerInfo(
   if (active[ENTITLEMENT_IDS.premium]) return 'premium';
   if (active[ENTITLEMENT_IDS.plus]) return 'plus';
   return 'free';
+}
+
+function activeProductIdentifier(
+  customerInfo: CustomerInfo | null | undefined,
+  plan: TarlaPusulaPlan,
+) {
+  if (plan !== 'plus' && plan !== 'premium') return null;
+
+  return (
+    customerInfo?.entitlements?.active?.[plan]?.productIdentifier ??
+    null
+  );
 }
 
 async function currentSupabaseUserId() {
@@ -275,9 +289,32 @@ export async function purchaseStorePlan(
       offering,
     }).catch(() => undefined);
 
-    const result = await Purchases.purchasePackage({
+    const currentResult = await Purchases.getCustomerInfo();
+    const currentPlan = activePlanFromCustomerInfo(
+      currentResult.customerInfo,
+    );
+    const oldProductIdentifier = activeProductIdentifier(
+      currentResult.customerInfo,
+      currentPlan,
+    );
+
+    const purchaseOptions: Parameters<typeof Purchases.purchasePackage>[0] = {
       aPackage,
-    });
+    };
+
+    if (
+      Capacitor.getPlatform() === 'android' &&
+      oldProductIdentifier &&
+      currentPlan !== 'free' &&
+      currentPlan !== plan
+    ) {
+      purchaseOptions.storeProductChangeInfo = {
+        oldProductIdentifier,
+        replacementMode: STORE_REPLACEMENT_MODE.WITH_TIME_PRORATION,
+      };
+    }
+
+    const result = await Purchases.purchasePackage(purchaseOptions);
 
     const activePlan = activePlanFromCustomerInfo(
       result.customerInfo,
@@ -346,4 +383,18 @@ export async function resetNativePurchasesUser() {
   } finally {
     configuredUserId = '';
   }
+}
+
+
+export async function manageNativeStoreSubscription() {
+  if (!Capacitor.isNativePlatform()) {
+    throw new Error('Abonelik yönetimi mobil uygulamada kullanılabilir.');
+  }
+
+  const url =
+    Capacitor.getPlatform() === 'ios'
+      ? 'https://apps.apple.com/account/subscriptions'
+      : 'https://play.google.com/store/account/subscriptions';
+
+  await Browser.open({ url });
 }
