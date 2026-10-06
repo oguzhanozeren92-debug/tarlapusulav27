@@ -19,6 +19,10 @@ import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 import { installNativeFeedback } from './mobile/nativeFeedback';
 import NativePushBridge from './mobile/NativePushBridge';
+import NativeAuthBridge from './mobile/NativeAuthBridge';
+import { forwardWebOAuthCallbackToNative } from './mobile/nativeAuth';
+
+forwardWebOAuthCallbackToNative();
 
 const nativePlatform = Capacitor.getPlatform();
 if (Capacitor.isNativePlatform()) {
@@ -45,6 +49,7 @@ createRoot(document.getElementById('root')!).render(
       <AppNotificationBridge />
       <AppActivityTracker />
       <NativePushBridge />
+      <NativeAuthBridge />
       <InAppAdminMode />
       <PusulaPointsCelebration />
       <PlanUpgradeModal />
