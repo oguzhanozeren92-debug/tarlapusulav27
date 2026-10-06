@@ -115,12 +115,12 @@ Her platform için gerçek store product → RevenueCat package eşlemesi doğru
 
 Kod/repo tarafında hukuki metnin gövdesi hazırdır. Halka açık ticari yayın öncesinde yalnız gerçek bilgilerle aşağıdaki alanlar kesinleştirilecek:
 
-- [ ] Veri sorumlusu / işletmeci **tam gerçek adı veya ticari unvanı**
-- [ ] Kalıcı **KVKK / gizlilik / destek e-posta adresi**
-- [ ] İletişim / tebligat adresi (kullanılacaksa)
-- [ ] `docs/KVKK_AYDINLATMA_METNI_2026-10-06.md` içindeki placeholder alanlarını doldur
-- [ ] Final KVKK sayfasını public web'e ekle ve Privacy/Support/Terms içinden linkle
-- [ ] Privacy + Terms içinde işletmeci ve kalıcı iletişim bilgisini finalle
+- [x] Veri sorumlusu / işletmeci: **Oğuzhan Özeren**
+- [x] Kalıcı KVKK / gizlilik / destek e-postası: **tarlapusula@gmail.com**
+- [x] Fiziksel iletişim adresi yayımlanmayacak; mevcut sürümde e-posta + uygulama içi destek kanalı kullanılacak
+- [x] `docs/KVKK_AYDINLATMA_METNI_2026-10-06.md` gerçek kimlik/iletişim bilgileriyle finalleştirildi
+- [x] `public/kvkk-aydinlatma.html` eklendi; Privacy/Support/Terms içinden çapraz linklendi
+- [x] Privacy + Terms içinde işletmeci ve kalıcı iletişim bilgisi finalleştirildi
 - [ ] Dedicated reviewer/test account oluştur
 
 **Güvenlik kuralı:** reviewer hesabının parolası, Apple/Google şifreleri, 2FA kodları veya sertifika özel anahtar parolaları repoya yazılmayacak.
@@ -143,7 +143,7 @@ Kod/repo tarafında hukuki metnin gövdesi hazırdır. Halka açık ticari yayı
   - 2026-10-06: Hobby günlük 100 deployment limiti doldu.
   - Limit reset sonrası latest main production deploy + HTTP 200 kontrolü.
 - [ ] kvkk-aydinlatma.html production 200
-  - Kimlik/iletişim alanları kesinleştirildikten sonra public sayfa oluşturulacak.
+  - Repo source hazır; production deployment doğrulaması bekliyor.
 
 ## H. Release gate
 
@@ -157,6 +157,6 @@ Public release **GO** ancak aşağıdakilerin tamamı geçince:
 - Subscription purchase + restore
 - Sign in with Apple production login
 - Privacy/Data Safety forms
-- Legal identity/contact final
-- KVKK public page + legal cross-links
+- Legal identity/contact final ✓
+- KVKK public page + legal cross-links (source ✓, production 200 pending)
 - Support URL 200
