@@ -11,6 +11,21 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'banner', 'list'],
     },
+    Keyboard: {
+      resize: 'body',
+      resizeOnFullScreen: true,
+      autoBackdropColor: 'auto',
+    },
+    StatusBar: {
+      style: 'LIGHT',
+    },
+    SplashScreen: {
+      launchShowDuration: 700,
+      launchAutoHide: true,
+      launchFadeOutDuration: 180,
+      backgroundColor: '#ffffffff',
+      showSpinner: false,
+    },
   },
   server: liveServerUrl
     ? {
