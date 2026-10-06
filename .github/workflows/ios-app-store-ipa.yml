@@ -13,6 +13,11 @@ on:
         required: true
         default: '1'
         type: string
+      upload_to_testflight:
+        description: 'Upload the verified IPA to App Store Connect / TestFlight'
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: ios-app-store-signed-ipa
@@ -34,6 +39,9 @@ jobs:
       IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
       IOS_APP_STORE_PROFILE_B64: ${{ secrets.IOS_APP_STORE_PROFILE_B64 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_P8_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_B64 }}
       IOS_VERSION_NAME: ${{ inputs.version_name }}
       IOS_BUILD_NUMBER: ${{ inputs.build_number }}
       KEYCHAIN_PASSWORD: temporary-ci-keychain-password
@@ -59,6 +67,22 @@ jobs:
             fi
           done
 
+      - name: Validate App Store Connect upload secrets
+        if: ${{ inputs.upload_to_testflight }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in \
+            APP_STORE_CONNECT_API_KEY_ID \
+            APP_STORE_CONNECT_API_ISSUER_ID \
+            APP_STORE_CONNECT_API_KEY_P8_B64
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::TestFlight upload requested but GitHub secret $name is missing"
+              exit 1
+            fi
+          done
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -77,8 +101,21 @@ jobs:
           PROFILE_PATH="$RUNNER_TEMP/tarlapusula-appstore.mobileprovision"
           KEYCHAIN_PATH="$RUNNER_TEMP/tarlapusula-signing.keychain-db"
 
-          printf '%s' "$IOS_DISTRIBUTION_P12_B64" | base64 --decode > "$CERT_PATH"
-          printf '%s' "$IOS_APP_STORE_PROFILE_B64" | base64 --decode > "$PROFILE_PATH"
+          export CERT_PATH PROFILE_PATH
+          python3 - <<'PY'
+          import base64
+          import os
+
+          for env_name, path_name in (
+              ("IOS_DISTRIBUTION_P12_B64", "CERT_PATH"),
+              ("IOS_APP_STORE_PROFILE_B64", "PROFILE_PATH"),
+          ):
+              raw = os.environ.get(env_name, "")
+              if not raw:
+                  raise SystemExit(f"missing {env_name}")
+              with open(os.environ[path_name], "wb") as fh:
+                  fh.write(base64.b64decode(raw))
+          PY
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -202,6 +239,41 @@ jobs:
           test "$APS_ENV" = "production"
           test "$SIGNED_APPLE_SIGNIN" = "Default"
 
+      - name: Upload verified IPA to App Store Connect / TestFlight
+        if: ${{ inputs.upload_to_testflight }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          IPA_PATH=$(find build-ios-export -maxdepth 1 -name '*.ipa' -print -quit)
+          test -n "$IPA_PATH"
+
+          ASC_KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          ASC_KEY_PATH="$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          mkdir -p "$ASC_KEY_DIR"
+          export ASC_KEY_PATH
+
+          python3 - <<'PY'
+          import base64
+          import os
+
+          raw = os.environ.get("APP_STORE_CONNECT_API_KEY_P8_B64", "")
+          if not raw:
+              raise SystemExit("missing APP_STORE_CONNECT_API_KEY_P8_B64")
+          with open(os.environ["ASC_KEY_PATH"], "wb") as fh:
+              fh.write(base64.b64decode(raw))
+          PY
+
+          chmod 600 "$ASC_KEY_PATH"
+
+          xcrun altool \
+            --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_API_ISSUER_ID"
+
+          rm -f "$ASC_KEY_PATH"
+
       - name: Upload signed IPA
         uses: actions/upload-artifact@v4
         with:
@@ -218,6 +290,9 @@ jobs:
           rm -f "$RUNNER_TEMP/tarlapusula-appstore.mobileprovision"
           rm -f "$RUNNER_TEMP/profile.plist"
           rm -f "$RUNNER_TEMP/ExportOptions.plist"
+          if [ -n "${APP_STORE_CONNECT_API_KEY_ID:-}" ]; then
+            rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          fi
           if [ -n "${KEYCHAIN_PATH:-}" ]; then
             security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
           fi
