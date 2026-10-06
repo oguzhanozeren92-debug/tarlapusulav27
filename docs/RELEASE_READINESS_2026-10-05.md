@@ -46,10 +46,11 @@ Son kontrol: 2026-10-06
 - [x] Herkese açık mağaza Support URL adayı mevcut: `/support.html`.
 - [x] iOS Privacy Manifest mevcut.
 - [x] Supabase RLS ve güvenlik denetimleri düzenli çalıştırılabiliyor.
+- [x] 13 RLS/no-policy tablosu denetlendi: anon/authenticated CRUD yetkisi yok; service-role-only/internal kullanım doğrulandı.
 - [!] Supabase Auth leaked-password protection Free planda açılamıyor; Supabase Pro+ özelliği olduğu için mevcut planda yayın bloklayıcısı olarak değerlendirilmiyor.
 - [ ] KVKK Aydınlatma Metni, veri sorumlusunun gerçek kimlik/iletişim bilgileriyle yayımlanmalı.
 - [!] Kullanım Koşulları teknik olarak yayımlandı; ancak halka açık ticari yayın öncesinde işletmeci/veri sorumlusu gerçek kimliği ve kalıcı kurumsal iletişim bilgisiyle hukuki metinler son kez kesinleştirilmeli.
-- [ ] SECURITY DEFINER uyarıları fonksiyon bazında denetlenmeli; topluca yetki kaldırılmamalı çünkü bazı RPC'ler istemci akışının bilinçli parçası.
+- [x] SECURITY DEFINER fonksiyonları tek tek denetlendi. Trigger RPC dış erişimi kapatıldı; PusulaPDF sahiplik/Premium kontrolü ve puan RPC server doğrulaması sertleştirildi. Kalan authenticated SECURITY DEFINER RPC'ler bilinçli, kullanıcı-sınırlı gateway olarak belgelendi.
 
 ## Mağaza yayını için kalan gerçek bloklayıcılar
 
@@ -65,7 +66,7 @@ Son kontrol: 2026-10-06
 
 ## Operasyonel notlar
 
-- Vercel production son kontrollerde güncel `main` commitlerini `READY` olarak yayınlıyor; Gizlilik Politikası ve hesap silme URL'leri production domain üzerinde 200 OK doğrulandı.
+- Vercel production'da Gizlilik Politikası, Kullanım Koşulları ve hesap silme URL'leri 200 OK. Yeni `/support.html` kodda hazır ancak Hobby plan günlük 100 API deployment limiti dolduğu için latest `main` henüz production'a deploy edilemedi; limit sıfırlandıktan sonra yeniden deploy edilip Support URL doğrulanmalı.
 - Supabase Free planda leaked-password protection için ücretli plana geçiş zorunluluğu vardır; yalnız bu özellik için şu aşamada plan yükseltme kararı alınmadı.
 - Fiziksel Android cihaz olmaması geliştirmeyi durdurmuyor; GitHub Actions APK üretebiliyor. Ancak halka açık mağaza yayını öncesinde fiziksel cihaz doğrulaması yine zorunlu kabul ediliyor.
 
