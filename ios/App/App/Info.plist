@@ -37,7 +37,7 @@
 	</array>
 	<key>GADApplicationIdentifier</key>
 	<!-- Google sample App ID. Replace with TarlaPusula AdMob App ID before production release. -->
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-9321324588059191~6054909436</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>TarlaPusula, ücretsiz plandaki reklamları ölçmek ve gizlilik tercihlerine göre kişiselleştirmek için reklam tanımlayıcısını kullanabilir.</string>
 	<key>SKAdNetworkItems</key>
