@@ -10,6 +10,10 @@ import { addTarlaCompass } from '../../components/MapCompass';
 import GbifObservationMap from '../../components/GbifObservationMap';
 import { analyzeFieldSatellite, type SatelliteHealthResult } from '../../lib/satelliteService';
 import {
+  NDVI_ABSOLUTE_COLORS,
+  NDVI_ABSOLUTE_LABELS,
+} from '../../features/home-map/services/ndviDisplayPolicy';
+import {
   fetchSentinel1Radar,
   type Sentinel1RadarMode,
   type Sentinel1RadarResponse,
@@ -89,12 +93,6 @@ const MAP_CAMERA = {
   bearing: -14,
   padding: { top: 8, right: 8, bottom: 16, left: 8 },
   maxZoom: 19.15,
-} as const;
-
-const NDVI_PALETTE = {
-  weak: 'rgb(226,71,42)',
-  medium: 'rgb(242,183,5)',
-  good: 'rgb(76,175,80)',
 } as const;
 
 const SOIL_VISUAL_PALETTES: Record<
@@ -204,7 +202,7 @@ function layerUiMeta(
     }
     return {
       title: 'Bitki Sağlığı (NDVI)',
-      description: 'Bu katman bitkinin canlılık ve stres düzeyini gösterir. Kırmızı alanlar zayıf, sarı alanlar takip edilmeli, yeşil alanlar daha sağlıklıdır.',
+      description: 'Bu katman mutlak NDVI düzeyini gösterir. Kırmızı düşük, sarı orta, yeşil yüksek NDVI sınıfıdır; tek başına hastalık veya sağlık teşhisi değildir.',
       source: 'Sentinel-2 · NDVI',
       icon: '⌁',
     };
@@ -2936,8 +2934,16 @@ export default function UnifiedMapScreen({
         <MapMeaningLegend
           config={{
             title: 'Bitki Sağlığı',
-            colors: [NDVI_PALETTE.weak, NDVI_PALETTE.medium, NDVI_PALETTE.good],
-            labels: ['Zayıf', 'Orta', 'İyi'],
+            colors: [
+              NDVI_ABSOLUTE_COLORS.low,
+              NDVI_ABSOLUTE_COLORS.medium,
+              NDVI_ABSOLUTE_COLORS.high,
+            ],
+            labels: [
+              NDVI_ABSOLUTE_LABELS.low,
+              NDVI_ABSOLUTE_LABELS.medium,
+              NDVI_ABSOLUTE_LABELS.high,
+            ],
             note: 'Kırmızıdan yeşile geçiş, bitki sağlığının göreli olarak iyileştiğini gösterir.',
           }}
         />
