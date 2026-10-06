@@ -67,6 +67,7 @@ Son kontrol: 2026-10-06
 ## Mağaza yayını için kalan gerçek bloklayıcılar
 
 - [x] Apple Developer Program membership ACTIVE (valid through 06 Oct 2027).
+- [x] Apple App ID `com.tarlapusula.app` registered with Push Notifications, Sign in with Apple and In-App Purchase capabilities.
 - [ ] App Store Connect üzerinde gerçek uygulama kaydı, Bundle ID, sertifika/provisioning ve imzalı archive/TestFlight akışı tamamlanmalı.
 - [ ] Google Play Console üzerinde gerçek uygulama kaydı, signing/upload key ve imzalı AAB üretimi tamamlanmalı.
 - [ ] RevenueCat ürünleri App Store Connect ve Google Play ürün kimlikleriyle production ortamında eşleştirilmeli ve gerçek sandbox/test satın alımı doğrulanmalı.
