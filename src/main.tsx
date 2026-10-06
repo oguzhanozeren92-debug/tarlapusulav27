@@ -21,6 +21,7 @@ import { installNativeFeedback } from './mobile/nativeFeedback';
 import NativePushBridge from './mobile/NativePushBridge';
 import NativeAuthBridge from './mobile/NativeAuthBridge';
 import NativeShellBridge from './mobile/NativeShellBridge';
+import NativePurchasesBridge from './mobile/NativePurchasesBridge';
 import { forwardWebOAuthCallbackToNative } from './mobile/nativeAuth';
 
 forwardWebOAuthCallbackToNative();
@@ -52,6 +53,7 @@ createRoot(document.getElementById('root')!).render(
       <NativePushBridge />
       <NativeAuthBridge />
       <NativeShellBridge />
+      <NativePurchasesBridge />
       <InAppAdminMode />
       <PusulaPointsCelebration />
       <PlanUpgradeModal />
