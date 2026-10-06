@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   appId: 'com.tarlapusula.app',
   appName: 'TarlaPusula',
   webDir: 'dist',
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'banner', 'list'],
+    },
+  },
   server: liveServerUrl
     ? {
         url: liveServerUrl,
