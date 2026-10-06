@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 import { Check, LockKeyhole, RotateCcw, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import {
@@ -70,6 +72,12 @@ const CSS = String.raw`
 .tp-plan-gate-compare-row>*:first-child{border-left:0;text-align:left}
 .tp-plan-gate-compare-row strong{font-size:8.3px}
 .tp-plan-gate-note{margin:12px 2px 0;color:#6a737c;font-size:8px;line-height:1.45;text-align:center}
+.tp-plan-gate-legal{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+.tp-plan-gate-legal button{
+  appearance:none;border:0;background:transparent;padding:2px;color:#525b64;
+  font-size:8px;font-weight:850;text-decoration:underline;text-underline-offset:3px;cursor:pointer
+}
+.tp-plan-gate-legal span{color:#a0a7ae;font-size:8px}
 .tp-plan-gate-message{margin:10px 0 0;padding:10px 11px;border-radius:12px;background:#f2f4f5;color:#2e353b;font-size:9px;line-height:1.4;text-align:center}
 .tp-plan-gate-restore{display:flex;justify-content:center;margin-top:12px}
 .tp-plan-gate-restore button{min-height:34px;display:inline-flex;align-items:center;gap:6px;padding:0 12px;border:1px solid #d7dde1;border-radius:10px;background:#fff;color:#30363c;font-size:8.5px;font-weight:850;cursor:pointer}
@@ -81,6 +89,27 @@ const CSS = String.raw`
   .tp-plan-gate-compare{overflow-x:auto}.tp-plan-gate-compare-row{min-width:590px}
 }
 `;
+
+function publicAppUrl() {
+  const configured = String(
+    import.meta.env.VITE_PUBLIC_APP_URL ||
+      import.meta.env.VITE_APP_URL ||
+      'https://tarlapusulav27.vercel.app',
+  ).trim();
+
+  return configured.replace(/\/$/, '');
+}
+
+async function openLegalPage(path: string) {
+  const url = `${publicAppUrl()}${path}`;
+
+  if (Capacitor.isNativePlatform()) {
+    await Browser.open({ url });
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
 
 function cardFeatures(plan: 'free' | 'plus' | 'premium') {
   if (plan === 'free') {
@@ -453,8 +482,20 @@ export default function PlanUpgradeModal() {
 
           {message ? <div className="tp-plan-gate-message">{message}</div> : null}
           <p className="tp-plan-gate-note">
-            Abonelikler otomatik yenilenir ve mağaza hesabından yönetilir. Kuru Tarım tüm planlarda kullanılabilir. Kritik tarımsal risk uyarıları plan kilidi arkasına saklanmaz.
+            Satın alma onaylandığında ücret App Store / Google Play hesabına yansıtılır.
+            Aylık veya yıllık abonelikler iptal edilmediği sürece seçilen dönem sonunda otomatik yenilenir
+            ve mağaza hesabından yönetilir. Kuru Tarım tüm planlarda kullanılabilir.
+            Kritik tarımsal risk uyarıları plan kilidi arkasına saklanmaz.
           </p>
+          <div className="tp-plan-gate-legal" aria-label="Abonelik yasal bağlantıları">
+            <button type="button" onClick={() => void openLegalPage('/privacy-policy.html')}>
+              Gizlilik Politikası
+            </button>
+            <span aria-hidden="true">·</span>
+            <button type="button" onClick={() => void openLegalPage('/terms-of-use.html')}>
+              Kullanım Koşulları
+            </button>
+          </div>
         </div>
       </section>
     </>,
