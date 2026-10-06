@@ -157,7 +157,7 @@ export default function FieldObservationPointsModal({
 
   const weakerZones = useMemo(
     () => weakerRelativeNdviZones(relativeZones),
-    [weakerZones],
+    [relativeZones],
   );
 
   const weakerAreaKeys = useMemo(
@@ -167,7 +167,7 @@ export default function FieldObservationPointsModal({
           .map((zone) => normalizeAreaKey(zone?.area))
           .filter(Boolean),
       ),
-    [relativeZones],
+    [weakerZones],
   );
 
   /*
