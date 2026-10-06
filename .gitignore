@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Secrets / signing material
+.env
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+android/app/upload-keystore.jks
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,4 +30,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
