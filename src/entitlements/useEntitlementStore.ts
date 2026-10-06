@@ -279,7 +279,7 @@ function renderDeveloperSwitch() {
   button.dataset.synced = String(state.backendSynced);
   button.disabled = state.switching;
   button.title =
-    'Test görünümü: Premium → Ücretsiz → Yeni Kullanıcı → Premium';
+    'Test görünümü: Premium → Plus → Ücretsiz → Yeni Kullanıcı → Premium';
   button.setAttribute(
     'aria-label',
     `TarlaPusula test planı: ${switchText()}`,
