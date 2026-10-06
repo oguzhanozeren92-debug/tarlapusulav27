@@ -1491,6 +1491,21 @@ export default function FieldStatusCenter({
       setTab('soil');
       return;
     }
+    if (/water-measurement/i.test(target)) {
+      setTab('input');
+      window.setTimeout(() => {
+        const section = document.getElementById('field-water-measurements');
+        const details = section?.querySelector<HTMLDetailsElement>('details');
+        if (details) details.open = true;
+        section?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        window.setTimeout(() => {
+          section
+            ?.querySelector<HTMLInputElement>('input[placeholder="Örn. 24.5"]')
+            ?.focus();
+        }, 160);
+      }, 120);
+      return;
+    }
     if (/irrigation|last-irrigation|soil-water/i.test(target)) {
       setTab('irrigation');
       return;
