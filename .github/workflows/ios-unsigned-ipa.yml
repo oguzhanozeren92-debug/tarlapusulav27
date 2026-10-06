@@ -13,6 +13,10 @@ on:
       - 'capacitor.config.ts'
       - '.github/workflows/ios-unsigned-ipa.yml'
 
+concurrency:
+  group: ios-unsigned-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
