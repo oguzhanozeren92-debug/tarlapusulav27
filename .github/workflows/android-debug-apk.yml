@@ -24,6 +24,8 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     env:
+      VITE_REVENUECAT_IOS_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_IOS_PUBLIC_KEY }}
+      VITE_REVENUECAT_ANDROID_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_ANDROID_PUBLIC_KEY }}
       VITE_ADMOB_TEST_MODE: 'true'
     steps:
       - name: Checkout
