@@ -3,12 +3,44 @@
 }
 .tp-drawer-social-stack{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:124px}
 .tp-drawer-socials{display:flex;gap:8px;align-items:center}
-.tp-drawer-privacy-link{
-  appearance:none;border:0;background:transparent;padding:0 2px;color:rgba(255,255,255,.58);
-  font:700 9.5px/1.2 inherit;letter-spacing:.01em;cursor:pointer;text-decoration:none;
-  transition:color .16s ease,opacity .16s ease;
+.tp-premium-drawer .tp-drawer-support-footer .tp-drawer-privacy-link{
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:auto!important;
+  min-width:0!important;
+  min-height:24px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  border-radius:999px!important;
+  background:rgba(255,255,255,.055)!important;
+  background-image:none!important;
+  color:rgba(255,255,255,.62)!important;
+  -webkit-text-fill-color:rgba(255,255,255,.62)!important;
+  box-shadow:none!important;
+  font-family:Inter,system-ui,sans-serif!important;
+  font-size:8.5px!important;
+  font-weight:750!important;
+  line-height:1!important;
+  letter-spacing:.045em!important;
+  text-decoration:none!important;
+  text-transform:none!important;
+  white-space:nowrap!important;
+  cursor:pointer!important;
+  transition:background .16s ease,border-color .16s ease,color .16s ease!important;
 }
-.tp-drawer-privacy-link:hover,.tp-drawer-privacy-link:focus-visible{color:rgba(255,255,255,.9);text-decoration:underline;text-underline-offset:2px}
+.tp-premium-drawer .tp-drawer-support-footer .tp-drawer-privacy-link:hover,
+.tp-premium-drawer .tp-drawer-support-footer .tp-drawer-privacy-link:focus-visible{
+  border-color:rgba(255,255,255,.26)!important;
+  background:rgba(255,255,255,.09)!important;
+  color:rgba(255,255,255,.86)!important;
+  -webkit-text-fill-color:rgba(255,255,255,.86)!important;
+  text-decoration:none!important;
+  outline:none!important;
+}
 
 .tp-drawer-socials a,.tp-drawer-socials button{
   width:36px;height:36px;padding:0;display:grid;place-items:center;border:1px solid rgba(255,255,255,.22);
