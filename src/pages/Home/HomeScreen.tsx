@@ -927,6 +927,8 @@ export default function HomeScreen(props: HomeScreenProps) {
      */
     const taskKeyTarget: Record<string, string> = {
       'irrigation-status': 'field-irrigation-status',
+      'irrigation-method': 'field-irrigation-status',
+      'model-surface-water-measurement': 'field-water-measurement',
       'canopy-development': 'field-canopy-development',
       'canopy-height': 'field-canopy-height',
       'model-planting-date': 'field-season',
@@ -957,6 +959,7 @@ export default function HomeScreen(props: HomeScreenProps) {
       Exclude<PusulaFieldQuestionTarget, null>
     > = {
       'field-irrigation-status': 'irrigation-status',
+      'field-irrigation-method': 'irrigation-status',
       'field-canopy-development': 'canopy-development',
       'field-canopy-height': 'canopy-height',
     };
@@ -983,8 +986,16 @@ export default function HomeScreen(props: HomeScreenProps) {
       return;
     }
 
+    if (target === 'field-water-measurement' && homeField) {
+      setFieldStatusInitialTab('input');
+      setFieldStatusInitialActionTarget('field-water-measurement');
+      setFieldStatusOpen(true);
+      return;
+    }
+
     if ((target === 'field-irrigation' || target === 'field-water') && homeField) {
       setFieldStatusInitialTab('irrigation');
+      setFieldStatusInitialActionTarget(target);
       setFieldStatusOpen(true);
       return;
     }
@@ -1555,6 +1566,7 @@ export default function HomeScreen(props: HomeScreenProps) {
             fieldName={String(homeField?.name ?? 'Tarlan')}
             onClose={() => setTasksOpen(false)}
             onAction={openFieldTask}
+            controller={homeTasks}
           />
 
           <HomeQuickSheets
