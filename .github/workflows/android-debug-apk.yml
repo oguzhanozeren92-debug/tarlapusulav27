@@ -18,6 +18,8 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      VITE_ADMOB_TEST_MODE: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
