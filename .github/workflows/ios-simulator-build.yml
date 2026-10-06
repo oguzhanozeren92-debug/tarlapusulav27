@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.ts'
+      - '.github/workflows/ios-simulator-build.yml'
 
 concurrency:
   group: ios-simulator-${{ github.ref }}
