@@ -63,7 +63,7 @@ Son güncelleme: 2026-10-06
 12. Sandbox subscription test
 13. App Privacy formunu `STORE_PRIVACY_DECLARATIONS_2026-10-06.md` ile doldur
 14. Store listing metinlerini `STORE_LISTING_TR_2026-10-06.md` ile doldur
-15. Reviewer test hesabı ekle
+15. [x] Reviewer test hesabı oluşturuldu; App Store Connect sign-in bilgileri kullanıcı tarafından girilecek
 16. Gerçek iPhone smoke test geçir
 
 ## C. Android cihaz doğrulaması yapılınca
@@ -127,7 +127,7 @@ Kod/repo tarafında hukuki metnin gövdesi hazırdır. Halka açık ticari yayı
 - [x] `docs/KVKK_AYDINLATMA_METNI_2026-10-06.md` gerçek kimlik/iletişim bilgileriyle finalleştirildi
 - [x] `public/kvkk-aydinlatma.html` eklendi; Privacy/Support/Terms içinden çapraz linklendi
 - [x] Privacy + Terms içinde işletmeci ve kalıcı iletişim bilgisi finalleştirildi
-- [ ] Dedicated reviewer/test account oluştur
+- [x] Dedicated reviewer/test account oluştur
 
 **Güvenlik kuralı:** reviewer hesabının parolası, Apple/Google şifreleri, 2FA kodları veya sertifika özel anahtar parolaları repoya yazılmayacak.
 
