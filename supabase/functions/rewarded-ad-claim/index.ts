@@ -245,10 +245,16 @@ function allowedAdMobUnits() {
     4000,
   );
 
-  const values = configured
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
+  // Ad unit IDs are public identifiers, not secrets. Keep TarlaPusula's
+  // production rewarded units as a safe baseline and allow env additions.
+  const values = [
+    'ca-app-pub-9321324588059191/4148774701',
+    'ca-app-pub-9321324588059191/9153689375',
+    ...configured
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  ];
 
   const allowed = new Set<string>();
 
