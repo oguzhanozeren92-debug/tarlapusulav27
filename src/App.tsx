@@ -512,6 +512,105 @@ export default function App() {
     nonce: number;
   } | null>(null);
 
+  useEffect(() => {
+    const handleNativeBack = (event: Event) => {
+      const detail =
+        (event as CustomEvent<{ handled?: boolean }>).detail ?? {};
+
+      if (detail.handled) return;
+
+      if (sideMenuOpen) {
+        detail.handled = true;
+        setSideMenuOpen(false);
+        return;
+      }
+
+      if (unifiedMapOpen) {
+        detail.handled = true;
+        setUnifiedMapOpen(false);
+        return;
+      }
+
+      if (sentinel1MapOpen) {
+        detail.handled = true;
+        setSentinel1MapOpen(false);
+        return;
+      }
+
+      if (demMapOpen) {
+        detail.handled = true;
+        setDemMapOpen(false);
+        return;
+      }
+
+      if (era5MapOpen) {
+        detail.handled = true;
+        setEra5MapOpen(false);
+        return;
+      }
+
+      if (pusulaIntroOpen) {
+        detail.handled = true;
+        setPusulaIntroOpen(false);
+        return;
+      }
+
+      if (fieldFabOpen) {
+        detail.handled = true;
+        setFieldFabOpen(false);
+        return;
+      }
+
+      if (screen === 'emailRegister' || screen === 'emailVerification') {
+        detail.handled = true;
+        setScreen('emailLogin');
+        return;
+      }
+
+      if (screen === 'onboarding' && onboardingStep > 0) {
+        detail.handled = true;
+        setOnboardingStep((step) => Math.max(0, step - 1));
+        return;
+      }
+
+      const rootScreens = new Set<string>([
+        'home',
+        'welcome',
+        'login',
+        'emailLogin',
+        'onboarding',
+        'ready',
+      ]);
+
+      if (!rootScreens.has(String(screen))) {
+        detail.handled = true;
+        goBackInMenu();
+      }
+    };
+
+    window.addEventListener(
+      'tp:native-back',
+      handleNativeBack as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'tp:native-back',
+        handleNativeBack as EventListener,
+      );
+    };
+  }, [
+    sideMenuOpen,
+    unifiedMapOpen,
+    sentinel1MapOpen,
+    demMapOpen,
+    era5MapOpen,
+    pusulaIntroOpen,
+    fieldFabOpen,
+    screen,
+    onboardingStep,
+  ]);
+
   const statusInfo = {
     good: {
       label: 'İyi',
