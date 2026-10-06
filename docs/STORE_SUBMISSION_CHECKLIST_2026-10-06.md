@@ -61,6 +61,9 @@ Son güncelleme: 2026-10-06
 
 ## C. Android cihaz doğrulaması yapılınca
 
+> Yeni kişisel Google Play hesabı için production öncesi 12 tester / 14 gün closed test zorunludur.
+> Ayrıntılı plan: `docs/GOOGLE_PLAY_CLOSED_TEST_PLAN_2026-10-06.md`
+
 1. Play Console developer-device verification tamamla
 2. Firebase Android app `com.tarlapusula.app` doğrula / oluştur
 3. Production `google-services.json` al
@@ -74,8 +77,10 @@ Son güncelleme: 2026-10-06
    - `VITE_REVENUECAT_ANDROID_PUBLIC_KEY`
 6. Signed Play AAB workflow çalıştır
 7. Internal testing track
-8. Gerçek Android smoke test
-9. Data Safety formunu store privacy dokümanıyla doldur
+8. Closed test oluştur; hedef 15–18 davetli, minimum 12 testerı 14 gün kesintisiz opt-in tut
+9. Gerçek Android smoke test + tester feedback
+10. 14 gün sonunda Apply for production
+11. Data Safety formunu store privacy dokümanıyla doldur
 10. Ads declaration = YES
 11. Account deletion URL gir
 12. Store listing metinlerini ekle
