@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.ts'
+      - '.github/workflows/android-debug-apk.yml'
 
 concurrency:
   group: android-debug-${{ github.ref }}
