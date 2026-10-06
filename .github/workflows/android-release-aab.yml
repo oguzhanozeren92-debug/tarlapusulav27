@@ -53,6 +53,20 @@ jobs:
           npm run build
           npx cap sync android
 
+      - name: Verify critical native plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx cap ls android | tee "$RUNNER_TEMP/cap-android-plugins.txt"
+          grep -Fq '@revenuecat/purchases-capacitor' "$RUNNER_TEMP/cap-android-plugins.txt" || {
+            echo "::error::RevenueCat native plugin is not installed for android"
+            exit 1
+          }
+          grep -Fq '@capacitor-community/admob' "$RUNNER_TEMP/cap-android-plugins.txt" || {
+            echo "::error::AdMob native plugin is not installed for android"
+            exit 1
+          }
+
       - name: Compile release AAB
         shell: bash
         run: |
