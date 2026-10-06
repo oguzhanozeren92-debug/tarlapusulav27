@@ -12,6 +12,15 @@ import type {
   NdviObservationTarget,
   ObservationUploadResult,
 } from '../types/fieldObservation';
+import {
+  getCurrentDevicePosition,
+  hasNativeCamera,
+  hasNativeGeolocation,
+  isLocationPermissionDenied,
+  isNativePickerCancellation,
+  pickNativeImageFiles,
+  takeNativePhotoFile,
+} from '../../../mobile/nativeDevice';
 
 type Props = {
   open: boolean;
@@ -531,9 +540,54 @@ export default function NdviObservationPhotoModal({
     target?.point.centroidLng,
   ]);
 
-  const checkLocation = () => {
+  const setResolvedLocation = (
+    lat: number,
+    lng: number,
+    accuracyM: number,
+  ) => {
     if (!referenceLocation) {
       setLocationState('error');
+      return;
+    }
+
+    const distanceM = distanceMeters(
+      lat,
+      lng,
+      referenceLocation.lat,
+      referenceLocation.lng,
+    );
+
+    setCaptureLocation({
+      lat,
+      lng,
+      accuracyM,
+      distanceM,
+    });
+    setLocationState('ready');
+  };
+
+  const checkLocation = async () => {
+    if (!referenceLocation) {
+      setLocationState('error');
+      return;
+    }
+
+    setLocationState('checking');
+
+    if (hasNativeGeolocation()) {
+      try {
+        const position = await getCurrentDevicePosition();
+        setResolvedLocation(
+          position.latitude,
+          position.longitude,
+          position.accuracy,
+        );
+      } catch (geoError) {
+        setCaptureLocation(null);
+        setLocationState(
+          isLocationPermissionDenied(geoError) ? 'denied' : 'error',
+        );
+      }
       return;
     }
 
@@ -545,31 +599,13 @@ export default function NdviObservationPhotoModal({
       return;
     }
 
-    setLocationState('checking');
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const lat = Number(position.coords.latitude);
-        const lng = Number(position.coords.longitude);
-        const accuracyM = Math.max(
-          0,
-          Number(position.coords.accuracy) || 0,
+        setResolvedLocation(
+          Number(position.coords.latitude),
+          Number(position.coords.longitude),
+          Math.max(0, Number(position.coords.accuracy) || 0),
         );
-
-        const distanceM = distanceMeters(
-          lat,
-          lng,
-          referenceLocation.lat,
-          referenceLocation.lng,
-        );
-
-        setCaptureLocation({
-          lat,
-          lng,
-          accuracyM,
-          distanceM,
-        });
-        setLocationState('ready');
       },
       (geoError) => {
         setCaptureLocation(null);
@@ -589,11 +625,50 @@ export default function NdviObservationPhotoModal({
 
   if (!open || !target) return null;
 
-  const appendFiles = (next: FileList | null, nextSource: FieldObservationPhotoSource) => {
+  const appendFiles = (
+    next: FileList | File[] | null,
+    nextSource: FieldObservationPhotoSource,
+  ) => {
     if (!next?.length) return;
     setSource(nextSource);
     setFiles((current) => [...current, ...Array.from(next)].slice(0, 3));
     setError(null);
+  };
+
+  const openCamera = async () => {
+    if (!hasNativeCamera()) {
+      cameraRef.current?.click();
+      return;
+    }
+
+    try {
+      const file = await takeNativePhotoFile();
+      appendFiles([file], 'camera');
+    } catch (value) {
+      if (isNativePickerCancellation(value)) return;
+      setError(
+        value instanceof Error ? value.message : 'Kamera açılamadı.',
+      );
+    }
+  };
+
+  const openGallery = async () => {
+    if (!hasNativeCamera()) {
+      galleryRef.current?.click();
+      return;
+    }
+
+    if (files.length >= 3) return;
+
+    try {
+      const picked = await pickNativeImageFiles(3 - files.length);
+      appendFiles(picked, 'gallery');
+    } catch (value) {
+      if (isNativePickerCancellation(value)) return;
+      setError(
+        value instanceof Error ? value.message : 'Galeri açılamadı.',
+      );
+    }
   };
 
   const submit = async () => {
@@ -754,10 +829,10 @@ export default function NdviObservationPhotoModal({
           </div>
 
           <div className="tp-ndvi-photo-pickers">
-            <button type="button" onClick={() => cameraRef.current?.click()}>
+            <button type="button" onClick={() => void openCamera()}>
               📷 Fotoğraf çek
             </button>
-            <button type="button" onClick={() => galleryRef.current?.click()}>
+            <button type="button" onClick={() => void openGallery()}>
               ▣ Galeriden seç
             </button>
           </div>
@@ -766,7 +841,6 @@ export default function NdviObservationPhotoModal({
             ref={cameraRef}
             type="file"
             accept="image/*"
-            capture="environment"
             multiple
             hidden
             onChange={(event) => appendFiles(event.target.files, 'camera')}
