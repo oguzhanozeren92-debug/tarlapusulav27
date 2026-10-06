@@ -115,7 +115,15 @@ Her platform için gerçek store product → RevenueCat package eşlemesi doğru
 
 Bu bilgiler kullanıcı tarafından kesinleştirilmeden isim/e-posta uydurulmayacak.
 
-## F. Vercel
+## F. AdMob app-ads.txt
+
+- [x] `public/app-ads.txt` oluşturuldu.
+- [x] Publisher ID: `pub-9321324588059191`
+- [ ] Production deploy sonrası `https://tarlapusulav27.vercel.app/app-ads.txt` HTTP 200 doğrula.
+- [ ] App Store / Google Play developer website alanında TarlaPusula web domainini kullan.
+- [ ] Uygulama mağazada listelendikten sonra AdMob → app-ads.txt durumunu Verified olarak kontrol et.
+
+## G. Vercel
 
 - [x] privacy-policy.html production 200
 - [x] terms-of-use.html production 200
@@ -125,7 +133,7 @@ Bu bilgiler kullanıcı tarafından kesinleştirilmeden isim/e-posta uydurulmaya
   - 2026-10-06: Hobby günlük 100 deployment limiti doldu.
   - Limit reset sonrası latest main production deploy + HTTP 200 kontrolü.
 
-## G. Release gate
+## H. Release gate
 
 Public release **GO** ancak aşağıdakilerin tamamı geçince:
 
