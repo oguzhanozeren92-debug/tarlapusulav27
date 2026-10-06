@@ -68,7 +68,7 @@ Son kontrol: 2026-10-06
 - [ ] Apple Developer / App Store Connect üzerinde gerçek uygulama kaydı, Bundle ID, sertifika/provisioning ve imzalı archive/TestFlight akışı tamamlanmalı.
 - [ ] Google Play Console üzerinde gerçek uygulama kaydı, signing/upload key ve imzalı AAB üretimi tamamlanmalı.
 - [ ] RevenueCat ürünleri App Store Connect ve Google Play ürün kimlikleriyle production ortamında eşleştirilmeli ve gerçek sandbox/test satın alımı doğrulanmalı.
-- [ ] Hukuki sayfaların latest `main` sürümü production'a deploy edilip `/support.html` ve `/kvkk-aydinlatma.html` için HTTP 200 doğrulanmalı.
+- [x] Latest `main` production'a deploy edildi; `/support.html`, `/kvkk-aydinlatma.html` ve `/app-ads.txt` HTTP 200 doğrulandı.
 - [ ] En az bir gerçek Android ve bir gerçek iOS cihazda oturumlu uçtan uca smoke turu yapılmalı.
 - [ ] Push notification gerçek cihaz tokenı ile arka plan/kapalı uygulama senaryosunda doğrulanmalı.
 - [ ] Rewarded ve interstitial reklamlar gerçek cihazda TEST reklamlarıyla akış bazında doğrulanmalı.
@@ -76,7 +76,7 @@ Son kontrol: 2026-10-06
 
 ## Operasyonel notlar
 
-- Vercel production'da Gizlilik Politikası, Kullanım Koşulları ve hesap silme URL'leri 200 OK. Yeni `/support.html` kodda hazır ancak Hobby plan günlük 100 API deployment limiti dolduğu için latest `main` henüz production'a deploy edilemedi; limit sıfırlandıktan sonra yeniden deploy edilip Support URL doğrulanmalı.
+- Vercel production latest `main` deployment READY. Gizlilik Politikası, Kullanım Koşulları, hesap silme, `/support.html`, `/kvkk-aydinlatma.html` ve `/app-ads.txt` canlıda doğrulandı.
 - Supabase Free planda leaked-password protection için ücretli plana geçiş zorunluluğu vardır; yalnız bu özellik için şu aşamada plan yükseltme kararı alınmadı.
 - Fiziksel Android cihaz olmaması geliştirmeyi durdurmuyor; GitHub Actions APK üretebiliyor. Ancak halka açık mağaza yayını öncesinde fiziksel cihaz doğrulaması yine zorunlu kabul ediliyor.
 
@@ -104,4 +104,4 @@ Son kontrol: 2026-10-06
 
 Teknik web beta ve native CI açısından **GO**.
 
-Halka açık App Store / Google Play ticari yayını için kod tarafındaki ana köprüler hazırdır; kalan kritik işler artık ağırlıklı olarak **mağaza imzalama/console kurulumu, production legal-page deployment doğrulaması ve gerçek cihaz sandbox smoke testleri**dir.
+Halka açık App Store / Google Play ticari yayını için kod tarafındaki ana köprüler hazırdır; kalan kritik işler artık ağırlıklı olarak **mağaza imzalama/console kurulumu, gerçek cihaz sandbox smoke testleri ve mağaza/abonelik production bağlantıları**dir.
