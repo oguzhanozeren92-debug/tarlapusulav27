@@ -1659,7 +1659,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
           <div
             className="tp-wxref-data-grid"
-            data-required-plan="premium"
+            data-required-plan="plus"
             data-plan-feature="Gelişmiş Tarla İklimi ve Geçmiş Veriler"
           >
             <article>
