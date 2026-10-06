@@ -4998,3 +4998,189 @@ body .tp-v1 .tp-map-first-shell .tp-map-stage .tp-home-general-metric.is-climate
     padding-top:5px!important;
   }
 }
+
+/* =========================================================
+   V29 — ÜRETİM KANONİK BEYAZ / GRİ HARİTA KROMU
+   2026-10-06
+   Veri katmanlarının kendi renklerine dokunmaz.
+   Yalnız arayüz çerçevesi, kontroller, legend kabı ve metin kontrastı.
+   ========================================================= */
+
+/* Eski yeşil/neon kart çerçevesini nötr premium çerçeveye sabitle. */
+body .tp-v1 .tp-home-field{
+  border-color:rgba(17,17,17,.18)!important;
+  box-shadow:
+    0 20px 54px rgba(0,0,0,.18),
+    0 0 0 1px rgba(255,255,255,.45)!important;
+}
+body .tp-v1 .tp-home-field::before{
+  border-color:rgba(255,255,255,.08)!important;
+  background:transparent!important;
+}
+body .tp-v1 .tp-home-field::after{
+  display:none!important;
+}
+body .tp-v1 .tp-map-frame-corner{
+  filter:none!important;
+}
+body .tp-v1 .tp-map-frame-corner::before,
+body .tp-v1 .tp-map-frame-corner::after{
+  background:#f5f5f5!important;
+}
+
+/* Harita üst bilgisi: yeşil değil siyah/beyaz. */
+body .tp-v1 .tp-field-head{
+  border-bottom-color:rgba(255,255,255,.10)!important;
+  background:linear-gradient(180deg,rgba(13,13,14,.98),rgba(5,5,6,.96))!important;
+}
+body .tp-v1 .tp-field-head::before{
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px)!important;
+}
+body .tp-v1 .tp-map-heading-icon{
+  border-color:rgba(255,255,255,.20)!important;
+  background:#0b0b0c!important;
+  color:#fff!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 8px 22px rgba(0,0,0,.24)!important;
+}
+body .tp-v1 .tp-map-heading-icon svg{
+  stroke:#fff!important;
+  color:#fff!important;
+  filter:none!important;
+}
+body .tp-v1 .tp-map-heading-copy h2{
+  color:#fff!important;
+  text-shadow:none!important;
+}
+body .tp-v1 .tp-map-heading-copy p,
+body .tp-v1 .tp-field-toolbar .tp-field-select-wrap small{
+  color:rgba(255,255,255,.62)!important;
+}
+
+/* Seçici ve harita butonları: yalnız siyah / gri / beyaz. */
+body .tp-v1 .tp-field-toolbar .tp-field-select-box,
+body .tp-v1 .tp-field-toolbar .tp-add-field-3d,
+body .tp-v1 .tp-map-add-field-btn,
+body .tp-v1 .tp-map-fullscreen-btn{
+  border-color:rgba(255,255,255,.18)!important;
+  background:#0b0b0c!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+body .tp-v1 .tp-field-pin{
+  color:#fff!important;
+  text-shadow:none!important;
+}
+body .tp-v1 .tp-map-add-field-btn:hover,
+body .tp-v1 .tp-map-control-btn:hover{
+  border-color:rgba(255,255,255,.34)!important;
+  background:#1a1a1c!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+body .tp-v1 .tp-map-control-btn:active{
+  background:#242426!important;
+}
+
+/* Eski sekme şeritleri görünürse de nötr kalsın. */
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary){
+  border-color:rgba(255,255,255,.14)!important;
+  background:#0b0b0c!important;
+}
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut::after{
+  background:linear-gradient(180deg,transparent,rgba(255,255,255,.12),transparent)!important;
+}
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut.active,
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut:nth-child(2).active,
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut:nth-child(4).active,
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut:nth-child(5).active,
+body .tp-v1 .tp-layer-subbar-chip.active{
+  border-color:rgba(255,255,255,.22)!important;
+  background:#171719!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut.active::before,
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut:nth-child(2).active::before,
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut:nth-child(4).active::before,
+body .tp-v1 .tp-map-shortcuts:not(.tp-map-shortcuts-secondary) .tp-map-shortcut:nth-child(5).active::before,
+body .tp-v1 .tp-map-shortcut.active::after{
+  background:linear-gradient(90deg,transparent,#fff,transparent)!important;
+  box-shadow:none!important;
+}
+
+/* Harita araçları koyu krom; yeşil glow yok. */
+body .tp-v1 .tp-map-control-rail,
+body .tp-v1 .tp-map-data-badge,
+body .tp-v1 .tp-real-home-map .maplibregl-ctrl-group,
+body .tp-v1 .tp-real-home-map .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group.tp-map-compass{
+  border-color:rgba(255,255,255,.20)!important;
+  background:rgba(10,10,11,.94)!important;
+  box-shadow:0 10px 26px rgba(0,0,0,.30)!important;
+}
+body .tp-v1 .tp-map-control-btn,
+body .tp-v1 .tp-map-data-icon,
+body .tp-v1 .tp-real-home-map .maplibregl-ctrl-bottom-right .tp-map-compass__button{
+  background:transparent!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+body .tp-v1 .tp-map-data-icon{
+  border-color:rgba(255,255,255,.18)!important;
+  color:#fff!important;
+  text-shadow:none!important;
+}
+body .tp-v1 .tp-map-data-badge small{
+  color:rgba(255,255,255,.64)!important;
+}
+
+/*
+ * KRİTİK OKUNURLUK DÜZELTMESİ:
+ * Önceki override koyu legend üstünde yazıyı #111 yapıyordu.
+ * Legend kabını beyaz yapıp metni siyah tutuyoruz.
+ */
+body .tp-v1 .tp-map-first-shell .tp-real-home-legend{
+  border-color:#d7d7d9!important;
+  background:rgba(255,255,255,.96)!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.18)!important;
+  color:#111!important;
+  backdrop-filter:blur(12px)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+}
+body .tp-v1 .tp-map-first-shell .tp-real-home-legend > strong,
+body .tp-v1 .tp-map-first-shell .tp-real-home-legend .tp-legend-label,
+body .tp-v1 .tp-map-first-shell .tp-real-home-legend .tp-legend-label span{
+  color:#111!important;
+  -webkit-text-fill-color:#111!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}
+
+/* Eski NDVI legend kartı görünür kalırsa beyaz/siyah; veri noktası renkleri korunur. */
+body .tp-v1 .tp-ndvi-legend-card{
+  border-color:#d7d7d9!important;
+  background:rgba(255,255,255,.96)!important;
+  color:#111!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.18)!important;
+}
+body .tp-v1 .tp-ndvi-legend-card::before{
+  border-color:#d7d7d9!important;
+  background:#f4f4f5!important;
+  color:#111!important;
+}
+body .tp-v1 .tp-ndvi-legend-card > strong,
+body .tp-v1 .tp-ndvi-live-summary span,
+body .tp-v1 .tp-ndvi-live-summary strong{
+  color:#111!important;
+  text-shadow:none!important;
+}
+body .tp-v1 .tp-ndvi-legend-card > strong::after{
+  background:linear-gradient(90deg,#111,#b7b7ba,transparent)!important;
+}
+body .tp-v1 .tp-ndvi-live-summary{
+  border-top-color:#dedee0!important;
+}
+
