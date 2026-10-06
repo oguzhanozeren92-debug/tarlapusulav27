@@ -3270,6 +3270,160 @@ body:not(.tp-map-body-fullscreen)
   }
 }
 
+
+/* =========================================================
+   V20 — KANONİK HARİTA ALT OVERLAY SIRASI
+   2026-10-06
+   Üstten alta: Uydu tarihi -> NDVI renk skalası -> Pusula yorumu.
+   Pusula haritanın gerçek overlay'idir; dış footer değildir.
+   ========================================================= */
+.tp-home-map-pusula-shell{
+  position:relative!important;
+}
+
+.tp-home-map-pusula-shell .tp-map-first-shell .tp-home-field{
+  margin-bottom:0!important;
+  overflow:hidden!important;
+  border-radius:18px!important;
+}
+
+.tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+  position:absolute!important;
+  z-index:205!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  top:auto!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  transform:none!important;
+  display:grid!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-bottom:0!important;
+  border-radius:0 0 18px 18px!important;
+  pointer-events:auto!important;
+}
+
+/* Normal görünüm: NDVI Pusula'nın 6 px üstünde. */
+body:not(.tp-map-body-fullscreen)
+.tp-map-first-shell
+.tp-map-stage:not(.tp-map-portrait-fullscreen)
+.tp-mf-ndvi-strip{
+  left:10px!important;
+  right:10px!important;
+  top:auto!important;
+  bottom:calc(var(--tp-pusula-strip-height,72px) + 6px)!important;
+  width:auto!important;
+  max-width:none!important;
+  margin:0!important;
+  transform:none!important;
+  z-index:190!important;
+  pointer-events:auto!important;
+}
+
+/* Tarih NDVI'nın 6 px üstünde. */
+body:not(.tp-map-body-fullscreen)
+.tp-map-first-shell
+.tp-map-stage:not(.tp-map-portrait-fullscreen)
+.tp-measurement-date{
+  left:50%!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:calc(
+    var(--tp-pusula-strip-height,72px) +
+    var(--tp-map-legend-height,56px) +
+    12px
+  )!important;
+  transform:translateX(-50%)!important;
+  z-index:195!important;
+  pointer-events:auto!important;
+}
+
+/* Tam ekranda Pusula da viewport'un içinde kalır. */
+body.tp-map-body-fullscreen
+.tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  z-index:2147483647!important;
+  border-radius:0!important;
+  padding-bottom:max(7px,env(safe-area-inset-bottom))!important;
+  pointer-events:auto!important;
+}
+
+/* Tam ekran NDVI: Pusula üstünde aynı stack. */
+body.tp-map-body-fullscreen
+.tp-map-stage
+.tp-mf-ndvi-strip{
+  left:max(10px,env(safe-area-inset-left))!important;
+  right:max(10px,env(safe-area-inset-right))!important;
+  top:auto!important;
+  bottom:calc(
+    var(--tp-pusula-strip-height,72px) +
+    env(safe-area-inset-bottom) +
+    6px
+  )!important;
+  width:auto!important;
+  max-width:none!important;
+  transform:none!important;
+  margin:0!important;
+  z-index:220!important;
+  pointer-events:auto!important;
+}
+
+/* Tam ekran tarih: NDVI üstünde. */
+body.tp-map-body-fullscreen
+.tp-map-stage
+.tp-measurement-date{
+  left:50%!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:calc(
+    var(--tp-pusula-strip-height,72px) +
+    var(--tp-map-legend-height,56px) +
+    env(safe-area-inset-bottom) +
+    12px
+  )!important;
+  transform:translateX(-50%)!important;
+  z-index:221!important;
+  max-width:calc(100% - 120px)!important;
+  pointer-events:auto!important;
+}
+
+/* Tam ekran araçları tıklanabilir kalır. */
+body.tp-map-body-fullscreen .tp-map-stage .tp-map-control-rail,
+body.tp-map-body-fullscreen .tp-map-stage .tp-map-control-btn,
+body.tp-map-body-fullscreen .tp-map-stage .tp-mf-layer-trigger,
+body.tp-map-body-fullscreen .tp-map-stage .tp-mf-stage-compass,
+body.tp-map-body-fullscreen .tp-map-stage .tp-map-portrait-close{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+
+@media(max-width:760px){
+  .tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
+    left:0!important;
+    right:0!important;
+    width:100%!important;
+    margin:0!important;
+    border-radius:0 0 18px 18px!important;
+  }
+
+  body:not(.tp-map-body-fullscreen)
+  .tp-map-first-shell
+  .tp-map-stage:not(.tp-map-portrait-fullscreen)
+  .tp-mf-ndvi-strip{
+    left:8px!important;
+    right:8px!important;
+  }
+}
+
 `
 
 function LayerIcon() {
@@ -3365,6 +3519,10 @@ export default function HomeMapSectionMapFirst(
 
     const syncBottomStack = () => {
       const root = rootRef.current;
+      const shell = root?.closest('.tp-home-map-pusula-shell') as HTMLElement | null;
+      const pusulaStrip = shell?.querySelector(
+        ':scope > .tp-home-map-pusula-strip',
+      ) as HTMLElement | null;
       const legend = mapStage.querySelector(
         activeLayer === 'vegetation'
           ? '.tp-mf-ndvi-strip'
@@ -3374,6 +3532,9 @@ export default function HomeMapSectionMapFirst(
         '.tp-measurement-date',
       ) as HTMLElement | null;
 
+      const pusulaHeight = Math.ceil(
+        pusulaStrip?.getBoundingClientRect().height ?? 72,
+      );
       const legendHeight = Math.ceil(
         legend?.getBoundingClientRect().height ?? 56,
       );
@@ -3381,6 +3542,10 @@ export default function HomeMapSectionMapFirst(
         date?.getBoundingClientRect().height ?? 28,
       );
 
+      mapStage.style.setProperty(
+        '--tp-pusula-strip-height',
+        `${pusulaHeight}px`,
+      );
       mapStage.style.setProperty(
         '--tp-map-legend-height',
         `${legendHeight}px`,
@@ -3399,6 +3564,10 @@ export default function HomeMapSectionMapFirst(
         : null;
 
     const root = rootRef.current;
+    const shell = root?.closest('.tp-home-map-pusula-shell') as HTMLElement | null;
+    const pusulaStrip = shell?.querySelector(
+      ':scope > .tp-home-map-pusula-strip',
+    ) as HTMLElement | null;
     const legend = mapStage.querySelector(
       activeLayer === 'vegetation'
         ? '.tp-mf-ndvi-strip'
@@ -3410,6 +3579,7 @@ export default function HomeMapSectionMapFirst(
 
     if (resizeObserver) {
       resizeObserver.observe(mapStage);
+      if (pusulaStrip) resizeObserver.observe(pusulaStrip);
       if (legend) resizeObserver.observe(legend);
       if (date) resizeObserver.observe(date);
     }
