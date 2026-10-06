@@ -28,7 +28,6 @@ export type PlanFeatureKey =
   | 'irrigation'
   | 'notifications'
   | 'reports'
-  | 'widget'
   | 'pusulaPdf'
   | 'orchard'
   | 'bisip'
@@ -49,7 +48,6 @@ export const PLAN_FEATURE_MATRIX: Array<{
   { key: 'irrigation', label: 'Sulama', free: 'Temel', plus: 'Optimizasyon', premium: 'Optimizasyon' },
   { key: 'notifications', label: 'Gelişmiş bildirimler', free: false, plus: true, premium: true },
   { key: 'reports', label: 'Raporlar', free: false, plus: true, premium: true },
-  { key: 'widget', label: 'Gelişmiş widget', free: false, plus: true, premium: true },
   { key: 'pusulaPdf', label: 'PusulaPDF', free: false, plus: false, premium: true },
   { key: 'orchard', label: 'Bahçe / ağaç zekâsı', free: false, plus: false, premium: true },
   { key: 'bisip', label: 'BİSİP / soğuklama', free: false, plus: false, premium: true },
