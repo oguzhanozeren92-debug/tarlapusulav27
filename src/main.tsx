@@ -20,6 +20,7 @@ import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 import { installNativeFeedback } from './mobile/nativeFeedback';
 import NativePushBridge from './mobile/NativePushBridge';
 import NativeAuthBridge from './mobile/NativeAuthBridge';
+import NativeShellBridge from './mobile/NativeShellBridge';
 import { forwardWebOAuthCallbackToNative } from './mobile/nativeAuth';
 
 forwardWebOAuthCallbackToNative();
@@ -50,6 +51,7 @@ createRoot(document.getElementById('root')!).render(
       <AppActivityTracker />
       <NativePushBridge />
       <NativeAuthBridge />
+      <NativeShellBridge />
       <InAppAdminMode />
       <PusulaPointsCelebration />
       <PlanUpgradeModal />
