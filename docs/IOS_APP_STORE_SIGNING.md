@@ -28,6 +28,15 @@ The Release Xcode configuration already sets `aps-environment=production`.
 - `VITE_REVENUECAT_IOS_PUBLIC_KEY`
 - `VITE_REVENUECAT_ANDROID_PUBLIC_KEY`
 
+TestFlight'a doğrudan yükleme seçeneği kullanılacaksa ayrıca:
+
+- `APP_STORE_CONNECT_API_KEY_ID`
+- `APP_STORE_CONNECT_API_ISSUER_ID`
+- `APP_STORE_CONNECT_API_KEY_P8_B64`
+
+App Store Connect API private key (`.p8`) dosyasını Base64 olarak GitHub Secret'a koyun.
+Dosyayı repoya commit etmeyin; `*.p8` gitignore kapsamındadır.
+
 Encode the exported `.p12` certificate and `.mobileprovision` profile as Base64
 before storing them in GitHub Secrets. Never commit either file.
 
@@ -50,5 +59,11 @@ Team, matches `com.tarlapusula.app`, contains production APNs entitlement, build
 Release archive, exports a signed App Store Connect IPA, verifies the code signature
 and uploads the IPA as a GitHub Actions artifact.
 
-It does not automatically upload to App Store Connect yet. Upload automation can be
-added after the App Store Connect API key is created.
+The workflow also has an `upload_to_testflight` boolean input. When enabled, it
+requires the three App Store Connect API secrets above, writes the `.p8` key only to
+the ephemeral macOS runner, uploads the verified IPA to App Store Connect/TestFlight
+with Apple's command-line uploader, then removes the private key.
+
+For the first signed run, keep `upload_to_testflight=false` if you only want to
+validate signing. After the App Store Connect app record and API key are ready, run
+again with a higher `build_number` and set `upload_to_testflight=true`.
