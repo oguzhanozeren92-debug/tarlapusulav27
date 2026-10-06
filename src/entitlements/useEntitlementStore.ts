@@ -1,8 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from '../supabaseClient';
 
-export type TarlaPusulaPlan = 'free' | 'premium';
-export type DeveloperPlanMode = 'real' | 'free' | 'premium' | 'new_user';
+export type TarlaPusulaPlan = 'free' | 'plus' | 'premium';
+export type DeveloperPlanMode = 'real' | 'free' | 'plus' | 'premium' | 'new_user';
 
 type EntitlementStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -13,7 +13,9 @@ export type EntitlementSnapshot = {
   developerMode: DeveloperPlanMode;
   effectivePlan: TarlaPusulaPlan;
   canOverride: boolean;
+  isPlus: boolean;
   isPremium: boolean;
+  isPaid: boolean;
   isNewUserPreview: boolean;
   switching: boolean;
   backendSynced: boolean;
@@ -34,7 +36,9 @@ let state: EntitlementSnapshot = {
   developerMode: 'real',
   effectivePlan: 'free',
   canOverride: false,
+  isPlus: false,
   isPremium: false,
+  isPaid: false,
   isNewUserPreview: false,
   switching: false,
   backendSynced: false,
@@ -50,7 +54,8 @@ function normalizePlan(value: unknown): TarlaPusulaPlan {
     .toLowerCase()
     .replace(/[\s-]+/g, '_');
 
-  if (plan === 'premium' || plan === 'plus') return 'premium';
+  if (plan === 'premium') return 'premium';
+  if (plan === 'plus') return 'plus';
   return 'free';
 }
 
@@ -59,6 +64,7 @@ function normalizeMode(value: unknown): DeveloperPlanMode {
 
   if (
     mode === 'premium' ||
+    mode === 'plus' ||
     mode === 'free' ||
     mode === 'real' ||
     mode === 'new_user'
@@ -138,6 +144,7 @@ function getEffectivePlan(
 ): TarlaPusulaPlan {
   if (mode === 'real') return realPlan;
   if (mode === 'premium') return 'premium';
+  if (mode === 'plus') return 'plus';
 
   // Ücretsiz ve Yeni Kullanıcı önizlemeleri plan yetkileri bakımından Free çalışır.
   return 'free';
@@ -228,10 +235,11 @@ function switchText() {
   if (state.switching) return 'DEĞİŞİYOR…';
 
   if (state.developerMode === 'premium') return 'PREMIUM';
+  if (state.developerMode === 'plus') return 'PLUS';
   if (state.developerMode === 'free') return 'ÜCRETSİZ';
   if (state.developerMode === 'new_user') return 'YENİ KULLANICI';
 
-  return `GERÇEK · ${state.realPlan === 'premium' ? 'PREMIUM' : 'ÜCRETSİZ'}`;
+  return `GERÇEK · ${state.realPlan === 'premium' ? 'PREMIUM' : state.realPlan === 'plus' ? 'PLUS' : 'ÜCRETSİZ'}`;
 }
 
 function renderDeveloperSwitch() {
@@ -297,7 +305,9 @@ function applyFallback(
     developerMode,
     effectivePlan,
     canOverride,
+    isPlus: effectivePlan === 'plus',
     isPremium: effectivePlan === 'premium',
+    isPaid: effectivePlan !== 'free',
     isNewUserPreview: developerMode === 'new_user',
     switching: false,
     backendSynced: false,
@@ -343,7 +353,9 @@ function applyBackendContext(row: any, email: string) {
     developerMode,
     effectivePlan,
     canOverride,
+    isPlus: effectivePlan === 'plus',
     isPremium: effectivePlan === 'premium',
+    isPaid: effectivePlan !== 'free',
     isNewUserPreview: developerMode === 'new_user',
     switching: false,
     backendSynced: true,
@@ -406,7 +418,9 @@ export async function refreshEntitlements() {
           canOverride: true,
           developerMode: localMode,
           effectivePlan,
+          isPlus: effectivePlan === 'plus',
           isPremium: effectivePlan === 'premium',
+          isPaid: effectivePlan !== 'free',
           isNewUserPreview: localMode === 'new_user',
         });
       }
@@ -442,7 +456,9 @@ export async function setDeveloperPlanMode(mode: DeveloperPlanMode) {
   patch({
     developerMode: safeMode,
     effectivePlan,
+    isPlus: effectivePlan === 'plus',
     isPremium: effectivePlan === 'premium',
+    isPaid: effectivePlan !== 'free',
     isNewUserPreview,
     // Yeni Kullanıcı frontend-only önizlemedir; backend RPC beklemeyiz.
     switching: !isNewUserPreview,
@@ -502,10 +518,12 @@ export async function setDeveloperPlanMode(mode: DeveloperPlanMode) {
 export async function cycleDeveloperPlanMode() {
   const next: DeveloperPlanMode =
     state.developerMode === 'premium'
-      ? 'free'
-      : state.developerMode === 'free'
-        ? 'new_user'
-        : 'premium';
+      ? 'plus'
+      : state.developerMode === 'plus'
+        ? 'free'
+        : state.developerMode === 'free'
+          ? 'new_user'
+          : 'premium';
 
   return setDeveloperPlanMode(next);
 }
@@ -524,6 +542,25 @@ function bootstrap() {
   if (typeof window === 'undefined') return;
 
   ensureAuthListener();
+
+  window.addEventListener('tp:store-entitlements-changed', (event: Event) => {
+    const detail =
+      (event as CustomEvent<{ plan?: TarlaPusulaPlan }>).detail ?? {};
+    const realPlan = normalizePlan(detail.plan);
+    const developerMode = state.canOverride
+      ? state.developerMode
+      : 'real';
+    const effectivePlan = getEffectivePlan(realPlan, developerMode);
+
+    patch({
+      realPlan,
+      effectivePlan,
+      isPlus: effectivePlan === 'plus',
+      isPremium: effectivePlan === 'premium',
+      isPaid: effectivePlan !== 'free',
+      error: null,
+    });
+  });
 
   window.setTimeout(() => {
     void refreshEntitlements();
