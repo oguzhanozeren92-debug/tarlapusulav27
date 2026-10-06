@@ -3372,9 +3372,23 @@
   inset:0;
   z-index:1;
   border:0;
-  background:rgba(12,14,15,.22)!important;
-  -webkit-backdrop-filter:blur(14px) saturate(.82) brightness(.82)!important;
-  backdrop-filter:blur(14px) saturate(.82) brightness(.82)!important;
+  background:rgba(10,12,14,.18)!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+
+.tp-peststore-content.tp-depot-sheet-bg-blur{
+  filter:blur(11px) brightness(.74) saturate(.78)!important;
+  transform:scale(1.025)!important;
+  transform-origin:center top!important;
+  pointer-events:none!important;
+  user-select:none!important;
+}
+
+body:has(.tp-depot-v4-sheet-layer) .tp-global-page-header{
+  filter:blur(8px) brightness(.78)!important;
+  opacity:.82!important;
+  pointer-events:none!important;
 }
 
 .tp-depot-v4-sheet{
