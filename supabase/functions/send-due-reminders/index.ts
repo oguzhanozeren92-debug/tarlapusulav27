@@ -106,6 +106,221 @@ async function getRequestUser(req: Request) {
   return error ? null : data.user;
 }
 
+function revenueCatSecretApiKey() {
+  const key = String(Deno.env.get("REVENUECAT_SECRET_API_KEY") || "").trim();
+  if (!key) {
+    throw new Error("REVENUECAT_SECRET_API_KEY is not configured.");
+  }
+  return key;
+}
+
+function revenueCatWebhookAuthorized(req: Request) {
+  const expected = String(
+    Deno.env.get("REVENUECAT_WEBHOOK_AUTH") || "",
+  ).trim();
+  const actual = String(req.headers.get("authorization") || "").trim();
+
+  return Boolean(expected && actual && expected === actual);
+}
+
+function revenueCatEntitlementActive(value: any) {
+  if (!value || typeof value !== "object") return false;
+
+  const expiresAt = String(value.expires_date || "").trim();
+  if (!expiresAt) return true;
+
+  const time = new Date(expiresAt).getTime();
+  return Number.isFinite(time) && time > Date.now();
+}
+
+function revenueCatPlanFromSubscriber(subscriber: any) {
+  const entitlements = subscriber?.entitlements || {};
+
+  if (revenueCatEntitlementActive(entitlements.premium)) {
+    return {
+      plan: "premium",
+      productId:
+        String(entitlements.premium?.product_identifier || "").trim() || null,
+      expiresAt:
+        String(entitlements.premium?.expires_date || "").trim() || null,
+    };
+  }
+
+  if (revenueCatEntitlementActive(entitlements.plus)) {
+    return {
+      plan: "plus",
+      productId:
+        String(entitlements.plus?.product_identifier || "").trim() || null,
+      expiresAt:
+        String(entitlements.plus?.expires_date || "").trim() || null,
+    };
+  }
+
+  return {
+    plan: "free",
+    productId: null,
+    expiresAt: null,
+  };
+}
+
+async function fetchRevenueCatSubscriber(userId: string) {
+  const response = await fetch(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${revenueCatSecretApiKey()}`,
+        Accept: "application/json",
+      },
+    },
+  );
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      `RevenueCat subscriber lookup failed (${response.status}): ${text.slice(0, 500)}`,
+    );
+  }
+
+  const payload = JSON.parse(text || "{}");
+  return payload?.subscriber || {};
+}
+
+async function syncRevenueCatUser(userId: string) {
+  const subscriber = await fetchRevenueCatSubscriber(userId);
+  const state = revenueCatPlanFromSubscriber(subscriber);
+  const now = new Date().toISOString();
+
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update({
+      subscription_plan: state.plan,
+      subscription_source: "revenuecat",
+      subscription_product_id: state.productId,
+      subscription_expires_at: state.expiresAt,
+      subscription_updated_at: now,
+      updated_at: now,
+    })
+    .eq("id", userId);
+
+  if (error) throw error;
+
+  return state;
+}
+
+function revenueCatUserCandidates(event: any) {
+  const values = [
+    event?.app_user_id,
+    event?.original_app_user_id,
+    ...(Array.isArray(event?.aliases) ? event.aliases : []),
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  return Array.from(new Set(values.filter((value) => uuidPattern.test(value))));
+}
+
+async function resolveRevenueCatUserId(event: any) {
+  const candidates = revenueCatUserCandidates(event);
+  if (!candidates.length) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .in("id", candidates)
+    .limit(1);
+
+  if (error) throw error;
+  return data?.[0]?.id ? String(data[0].id) : null;
+}
+
+async function handleRevenueCatWebhook(req: Request, body: any) {
+  if (!revenueCatWebhookAuthorized(req)) {
+    return {
+      status: 401,
+      body: { error: "Unauthorized RevenueCat webhook." },
+    };
+  }
+
+  const event = body?.event;
+  const eventId = String(event?.id || "").trim();
+  const eventType = String(event?.type || "UNKNOWN").trim();
+
+  if (!eventId) {
+    return {
+      status: 400,
+      body: { error: "RevenueCat event id is required." },
+    };
+  }
+
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from("subscription_webhook_events")
+    .select("event_id")
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+
+  if (existing?.event_id) {
+    return {
+      status: 200,
+      body: { ok: true, duplicate: true },
+    };
+  }
+
+  const userId = await resolveRevenueCatUserId(event);
+
+  if (!userId) {
+    await supabaseAdmin
+      .from("subscription_webhook_events")
+      .insert({
+        event_id: eventId,
+        user_id: null,
+        event_type: eventType,
+        store: String(event?.store || "").trim() || null,
+        product_id: String(event?.product_id || "").trim() || null,
+        environment: String(event?.environment || "").trim() || null,
+        event_timestamp_ms: Number(event?.event_timestamp_ms || 0) || null,
+        payload: body,
+      });
+
+    return {
+      status: 200,
+      body: { ok: true, ignored: "user_not_found" },
+    };
+  }
+
+  const state = await syncRevenueCatUser(userId);
+
+  const { error: insertError } = await supabaseAdmin
+    .from("subscription_webhook_events")
+    .insert({
+      event_id: eventId,
+      user_id: userId,
+      event_type: eventType,
+      store: String(event?.store || "").trim() || null,
+      product_id: String(event?.product_id || "").trim() || null,
+      environment: String(event?.environment || "").trim() || null,
+      event_timestamp_ms: Number(event?.event_timestamp_ms || 0) || null,
+      payload: body,
+    });
+
+  if (insertError) throw insertError;
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      userId,
+      plan: state.plan,
+    },
+  };
+}
+
 async function isAuthorizedCronRequest(req: Request) {
   const supplied = req.headers.get("x-cron-secret") || "";
   if (!supplied) return false;
@@ -1078,6 +1293,33 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
+
+    if (body?.event?.id && body?.event?.app_user_id) {
+      const result = await handleRevenueCatWebhook(req, body);
+
+      return new Response(JSON.stringify(result.body), {
+        status: result.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (body?.mode === "revenuecat_sync") {
+      const user = await getRequestUser(req);
+
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Oturum gerekli." }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const state = await syncRevenueCatUser(user.id);
+
+      return new Response(JSON.stringify({ ok: true, ...state }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (body?.enqueuePush) {
       const queued = await enqueueAuthenticatedFieldActivity(req, body.enqueuePush);
