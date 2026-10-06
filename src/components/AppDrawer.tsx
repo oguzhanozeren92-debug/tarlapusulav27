@@ -275,7 +275,7 @@ export default function AppDrawer({
         .tp-premium-drawer-backdrop{
           position:fixed;
           inset:0;
-          z-index:9998;
+          z-index:2147483490;
           border:0;
           padding:0;
           background:rgba(0,5,2,.66);
@@ -285,7 +285,7 @@ export default function AppDrawer({
 
         .tp-premium-drawer{
           position:fixed;
-          z-index:9999;
+          z-index:2147483500;
           inset:0 auto 0 0;
           width:min(88vw,392px);
           padding:16px 18px 16px;
@@ -788,6 +788,26 @@ export default function AppDrawer({
           color:#20252b!important;
         }
 
+
+        /* DRAWER IS THE ONLY APP CHROME WHILE OPEN.
+           Global/header bars use extremely high z-index values (one of them
+           is 2147483647), so raising the drawer alone can never reliably win.
+           Hide fixed app chrome while the drawer exists; restore automatically
+           when the drawer unmounts. */
+        body:has(.tp-premium-drawer) .tp-global-page-header,
+        body:has(.tp-premium-drawer) .tp-v1-header,
+        body:has(.tp-premium-drawer) .tp-classic-bottom-nav,
+        body:has(.tp-premium-drawer) .tp-field-detail-bottom,
+        body:has(.tp-premium-drawer) .bottomNav{
+          display:none!important;
+          visibility:hidden!important;
+          pointer-events:none!important;
+        }
+
+        body:has(.tp-premium-drawer){
+          overflow:hidden!important;
+          overscroll-behavior:none!important;
+        }
 
         /* DRAWER FOOTER CLEANUP V2 */
         body:has(.tp-premium-drawer) .tp-admin-entry{
