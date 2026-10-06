@@ -47,8 +47,14 @@ function platformUnits() {
   }
 
   const prefix = platform === 'ios' ? 'IOS' : 'ANDROID';
+  const nativeLiveTestShell =
+    Capacitor.isNativePlatform() &&
+    typeof window !== 'undefined' &&
+    /(?:^|\.)vercel\.app$/i.test(window.location.hostname);
+
   const forceTesting =
     import.meta.env.DEV ||
+    nativeLiveTestShell ||
     env('VITE_ADMOB_TEST_MODE').toLowerCase() === 'true';
 
   const rewardedProd =
