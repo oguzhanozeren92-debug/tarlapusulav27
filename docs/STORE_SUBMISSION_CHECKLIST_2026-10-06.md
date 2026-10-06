@@ -32,6 +32,7 @@ Son güncelleme: 2026-10-06
 - [x] Gamification self-award server-side verification
 - [x] Store Privacy / Data Safety draft
 - [x] Turkish store listing copy draft
+- [x] KVKK Aydınlatma Metni release taslağı (`docs/KVKK_AYDINLATMA_METNI_2026-10-06.md`)
 
 ## B. Apple membership ACTIVE olur olmaz
 
@@ -81,10 +82,10 @@ Son güncelleme: 2026-10-06
 9. Gerçek Android smoke test + tester feedback
 10. 14 gün sonunda Apply for production
 11. Data Safety formunu store privacy dokümanıyla doldur
-10. Ads declaration = YES
-11. Account deletion URL gir
-12. Store listing metinlerini ekle
-13. Sandbox subscription / restore test
+12. Ads declaration = YES
+13. Account deletion URL gir
+14. Store listing metinlerini ekle
+15. Sandbox subscription / restore test
 
 ## D. RevenueCat mağazalar açılınca
 
@@ -110,15 +111,19 @@ RevenueCat:
 
 Her platform için gerçek store product → RevenueCat package eşlemesi doğrulanmalı.
 
-## E. Hukuki/operasyonel tek kalan insan girdileri
+## E. Hukuki/operasyonel son insan girdileri
 
-- [ ] Veri sorumlusu / işletmeci gerçek kimliği
-- [ ] Kalıcı kurumsal destek e-posta adresi
-- [ ] KVKK Aydınlatma Metni final
-- [ ] Terms/Privacy içinde işletmeci ve iletişim alanlarını finalle
-- [ ] Dedicated reviewer/test account
+Kod/repo tarafında hukuki metnin gövdesi hazırdır. Halka açık ticari yayın öncesinde yalnız gerçek bilgilerle aşağıdaki alanlar kesinleştirilecek:
 
-Bu bilgiler kullanıcı tarafından kesinleştirilmeden isim/e-posta uydurulmayacak.
+- [ ] Veri sorumlusu / işletmeci **tam gerçek adı veya ticari unvanı**
+- [ ] Kalıcı **KVKK / gizlilik / destek e-posta adresi**
+- [ ] İletişim / tebligat adresi (kullanılacaksa)
+- [ ] `docs/KVKK_AYDINLATMA_METNI_2026-10-06.md` içindeki placeholder alanlarını doldur
+- [ ] Final KVKK sayfasını public web'e ekle ve Privacy/Support/Terms içinden linkle
+- [ ] Privacy + Terms içinde işletmeci ve kalıcı iletişim bilgisini finalle
+- [ ] Dedicated reviewer/test account oluştur
+
+**Güvenlik kuralı:** reviewer hesabının parolası, Apple/Google şifreleri, 2FA kodları veya sertifika özel anahtar parolaları repoya yazılmayacak.
 
 ## F. AdMob app-ads.txt
 
@@ -137,6 +142,8 @@ Bu bilgiler kullanıcı tarafından kesinleştirilmeden isim/e-posta uydurulmaya
   - Repo source hazır.
   - 2026-10-06: Hobby günlük 100 deployment limiti doldu.
   - Limit reset sonrası latest main production deploy + HTTP 200 kontrolü.
+- [ ] kvkk-aydinlatma.html production 200
+  - Kimlik/iletişim alanları kesinleştirildikten sonra public sayfa oluşturulacak.
 
 ## H. Release gate
 
@@ -151,4 +158,5 @@ Public release **GO** ancak aşağıdakilerin tamamı geçince:
 - Sign in with Apple production login
 - Privacy/Data Safety forms
 - Legal identity/contact final
+- KVKK public page + legal cross-links
 - Support URL 200
