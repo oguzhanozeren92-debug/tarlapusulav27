@@ -1,5 +1,6 @@
 import { fromUrl } from 'geotiff';
 import type { EarthSearchScene, Position } from '../../../services/earthSearchService';
+import { NDVI_HIGH_MIN, NDVI_LOW_MAX } from './ndviDisplayPolicy';
 
 export type EarthSearchNdviRelativeZoneStatus = 'weaker' | 'similar' | 'stronger';
 
@@ -276,9 +277,11 @@ function percentagesFromValues(values: number[]) {
   const total = values.length;
   if (!total) return null;
 
-  const healthy = values.filter((value) => value >= 0.6).length;
-  const moderate = values.filter((value) => value >= 0.3 && value < 0.6).length;
-  const stressed = values.filter((value) => value < 0.3).length;
+  const healthy = values.filter((value) => value >= NDVI_HIGH_MIN).length;
+  const moderate = values.filter(
+    (value) => value >= NDVI_LOW_MAX && value < NDVI_HIGH_MIN,
+  ).length;
+  const stressed = values.filter((value) => value < NDVI_LOW_MAX).length;
 
   return {
     healthyPercent: (healthy / total) * 100,
@@ -319,8 +322,8 @@ function percentagesFromHistogram(histogram: GeoBlazeBandStats['histogram']) {
 
     total += count;
 
-    if (value >= 0.6) healthy += count;
-    else if (value >= 0.3) moderate += count;
+    if (value >= NDVI_HIGH_MIN) healthy += count;
+    else if (value >= NDVI_LOW_MAX) moderate += count;
     else stressed += count;
   }
 
