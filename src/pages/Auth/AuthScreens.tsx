@@ -9,6 +9,10 @@ import type { Screen } from '../../types';
 import { Button, Card } from '../../ui';
 import PusulaMark from '../../ui/brand/PusulaMark';
 import { supabase } from '../../supabaseClient';
+import {
+  isNativeOAuthAvailable,
+  startNativeOAuth,
+} from '../../mobile/nativeAuth';
 import './Auth.css';
 
 type AuthScreensProps = {
@@ -350,10 +354,17 @@ export default function AuthScreens({
     setSocialLoading(provider);
 
     try {
+      if (isNativeOAuthAvailable()) {
+        await startNativeOAuth(provider);
+        setSocialLoading(null);
+        return;
+      }
+
       const redirectTo =
         window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? `${window.location.origin}/`
           : 'https://tarlapusulav25.vercel.app/';
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo },
