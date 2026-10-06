@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { useEntitlementStore } from '../entitlements/useEntitlementStore';
 import IssueReportModal from './IssueReportModal';
 import './DrawerSupportFooter.css';
 
@@ -25,6 +27,10 @@ function SocialButton({
 
 export default function DrawerSupportFooter({ screen }: Props) {
   const [reportOpen, setReportOpen] = useState(false);
+  const entitlement = useEntitlementStore();
+  const showAdPrivacy =
+    Capacitor.isNativePlatform() &&
+    entitlement.effectivePlan === 'free';
 
   return (
     <>
@@ -40,6 +46,22 @@ export default function DrawerSupportFooter({ screen }: Props) {
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
           </SocialButton>
         </div>
+
+        {showAdPrivacy ? (
+          <button
+            className="tp-drawer-report-button"
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('tp:ad-privacy-options'));
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 5 6v5c0 4.6 2.7 8 7 10 4.3-2 7-5.4 7-10V6l-7-3Z"/>
+              <path d="M9.5 12.2 11.2 14l3.6-4"/>
+            </svg>
+            <span>Reklam gizlilik tercihleri</span>
+          </button>
+        ) : null}
 
         <button className="tp-drawer-report-button" type="button" onClick={() => setReportOpen(true)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".8"/><path d="M10.3 4.2 2.8 17.1A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.9L13.7 4.2a2 2 0 0 0-3.4 0Z"/></svg>
