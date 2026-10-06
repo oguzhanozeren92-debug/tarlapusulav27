@@ -66,7 +66,8 @@ Son kontrol: 2026-10-06
 
 ## Mağaza yayını için kalan gerçek bloklayıcılar
 
-- [ ] Apple Developer / App Store Connect üzerinde gerçek uygulama kaydı, Bundle ID, sertifika/provisioning ve imzalı archive/TestFlight akışı tamamlanmalı.
+- [x] Apple Developer Program membership ACTIVE (valid through 06 Oct 2027).
+- [ ] App Store Connect üzerinde gerçek uygulama kaydı, Bundle ID, sertifika/provisioning ve imzalı archive/TestFlight akışı tamamlanmalı.
 - [ ] Google Play Console üzerinde gerçek uygulama kaydı, signing/upload key ve imzalı AAB üretimi tamamlanmalı.
 - [ ] RevenueCat ürünleri App Store Connect ve Google Play ürün kimlikleriyle production ortamında eşleştirilmeli ve gerçek sandbox/test satın alımı doğrulanmalı.
 - [x] Latest `main` production'a deploy edildi; `/support.html`, `/kvkk-aydinlatma.html` ve `/app-ads.txt` HTTP 200 doğrulandı.
