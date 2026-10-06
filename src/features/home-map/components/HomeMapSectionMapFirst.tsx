@@ -3880,6 +3880,12 @@ export default function HomeMapSectionMapFirst(
                 return;
               }
 
+              if (typeof props.onOpenFieldOperation === 'function') {
+                props.onOpenFieldOperation();
+                return;
+              }
+
+              // Legacy fallback for older hosts.
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(
                   new CustomEvent('tp:home-map-open-field-operation'),
