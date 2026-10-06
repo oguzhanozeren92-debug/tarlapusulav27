@@ -8,6 +8,9 @@ import {
 import { supabase } from '../supabaseClient';
 import type { AdPlacement } from '../monetization/adRuntime';
 
+const ANDROID_PRODUCTION_REWARDED_ID =
+  'ca-app-pub-9321324588059191/4148774701';
+
 const TEST_UNITS = {
   android: {
     rewarded: 'ca-app-pub-3940256099942544/5224354917',
@@ -39,7 +42,9 @@ function platformUnits() {
     import.meta.env.DEV ||
     env('VITE_ADMOB_TEST_MODE').toLowerCase() === 'true';
 
-  const rewardedProd = env(`VITE_ADMOB_${prefix}_REWARDED_ID`);
+  const rewardedProd =
+    env(`VITE_ADMOB_${prefix}_REWARDED_ID`) ||
+    (platform === 'android' ? ANDROID_PRODUCTION_REWARDED_ID : '');
   const interstitialProd = env(`VITE_ADMOB_${prefix}_INTERSTITIAL_ID`);
 
   return {
