@@ -14,6 +14,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Trash2,
   UserRound,
   Wheat,
 } from 'lucide-react';
@@ -474,6 +475,28 @@ const HUB_CSS = String.raw`
 .tp-plan-option span{display:block;color:#8a929d;font-size:7px;font-weight:900;text-transform:uppercase}
 .tp-plan-option strong{display:block;margin-top:4px;color:#111827;font-size:12px}
 .tp-plan-option ul{margin:8px 0 0;padding-left:15px;color:#626b76;font-size:8px;line-height:1.55}
+
+.tp-account-actions{display:flex;flex-wrap:wrap;gap:7px}
+.tp-account-delete-trigger{
+  min-height:34px;padding:0 11px;border:1px solid #e8d3d3;border-radius:11px;background:#fff;color:#943434;
+  font:800 9px/1 system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer;
+}
+.tp-account-delete-modal{
+  position:fixed;z-index:2147483001;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(calc(100% - 24px),470px);padding:16px;border:1px solid #e0e4e8;border-radius:20px;
+  background:#fff;color:#111827;box-shadow:0 28px 90px rgba(17,24,39,.24);
+}
+.tp-account-delete-modal h3{margin:0;font-size:18px;letter-spacing:-.03em}
+.tp-account-delete-modal p{margin:7px 0 0;color:#626b76;font-size:9.5px;line-height:1.5}
+.tp-account-delete-warning{margin-top:10px;padding:10px;border:1px solid #ead8d8;border-radius:12px;background:#fff8f8;color:#7d3434;font-size:8.5px;line-height:1.45}
+.tp-account-delete-label{display:block;margin-top:12px;color:#4b5563;font-size:8px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+.tp-account-delete-input{width:100%;min-height:40px;margin-top:6px;padding:0 11px;border:1px solid #d7dde2;border-radius:11px;background:#fff;color:#111827;font:800 11px system-ui;outline:none}
+.tp-account-delete-input:focus{border-color:#111827;box-shadow:0 0 0 2px rgba(17,24,39,.08)}
+.tp-account-delete-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.tp-account-delete-actions button{min-height:40px;border-radius:12px;font:850 9px system-ui;cursor:pointer}
+.tp-account-delete-cancel{border:1px solid #dfe4e8;background:#f6f7f8;color:#111827}
+.tp-account-delete-confirm{border:1px solid #8d2f2f;background:#8d2f2f;color:#fff}
+.tp-account-delete-confirm:disabled{opacity:.42;cursor:not-allowed}
 
 @media(max-width:560px){
   .tp-hub-page{padding:72px 8px 0}
@@ -937,6 +960,10 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
   const [accountMessage, setAccountMessage] = useState('');
   const [accountMessageTone, setAccountMessageTone] = useState<'success' | 'error' | ''>('');
   const [planOpen, setPlanOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState('');
   const [preferences, setPreferences] = useState<NotificationPreferences>(() => readPreferences());
 
   useEffect(() => {
@@ -1045,6 +1072,53 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
     if (!supabase) return;
     await supabase.auth.signOut();
     window.location.reload();
+  };
+
+  const deleteAccount = async () => {
+    if (!supabase || deleteLoading) return;
+
+    const phrase = deletePhrase.trim().toLocaleUpperCase('tr-TR');
+    if (phrase !== 'SİL') {
+      setDeleteMessage('Devam etmek için SİL yazmalısın.');
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteMessage('');
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        body: { confirm: 'DELETE_MY_ACCOUNT' },
+      });
+
+      if (error) throw error;
+      if (!data?.ok) {
+        throw new Error(data?.userMessage || data?.error || 'Hesap silinemedi.');
+      }
+
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Auth kaydı sunucuda silindiği için yerel çıkış hatası akışı engellemez.
+      }
+
+      try {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+      } catch {
+        // Tarayıcı depolaması kapalıysa yeniden yükleme yine oturumu temizler.
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setDeleteMessage(
+        error instanceof Error
+          ? error.message
+          : 'Hesap silme işlemi tamamlanamadı. Lütfen tekrar dene.',
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   return (
@@ -1156,16 +1230,81 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
         <section className="tp-hub-section">
           <div className="tp-hub-section-head">
             <div>
-              <small>OTURUM</small>
+              <small>OTURUM & HESAP</small>
               <strong>Hesap işlemleri</strong>
-              <p>Bu cihazdaki TarlaPusula oturumunu yönet.</p>
+              <p>Bu cihazdaki oturumunu kapat veya TarlaPusula hesabını kalıcı olarak sil.</p>
             </div>
           </div>
-          <button type="button" className="tp-hub-danger-button" onClick={() => void logout()}><LogOut size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />Çıkış Yap</button>
+          <div className="tp-account-actions">
+            <button type="button" className="tp-hub-danger-button" onClick={() => void logout()}><LogOut size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />Çıkış Yap</button>
+            <button
+              type="button"
+              className="tp-account-delete-trigger"
+              onClick={() => {
+                setDeletePhrase('');
+                setDeleteMessage('');
+                setDeleteOpen(true);
+              }}
+            >
+              <Trash2 size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />Hesabımı Sil
+            </button>
+          </div>
         </section>
 
         <ClassicBottomNav activeScreen="settingsHub" setScreen={setScreen} />
       </main>
+
+      {deleteOpen ? (
+        <>
+          <button
+            type="button"
+            className="tp-plan-modal-backdrop"
+            aria-label="Hesap silme penceresini kapat"
+            onClick={() => {
+              if (!deleteLoading) setDeleteOpen(false);
+            }}
+          />
+          <section className="tp-account-delete-modal" role="dialog" aria-modal="true" aria-label="TarlaPusula hesabını sil">
+            <h3>Hesabını kalıcı olarak sil</h3>
+            <p>Bu işlem geri alınamaz. Tarlaların, tarımsal kayıtların, fotoğrafların, analizlerin, bildirimlerin ve TarlaPusula hesap verilerin silinir.</p>
+            <div className="tp-account-delete-warning">
+              Aktif App Store veya Google Play aboneliğin varsa hesabı silmek mağaza aboneliğini otomatik olarak iptal etmez. Aboneliğini ayrıca mağaza hesabından yönetmelisin.
+            </div>
+            <label className="tp-account-delete-label" htmlFor="tp-delete-account-confirm">Onaylamak için SİL yaz</label>
+            <input
+              id="tp-delete-account-confirm"
+              className="tp-account-delete-input"
+              value={deletePhrase}
+              onChange={(event) => {
+                setDeletePhrase(event.target.value);
+                if (deleteMessage) setDeleteMessage('');
+              }}
+              autoComplete="off"
+              spellCheck={false}
+              disabled={deleteLoading}
+            />
+            {deleteMessage ? <div className="tp-status-note error">{deleteMessage}</div> : null}
+            <div className="tp-account-delete-actions">
+              <button
+                type="button"
+                className="tp-account-delete-cancel"
+                disabled={deleteLoading}
+                onClick={() => setDeleteOpen(false)}
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                className="tp-account-delete-confirm"
+                disabled={deleteLoading || deletePhrase.trim().toLocaleUpperCase('tr-TR') !== 'SİL'}
+                onClick={() => void deleteAccount()}
+              >
+                {deleteLoading ? 'Siliniyor…' : 'Hesabı Kalıcı Sil'}
+              </button>
+            </div>
+          </section>
+        </>
+      ) : null}
 
       {planOpen ? (
         <>
@@ -1192,7 +1331,7 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
                 <ul><li>Sınırsız tarla</li><li>Tüm modüller</li><li>Tam Pusula asistanı</li><li>Gelişmiş analiz ve widget'lar</li></ul>
               </article>
             </div>
-            <div className="tp-status-note">Ödeme sistemi bağlanana kadar burada yalnızca plan özellikleri karşılaştırılır; kullanıcıya sahte fiyat veya satın alma işlemi gösterilmez.</div>
+            <div className="tp-status-note">Bu ekran plan kapsamını karşılaştırır. Mobil mağaza satın alma ve abonelik yönetimi, ilgili Plus/Premium satın alma akışından yapılır.</div>
           </section>
         </>
       ) : null}
