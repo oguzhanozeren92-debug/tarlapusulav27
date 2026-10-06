@@ -3351,7 +3351,9 @@
 .tp-depot-v4-sheet-layer{
   position:fixed;
   inset:0;
-  z-index:180;
+  /* ClassicBottomNav uses z-index: 2147481500. This modal must sit above it
+     so the last choice/action can never be hidden or become untappable. */
+  z-index:2147483000;
   display:flex;
   align-items:flex-end;
   justify-content:center;
@@ -3646,7 +3648,13 @@
   .tp-peststore-product-visual{width:52px!important;height:52px!important;flex-basis:52px!important}
   .tp-peststore-product-visual>img{width:46px!important;height:46px!important}
 
-  .tp-depot-v4-sheet{max-height:88svh;padding-left:13px;padding-right:13px}
+  .tp-depot-v4-sheet{
+    max-height:calc(100svh - 12px);
+    padding-left:13px;
+    padding-right:13px;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
   .tp-depot-v4-sheet-head h2{font-size:23px}
 }
 
