@@ -44,7 +44,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in             IOS_DISTRIBUTION_P12_B64             IOS_DISTRIBUTION_P12_PASSWORD             IOS_APP_STORE_PROFILE_B64             APPLE_TEAM_ID
+          for name in \
+            IOS_DISTRIBUTION_P12_B64 \
+            IOS_DISTRIBUTION_P12_PASSWORD \
+            IOS_APP_STORE_PROFILE_B64 \
+            APPLE_TEAM_ID \
+            VITE_REVENUECAT_IOS_PUBLIC_KEY
           do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub secret for $name"
