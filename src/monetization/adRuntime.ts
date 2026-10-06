@@ -85,7 +85,7 @@ function writeInterstitialState(next: { day: string; count: number; lastAt: numb
 function canShowInterstitialNow() {
   if (typeof window === 'undefined') return false;
   const entitlement = getEntitlementSnapshot();
-  if (entitlement.effectivePlan === 'premium') return false;
+  if (entitlement.effectivePlan !== 'free') return false;
 
   const state = readInterstitialState();
   if (state.count >= INTERSTITIAL_DAILY_LIMIT) return false;
@@ -313,11 +313,11 @@ async function claimAdReward(placement: AdPlacement, ad: BridgeAdResult) {
 
 export async function showRewardedAdAndClaim(placement: AdPlacement) {
   const entitlement = getEntitlementSnapshot();
-  if (entitlement.effectivePlan === 'premium') {
+  if (entitlement.effectivePlan !== 'free') {
     return {
       completed: false,
       claim: null,
-      reason: 'premium_no_ads',
+      reason: 'paid_plan_no_ads',
     } as const;
   }
 
