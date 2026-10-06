@@ -141,7 +141,7 @@ export function useCalendarController({
       if (!vapidPublicKey) {
         setPushEnabled(false);
         setPushMessage(
-          'Telefon bildirimlerinin sunucu anahtarı bu önizlemede tanımlı değil. VAPID public key eklendiğinde buradan tek dokunuşla açılacak.',
+          'Telefon bildirimleri mobil uygulamada kullanılabilir.',
         );
         return;
       }
