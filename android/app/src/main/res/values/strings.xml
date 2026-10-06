@@ -6,5 +6,5 @@
     <string name="custom_url_scheme">com.tarlapusula.app</string>
     <string name="default_notification_channel_id">tarlapusula_general</string>
     <!-- Google sample App ID: replace with TarlaPusula AdMob App ID before production release. -->
-    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_app_id">ca-app-pub-9321324588059191~4027511899</string>
 </resources>
