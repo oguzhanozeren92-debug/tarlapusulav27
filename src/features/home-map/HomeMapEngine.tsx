@@ -37,6 +37,10 @@ import NdviObservationPhotoModal from '../field-observations/components/NdviObse
 import NdviObservationTimelineModal from '../field-observations/components/NdviObservationTimelineModal';
 import FieldObservationPointsModal from '../field-observations/components/FieldObservationPointsModal';
 import type { EarthSearchNdviStats } from './services/earthSearchNdvi.service';
+import {
+  findRelativeNdviZone,
+  weakerRelativeNdviZones,
+} from './services/relativeNdviZones';
 import type { OrchardTrackingZonePolygon, OrchardTrackingZoneRecord } from '../orchard-tracking-zones/types/orchardTrackingZone';
 import {
   buildTrackingZonePolygon,
@@ -6689,14 +6693,45 @@ export function HomeInlineLayerMap({
                 labelBg: 'rgba(2,10,5,.92)',
               };
 
+      /*
+       * NDVI göreli farkta tek kaynak gerçek Sentinel-2 relativeZones.
+       * AI importantArea/spatial metni bu alanların sayısını veya konumunu
+       * değiştiremez. Takip modalından tek alan istenmişse yalnız o weaker
+       * hücreyi; Pusula kartından gelmişse bütün weaker hücreleri göster.
+       */
+      const canonicalWeakZones =
+        layer === 'vegetation'
+          ? weakerRelativeNdviZones(ndviStats?.relativeZones)
+          : [];
+
+      const requestedRelativeDirection =
+        layer === 'vegetation'
+          ? normalizeHomePusulaDirection(importantArea?.area)
+          : null;
+
+      const requestedRelativeZone =
+        requestedRelativeDirection
+          ? findRelativeNdviZone(
+              canonicalWeakZones,
+              requestedRelativeDirection,
+              'weaker',
+            )
+          : null;
+
       const directFeature =
-        homePusulaFeatureFromGeometry(importantArea?.geometry);
+        layer === 'vegetation'
+          ? null
+          : homePusulaFeatureFromGeometry(importantArea?.geometry);
 
       const directBounds =
-        normalizeHomeBbox(importantArea?.bounds);
+        layer === 'vegetation'
+          ? null
+          : normalizeHomeBbox(importantArea?.bounds);
 
       const direction =
-        normalizeHomePusulaDirection(importantArea?.area);
+        layer === 'vegetation'
+          ? requestedRelativeZone?.area ?? null
+          : normalizeHomePusulaDirection(importantArea?.area);
 
       const radarBounds =
         layer === 'radar-vv' ||
@@ -6711,12 +6746,18 @@ export function HomeInlineLayerMap({
         normalizeHomeBbox(satelliteData?.bbox);
 
       const spatialDirections =
-        analysisBounds
-          ? homePusulaSpatialFocusDirections(
-              spatial,
-              layer,
+        layer === 'vegetation'
+          ? (
+              requestedRelativeZone
+                ? [requestedRelativeZone.area]
+                : canonicalWeakZones.map((zone) => zone.area)
             )
-          : [];
+          : analysisBounds
+            ? homePusulaSpatialFocusDirections(
+                spatial,
+                layer,
+              )
+            : [];
 
       /*
        * Pusula stripi spatial importantAreaByLayer üzerinden tek bir alan
@@ -6749,29 +6790,9 @@ export function HomeInlineLayerMap({
           : directBounds);
 
       /*
-       * Yeni NDVI akışında “Göreli farkı göster” öncelikle gerçek Sentinel-2
-       * piksellerinden üretilen 3×3 bölge karşılaştırmasını kullanır. Yalnızca
-       * eski kayıtlarda göreli yön bilgisi yoksa görüntü-hotspot fallback'i
-       * devreye girebilir.
+       * Vegetation için görüntüden ikinci bir hotspot türetmiyoruz.
+       * relativeZones boşsa göreli fark yoktur; sahte/fallback alan çizilmez.
        */
-      if (
-        !multiSpatialFocus &&
-        layer === 'vegetation' &&
-        !fallbackSpatialDirection &&
-        smoothNdvi &&
-        analysisBounds
-      ) {
-        const realHotspots =
-          await homeNdviHotspotFocus(
-            smoothNdvi,
-            analysisBounds,
-          );
-
-        if (realHotspots) {
-          focusFeature = realHotspots.feature;
-          focusBounds = realHotspots.bounds;
-        }
-      }
 
       if (
         !multiSpatialFocus &&
@@ -7206,10 +7227,14 @@ export function HomeInlineLayerMap({
               center,
               analysisBounds,
             );
-            const relativeHealth = homePusulaRelativeHealthForDirection(
-              spatial,
-              direction,
-            );
+            const canonicalRelativeZone =
+              findRelativeNdviZone(
+                ndviStats?.relativeZones,
+                direction,
+                'weaker',
+              );
+            const relativeHealth =
+              canonicalRelativeZone?.relativeHealth ?? null;
 
             // Oklarla hızlı gezinirken her ara noktada DB/cache yazma işini
             // çalıştırma. Kullanıcı bir noktada kısa süre durunca hazırla.
@@ -7221,9 +7246,12 @@ export function HomeInlineLayerMap({
                 direction,
                 centroid: center,
                 areaGeometry: item.feature?.geometry ?? null,
-                ndviValue: null,
+                ndviValue: canonicalRelativeZone?.mean ?? null,
                 relativeHealth,
-                satelliteDate: satelliteData?.latestImageDate ?? null,
+                satelliteDate:
+                  ndviStats?.datetime ??
+                  satelliteData?.latestImageDate ??
+                  null,
               })
                 .then((point) => {
                   if (requestId !== ndviObservationRequestRef.current) return;
@@ -7234,9 +7262,13 @@ export function HomeInlineLayerMap({
                     direction,
                     centroid: center,
                     relativeHealth,
-                    ndviValue: null,
+                    ndviValue: canonicalRelativeZone?.mean ?? null,
                     satelliteDate:
-                      String(satelliteData?.latestImageDate ?? '').trim() || null,
+                      String(
+                        ndviStats?.datetime ??
+                        satelliteData?.latestImageDate ??
+                        '',
+                      ).trim() || null,
                   });
 
                   if (detail?.openPhoto) {
@@ -7540,6 +7572,7 @@ export function HomeInlineLayerMap({
     activeRadarImage?.bbox,
     clippedRadarImage,
     smoothNdvi,
+    ndviStats,
     bbox?.[0],
     bbox?.[1],
     bbox?.[2],
@@ -9659,6 +9692,22 @@ export function HomeInlineLayerMap({
               ? { ...current, point }
               : current,
           );
+        }}
+        onOpenRelativeArea={(area) => {
+          setFieldTrackingOpen(false);
+          window.setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('tp:home-map-show-pusula-area', {
+                detail: {
+                  fieldId: field?.id ? String(field.id) : '',
+                  layer: 'vegetation',
+                  importantArea: { area },
+                  spatial: null,
+                  relativeMode: 'single',
+                },
+              }),
+            );
+          }, 80);
         }}
         onOpenHistory={(target) => {
           setFieldTrackingOpen(false);
