@@ -1,0 +1,107 @@
+name: Android Play Signed AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'Google Play versionCode (must increase on every upload)'
+        required: true
+        default: '1'
+        type: string
+      version_name:
+        description: 'User-visible versionName'
+        required: true
+        default: '1.0.0'
+        type: string
+
+concurrency:
+  group: android-play-signed-aab
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  signed-aab:
+    runs-on: ubuntu-latest
+    env:
+      VITE_REVENUECAT_IOS_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_IOS_PUBLIC_KEY }}
+      VITE_REVENUECAT_ANDROID_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_ANDROID_PUBLIC_KEY }}
+      VITE_ADMOB_TEST_MODE: 'false'
+      ANDROID_UPLOAD_KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+      TP_ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+      TP_ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+      TP_ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+      TP_ANDROID_VERSION_CODE: ${{ inputs.version_code }}
+      TP_ANDROID_VERSION_NAME: ${{ inputs.version_name }}
+      TP_ANDROID_UPLOAD_STORE_FILE: ${{ github.workspace }}/android/app/upload-keystore.jks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate release secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in             ANDROID_UPLOAD_KEYSTORE_B64             TP_ANDROID_UPLOAD_STORE_PASSWORD             TP_ANDROID_UPLOAD_KEY_ALIAS             TP_ANDROID_UPLOAD_KEY_PASSWORD
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required GitHub secret for $name"
+              exit 1
+            fi
+          done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore upload keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 --decode > "$TP_ANDROID_UPLOAD_STORE_FILE"
+          chmod 600 "$TP_ANDROID_UPLOAD_STORE_FILE"
+
+      - name: Build and sync production web assets
+        run: |
+          npm run build
+          npx cap sync android
+
+      - name: Build signed Play AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x android/gradlew
+          cd android
+          ./gradlew bundleRelease
+
+      - name: Verify AAB signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          jarsigner -verify -strict android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload signed AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: TarlaPusula-Play-v${{ inputs.version_name }}-${{ inputs.version_code }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove restored keystore
+        if: always()
+        shell: bash
+        run: rm -f "$TP_ANDROID_UPLOAD_STORE_FILE"
