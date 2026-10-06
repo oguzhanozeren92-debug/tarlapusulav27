@@ -196,6 +196,7 @@ export default function HomeScreen(props: HomeScreenProps) {
     reason?: string;
   } | null>(null);
   const [irrigationRecordOpen, setIrrigationRecordOpen] = useState(false);
+  const [fieldOperationOpen, setFieldOperationOpen] = useState(false);
   const [fieldsSheetOpen, setFieldsSheetOpen] = useState(false);
   const [quickSheet, setQuickSheet] = useState<'today' | 'notifications' | null>(null);
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -301,6 +302,12 @@ export default function HomeScreen(props: HomeScreenProps) {
         return;
       }
 
+      if (fieldOperationOpen) {
+        detail.handled = true;
+        setFieldOperationOpen(false);
+        return;
+      }
+
       if (irrigationRecordOpen) {
         detail.handled = true;
         setIrrigationRecordOpen(false);
@@ -362,6 +369,7 @@ export default function HomeScreen(props: HomeScreenProps) {
     };
   }, [
     fieldStatusOpen,
+    fieldOperationOpen,
     irrigationRecordOpen,
     fieldsSheetOpen,
     quickSheet,
@@ -1426,6 +1434,13 @@ export default function HomeScreen(props: HomeScreenProps) {
               setHomeFieldId={setHomeFieldId}
               setFieldControlFieldId={setFieldControlFieldId}
               onAddField={handleAddFieldClick}
+              onOpenFieldOperation={() => {
+                if (!fieldKey || homeField?.demo) {
+                  handleAddFieldClick();
+                  return;
+                }
+                setFieldOperationOpen(true);
+              }}
               activeHomeLayer={activeHomeLayer}
               openMapLayer={openMapLayer}
               soilMenuOpen={soilMenuOpen}
@@ -1721,6 +1736,16 @@ export default function HomeScreen(props: HomeScreenProps) {
             </section>
           </div>
         )}
+
+        <FieldOperationModal
+          open={fieldOperationOpen && Boolean(fieldKey) && !homeField?.demo}
+          fieldId={fieldKey || null}
+          fieldName={String(homeField?.name ?? 'Tarlan')}
+          onClose={() => setFieldOperationOpen(false)}
+          onSaved={() => {
+            setFieldStatusRecordsNonce(Date.now());
+          }}
+        />
 
         <FieldOperationModal
           open={irrigationRecordOpen && Boolean(fieldKey) && !homeField?.demo}
