@@ -315,10 +315,7 @@ export default function CalendarScreen({
 
       <GlobalPusulaBand
         screen="calendar"
-        title={cmsText(
-          calendarHeaderBlock,
-          calendarPage?.title || 'Takvim & Hatırlatmalar',
-        )}
+        title="Takvim"
         fieldName={realFields[0]?.name ?? null}
         onBack={() => setScreen('home')}
         onMenu={() => setDrawerOpen(true)}
@@ -331,12 +328,7 @@ export default function CalendarScreen({
 
           <div>
             <span>TarlaPusula</span>
-            <strong>
-              {cmsText(
-                calendarHeaderBlock,
-                calendarPage?.title || 'Takvim & Hatırlatmalar',
-              )}
-            </strong>
+            <strong>Takvim</strong>
           </div>
 
           <button
