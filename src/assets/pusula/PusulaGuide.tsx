@@ -241,11 +241,23 @@ export default function PusulaGuide({
       if (!target) return;
 
       const rect = target.getBoundingClientRect();
+      const isCenteredHeaderAnchor =
+        anchorSelector === '.tp-global-pusula-anchor' ||
+        anchorSelector === '.tp-brand-pusula-anchor';
+
+      // Native iOS WebView can report tiny horizontal layout shifts while
+      // safe-area/header content settles. Both TarlaPusula compass anchors are
+      // contractually centered, so pin the animated copy to the viewport
+      // center instead of following those transient rect.left changes.
+      const viewportWidth =
+        document.documentElement.clientWidth || window.innerWidth;
 
       setAnchor({
-        x: rect.left + rect.width / 2,
+        x: isCenteredHeaderAnchor
+          ? viewportWidth / 2
+          : rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
-        size: Math.max(56, Math.max(rect.width, rect.height)),
+        size: Math.max(1, Math.max(rect.width, rect.height) || 50),
       });
     };
 
@@ -273,18 +285,16 @@ export default function PusulaGuide({
 
   useEffect(() => {
     const target = document.querySelector(anchorSelector) as HTMLElement | null;
-    const visual = (
-      target?.querySelector('.tp-global-pusula-stage') ??
-      target?.querySelector('img')
-    ) as HTMLElement | null;
+    if (!target) return;
 
-    if (!visual) return;
-
-    const previousOpacity = visual.style.opacity;
-    visual.style.opacity = '0';
+    // Hide the complete source compass while the Guide draws its animated
+    // copy. Hiding only the first <img> left the needle visible on Home and
+    // produced a split / drifting compass on real iPhones.
+    const previousOpacity = target.style.opacity;
+    target.style.opacity = '0';
 
     return () => {
-      visual.style.opacity = previousOpacity;
+      target.style.opacity = previousOpacity;
     };
   }, [anchorSelector]);
 
