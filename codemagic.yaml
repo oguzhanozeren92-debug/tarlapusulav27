@@ -27,6 +27,11 @@ workflows:
           npm run build
           npx cap sync ios
 
+      - name: Set iOS build number
+        script: |
+          BUILD_NO="${CM_BUILD_NUMBER:-2}"
+          sed -i '' -E "s/CURRENT_PROJECT_VERSION = [0-9]+;/CURRENT_PROJECT_VERSION = ${BUILD_NO};/g" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+
       - name: Set up iOS code signing
         script: |
           xcode-project use-profiles --project "$CM_BUILD_DIR/$XCODE_PROJECT"
