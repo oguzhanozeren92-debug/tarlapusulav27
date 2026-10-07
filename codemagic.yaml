@@ -29,7 +29,11 @@ workflows:
 
       - name: Set iOS build number
         script: |
-          BUILD_NO="${CM_BUILD_NUMBER:-2}"
+          # App Store Connect requires CFBundleVersion to be strictly higher
+          # than every previously uploaded build. Codemagic's CM_BUILD_NUMBER
+          # can restart/reset across workflows, so use a monotonic UTC epoch.
+          BUILD_NO="$(date -u +%s)"
+          echo "Using iOS build number: $BUILD_NO"
           sed -i '' -E "s/CURRENT_PROJECT_VERSION = [0-9]+;/CURRENT_PROJECT_VERSION = ${BUILD_NO};/g" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
 
       - name: Set up iOS code signing
