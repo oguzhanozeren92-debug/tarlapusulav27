@@ -1055,3 +1055,86 @@
     width: 100%;
   }
 }
+
+
+/* =========================================================
+   PUSULA STABLE NATIVE CONTRACT — 2026-10-07
+   The actual header logo is the only visible logo while idle.
+   The Guide owns a copy only during the deliberate tap animation.
+   Motion is vertical-only; no lateral seeking or oversized zoom.
+   ========================================================= */
+.pusula-guide--idle .pusula-guide__stage{
+  opacity:0!important;
+}
+
+.pusula-guide--idle .pusula-guide__logo{
+  transform:translate3d(-50%,-50%,0)!important;
+}
+
+.pusula-guide--wake .pusula-guide__stage,
+.pusula-guide--accelerate .pusula-guide__stage,
+.pusula-guide--seek .pusula-guide__stage,
+.pusula-guide--lock .pusula-guide__stage,
+.pusula-guide--talk .pusula-guide__stage,
+.pusula-guide--hold .pusula-guide__stage,
+.pusula-guide--back .pusula-guide__stage,
+.pusula-guide--replay .pusula-guide__stage{
+  opacity:1!important;
+}
+
+.pusula-guide--accelerate .pusula-guide__logo{
+  animation:pgStableDown 560ms cubic-bezier(.2,.8,.2,1) forwards!important;
+}
+
+@keyframes pgStableDown{
+  from{
+    transform:translate3d(-50%,-50%,0) translate3d(0,0,0) scale(1);
+  }
+  to{
+    transform:translate3d(-50%,-50%,0) translate3d(0,var(--pg-drop),0) scale(var(--pg-scale));
+  }
+}
+
+.pusula-guide--accelerate .pusula-guide__needle-layer{
+  animation:pgStableNeedleTurn 560ms cubic-bezier(.2,.75,.2,1) forwards!important;
+}
+
+@keyframes pgStableNeedleTurn{
+  from{transform:rotate(0deg)}
+  to{transform:rotate(360deg)}
+}
+
+.pusula-guide--seek .pusula-guide__needle-layer,
+.pusula-guide--lock .pusula-guide__needle-layer,
+.pusula-guide--talk .pusula-guide__needle-layer,
+.pusula-guide--hold .pusula-guide__needle-layer{
+  animation:none!important;
+  transform:rotate(360deg)!important;
+}
+
+.pusula-guide--back .pusula-guide__logo{
+  animation:pgStableReturn 480ms cubic-bezier(.2,.8,.2,1) forwards!important;
+}
+
+@keyframes pgStableReturn{
+  from{
+    transform:translate3d(-50%,-50%,0) translate3d(0,var(--pg-drop),0) scale(var(--pg-scale));
+  }
+  to{
+    transform:translate3d(-50%,-50%,0) translate3d(0,0,0) scale(1);
+  }
+}
+
+.pusula-guide--back .pusula-guide__needle-layer{
+  animation:none!important;
+  transform:rotate(0deg)!important;
+}
+
+@media(max-width:600px){
+  .pusula-guide__speech{
+    width:calc(100vw - 24px)!important;
+    min-height:126px!important;
+    padding:48px 20px 16px!important;
+    border-radius:18px!important;
+  }
+}
