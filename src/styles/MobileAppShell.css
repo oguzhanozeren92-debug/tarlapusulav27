@@ -354,3 +354,57 @@ html.tp-native-app.tp-native-keyboard-open
   :is(input, textarea, select):focus {
   scroll-margin-bottom: 28px;
 }
+
+
+/* =========================================================
+   NATIVE MOBILE REVISION V4
+   Real iPhone viewport hard guard.
+   Prevent legacy 480px/desktop layout rules or wide toolbar children from
+   making the Capacitor page wider than the physical device viewport.
+   ========================================================= */
+html.tp-native-app,
+html.tp-native-app body,
+html.tp-native-app #root,
+html.tp-native-app .tp-v1 {
+  width: 100% !important;
+  max-width: 100vw !important;
+  min-width: 0 !important;
+  margin-inline: 0 !important;
+  overflow-x: hidden !important;
+}
+
+html.tp-native-app .tp-v1-header,
+html.tp-native-app .tp-main,
+html.tp-native-app .tp-home-field,
+html.tp-native-app .tp-map-first-shell,
+html.tp-native-app .tp-field-head,
+html.tp-native-app .tp-field-toolbar,
+html.tp-native-app .tp-map-stage {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+html.tp-native-app .tp-v1-header {
+  padding-left: max(10px, env(safe-area-inset-left)) !important;
+  padding-right: max(10px, env(safe-area-inset-right)) !important;
+}
+
+html.tp-native-app .tp-field-toolbar > * {
+  min-width: 0;
+}
+
+html.tp-native-app .tp-field-select-wrap,
+html.tp-native-app .tp-field-select-box,
+html.tp-native-app .tp-field-select {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+@media (max-width: 390px) {
+  html.tp-native-app .tp-main {
+    padding-left: 7px !important;
+    padding-right: 7px !important;
+  }
+}
