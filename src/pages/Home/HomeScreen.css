@@ -5184,3 +5184,43 @@ body .tp-v1 .tp-ndvi-live-summary{
   border-top-color:#dedee0!important;
 }
 
+
+
+/* =========================================================
+   PUSULA HEADER — NATIVE STABILITY FIX
+   Keep the body fixed, layer the needle exactly on top, and let only the
+   needle move. This prevents the two image layers from flowing separately
+   inside the header button on real iPhones.
+   ========================================================= */
+.tp-brand-pusula-anchor{
+  position:relative!important;
+  cursor:pointer!important;
+}
+
+.tp-brand-pusula-anchor > img{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  margin:0!important;
+  display:block!important;
+  object-fit:contain!important;
+  transform-origin:50% 50%!important;
+  pointer-events:none!important;
+}
+
+.tp-brand-pusula-anchor > img:first-of-type{
+  z-index:1!important;
+}
+
+.tp-brand-pusula-anchor > .tp-brand-pusula-needle{
+  z-index:2!important;
+  animation:tpHomePusulaNeedleIdle 8.5s ease-in-out infinite!important;
+}
+
+@keyframes tpHomePusulaNeedleIdle{
+  0%,100%{transform:rotate(0deg)}
+  28%{transform:rotate(15deg)}
+  62%{transform:rotate(-11deg)}
+  82%{transform:rotate(5deg)}
+}
