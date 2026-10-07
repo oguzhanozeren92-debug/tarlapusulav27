@@ -1807,6 +1807,9 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                             <td key={dayIndex}>
                               {day ? (
                                 <div className="tp-wxr-day">
+                                  <strong>
+                                    {formatTemp(day?.tempMax)} / {formatTemp(day?.tempMin)}
+                                  </strong>
                                   <span>
                                     <img
                                       src={weather3DIcon(day?.condition)}
@@ -1816,9 +1819,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                                       style={{ width: 58, height: 58, objectFit: 'contain', display: 'block' }}
                                     />
                                   </span>
-                                  <strong>
-                                    {formatTemp(day?.tempMax)} / {formatTemp(day?.tempMin)}
-                                  </strong>
                                   <small>💧 {Math.round(probability)}%</small>
                                 </div>
                               ) : (
@@ -4117,6 +4117,99 @@ const WEATHER_STYLES = `
 
     .tp-wxref-actions button{
       font-size:9px!important;
+    }
+  }
+
+
+  /* =========================================================
+     WX FORECAST GRID — TEMP ABOVE ICON / READABILITY
+     Kare ölçülerini değiştirmeden sıcaklığı üstte sabitler ve
+     gerçek telefonda yazıları büyütür.
+     ========================================================= */
+  .tp-wxr-day{
+    min-height:98px!important;
+    height:98px!important;
+    display:grid!important;
+    grid-template-rows:18px 52px 16px!important;
+    align-content:center!important;
+    justify-items:center!important;
+    gap:1px!important;
+    padding:5px 3px!important;
+    overflow:hidden!important;
+  }
+
+  .tp-wxr-day strong{
+    order:1!important;
+    align-self:center!important;
+    margin:0!important;
+    color:#111315!important;
+    font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+    font-size:13px!important;
+    font-weight:850!important;
+    line-height:1!important;
+    letter-spacing:-.015em!important;
+    white-space:nowrap!important;
+    position:relative!important;
+    z-index:2!important;
+  }
+
+  .tp-wxr-day>span{
+    order:2!important;
+    width:100%!important;
+    height:52px!important;
+    display:grid!important;
+    place-items:center!important;
+    overflow:visible!important;
+  }
+
+  .tp-wxr-day>span img{
+    width:52px!important;
+    height:52px!important;
+    max-width:52px!important;
+    max-height:52px!important;
+    object-fit:contain!important;
+    margin:0!important;
+    transform:none!important;
+  }
+
+  .tp-wxr-day small{
+    order:3!important;
+    margin:0!important;
+    color:#4f5962!important;
+    font-size:9.5px!important;
+    font-weight:700!important;
+    line-height:1!important;
+    white-space:nowrap!important;
+  }
+
+  @media(max-width:560px){
+    .tp-wxr-day{
+      min-height:66px!important;
+      height:66px!important;
+      grid-template-rows:15px 36px 12px!important;
+      gap:0!important;
+      padding:2px!important;
+    }
+
+    .tp-wxr-day strong{
+      font-size:10.5px!important;
+      font-weight:850!important;
+    }
+
+    .tp-wxr-day>span{
+      height:36px!important;
+    }
+
+    .tp-wxr-day>span img{
+      width:42px!important;
+      height:42px!important;
+      max-width:42px!important;
+      max-height:42px!important;
+    }
+
+    .tp-wxr-day small{
+      font-size:7.8px!important;
+      font-weight:750!important;
     }
   }
 
