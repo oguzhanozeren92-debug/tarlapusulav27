@@ -88,7 +88,7 @@ const CSS = String.raw`
   width:100%!important;
   max-width:none!important;
   display:grid!important;
-  grid-template-columns:40px minmax(0,1fr) 40px 40px!important;
+  grid-template-columns:40px minmax(0,1fr) repeat(5,40px)!important;
   gap:6px!important;
   align-items:center!important;
   margin:0!important;
@@ -173,6 +173,34 @@ const CSS = String.raw`
 .tp-map-first-shell .tp-field-toolbar .tp-add-field-3d:hover{
   background:rgba(7,25,13,.82)!important;
   border-color:rgba(101,142,111,.32)!important;
+}
+
+.tp-map-first-shell .tp-field-toolbar>.tp-mf-quick-action{
+  position:relative!important;
+  width:40px!important;
+  height:40px!important;
+  min-width:40px!important;
+  min-height:40px!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:0!important;
+  border:1px solid rgba(82,113,90,.20)!important;
+  border-radius:11px!important;
+  background:rgba(3,13,7,.70)!important;
+  color:#17202a!important;
+  box-shadow:none!important;
+}
+
+.tp-map-first-shell .tp-field-toolbar>.tp-mf-quick-action svg{
+  width:19px!important;
+  height:19px!important;
+  stroke:currentColor!important;
+}
+
+.tp-map-first-shell .tp-field-toolbar>.tp-mf-quick-action .tp-mf-notification-dot{
+  position:absolute!important;
+  top:4px!important;
+  right:4px!important;
 }
 
 .tp-mf-operation-toolbar{
@@ -832,7 +860,7 @@ const CSS = String.raw`
   }
 
   .tp-map-first-shell .tp-field-toolbar{
-    grid-template-columns:38px minmax(0,1fr) 38px 38px!important;
+    grid-template-columns:38px minmax(0,1fr) repeat(5,38px)!important;
   }
 
   .tp-map-first-shell .tp-field-select{
@@ -843,8 +871,15 @@ const CSS = String.raw`
 }
 
 @media(max-width:390px){
+  .tp-map-first-shell .tp-field-toolbar>.tp-mf-quick-action{
+    width:36px!important;
+    height:36px!important;
+    min-width:36px!important;
+    min-height:36px!important;
+  }
+
   .tp-map-first-shell .tp-field-toolbar{
-    grid-template-columns:36px minmax(0,1fr) 36px 36px!important;
+    grid-template-columns:36px minmax(0,1fr) repeat(5,36px)!important;
     gap:4px!important;
   }
 
@@ -862,13 +897,21 @@ const CSS = String.raw`
 }
 
 @media(max-width:560px){
+  .tp-map-first-shell .tp-field-toolbar>.tp-mf-quick-action{
+    width:38px!important;
+    height:38px!important;
+    min-width:38px!important;
+    min-height:38px!important;
+    border-radius:10px!important;
+  }
+
   .tp-map-first-shell .tp-field-head{
     min-height:50px!important;
     padding:5px 7px!important;
   }
 
   .tp-map-first-shell .tp-field-toolbar{
-    grid-template-columns:38px minmax(0,1fr) 38px 38px!important;
+    grid-template-columns:38px minmax(0,1fr) repeat(5,38px)!important;
     gap:5px!important;
   }
 
@@ -3923,44 +3966,10 @@ export default function HomeMapSectionMapFirst(
         )
       : null;
 
-  const quickToolbarButtons = fieldToolbar != null
-    ? createPortal(
-        <>
-          <button
-            type="button"
-            className="tp-mf-quick-action tp-mf-quick-today"
-            onClick={() => props.onOpenToday?.()}
-            aria-label="Bugün ne yapmalısın?"
-            aria-haspopup="dialog"
-            title="Bugün ne yapmalısın?"
-          >
-            <ClipboardList size={19} strokeWidth={1.9} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="tp-mf-quick-action tp-mf-quick-notifications"
-            onClick={() => props.onOpenNotifications?.()}
-            aria-label={`Bildirimler${props.notificationCount > 0 ? `, ${props.notificationCount} yeni gelişme` : ''}`}
-            aria-haspopup="dialog"
-            title="Bildirimler"
-          >
-            <Bell size={19} strokeWidth={1.9} aria-hidden="true" />
-            {props.notificationCount > 0 && <span className="tp-mf-notification-dot" aria-hidden="true" />}
-          </button>
-          <button
-            type="button"
-            className="tp-mf-quick-action tp-mf-quick-field-status"
-            onClick={() => props.onOpenFieldStatus?.()}
-            aria-label="Tarla Durumu"
-            aria-haspopup="dialog"
-            title="Tarla Durumu"
-          >
-            <Gauge size={19} strokeWidth={1.9} aria-hidden="true" />
-          </button>
-        </>,
-        fieldToolbar,
-      )
-    : null;
+  // HomeMapSection already renders Today, Notifications and Field Status in the
+  // field toolbar. Do not portal a second copy here; duplicated controls expand
+  // the grid beyond the native iPhone viewport.
+  const quickToolbarButtons = null;
 
   const mapOverlay =
     mapStage != null
