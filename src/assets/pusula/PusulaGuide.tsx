@@ -237,6 +237,11 @@ export default function PusulaGuide({
 
   useEffect(() => {
     const updateAnchor = () => {
+      // Once the logo starts moving, keep the starting point frozen.
+      // iOS WebView can emit scroll/resize noise while fixed headers settle;
+      // recalculating here made the animated copy appear to drift sideways.
+      if (phase !== 'idle' && phase !== 'back') return;
+
       const target = document.querySelector(anchorSelector) as HTMLElement | null;
       if (!target) return;
 
@@ -245,10 +250,6 @@ export default function PusulaGuide({
         anchorSelector === '.tp-global-pusula-anchor' ||
         anchorSelector === '.tp-brand-pusula-anchor';
 
-      // Native iOS WebView can report tiny horizontal layout shifts while
-      // safe-area/header content settles. Both TarlaPusula compass anchors are
-      // contractually centered, so pin the animated copy to the viewport
-      // center instead of following those transient rect.left changes.
       const viewportWidth =
         document.documentElement.clientWidth || window.innerWidth;
 
@@ -281,22 +282,24 @@ export default function PusulaGuide({
       window.removeEventListener('scroll', updateAnchor, true);
       observer?.disconnect();
     };
-  }, [anchorSelector]);
+  }, [anchorSelector, phase]);
 
   useEffect(() => {
     const target = document.querySelector(anchorSelector) as HTMLElement | null;
     if (!target) return;
 
-    // Hide the complete source compass while the Guide draws its animated
-    // copy. Hiding only the first <img> left the needle visible on Home and
-    // produced a split / drifting compass on real iPhones.
+    // Idle state uses the REAL header logo. The Guide copy becomes visible
+    // only while it is actually descending/talking. This removes the old
+    // "two competing logos" problem on native iPhone.
+    if (phase === 'idle') return;
+
     const previousOpacity = target.style.opacity;
     target.style.opacity = '0';
 
     return () => {
       target.style.opacity = previousOpacity;
     };
-  }, [anchorSelector]);
+  }, [anchorSelector, phase]);
 
   useEffect(() => {
     if (phase !== 'talk' && phase !== 'replay') return;
@@ -331,7 +334,7 @@ export default function PusulaGuide({
     setPanelVisible(false);
     setPhase('back');
 
-    await wait(800);
+    await wait(480);
 
     if (token !== runRef.current) return;
 
@@ -356,22 +359,22 @@ export default function PusulaGuide({
     });
 
     setPhase('wake');
-    await wait(560);
+    await wait(220);
 
     if (token !== runRef.current) return;
 
     setPhase('accelerate');
-    await wait(1080);
+    await wait(560);
 
     if (token !== runRef.current) return;
 
     setPhase('seek');
-    await wait(400);
+    await wait(180);
 
     if (token !== runRef.current) return;
 
     setPhase('lock');
-    await wait(820);
+    await wait(360);
 
     if (token !== runRef.current) return;
 
@@ -462,9 +465,11 @@ export default function PusulaGuide({
     };
   }, [phase]);
 
-  const largeSize = 198;
+  const largeSize =
+    typeof window !== 'undefined' && window.innerWidth <= 600 ? 128 : 150;
   const scale = largeSize / Math.max(anchor.size, 1);
-  const dropDistance = 205;
+  const dropDistance =
+    typeof window !== 'undefined' && window.innerWidth <= 600 ? 112 : 132;
 
   const style = {
     '--pg-x': `${anchor.x}px`,
