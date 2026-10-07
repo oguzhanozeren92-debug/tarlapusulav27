@@ -2321,6 +2321,7 @@ export default function GlobalPusulaBand({
 
       {!interactiveOpen && (
         <PusulaGuide
+          key={`global-pusula-${screen}`}
           insight={insight}
           anchorSelector=".tp-global-pusula-anchor"
           hasUnread={hasPusulaSignal}
