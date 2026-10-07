@@ -6,6 +6,7 @@ import { useGamificationStore } from '../../gamification/useGamificationStore';
 import { openPlanUpgrade } from '../../entitlements/planAccess';
 import AppDrawer from '../../components/AppDrawer';
 import PusulaPointsModal from '../../components/PusulaPointsModal';
+import PusulaGuide, { type PusulaInsight } from '../../assets/pusula/PusulaGuide';
 import ClassicBottomNav from '../../components/ClassicBottomNav';
 import { persistHomeNotifications } from '../../features/notifications/services/notificationQueue';
 import {
@@ -206,6 +207,8 @@ export default function HomeScreen(props: HomeScreenProps) {
   const [fieldStatusRecordsNonce, setFieldStatusRecordsNonce] = useState(0);
   const [notificationInboxRevision, setNotificationInboxRevision] = useState(0);
   const [pointsOpen, setPointsOpen] = useState(false);
+  const [homeHeaderPusulaInsight, setHomeHeaderPusulaInsight] =
+    useState<PusulaInsight | null>(null);
   const [taskQuestionTarget, setTaskQuestionTarget] =
     useState<PusulaFieldQuestionTarget>(null);
   const [activeHomeLayer, setActiveHomeLayer] =
@@ -1182,6 +1185,26 @@ export default function HomeScreen(props: HomeScreenProps) {
     setScreen(screen);
   };
 
+  const handleHomeHeaderPusulaClick = () => {
+    if (fieldEventPrompt.candidate) {
+      fieldEventPrompt.openPrompt();
+      return;
+    }
+
+    const headline = String(displayHeadline ?? '').trim();
+    const summary = String(displaySummary ?? '').trim();
+
+    setHomeHeaderPusulaInsight({
+      id: `home-header-manual-${fieldKey || 'field'}-${Date.now()}`,
+      gozlem:
+        headline ||
+        `${String(homeField?.name ?? 'Tarlan')} için güncel verileri birlikte takip ediyorum.`,
+      yonlendirme:
+        summary ||
+        'Harita, hava, görevler ve tarla kayıtların güncellendikçe önemli değişiklikleri burada öne çıkaracağım.',
+    });
+  };
+
   const handleAddFieldClick = () => {
     try {
       window.sessionStorage.removeItem('tp_field_gate_notice');
@@ -1227,6 +1250,17 @@ export default function HomeScreen(props: HomeScreenProps) {
   return (
     <>
       <style>{cmsRuntimeCss + onboardingStyles}</style>
+
+      {!pusulaGuideAway && !operationQuestionVisible ? (
+        <PusulaGuide
+          insight={homeHeaderPusulaInsight}
+          anchorSelector=".tp-brand-pusula-anchor"
+          hasUnread={Boolean(
+            fieldEventPrompt.candidate && fieldEventPrompt.needsAttention,
+          )}
+          onLogoClick={handleHomeHeaderPusulaClick}
+        />
+      ) : null}
 
       {pusulaFieldQuestion ? (
         <PusulaFieldQuestion
@@ -1319,9 +1353,7 @@ export default function HomeScreen(props: HomeScreenProps) {
                   ? 'Pusula bir şey fark etti'
                   : 'Pusula'
               }
-              onClick={() => {
-                if (fieldEventPrompt.candidate) fieldEventPrompt.openPrompt();
-              }}
+              onClick={handleHomeHeaderPusulaClick}
             >
               <img
                 src="https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/compass-body.webp"
