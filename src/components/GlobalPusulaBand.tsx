@@ -2002,9 +2002,10 @@ export default function GlobalPusulaBand({
         }
 
         .tp-global-pusula-anchor.tp-depot-pusula-active{
-          top:calc(50% + 92px)!important;
-          transform:translate(-50%,-50%) scale(1.28)!important;
-          filter:drop-shadow(0 10px 22px rgba(0,0,0,.42))!important;
+          top:50%!important;
+          left:50%!important;
+          transform:translate(-50%,-50%)!important;
+          filter:drop-shadow(0 0 9px rgba(110,225,149,.14))!important;
         }
 
         .tp-global-pusula-stage{
@@ -2231,8 +2232,10 @@ export default function GlobalPusulaBand({
           }
 
           .tp-global-pusula-anchor.tp-depot-pusula-active{
-            top:calc(50% + 84px)!important;
-            transform:translate(-50%,-50%) scale(1.24)!important;
+            top:auto!important;
+            bottom:9px!important;
+            left:50%!important;
+            transform:translateX(-50%)!important;
           }
 
           .tp-depot-pusula-card,
