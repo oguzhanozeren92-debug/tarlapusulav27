@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { Screen } from '../types';
 import { supabase } from '../supabaseClient';
@@ -202,6 +202,7 @@ export default function AppDrawer({
   const [resolvedName, setResolvedName] = useState(
     String(profileName || '').trim() || 'Üretici',
   );
+  const drawerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const explicitName = String(profileName || '').trim();
@@ -243,6 +244,51 @@ export default function AppDrawer({
       alive = false;
     };
   }, [profileName]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const applyNativeMobileOffset = () => {
+      const drawer = drawerRef.current;
+      if (!drawer) return;
+
+      const isPhone = window.matchMedia('(max-width: 520px)').matches;
+
+      if (isPhone) {
+        // Hard native guard: keep the whole drawer comfortably below the
+        // iPhone status bar / Dynamic Island. Use !important at runtime so
+        // legacy theme rules cannot pull it back to top:0.
+        drawer.style.setProperty('inset', 'auto auto 0 0', 'important');
+        drawer.style.setProperty('top', '72px', 'important');
+        drawer.style.setProperty('bottom', '0', 'important');
+        drawer.style.setProperty('left', '0', 'important');
+        drawer.style.setProperty('right', 'auto', 'important');
+        drawer.style.setProperty('height', 'auto', 'important');
+        drawer.style.setProperty('max-height', 'calc(100dvh - 72px)', 'important');
+      } else {
+        for (const property of [
+          'inset',
+          'top',
+          'bottom',
+          'left',
+          'right',
+          'height',
+          'max-height',
+        ]) {
+          drawer.style.removeProperty(property);
+        }
+      }
+    };
+
+    applyNativeMobileOffset();
+    window.addEventListener('resize', applyNativeMobileOffset);
+    window.addEventListener('orientationchange', applyNativeMobileOffset);
+
+    return () => {
+      window.removeEventListener('resize', applyNativeMobileOffset);
+      window.removeEventListener('orientationchange', applyNativeMobileOffset);
+    };
+  }, [open]);
 
   const shownPoints = useMemo(() => {
     const explicit = Number(points);
@@ -885,7 +931,13 @@ export default function AppDrawer({
                Dynamic Island zone. env(safe-area-inset-top) may be reported
                as 0 in some Capacitor/WebView configurations, so keep a
                physical fallback as well. */
-            inset:max(54px, calc(env(safe-area-inset-top) + 14px)) auto 0 0;
+            inset:auto auto 0 0!important;
+            top:72px!important;
+            bottom:0!important;
+            left:0!important;
+            right:auto!important;
+            height:auto!important;
+            max-height:calc(100dvh - 72px)!important;
             width:min(92vw,360px);
             padding:13px 14px max(12px, env(safe-area-inset-bottom));
             border-radius:0 26px 26px 0;
@@ -949,7 +1001,7 @@ export default function AppDrawer({
         onClick={onClose}
       />
 
-      <aside className="tp-premium-drawer">
+      <aside ref={drawerRef} className="tp-premium-drawer">
         <div className="tp-premium-drawer-atmosphere" aria-hidden="true" />
 
         <div className="tp-premium-drawer-top">
