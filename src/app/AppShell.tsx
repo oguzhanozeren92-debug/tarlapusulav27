@@ -51,14 +51,31 @@ export default function AppShell({
     (field) => String(field.id) === String(favoriteFieldId),
   );
 
+  const canonicalTitles: Partial<Record<Screen, string>> = {
+    weatherHub: 'Hava Durumu',
+    inventoryHub: 'Depom',
+    marketHub: 'Piyasa Fiyatları',
+    pestGuideHub: 'Bilgi Rehberi',
+    calendar: 'Takvim',
+    notificationsHub: 'Bildirimler',
+    settingsHub: 'Ayarlar',
+    supportHub: 'Tarımsal Destek',
+    agendaHub: 'Tarım Gündemi',
+    nutritionHub: 'Bitki Besleme',
+    producerMarketHub: 'Üretici Pazarı',
+    fieldNotebookHub: 'Tarla Defteri',
+    aiAnalysis: 'Pusula AI',
+    fieldControlHub: 'Tarla Kontrol',
+  };
+
   const shellTitle =
-    screen === 'pestGuideHub'
-      ? 'Bilgi Rehberi'
-      : screen === 'calendar'
-        ? 'Takvim'
-        : menuItems.find(
-            (item) => String(item.screen) === String(screen),
-          )?.label ?? null;
+    canonicalTitles[screen] ??
+    menuItems.find(
+      (item) => String(item.screen) === String(screen),
+    )?.label ??
+    null;
+
+  const globalBandVisible = showGlobalBand && screen !== 'home';
 
   return (
     <>
@@ -69,7 +86,7 @@ export default function AppShell({
         onNavigate={onNavigate}
       />
 
-      {showGlobalBand && screen !== 'home' && (
+      {globalBandVisible && (
         <GlobalPusulaBand
           screen={String(screen)}
           title={shellTitle}
@@ -80,7 +97,13 @@ export default function AppShell({
         />
       )}
 
-      {children}
+      {globalBandVisible ? (
+        <div className="tp-app-shell-content tp-app-shell-content--with-global-band">
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </>
   );
 }
