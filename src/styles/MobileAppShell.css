@@ -408,3 +408,38 @@ html.tp-native-app .tp-field-select {
     padding-right: 7px !important;
   }
 }
+
+
+/* =========================================================
+   GLOBAL MENU HEADER CONTRACT — 2026-10-07
+   Every non-home screen uses the same fixed GlobalPusulaBand.
+   Reserve the exact same vertical slot under it so individual page titles
+   can never slide underneath / be clipped by the fixed header.
+   ========================================================= */
+.tp-app-shell-content--with-global-band {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding-top: 76px !important;
+}
+
+@media (max-width: 600px) {
+  html.tp-native-app .tp-app-shell-content--with-global-band {
+    padding-top:
+      calc(
+        var(--tp-native-header-row, 70px)
+        + var(--tp-native-safe-top, env(safe-area-inset-top, 0px))
+        + 10px
+      ) !important;
+  }
+
+  /* All menu headers share exactly the same geometry on iPhone. */
+  html.tp-native-app .tp-global-page-header {
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    transform: none !important;
+  }
+}
