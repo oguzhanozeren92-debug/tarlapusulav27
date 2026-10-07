@@ -881,13 +881,34 @@ export default function AppDrawer({
 
         @media(max-width:520px){
           .tp-premium-drawer{
+            /* Native iPhone: keep the whole drawer below the status-bar /
+               Dynamic Island zone. env(safe-area-inset-top) may be reported
+               as 0 in some Capacitor/WebView configurations, so keep a
+               physical fallback as well. */
+            inset:max(54px, calc(env(safe-area-inset-top) + 14px)) auto 0 0;
             width:min(92vw,360px);
-            padding:13px 14px 12px;
+            padding:13px 14px max(12px, env(safe-area-inset-bottom));
+            border-radius:0 26px 26px 0;
           }
 
           .tp-premium-drawer-top{
-            grid-template-columns:57px minmax(0,1fr) 34px;
+            grid-template-columns:57px minmax(0,1fr) 44px;
             gap:10px;
+            align-items:start;
+          }
+
+          .tp-premium-drawer-x{
+            width:44px;
+            height:44px;
+            min-width:44px;
+            min-height:44px;
+            margin-top:0;
+            border-radius:13px;
+            background:rgba(255,255,255,.08);
+            border:1px solid rgba(255,255,255,.16);
+            font-size:27px;
+            -webkit-tap-highlight-color:transparent;
+            touch-action:manipulation;
           }
 
           .tp-premium-drawer-brand-mark{
