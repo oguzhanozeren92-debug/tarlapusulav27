@@ -255,16 +255,16 @@ export default function AppDrawer({
       const isPhone = window.matchMedia('(max-width: 520px)').matches;
 
       if (isPhone) {
-        // Hard native guard: keep the whole drawer comfortably below the
-        // iPhone status bar / Dynamic Island. Use !important at runtime so
+        // Hard native guard: move the WHOLE drawer clearly below the
+        // iPhone status bar / Dynamic Island, not only the close button. Use !important at runtime so
         // legacy theme rules cannot pull it back to top:0.
         drawer.style.setProperty('inset', 'auto auto 0 0', 'important');
-        drawer.style.setProperty('top', '72px', 'important');
+        drawer.style.setProperty('top', '112px', 'important');
         drawer.style.setProperty('bottom', '0', 'important');
         drawer.style.setProperty('left', '0', 'important');
         drawer.style.setProperty('right', 'auto', 'important');
         drawer.style.setProperty('height', 'auto', 'important');
-        drawer.style.setProperty('max-height', 'calc(100dvh - 72px)', 'important');
+        drawer.style.setProperty('max-height', 'calc(100dvh - 112px)', 'important');
       } else {
         for (const property of [
           'inset',
@@ -932,12 +932,12 @@ export default function AppDrawer({
                as 0 in some Capacitor/WebView configurations, so keep a
                physical fallback as well. */
             inset:auto auto 0 0!important;
-            top:72px!important;
+            top:112px!important;
             bottom:0!important;
             left:0!important;
             right:auto!important;
             height:auto!important;
-            max-height:calc(100dvh - 72px)!important;
+            max-height:calc(100dvh - 112px)!important;
             width:min(92vw,360px);
             padding:13px 14px max(12px, env(safe-area-inset-bottom));
             border-radius:0 26px 26px 0;
@@ -947,6 +947,7 @@ export default function AppDrawer({
             grid-template-columns:57px minmax(0,1fr) 44px;
             gap:10px;
             align-items:start;
+            padding-top:8px;
           }
 
           .tp-premium-drawer-x{
