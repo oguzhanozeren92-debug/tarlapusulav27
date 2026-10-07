@@ -4014,4 +4014,110 @@ const WEATHER_STYLES = `
     opacity:1!important;
   }
 
+
+  /* =========================================================
+     WXREF-V4 — GERÇEK TELEFON OKUNURLUK
+     Kart ölçülerine dokunmadan yalnız tipografiyi büyütür.
+     ========================================================= */
+  .tp-wxref-current-copy h2{
+    font-size:17px!important;
+  }
+
+  .tp-wxref-minmax b{
+    font-size:11.5px!important;
+  }
+  .tp-wxref-minmax small{
+    font-size:8.2px!important;
+  }
+
+  .tp-wxref-stats b{
+    font-size:11.5px!important;
+  }
+  .tp-wxref-stats small{
+    font-size:8.2px!important;
+  }
+
+  .tp-wxref-risk-grid small{
+    font-size:9.5px!important;
+    line-height:1.1!important;
+  }
+  .tp-wxref-risk-grid strong{
+    font-size:18px!important;
+    line-height:.98!important;
+  }
+  .tp-wxref-risk-grid em{
+    font-size:8.2px!important;
+    line-height:1.18!important;
+  }
+
+  .tp-wxref-data-grid small{
+    font-size:9px!important;
+    line-height:1.08!important;
+  }
+  .tp-wxref-data-grid strong{
+    font-size:13.5px!important;
+    line-height:1.05!important;
+  }
+  .tp-wxref-data-grid p{
+    font-size:8px!important;
+    line-height:1.18!important;
+  }
+
+  .tp-wxref-inline-state{
+    font-size:8.2px!important;
+  }
+
+  .tp-wxref-advice p{
+    font-size:9.5px!important;
+    line-height:1.3!important;
+  }
+
+  .tp-wxref-actions button{
+    font-size:9.8px!important;
+  }
+
+  @media(max-width:560px){
+    .tp-wxref-current-copy h2{
+      font-size:15px!important;
+    }
+
+    .tp-wxref-minmax b,
+    .tp-wxref-stats b{
+      font-size:10.5px!important;
+    }
+
+    .tp-wxref-minmax small,
+    .tp-wxref-stats small{
+      font-size:7.6px!important;
+    }
+
+    .tp-wxref-risk-grid small{
+      font-size:8.8px!important;
+    }
+    .tp-wxref-risk-grid strong{
+      font-size:16.5px!important;
+    }
+    .tp-wxref-risk-grid em{
+      font-size:7.5px!important;
+    }
+
+    .tp-wxref-data-grid small{
+      font-size:8.4px!important;
+    }
+    .tp-wxref-data-grid strong{
+      font-size:12.5px!important;
+    }
+    .tp-wxref-data-grid p{
+      font-size:7.4px!important;
+    }
+
+    .tp-wxref-advice p{
+      font-size:8.8px!important;
+    }
+
+    .tp-wxref-actions button{
+      font-size:9px!important;
+    }
+  }
+
 `;
