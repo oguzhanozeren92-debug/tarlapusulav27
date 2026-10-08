@@ -5224,3 +5224,62 @@ body .tp-v1 .tp-ndvi-live-summary{
   62%{transform:rotate(-11deg)}
   82%{transform:rotate(5deg)}
 }
+
+
+/* V63 — Mobil harita yatay hizası ve ana ekran Pusula ince konum ayarı */
+@media (max-width: 760px) {
+  /*
+   * Map-first eski -11px sağ/sol taşırmaları içeriyordu. Kartı ana ekranın
+   * eşit iç boşluklarına oturt; başlık, harita, NDVI ve Pusula altlığı aynı
+   * genişlikte kalsın. Tam ekran harita sınıflarını değiştirme.
+   */
+  body .tp-v1 .tp-main {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  body .tp-v1 .tp-home-map-pusula-shell {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  body .tp-v1 .tp-home-map-pusula-shell > .tp-map-first-shell {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  body .tp-v1 .tp-home-map-pusula-shell .tp-map-first-shell > .tp-home-field {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  body .tp-v1 .tp-home-map-pusula-shell > .tp-home-map-pusula-strip {
+    box-sizing: border-box !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
+
+/* Yalnız ana ekran logosu: sabit yatay merkez korunurken 10px aşağı. */
+@media (max-width: 760px) {
+  body .tp-v1 .tp-v1-header .tp-brand-pusula-wrap {
+    left: 50% !important;
+    top: calc(50% + 10px) !important;
+    transform: translate(-50%, -50%) !important;
+  }
+}
