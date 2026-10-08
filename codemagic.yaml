@@ -60,7 +60,7 @@ workflows:
 
   android-release:
     name: TarlaPusula Android AAB Release
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     max_build_duration: 90
 
     # Before running, upload the Google Play upload keystore in Codemagic:
