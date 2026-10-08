@@ -56,3 +56,58 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
+
+
+  android-release:
+    name: TarlaPusula Android AAB Release
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+
+    # Before running, upload the Google Play upload keystore in Codemagic:
+    # Team settings > Code signing identities > Android keystores.
+    # Use the reference name "tarlapusula_upload". Never commit the keystore.
+    environment:
+      android_signing:
+        - tarlapusula_upload
+      node: 22
+      java: 21
+
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm install
+
+      - name: Build web app and sync Android
+        script: |
+          npm run build
+          npx cap sync android
+
+      - name: Build signed Google Play AAB
+        script: |
+          set -eu
+
+          : "${CM_KEYSTORE_PATH:?Configure the tarlapusula_upload keystore in Codemagic}"
+          : "${CM_KEYSTORE_PASSWORD:?Missing Android keystore password}"
+          : "${CM_KEY_ALIAS:?Missing Android upload key alias}"
+          : "${CM_KEY_PASSWORD:?Missing Android upload key password}"
+          test -f "$CM_KEYSTORE_PATH" || { echo "Android upload keystore file not found" >&2; exit 1; }
+
+          export TP_ANDROID_UPLOAD_STORE_FILE="$CM_KEYSTORE_PATH"
+          export TP_ANDROID_UPLOAD_STORE_PASSWORD="$CM_KEYSTORE_PASSWORD"
+          export TP_ANDROID_UPLOAD_KEY_ALIAS="$CM_KEY_ALIAS"
+          export TP_ANDROID_UPLOAD_KEY_PASSWORD="$CM_KEY_PASSWORD"
+
+          BUILD_CODE="${BUILD_NUMBER:-1}"
+          case "$BUILD_CODE" in
+            *[!0-9]*|'') echo "Invalid Android version code" >&2; exit 1 ;;
+          esac
+          export TP_ANDROID_VERSION_CODE="$BUILD_CODE"
+          export TP_ANDROID_VERSION_NAME="1.0.$BUILD_CODE"
+
+          cd android
+          chmod +x ./gradlew
+          ./gradlew bundleRelease --no-daemon
+
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/mapping/release/mapping.txt
