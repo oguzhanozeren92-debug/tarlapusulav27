@@ -120,6 +120,49 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+function fieldClimateCoordinates(field: Field | null) {
+  if (!field) return null;
+
+  const directLat = finiteNumber(field.parcelCentroidLat ?? field.latitude);
+  const directLng = finiteNumber(field.parcelCentroidLng ?? field.longitude);
+  if (directLat !== null && directLng !== null) {
+    return { latitude: directLat, longitude: directLng };
+  }
+
+  // Centroid kolonları boş olsa bile kayıtlı parsel geometrisinden merkez üret.
+  // Hava ekranı bunu zaten yapıyordu; NASA/ERA5 tarafı yapmadığı için
+  // "Tarla İklimi" paneli polygon kayıtlı bazı tarlalarda boş kalıyordu.
+  const geometry =
+    (field as any)?.parcelGeometry?.geometry ??
+    (field as any)?.parcelGeometry ??
+    (field as any)?.parcel_geometry?.geometry ??
+    (field as any)?.parcel_geometry;
+
+  const points: Array<[number, number]> = [];
+  const collect = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    if (
+      value.length >= 2 &&
+      Number.isFinite(Number(value[0])) &&
+      Number.isFinite(Number(value[1]))
+    ) {
+      points.push([Number(value[0]), Number(value[1])]);
+      return;
+    }
+    value.forEach(collect);
+  };
+
+  collect(geometry?.coordinates);
+  if (!points.length) return null;
+
+  const longitude = points.reduce((sum, point) => sum + point[0], 0) / points.length;
+  const latitude = points.reduce((sum, point) => sum + point[1], 0) / points.length;
+
+  return Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? { latitude, longitude }
+    : null;
+}
+
 function buildUnifiedClimateContext(
   field: Field | null,
   nasaPowerState: NasaPowerCardState,
@@ -189,9 +232,9 @@ function buildUnifiedClimateContext(
     version: 1,
     fieldId,
     fieldName: field.name,
-    coordinates: {
-      latitude: finiteNumber(field.parcelCentroidLat ?? field.latitude),
-      longitude: finiteNumber(field.parcelCentroidLng ?? field.longitude),
+    coordinates: fieldClimateCoordinates(field) ?? {
+      latitude: null,
+      longitude: null,
     },
     generatedAt: new Date().toISOString(),
     confidence,
@@ -411,14 +454,19 @@ export function useAppWeatherData({ realFields, favoriteFieldId }: UseAppWeather
     [realFields, weatherHubFieldId, favoriteFieldId],
   );
 
+  const climateCoordinates = useMemo(
+    () => fieldClimateCoordinates(climateTargetField),
+    [climateTargetField],
+  );
+
   useEffect(() => {
     if (!climateTargetField) {
       setNasaPowerState({ status: 'idle' });
       return;
     }
 
-    const latitude = Number(climateTargetField.parcelCentroidLat ?? climateTargetField.latitude ?? NaN);
-    const longitude = Number(climateTargetField.parcelCentroidLng ?? climateTargetField.longitude ?? NaN);
+    const latitude = climateCoordinates?.latitude ?? NaN;
+    const longitude = climateCoordinates?.longitude ?? NaN;
 
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       setNasaPowerState({
@@ -460,7 +508,7 @@ export function useAppWeatherData({ realFields, favoriteFieldId }: UseAppWeather
     return () => {
       active = false;
     };
-  }, [climateTargetField?.id, climateTargetField?.parcelCentroidLat, climateTargetField?.parcelCentroidLng, climateTargetField?.latitude, climateTargetField?.longitude]);
+  }, [climateTargetField?.id, climateCoordinates?.latitude, climateCoordinates?.longitude]);
 
   useEffect(() => {
     if (!climateTargetField) {
@@ -468,8 +516,8 @@ export function useAppWeatherData({ realFields, favoriteFieldId }: UseAppWeather
       return;
     }
 
-    const latitude = Number(climateTargetField.parcelCentroidLat ?? climateTargetField.latitude ?? NaN);
-    const longitude = Number(climateTargetField.parcelCentroidLng ?? climateTargetField.longitude ?? NaN);
+    const latitude = climateCoordinates?.latitude ?? NaN;
+    const longitude = climateCoordinates?.longitude ?? NaN;
 
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       setEra5ClimateState({
@@ -520,7 +568,7 @@ export function useAppWeatherData({ realFields, favoriteFieldId }: UseAppWeather
     return () => {
       active = false;
     };
-  }, [climateTargetField?.id, climateTargetField?.parcelCentroidLat, climateTargetField?.parcelCentroidLng, climateTargetField?.latitude, climateTargetField?.longitude]);
+  }, [climateTargetField?.id, climateCoordinates?.latitude, climateCoordinates?.longitude]);
 
   const unifiedClimateContext = useMemo(
     () => buildUnifiedClimateContext(climateTargetField, nasaPowerState, era5ClimateState),

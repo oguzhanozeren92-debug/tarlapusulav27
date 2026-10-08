@@ -496,3 +496,33 @@ body:has(.tp-orchard-zone-save-backdrop) .tp-mf-ndvi-strip {
     gap:4px;
   }
 }
+
+
+/* =========================================================
+   V45 — BAHÇE TAKİP ALANI / ÜST METİN KONTRASTI
+   "Kalın" değil, daha koyu metin. Dış kart beyaz; üst başlık ve
+   açıklama koyu tonlarda okunaklı. İç örnek alan siyah kalır.
+   ========================================================= */
+body .tp-orchard-zone-premium-preview{
+  background:#ffffff!important;
+  color:#101214!important;
+  border-color:#d9dde1!important;
+  box-shadow:0 18px 38px rgba(0,0,0,.24)!important;
+}
+
+body .tp-orchard-zone-premium-head span{
+  color:#555d65!important;
+  -webkit-text-fill-color:#555d65!important;
+}
+
+body .tp-orchard-zone-premium-head strong{
+  color:#111315!important;
+  -webkit-text-fill-color:#111315!important;
+  font-weight:850!important;
+}
+
+body .tp-orchard-zone-premium-preview>p{
+  color:#454c53!important;
+  -webkit-text-fill-color:#454c53!important;
+  font-weight:550!important;
+}

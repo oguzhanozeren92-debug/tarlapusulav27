@@ -967,3 +967,82 @@
     animation: none;
   }
 }
+
+
+/* =========================================================
+   V56 — GİRİŞ SAYFASI PUSULA IŞIĞI
+   Yalnız Auth ekranındaki pusulayı etkiler.
+   Siyah zemin oluşturmaz; beyaz + çok hafif yeşil halo verir.
+   ========================================================= */
+.tp-authv2-brand-mark{
+  position:relative;
+  z-index:2;
+  margin-bottom:1px;
+  filter:
+    drop-shadow(0 6px 12px rgba(17,18,20,.16))
+    drop-shadow(0 0 8px rgba(255,255,255,.95));
+}
+
+.tp-authv2-brand-mark::before{
+  inset:-20px!important;
+  background:
+    radial-gradient(
+      circle,
+      rgba(255,255,255,.98) 0%,
+      rgba(255,255,255,.76) 31%,
+      rgba(183,226,211,.38) 52%,
+      rgba(102,176,154,.16) 66%,
+      transparent 79%
+    )!important;
+  filter:blur(5px);
+  opacity:.92;
+  animation:tp-auth-compass-glow 3.8s ease-in-out infinite;
+}
+
+.tp-authv2-brand-mark::after{
+  content:'';
+  position:absolute;
+  inset:-28px;
+  z-index:-1;
+  border-radius:50%;
+  pointer-events:none;
+  background:
+    radial-gradient(
+      circle,
+      rgba(255,255,255,.34) 0%,
+      rgba(133,200,180,.18) 42%,
+      transparent 72%
+    );
+  filter:blur(10px);
+  opacity:.72;
+  animation:tp-auth-compass-aura 4.8s ease-in-out infinite;
+}
+
+@keyframes tp-auth-compass-glow{
+  0%,100%{
+    opacity:.72;
+    transform:scale(.97);
+  }
+  50%{
+    opacity:1;
+    transform:scale(1.05);
+  }
+}
+
+@keyframes tp-auth-compass-aura{
+  0%,100%{
+    opacity:.42;
+    transform:scale(.94);
+  }
+  50%{
+    opacity:.82;
+    transform:scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .tp-authv2-brand-mark::before,
+  .tp-authv2-brand-mark::after{
+    animation:none!important;
+  }
+}

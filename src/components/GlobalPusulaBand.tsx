@@ -2041,19 +2041,19 @@ export default function GlobalPusulaBand({
           animation:tp-depot-needle-talk 1.45s ease-in-out infinite!important;
         }
 
+        /* 2026-10-07 — imleç artık küçük sağ/sol salınım yapmaz.
+           Her döngüde iki tam tur (2 x 360° = 720°) atar, sonra dinlenir. */
         @keyframes tp-depot-needle-idle{
-          0%,100%{transform:rotate(0deg)}
-          28%{transform:rotate(15deg)}
-          62%{transform:rotate(-11deg)}
-          82%{transform:rotate(5deg)}
+          0%{transform:rotate(0deg)}
+          12%{transform:rotate(360deg)}
+          24%{transform:rotate(720deg)}
+          100%{transform:rotate(720deg)}
         }
 
         @keyframes tp-depot-needle-talk{
-          0%{transform:rotate(-18deg)}
-          35%{transform:rotate(74deg)}
-          58%{transform:rotate(42deg)}
-          78%{transform:rotate(96deg)}
-          100%{transform:rotate(-18deg)}
+          0%{transform:rotate(0deg)}
+          50%{transform:rotate(360deg)}
+          100%{transform:rotate(720deg)}
         }
 
         .tp-depot-pusula-card,
@@ -2184,14 +2184,6 @@ export default function GlobalPusulaBand({
         .pusula-guide{
           z-index:2147483000!important;
         }
-
-        ${screen === 'weatherHub' ? `
-        /* Hava ekranında tıklamayı alttaki global Pusula butonu yönetir;
-           böylece son güncel öneri isteğe bağlı tekrar oynatılır. */
-        .pusula-guide__logo{
-          pointer-events:none!important;
-        }
-        ` : ''}
 
         @media(max-width:560px){
           .tp-global-page-header{

@@ -373,6 +373,7 @@ export default function Era5MapScreen({
           <label>
             <span>Tarla</span>
             <select
+              className="tp-global-field-select"
               value={String(selectedField?.id ?? '')}
               onChange={(event) => {
                 setInternalFieldId(event.target.value);

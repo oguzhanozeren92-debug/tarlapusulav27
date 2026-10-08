@@ -209,6 +209,8 @@ export default function HomeScreen(props: HomeScreenProps) {
   const [pointsOpen, setPointsOpen] = useState(false);
   const [homeHeaderPusulaInsight, setHomeHeaderPusulaInsight] =
     useState<PusulaInsight | null>(null);
+  const [seenHomePusulaDecisionId, setSeenHomePusulaDecisionId] =
+    useState('');
   const [taskQuestionTarget, setTaskQuestionTarget] =
     useState<PusulaFieldQuestionTarget>(null);
   const [activeHomeLayer, setActiveHomeLayer] =
@@ -629,6 +631,7 @@ export default function HomeScreen(props: HomeScreenProps) {
 
   const {
     todayDecisions: todayDecisionCards,
+    fieldStatusDecisions,
     notifications: homeSystemNotifications,
     pusulaDecision,
     nutrientProductionGuard,
@@ -703,6 +706,12 @@ export default function HomeScreen(props: HomeScreenProps) {
         }
       : null,
   });
+
+  const homePusulaDecisionAttention = Boolean(
+    pusulaDecision &&
+      pusulaDecision.id !== seenHomePusulaDecisionId &&
+      (pusulaDecision.severity !== 'info' || pusulaDecision.priority >= 80),
+  );
 
   // 14.4: Pusula'nın ham harita ve field-synthesis yorumları kullanıcıya
   // gösterilmeden önce HomeDecisionEngine'in ürettiği aynı production
@@ -850,6 +859,18 @@ export default function HomeScreen(props: HomeScreenProps) {
         setQuickSheet(null);
         setTasksOpen(false);
         setFieldStatusInitialTab('plant');
+        setFieldStatusOpen(true);
+      } else {
+        setScreen?.('home');
+      }
+      return;
+    }
+
+    if (target === 'field_status') {
+      if (homeField) {
+        setQuickSheet(null);
+        setTasksOpen(false);
+        setFieldStatusInitialTab('summary');
         setFieldStatusOpen(true);
       } else {
         setScreen?.('home');
@@ -1191,6 +1212,30 @@ export default function HomeScreen(props: HomeScreenProps) {
       return;
     }
 
+    // V58: Ana sayfadaki Pusula artık ham harita metnini değil,
+    // HomeDecisionEngine'in bütün motorları birleştirdikten sonra seçtiği
+    // kanonik Pusula kararını kullanır. Logo yine yalnız kullanıcı tıklayınca iner.
+    if (pusulaDecision) {
+      setSeenHomePusulaDecisionId(pusulaDecision.id);
+      const confidence =
+        pusulaDecision.gateway?.confidence ??
+        pusulaDecision.confidence ??
+        'preliminary';
+
+      setHomeHeaderPusulaInsight({
+        id: `home-decision-${pusulaDecision.id}`,
+        gozlem: String(pusulaDecision.title || pusulaDecision.label || 'Pusula').trim(),
+        yonlendirme: String(pusulaDecision.detail || '').trim(),
+        guven_skoru:
+          confidence === 'strong'
+            ? 'Yüksek'
+            : confidence === 'medium'
+              ? 'Orta'
+              : 'Düşük',
+      });
+      return;
+    }
+
     const headline = String(displayHeadline ?? '').trim();
     const summary = String(displaySummary ?? '').trim();
 
@@ -1256,7 +1301,8 @@ export default function HomeScreen(props: HomeScreenProps) {
           insight={homeHeaderPusulaInsight}
           anchorSelector=".tp-brand-pusula-anchor"
           hasUnread={Boolean(
-            fieldEventPrompt.candidate && fieldEventPrompt.needsAttention,
+            (fieldEventPrompt.candidate && fieldEventPrompt.needsAttention) ||
+              homePusulaDecisionAttention,
           )}
           onLogoClick={handleHomeHeaderPusulaClick}
         />
@@ -1336,20 +1382,20 @@ export default function HomeScreen(props: HomeScreenProps) {
               className={`tp-brand-pusula-anchor${
                 pusulaGuideAway || operationQuestionVisible ? ' tp-brand-pusula-away' : ''
               }${
-                fieldEventPrompt.candidate &&
-                fieldEventPrompt.needsAttention &&
+                ((fieldEventPrompt.candidate && fieldEventPrompt.needsAttention) ||
+                  homePusulaDecisionAttention) &&
                 !pusulaGuideAway &&
                 !operationQuestionVisible
                   ? ' tp-brand-pusula-event-attention'
                   : ''
               }`}
               aria-label={
-                fieldEventPrompt.candidate
-                  ? 'Pusula bir tarla değişikliği fark etti'
+                fieldEventPrompt.candidate || homePusulaDecisionAttention
+                  ? 'Pusula bir şey fark etti'
                   : 'Pusula'
               }
               title={
-                fieldEventPrompt.candidate
+                fieldEventPrompt.candidate || homePusulaDecisionAttention
                   ? 'Pusula bir şey fark etti'
                   : 'Pusula'
               }
@@ -1514,6 +1560,8 @@ export default function HomeScreen(props: HomeScreenProps) {
               synthesis={fieldSynthesis}
               ndviStats={homeNdviStats}
               error={homePusulaError}
+              decision={pusulaDecision}
+              onOpenDecision={openHomeInsightTarget}
               showOnMapAvailable={
                 activeHomeLayer === 'vegetation' &&
                 Boolean(sat?.ndviImage)
@@ -1597,7 +1645,7 @@ export default function HomeScreen(props: HomeScreenProps) {
             initialTab={fieldStatusInitialTab}
             initialActionTarget={fieldStatusInitialActionTarget}
             notifications={visibleHomeSystemNotifications}
-            decisions={todayDecisionCards}
+            decisions={fieldStatusDecisions}
             irrigation={homeIrrigation}
             phenology={decisionPhenology}
             onClose={() => {

@@ -31,7 +31,8 @@ import {
   getSoilGridsWmsLayerName,
   type SoilGridsProfile,
 } from '../../services/soilGridsService';
-import { createSatelliteRasterSource, vividSatellitePaint } from '../../lib/mapStyle';
+import { createResilientSatelliteStyle } from '../../lib/mapStyle';
+import { clearRecoverableImageOverlay, installMapLifecycleRecovery, swapRecoverableImageOverlay } from '../../lib/mapLayerRecovery';
 import { addTarlaCompass } from '../../components/MapCompass';
 import NdviObservationPhotoModal from '../field-observations/components/NdviObservationPhotoModal';
 import NdviObservationTimelineModal from '../field-observations/components/NdviObservationTimelineModal';
@@ -266,30 +267,11 @@ function homeMapFieldCacheKey(field: any) {
 
 type HomeBBox = [number, number, number, number];
 
-const HOME_SATELLITE_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    // Bazı bölgelerde sağlayıcının z19 karoları gerçek görüntü yerine
-    // "Map data not yet available" placeholder'ı döndürüyor.
-    // z18'de gerçek uydu görüntüsü mevcut olduğu için kaynağı z18'de
-    // sabitliyor, MapLibre'ın daha yakın zoomlarda bu karoyu overzoom
-    // etmesine izin veriyoruz. Katman/veri mantığı değişmez.
-    satellite: {
-      ...(createSatelliteRasterSource() as any),
-      maxzoom: 18,
-    } as any,
-  },
-  layers: [
-    {
-      id: 'home-satellite-base',
-      type: 'raster',
-      source: 'satellite',
-      minzoom: 0,
-      maxzoom: 22,
-      paint: vividSatellitePaint,
-    },
-  ],
-};
+// Mapbox ana uydu kaynağı kullanılırken Esri World Imagery altta sıcak
+// yedek olarak kalır. Kaynak z18'de sabitlenir ve daha yakın zoomlarda
+// overzoom edilir; geçici tile hatasında harita çıplak kalmaz.
+const HOME_SATELLITE_STYLE: maplibregl.StyleSpecification =
+  createResilientSatelliteStyle('home-satellite-base', 18);
 
 function homeBboxFromGeometry(parcelGeometry: any): HomeBBox | null {
   const geometry = parcelGeometry?.geometry ?? parcelGeometry;
@@ -2348,6 +2330,7 @@ function InteractiveHomeHealthMap({
     });
 
     mapRef.current = map;
+    const stopMapRecovery = installMapLifecycleRecovery(map);
 
     map.addControl(
       new mapRuntime.NavigationControl({
@@ -2422,6 +2405,7 @@ function InteractiveHomeHealthMap({
     });
 
     return () => {
+      stopMapRecovery();
       mapRef.current = null;
       map.remove();
     };
@@ -6076,6 +6060,7 @@ export function HomeInlineLayerMap({
     });
 
     mapRef.current = map;
+    const stopMapRecovery = installMapLifecycleRecovery(map);
     const stopOpening = (event: { originalEvent?: unknown }) => {
       if (event.originalEvent) {
         userInteracted = true;
@@ -6156,6 +6141,7 @@ export function HomeInlineLayerMap({
         }
       }
       trackingPointMarkersRef.current = [];
+      stopMapRecovery();
       mapRef.current = null;
       map.remove();
     };
@@ -8518,15 +8504,8 @@ export function HomeInlineLayerMap({
                     )
                   : false;
 
-      const clearLayer = (id: string, source: string) => {
-        if (map.getLayer(id)) map.removeLayer(id);
-        if (map.getSource(source)) map.removeSource(source);
-      };
-
       const clearRenderedRaster = () => {
-        clearLayer('home-inline-image-layer', 'home-inline-image');
-        clearLayer('home-inline-climate-layer', 'home-inline-climate');
-        clearLayer('home-inline-agro-layer', 'home-inline-agro');
+        clearRecoverableImageOverlay(map, 'home-inline-overlay');
         renderedLayerRequestKeyRef.current = '';
       };
 
@@ -8540,7 +8519,8 @@ export function HomeInlineLayerMap({
         return;
       }
 
-      clearRenderedRaster();
+      // Hedef raster hazırsa eski çalışan katmanı önce silme. Yeni görüntü
+      // doğrulanıp haritaya eklendikten sonra atomik olarak yer değiştirir.
 
       if (
         layer === 'vegetation' &&
@@ -8548,8 +8528,8 @@ export function HomeInlineLayerMap({
         bbox &&
         smoothNdviKey === ndviCacheKey
       ) {
-        map.addSource('home-inline-image', {
-          type: 'image',
+        void swapRecoverableImageOverlay(map, {
+          key: 'home-inline-overlay',
           url: smoothNdvi,
           coordinates: [
             [bbox[0], bbox[3]],
@@ -8557,26 +8537,17 @@ export function HomeInlineLayerMap({
             [bbox[2], bbox[1]],
             [bbox[0], bbox[1]],
           ],
-        } as any);
-
-        map.addLayer(
-          {
-            id: 'home-inline-image-layer',
-            type: 'raster',
-            source: 'home-inline-image',
-            paint: {
-              'raster-opacity': 0.82,
-              'raster-fade-duration': 0,
-              'raster-saturation': 0.04,
-              'raster-contrast': -0.04,
-              'raster-resampling': 'linear',
-            },
+          beforeLayerId: 'home-inline-parcel-shadow',
+          paint: {
+            'raster-opacity': 0.82,
+            'raster-fade-duration': 0,
+            'raster-saturation': 0.04,
+            'raster-contrast': -0.04,
+            'raster-resampling': 'linear',
           },
-          map.getLayer('home-inline-parcel-shadow')
-            ? 'home-inline-parcel-shadow'
-            : undefined
-        );
-        renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        }).then((installed) => {
+          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        });
       }
 
       if (
@@ -8589,8 +8560,8 @@ export function HomeInlineLayerMap({
       ) {
         const rb = activeRadarImage.bbox as HomeBBox;
 
-        map.addSource('home-inline-image', {
-          type: 'image',
+        void swapRecoverableImageOverlay(map, {
+          key: 'home-inline-overlay',
           url: clippedRadarImage,
           coordinates: [
             [rb[0], rb[3]],
@@ -8598,26 +8569,17 @@ export function HomeInlineLayerMap({
             [rb[2], rb[1]],
             [rb[0], rb[1]],
           ],
-        } as any);
-
-        map.addLayer(
-          {
-            id: 'home-inline-image-layer',
-            type: 'raster',
-            source: 'home-inline-image',
-            paint: {
-              'raster-opacity': 0.90,
-              'raster-fade-duration': 0,
-              'raster-resampling': 'linear',
-              'raster-contrast': 0.10,
-              'raster-saturation': 0.10,
-            },
+          beforeLayerId: 'home-inline-parcel-shadow',
+          paint: {
+            'raster-opacity': 0.90,
+            'raster-fade-duration': 0,
+            'raster-resampling': 'linear',
+            'raster-contrast': 0.10,
+            'raster-saturation': 0.10,
           },
-          map.getLayer('home-inline-parcel-shadow')
-            ? 'home-inline-parcel-shadow'
-            : undefined
-        );
-        renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        }).then((installed) => {
+          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        });
       }
 
       if (
@@ -8628,8 +8590,8 @@ export function HomeInlineLayerMap({
       ) {
         setSoilLoadError(null);
 
-        map.addSource('home-inline-image', {
-          type: 'image',
+        void swapRecoverableImageOverlay(map, {
+          key: 'home-inline-overlay',
           url: clippedSoilImage.url,
           coordinates: [
             [clippedSoilImage.bbox[0], clippedSoilImage.bbox[3]],
@@ -8637,26 +8599,17 @@ export function HomeInlineLayerMap({
             [clippedSoilImage.bbox[2], clippedSoilImage.bbox[1]],
             [clippedSoilImage.bbox[0], clippedSoilImage.bbox[1]],
           ],
-        } as any);
-
-        map.addLayer(
-          {
-            id: 'home-inline-image-layer',
-            type: 'raster',
-            source: 'home-inline-image',
-            paint: {
-              'raster-opacity': 0.72,
-              'raster-fade-duration': 0,
-              'raster-resampling': 'linear',
-              'raster-contrast': 0.03,
-              'raster-saturation': 0.06,
-            },
+          beforeLayerId: 'home-inline-parcel-shadow',
+          paint: {
+            'raster-opacity': 0.72,
+            'raster-fade-duration': 0,
+            'raster-resampling': 'linear',
+            'raster-contrast': 0.03,
+            'raster-saturation': 0.06,
           },
-          map.getLayer('home-inline-parcel-shadow')
-            ? 'home-inline-parcel-shadow'
-            : undefined,
-        );
-        renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        }).then((installed) => {
+          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        });
       }
 
       if (
@@ -8668,8 +8621,8 @@ export function HomeInlineLayerMap({
       ) {
         const cb = clippedClimateImage.bbox;
 
-        map.addSource('home-inline-climate', {
-          type: 'image',
+        void swapRecoverableImageOverlay(map, {
+          key: 'home-inline-overlay',
           url: clippedClimateImage.url,
           coordinates: [
             [cb[0], cb[3]],
@@ -8677,25 +8630,16 @@ export function HomeInlineLayerMap({
             [cb[2], cb[1]],
             [cb[0], cb[1]],
           ],
-        } as any);
-
-        map.addLayer(
-          {
-            id: 'home-inline-climate-layer',
-            type: 'raster',
-            source: 'home-inline-climate',
-            paint: {
-              'raster-opacity': 0.72,
-              'raster-fade-duration': 0,
-              'raster-resampling': 'linear',
-              'raster-contrast': -0.08,
-            },
+          beforeLayerId: 'home-inline-parcel-shadow',
+          paint: {
+            'raster-opacity': 0.72,
+            'raster-fade-duration': 0,
+            'raster-resampling': 'linear',
+            'raster-contrast': -0.08,
           },
-          map.getLayer('home-inline-parcel-shadow')
-            ? 'home-inline-parcel-shadow'
-            : undefined,
-        );
-        renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        }).then((installed) => {
+          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        });
       }
 
 
@@ -8708,8 +8652,8 @@ export function HomeInlineLayerMap({
       ) {
         const ab = clippedAgroImage.bbox;
 
-        map.addSource('home-inline-agro', {
-          type: 'image',
+        void swapRecoverableImageOverlay(map, {
+          key: 'home-inline-overlay',
           url: clippedAgroImage.url,
           coordinates: [
             [ab[0], ab[3]],
@@ -8717,26 +8661,17 @@ export function HomeInlineLayerMap({
             [ab[2], ab[1]],
             [ab[0], ab[1]],
           ],
-        } as any);
-
-        map.addLayer(
-          {
-            id: 'home-inline-agro-layer',
-            type: 'raster',
-            source: 'home-inline-agro',
-            paint: {
-              'raster-opacity': 0.86,
-              'raster-fade-duration': 0,
-              'raster-resampling': 'linear',
-              'raster-contrast': 0.08,
-              'raster-saturation': 0.12,
-            },
+          beforeLayerId: 'home-inline-parcel-shadow',
+          paint: {
+            'raster-opacity': 0.86,
+            'raster-fade-duration': 0,
+            'raster-resampling': 'linear',
+            'raster-contrast': 0.08,
+            'raster-saturation': 0.12,
           },
-          map.getLayer('home-inline-parcel-shadow')
-            ? 'home-inline-parcel-shadow'
-            : undefined,
-        );
-        renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        }).then((installed) => {
+          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+        });
       }
     };
 

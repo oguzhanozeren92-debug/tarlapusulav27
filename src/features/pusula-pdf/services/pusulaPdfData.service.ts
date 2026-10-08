@@ -1,7 +1,8 @@
 import { supabase } from '../../../supabaseClient';
 import { fetchHistoricalSatellite, listSatelliteDates } from '../../map-data/services/satelliteHistory';
-import type { PusulaPdfLayerArchiveSnapshot, PusulaPdfSatellitePoint, PusulaPdfSnapshot, PusulaPdfWeatherDay, WeeklyPusulaReport } from '../types';
+import type { PusulaPdfFieldPhoto, PusulaPdfLayerArchiveSnapshot, PusulaPdfSatellitePoint, PusulaPdfSnapshot, PusulaPdfWeatherDay, WeeklyPusulaReport } from '../types';
 import { fetchNasaPowerData } from '../../../services/nasaPowerService';
+import { getPrivateFileUrls } from '../../../services/r2Storage';
 
 const FIELD_COLUMNS = [
   'id','name','city','district','village','area_decare','crop','crop_subtype','season',
@@ -205,6 +206,57 @@ async function collectLayerArchive(
   });
 }
 
+async function collectFieldPhotos(fieldId: string, userId: string): Promise<PusulaPdfFieldPhoto[]> {
+  const { data, error } = await supabase
+    .from('field_observation_photos')
+    .select('id,storage_path,captured_at,notes,ai_result,ndvi_value,relative_health,satellite_date')
+    .eq('user_id', userId)
+    .eq('field_id', fieldId)
+    .order('captured_at', { ascending: false })
+    .limit(6);
+
+  if (error) {
+    console.warn('[PUSULAPDF] saha fotoğrafları alınamadı:', error.message);
+    return [];
+  }
+
+  const rows = data ?? [];
+  const paths = rows
+    .map((row: any) => String(row?.storage_path ?? '').trim())
+    .filter(Boolean);
+
+  let signed = new Map<string, string>();
+  if (paths.length) {
+    try {
+      signed = await getPrivateFileUrls(
+        'field-observation-photos',
+        paths,
+        'field-observation-photos',
+      );
+    } catch (signError) {
+      console.warn('[PUSULAPDF] saha fotoğraf URLleri hazırlanamadı:', signError);
+    }
+  }
+
+  return rows.map((row: any) => {
+    const storagePath = String(row?.storage_path ?? '').trim();
+    const aiResult = row?.ai_result && typeof row.ai_result === 'object' && !Array.isArray(row.ai_result)
+      ? row.ai_result as Record<string, unknown>
+      : null;
+
+    return {
+      id: String(row.id),
+      capturedAt: String(row.captured_at ?? ''),
+      signedUrl: signed.get(storagePath) ?? null,
+      notes: row.notes ? String(row.notes) : null,
+      aiResult,
+      ndviValue: numberOrNull(row.ndvi_value),
+      relativeHealth: numberOrNull(row.relative_health),
+      satelliteDate: row.satellite_date ? String(row.satellite_date) : null,
+    };
+  });
+}
+
 async function collectWeather(field: any) {
   const lat = numberOrNull(field.parcel_centroid_lat ?? field.latitude);
   const lng = numberOrNull(field.parcel_centroid_lng ?? field.longitude);
@@ -274,7 +326,7 @@ export async function buildPusulaPdfSnapshot(fieldIdInput: string, appWeather?: 
   const geometry = field.parcel_geometry ?? null;
   const period = getWeeklyReportPeriod();
 
-  const [satellite, weather, activities, soilAnalyses, diagnoses, kcSnapshots, layerArchive] = await Promise.all([
+  const [satellite, weather, activities, soilAnalyses, diagnoses, kcSnapshots, layerArchive, fieldPhotos] = await Promise.all([
     collectSatellite(geometry).catch(() => ({ points: [], availableDates: [] })),
     hasUsableAppWeather(appWeather) ? Promise.resolve(appWeather) : collectWeather(field),
     optionalRows('activities', fieldId, '*', 'activity_date'),
@@ -282,6 +334,7 @@ export async function buildPusulaPdfSnapshot(fieldIdInput: string, appWeather?: 
     optionalRows('ai_diagnosis_sessions', fieldId, '*', 'updated_at'),
     optionalRows('field_irrigation_kc_snapshots', fieldId, '*', 'snapshot_date'),
     collectLayerArchive(fieldId, user.id),
+    collectFieldPhotos(fieldId, user.id),
   ]);
 
   const missing: string[] = [];
@@ -311,6 +364,7 @@ export async function buildPusulaPdfSnapshot(fieldIdInput: string, appWeather?: 
     activities,
     soilAnalyses,
     diagnoses: diagnoses.filter((d: any) => d.status === 'resolved'),
+    fieldPhotos,
     missing,
   };
 }

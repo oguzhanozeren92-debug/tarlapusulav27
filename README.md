@@ -30,3 +30,16 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## v61 — Sosyal giriş yayın sertleştirmesi
+- Google / Facebook / Apple butonları Supabase Auth provider durumundan canlı keşfedilir.
+- Supabase'de kapalı provider kullanıcıya bozuk buton olarak gösterilmez.
+- Native OAuth dönüş köprüsü release workflow'larında `https://tarlapusulav27.vercel.app/` olarak sabitlenmiştir.
+- Android intent filter, iOS URL scheme ve Sign in with Apple entitlement için otomatik audit eklenmiştir.
+- Provider ayar isteği erişilemezse güvenli fallback uygulanır; Apple fallback varsayılan kapalıdır.
+
+## v62 release closure
+
+v62 closes the remaining code-side release hardening work: one-page premium PusulaPDF, centralized decision engine, map layer recovery, live social-provider discovery, market schedulers, content cover-image guard and release readiness auditing. Run `npm run audit:release-closure` for the static release wiring audit.
+
+The only remaining production blockers require external account credentials: Facebook/Apple OAuth provider credentials, RevenueCat backend/webhook credentials, and FCM/APNs server credentials. See `docs/RELEASE_CLOSURE_2026-10-08.md`.

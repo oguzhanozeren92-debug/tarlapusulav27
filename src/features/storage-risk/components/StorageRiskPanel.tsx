@@ -204,7 +204,7 @@ export default function StorageRiskPanel({ fields }: { fields: Field[] }) {
           </label>
           <label>
             <span>Tarla</span>
-            <select value={fieldId} onChange={(event) => setFieldId(event.target.value)}>
+            <select className="tp-global-field-select" value={fieldId} onChange={(event) => setFieldId(event.target.value)}>
               <option value="">Tarla bağlantısı yok</option>
               {fields
                 .filter((field) => !field.demo)

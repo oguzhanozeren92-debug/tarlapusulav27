@@ -17,7 +17,13 @@
     "mobile:android": "npm run build && npx cap sync android",
     "mobile:ios": "npm run build && npx cap sync ios",
     "android:open": "npx cap open android",
-    "ios:open": "npx cap open ios"
+    "ios:open": "npx cap open ios",
+    "audit:integration": "node ./scripts/integration-closure-audit.mjs",
+    "test:acceptance": "node --disable-warning=ExperimentalWarning --experimental-strip-types --experimental-loader ./scripts/resolve-ts-test-imports.mjs --test src/features/decision/services/endToEndAcceptance.test.mjs",
+    "audit:acceptance": "node ./scripts/end-to-end-acceptance-audit.mjs",
+    "audit:auth": "node ./scripts/auth-release-audit.mjs",
+    "verify:release": "npm run verify && npm run audit:integration && npm run audit:acceptance && npm run audit:auth && npm run audit:release-closure",
+    "audit:release-closure": "node ./scripts/release-closure-audit.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

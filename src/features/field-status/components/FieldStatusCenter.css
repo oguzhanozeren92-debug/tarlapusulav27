@@ -1561,3 +1561,340 @@ html body .tp-v1 .tp-map-first-shell .tp-field-toolbar.tp-field-toolbar {
     font-size: 14px;
   }
 }
+
+/* =========================================================
+   V51 — TARLA DURUMU / GÖRÜNÜR ZEKA KARTLARI
+   ========================================================= */
+.tp-field-status-intelligence-card{
+  display:grid;
+  gap:8px;
+  padding:12px;
+  border:1px solid #dce1e5;
+  border-radius:16px;
+  background:#fff;
+  color:#171a1e;
+}
+.tp-field-status-intelligence-card.muted{background:#f8f9fa}
+.tp-field-status-intelligence-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tp-field-status-intelligence-head>div{min-width:0}
+.tp-field-status-intelligence-head>div>span,
+.tp-field-status-multi-stress>div>span{display:block;color:#7c858d;font-size:7px;font-weight:900;letter-spacing:.13em}
+.tp-field-status-intelligence-head strong,
+.tp-field-status-multi-stress strong{display:block;margin-top:3px;color:#171a1e;font-size:12px;line-height:1.18;letter-spacing:-.015em}
+.tp-field-status-intelligence-card p,
+.tp-field-status-multi-stress p{margin:0;color:#67717a;font-size:9px;line-height:1.45}
+.tp-field-status-intelligence-badge{flex:0 0 auto;padding:5px 7px;border:1px solid #d9dee2;border-radius:999px;background:#f3f5f6;color:#5c666f;font-size:7px;font-weight:900;letter-spacing:.08em}
+.tp-field-status-intelligence-badge.watch{background:#111315;border-color:#111315;color:#fff}
+.tp-field-status-intelligence-badge.ready{background:#eef4ef;color:#31563a}
+.tp-field-status-intelligence-card>button,
+.tp-field-status-multi-stress>button{justify-self:start;display:inline-flex;align-items:center;gap:5px;min-height:31px;padding:0 10px;border:1px solid #d8dde1;border-radius:10px;background:#111315;color:#fff;font-size:8px;font-weight:850}
+
+.tp-field-status-multi-stress{
+  position:relative;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px;
+  border:1px solid #dce1e5;
+  border-radius:16px;
+  background:#fff;
+}
+.tp-field-status-multi-stress.active{border-color:#b8bec4;background:linear-gradient(135deg,#fff 0%,#f5f6f7 100%)}
+.tp-field-status-multi-stress.quiet{background:#f8f9fa}
+.tp-field-status-multi-stress>div{min-width:0;display:grid;gap:3px}
+.tp-field-status-multi-stress-ok{flex:0 0 auto;padding:5px 7px;border-radius:999px;background:#111315;color:#fff;font-size:7px;font-weight:900;letter-spacing:.08em}
+
+@media(max-width:560px){
+  .tp-field-status-intelligence-card,.tp-field-status-multi-stress{padding:10px;border-radius:14px}
+  .tp-field-status-intelligence-head strong,.tp-field-status-multi-stress strong{font-size:10.5px}
+  .tp-field-status-intelligence-card p,.tp-field-status-multi-stress p{font-size:8px}
+}
+
+
+/* =========================================================
+   V53 — TARLA DURUMU / KOMPAKT AÇILIR KARTLAR
+   ========================================================= */
+.tp-field-status-summary-grid button svg:last-child{transition:transform .18s ease}
+.tp-field-status-summary-grid button svg:last-child.is-open{transform:rotate(90deg)}
+
+.tp-field-status-workability-detail{
+  display:grid;
+  gap:8px;
+  padding:11px;
+  border:1px solid #d9dee2;
+  border-radius:15px;
+  background:#f7f8f9;
+}
+.tp-field-status-workability-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.tp-field-status-workability-head>div{min-width:0}
+.tp-field-status-workability-head span{
+  display:block;color:#7a838b;font-size:7px;font-weight:900;letter-spacing:.12em
+}
+.tp-field-status-workability-head strong{
+  display:block;margin-top:3px;color:#15181b;font-size:12px;line-height:1.2
+}
+.tp-field-status-workability-head button{
+  flex:0 0 auto;min-height:28px;padding:0 8px;border:1px solid #d5dadd;
+  border-radius:9px;background:#fff;color:#111315;font-size:7px;font-weight:850
+}
+.tp-field-status-workability-detail>p{
+  margin:0;color:#616b73;font-size:8.5px;line-height:1.4
+}
+.tp-field-status-workability-facts{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px
+}
+.tp-field-status-workability-facts article{
+  padding:8px;border:1px solid #e0e4e7;border-radius:11px;background:#fff
+}
+.tp-field-status-workability-facts span{display:block;color:#7b848c;font-size:6.8px}
+.tp-field-status-workability-facts strong{display:block;margin-top:3px;color:#171a1e;font-size:9px}
+
+.tp-field-status-accordion{position:relative;padding:0!important;overflow:hidden}
+.tp-field-status-accordion>summary{
+  list-style:none;cursor:pointer;padding:11px 32px 11px 12px
+}
+.tp-field-status-accordion>summary::-webkit-details-marker{display:none}
+.tp-field-status-accordion>summary::after{
+  content:'›';position:absolute;right:12px;top:19px;color:#6e7780;
+  font-size:17px;font-weight:900;transition:transform .18s ease
+}
+.tp-field-status-accordion[open]>summary::after{transform:rotate(90deg)}
+.tp-field-status-accordion-body{
+  display:grid;gap:8px;padding:0 12px 12px;border-top:1px solid #eceff1
+}
+.tp-field-status-accordion-body p{margin-top:9px!important}
+.tp-field-status-accordion-body>button{
+  justify-self:start;display:inline-flex;align-items:center;gap:5px;min-height:31px;
+  padding:0 10px;border:1px solid #d8dde1;border-radius:10px;background:#111315;
+  color:#fff;font-size:8px;font-weight:850
+}
+
+
+/* =========================================================
+   V55 — TARLA DURUMU / SONUÇ ÖNCE, DETAY İSTEĞE BAĞLI
+   ========================================================= */
+.tp-field-status-body{
+  padding-top:8px!important;
+}
+.tp-field-status-stack{
+  gap:7px!important;
+}
+
+/* Özet ilk bakışta kısa */
+.tp-field-status-hero.compact{
+  grid-template-columns:minmax(0,1fr) 68px!important;
+  padding:10px!important;
+}
+.tp-field-status-hero.compact p{display:none!important}
+.tp-field-status-score{
+  min-height:58px!important;
+}
+.tp-field-status-summary-grid{
+  gap:6px!important;
+}
+.tp-field-status-summary-grid button{
+  min-height:52px!important;
+  padding:8px!important;
+}
+.tp-field-status-summary-grid .tp-field-status-yield-summary{
+  min-height:52px!important;
+}
+.tp-field-status-summary-grid em{display:none!important}
+.tp-field-status-missing-banner p,
+.tp-field-status-field-event-copy p,
+.tp-field-status-highlight p{display:none!important}
+.tp-field-status-missing-banner,
+.tp-field-status-field-event,
+.tp-field-status-highlight{
+  min-height:0!important;
+  padding-top:9px!important;
+  padding-bottom:9px!important;
+}
+
+/* Her sekmenin kısa sonuç kartı */
+.tp-field-status-result-card{
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 11px;
+  border:1px solid #dce1e5;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 1px 0 rgba(17,19,21,.02);
+}
+.tp-field-status-result-card>div{
+  min-width:0;
+}
+.tp-field-status-result-card>div>span{
+  display:block;
+  color:#78818a;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+.tp-field-status-result-card>div>strong{
+  display:block;
+  margin-top:3px;
+  overflow:hidden;
+  color:#15191d;
+  font-size:13px;
+  font-weight:900;
+  line-height:1.2;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.tp-field-status-result-chip{
+  flex:0 0 auto;
+  padding:5px 7px;
+  border-radius:999px;
+  background:#eef1f3;
+  color:#58626b;
+  font-size:6.7px;
+  font-weight:900;
+  letter-spacing:.06em;
+}
+.tp-field-status-result-chip.good{
+  background:#edf5ef;
+  color:#315c3c;
+}
+.tp-field-status-result-chip.watch{
+  background:#fff3df;
+  color:#8a5b12;
+}
+.tp-field-status-result-chip.muted{
+  background:#f0f2f4;
+  color:#727b83;
+}
+
+/* Uzun teknik alanlar tek satırdan açılır */
+.tp-field-status-detail-fold{
+  overflow:hidden;
+  border:1px solid #dce1e5;
+  border-radius:14px;
+  background:#fff;
+}
+.tp-field-status-detail-fold>summary{
+  min-height:52px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 18px;
+  align-items:center;
+  gap:8px;
+  padding:9px 11px;
+  list-style:none;
+  cursor:pointer;
+}
+.tp-field-status-detail-fold>summary::-webkit-details-marker{display:none}
+.tp-field-status-detail-fold>summary>span{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+.tp-field-status-detail-fold>summary small{
+  color:#7a838b;
+  font-size:6.5px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+.tp-field-status-detail-fold>summary strong{
+  color:#1b2025;
+  font-size:10.5px;
+  line-height:1.15;
+}
+.tp-field-status-detail-fold>summary em{
+  overflow:hidden;
+  color:#7a838b;
+  font-size:7.5px;
+  font-style:normal;
+  line-height:1.2;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.tp-field-status-detail-fold>summary>svg{
+  color:#5f6972;
+  transition:transform .18s ease;
+}
+.tp-field-status-detail-fold[open]>summary>svg{
+  transform:rotate(90deg);
+}
+.tp-field-status-detail-fold-body{
+  display:grid;
+  gap:8px;
+  padding:9px;
+  border-top:1px solid #edf0f2;
+  background:#f7f8f9;
+}
+
+/* Açılmış detayların içindeki eski başlıkları da daha kısa tut */
+.tp-field-status-detail-fold-body .tp-field-status-section-head{
+  padding:9px 10px!important;
+}
+.tp-field-status-detail-fold-body .tp-field-status-section-head p{
+  margin-top:3px!important;
+  font-size:8.5px!important;
+}
+.tp-field-status-detail-fold-body .tp-field-status-yield-harvest>header p{
+  display:none!important;
+}
+.tp-field-status-detail-fold-body .tp-field-status-yield-note{
+  font-size:8px!important;
+}
+
+/* Risk listesi: yalnız karar başlığı */
+.tp-field-status-risk-list button{
+  min-height:48px!important;
+  padding:8px 9px!important;
+}
+.tp-field-status-risk-list button p{
+  display:none!important;
+}
+.tp-field-status-multi-stress{
+  min-height:52px!important;
+  padding:9px 10px!important;
+}
+.tp-field-status-multi-stress p{
+  display:none!important;
+}
+
+/* Veri Girişi ilk görünüm: seçimler net */
+.tp-field-status-input-grid{
+  gap:6px!important;
+}
+.tp-field-status-input-grid button{
+  min-height:52px!important;
+  padding:8px 9px!important;
+}
+.tp-field-status-input-copy small{
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+
+/* Sulama alt kartları da kısa */
+.tp-field-status-intelligence-card>summary{
+  min-height:50px!important;
+}
+.tp-water-scarcity{
+  margin:0!important;
+}
+
+@media(max-width:560px){
+  .tp-field-status-result-card{
+    min-height:54px;
+    padding:9px 10px;
+  }
+  .tp-field-status-result-card>div>strong{
+    font-size:12px;
+  }
+  .tp-field-status-detail-fold>summary{
+    min-height:49px;
+    padding:8px 10px;
+  }
+}

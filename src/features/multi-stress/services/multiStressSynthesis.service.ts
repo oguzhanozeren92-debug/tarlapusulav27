@@ -86,6 +86,11 @@ function classifyEvent(event: HomeDecisionEvent): MultiStressFamily | null {
   ) {
     return 'disease_pest';
   }
+  if (event.source === 'disaster-recovery') {
+    if (/don|frost|dusuk sicaklik/.test(haystack)) return 'frost';
+    if (/asiri sicak|extreme heat|heat|yuksek sicaklik/.test(haystack)) return 'heat';
+    if (/agir yagis|heavy rain|heavy_rain|sel|su birik|waterlog/.test(haystack)) return 'water_excess';
+  }
   if (event.source === 'frost-pocket') return 'frost';
   if (event.source === 'water-scarcity') return 'water_deficit';
   if (event.source === 'irrigation-distribution') return 'water_deficit';

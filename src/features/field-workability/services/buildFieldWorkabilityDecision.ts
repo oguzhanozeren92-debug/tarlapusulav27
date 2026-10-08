@@ -9,7 +9,7 @@ export function buildFieldWorkabilityDecision(
   const common = {
     group: 'field-workability',
     source: 'field-workability' as const,
-    target: 'soil' as const,
+    target: 'field_status' as const,
     label: 'TARLAYA GİRİŞ',
     sourceModel: 'field-workability-engine-v21',
     evidence: snapshot.evidence.slice(0, 6),

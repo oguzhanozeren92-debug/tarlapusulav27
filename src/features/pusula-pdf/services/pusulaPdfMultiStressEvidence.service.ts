@@ -211,6 +211,33 @@ function eventsFromPdfArchive(rows: any[]): HomeDecisionEvent[] {
     }
   }
 
+  const disaster = latestByLayer.get('disaster-recovery');
+  if (disaster) {
+    const metrics = objectValue(disaster.metrics);
+    const details = objectValue(disaster.details);
+    const status = String(metrics.status ?? '');
+    const eventType = String(metrics.eventType ?? details.event?.type ?? '').toLowerCase();
+    if (['damage_signal_supported', 'recovering'].includes(status) && eventType) {
+      const isFrost = eventType === 'frost';
+      const isHeat = eventType === 'extreme_heat';
+      const isRain = eventType === 'heavy_rain';
+      if (isFrost || isHeat || isRain) {
+        events.push(baseEvent({
+          id: `pdf-disaster-recovery:${eventType}:${String(metrics.eventDate ?? details.event?.date ?? 'event')}`,
+          group: 'disaster-recovery',
+          source: 'disaster-recovery',
+          sourceModel: 'disaster-recovery-v27',
+          observedAt: disaster.observedAt ?? metrics.eventDate ?? null,
+          severity: status === 'damage_signal_supported' ? 'warning' : 'warning',
+          title: String(details.headline ?? (isFrost ? 'Don sonrası değişim sinyali' : isHeat ? 'Aşırı sıcak sonrası değişim sinyali' : 'Ağır yağış sonrası değişim sinyali')),
+          detail: String(details.summary ?? 'Hava olayı ile olay sonrası uydu değişimi birlikte izlendi.'),
+          evidence: listText(details.evidence),
+          confidence: confidence(metrics.confidence),
+        }));
+      }
+    }
+  }
+
   const frost = latestByLayer.get('frost-pocket');
   if (frost) {
     const metrics = objectValue(frost.metrics);

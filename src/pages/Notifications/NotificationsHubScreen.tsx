@@ -233,6 +233,7 @@ export default function NotificationsHubScreen({
               <label className="tp-notifications-field-picker">
                 <span>Tarla</span>
                 <select
+                  className="tp-global-field-select"
                   value={fieldId}
                   onChange={(event) => setActiveFieldId(event.target.value)}
                 >

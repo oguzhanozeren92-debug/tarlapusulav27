@@ -1,387 +1,969 @@
 import { jsPDF } from 'jspdf';
-import type { PusulaPdfRadarPoint, PusulaPdfSatellitePoint, PusulaPdfSnapshot } from '../types';
+import type { PusulaPdfFieldPhoto, PusulaPdfSatellitePoint, PusulaPdfSnapshot } from '../types';
+import type { PusulaInsight } from './pusulaPdfInsights.service';
 import { buildPusulaPdfGuidance } from './pusulaPdfInsights.service';
 
 const W = 1240;
 const H = 1754;
-const M = 28;
-const INK = '#12252b';
-const MUTED = '#65747a';
-const LINE = '#d9e1e4';
+const INK = '#10243a';
+const MUTED = '#667784';
+const LINE = '#dfe6e9';
 const WHITE = '#ffffff';
-const GREEN = '#0a9a56';
-const GREEN_DARK = '#063d36';
-const GREEN_SOFT = '#e8f7ed';
-const BLUE = '#168ee3';
-const BLUE_SOFT = '#e9f4ff';
-const ORANGE = '#f28a19';
-const ORANGE_SOFT = '#fff3df';
-const RED = '#ef4c42';
-const GRAY_SOFT = '#f4f7f8';
+const PAGE = '#f7f9fa';
+const GREEN = '#07964f';
+const GREEN_DARK = '#07513f';
+const GREEN_SOFT = '#edf9f1';
+const BLUE = '#1677e8';
+const BLUE_SOFT = '#edf5ff';
+const ORANGE = '#f58219';
+const ORANGE_SOFT = '#fff4e8';
+const RED = '#ec3f42';
+const RED_SOFT = '#fff0f1';
+const PURPLE = '#7a23d7';
+const PURPLE_SOFT = '#f5efff';
+const TEAL = '#009688';
+const GRAY_SOFT = '#f3f6f7';
+
+const APP_WEB_URL = String(import.meta.env.VITE_PUBLIC_APP_URL || 'https://tarlapusulav27.vercel.app/').trim();
+const ANDROID_URL = String(import.meta.env.VITE_ANDROID_DOWNLOAD_URL || APP_WEB_URL).trim();
+const IOS_URL = String(import.meta.env.VITE_IOS_DOWNLOAD_URL || APP_WEB_URL).trim();
 
 const fmt = (value?: string | null, year = true) => {
   if (!value) return '—';
-  const d = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return value;
+  const raw = String(value).slice(0, 10);
+  const d = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return raw;
   return d.toLocaleDateString('tr-TR', year
-    ? { day: 'numeric', month: 'short', year: 'numeric' }
+    ? { day: 'numeric', month: 'long', year: 'numeric' }
     : { day: 'numeric', month: 'short' });
 };
-const num = (v: unknown, digits = 2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
-const valid = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+const valid = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const num = (value: unknown, digits = 2) => valid(value) ? value.toFixed(digits) : '—';
 
 function makeCanvas() {
-  const c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  const ctx = c.getContext('2d');
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('PDF çizim alanı oluşturulamadı.');
-  ctx.fillStyle = '#f7f9f8'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = PAGE;
+  ctx.fillRect(0, 0, W, H);
   ctx.textBaseline = 'alphabetic';
-  return { c, ctx };
+  return { canvas, ctx };
 }
+
 function font(ctx: CanvasRenderingContext2D, size: number, weight = 500) {
   ctx.font = `${weight} ${size}px Inter, "Noto Sans", Arial, sans-serif`;
 }
-function rr(ctx: CanvasRenderingContext2D, x:number,y:number,w:number,h:number,r=18,fill=WHITE,stroke=LINE,lw=1.5) {
-  ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fillStyle=fill; ctx.fill();
-  if (stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke(); }
-}
-function lines(ctx:CanvasRenderingContext2D, s:string, x:number,y:number,size=18,weight=500,color=INK,max=9999,lineHeight=1.28,maxLines=99) {
-  font(ctx,size,weight); ctx.fillStyle=color;
-  const words=String(s ?? '').split(/\s+/).filter(Boolean); let line=''; let yy=y; let count=0;
-  for(const word of words){
-    const test=line?`${line} ${word}`:word;
-    if(ctx.measureText(test).width>max && line){ ctx.fillText(line,x,yy); count++; if(count>=maxLines)return yy; line=word; yy+=size*lineHeight; }
-    else line=test;
+
+function rr(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r = 16,
+  fill = WHITE,
+  stroke = LINE,
+  lineWidth = 1.2,
+) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
   }
-  if(line && count<maxLines)ctx.fillText(line,x,yy);
+}
+
+function text(
+  ctx: CanvasRenderingContext2D,
+  value: string,
+  x: number,
+  y: number,
+  size = 18,
+  weight = 500,
+  color = INK,
+) {
+  font(ctx, size, weight);
+  ctx.fillStyle = color;
+  ctx.fillText(String(value ?? ''), x, y);
+}
+
+function wrap(
+  ctx: CanvasRenderingContext2D,
+  value: string,
+  x: number,
+  y: number,
+  size = 15,
+  weight = 500,
+  color = INK,
+  maxWidth = 300,
+  lineHeight = 1.25,
+  maxLines = 4,
+) {
+  font(ctx, size, weight);
+  ctx.fillStyle = color;
+  const words = String(value ?? '').split(/\s+/).filter(Boolean);
+  let current = '';
+  let yy = y;
+  let rendered = 0;
+
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i];
+    const candidate = current ? `${current} ${word}` : word;
+    if (ctx.measureText(candidate).width > maxWidth && current) {
+      const finalLine = rendered === maxLines - 1 && i < words.length ? `${current.replace(/[.,;:]?$/, '')}…` : current;
+      ctx.fillText(finalLine, x, yy);
+      rendered += 1;
+      if (rendered >= maxLines) return yy;
+      current = word;
+      yy += size * lineHeight;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current && rendered < maxLines) ctx.fillText(current, x, yy);
   return yy;
 }
-function t(ctx:CanvasRenderingContext2D,s:string,x:number,y:number,size=18,weight=500,color=INK){font(ctx,size,weight);ctx.fillStyle=color;ctx.fillText(s,x,y)}
-function compass(ctx:CanvasRenderingContext2D,x:number,y:number,r=24,color=WHITE){
-  ctx.save();ctx.translate(x,y);ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(0,-r+4);ctx.lineTo(7,5);ctx.lineTo(0,1);ctx.lineTo(-7,5);ctx.closePath();ctx.fill();
-  ctx.globalAlpha=.45;ctx.beginPath();ctx.moveTo(0,r-4);ctx.lineTo(-6,-4);ctx.lineTo(0,0);ctx.lineTo(6,-4);ctx.closePath();ctx.fill();ctx.restore();
+
+function circleIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  fill: string,
+  symbol: string,
+  symbolColor = WHITE,
+  symbolSize = 16,
+) {
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.textAlign = 'center';
+  text(ctx, symbol, x, y + symbolSize * 0.34, symbolSize, 900, symbolColor);
+  ctx.textAlign = 'left';
 }
-function topBar(ctx:CanvasRenderingContext2D){
-  const g=ctx.createLinearGradient(0,0,W,0);g.addColorStop(0,'#052d2c');g.addColorStop(1,'#061f28');ctx.fillStyle=g;ctx.fillRect(0,0,W,104);
-  compass(ctx,54,51,27);t(ctx,'TarlaPusula',91,51,27,850,WHITE);t(ctx,'Tarlan için doğru yön.',91,78,13,600,'#dce9e5');
-  ctx.textAlign='right';t(ctx,'TARLA ANALİZ RAPORU',W-35,45,17,850,WHITE);t(ctx,'Veriyle, daha güçlü yarınlara.',W-35,70,13,550,'#dce9e5');ctx.textAlign='left';
+
+function logo(ctx: CanvasRenderingContext2D, x: number, y: number, compact = false) {
+  const r = compact ? 24 : 30;
+  const g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  g.addColorStop(0, '#35c760');
+  g.addColorStop(1, '#06763d');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.roundRect(x - r, y - r, r * 2, r * 2, compact ? 13 : 17);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = WHITE;
+  ctx.lineWidth = compact ? 2.5 : 3;
+  ctx.beginPath();
+  ctx.moveTo(-5, 13);
+  ctx.quadraticCurveTo(-6, -8, 12, -17);
+  ctx.stroke();
+  ctx.fillStyle = '#dcffe4';
+  ctx.beginPath();
+  ctx.ellipse(-8, -6, 10, 5, -0.65, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(8, -1, 11, 5.5, 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  text(ctx, 'TarlaPusula', x + r + 12, y - 1, compact ? 24 : 31, 900, INK);
+  text(ctx, 'TARLANIN AKLI, YANINDA.', x + r + 14, y + (compact ? 20 : 24), compact ? 9 : 11, 800, MUTED);
 }
-function footer(ctx:CanvasRenderingContext2D,page:number,snapshot:PusulaPdfSnapshot){
-  const y=1693;ctx.strokeStyle=LINE;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(28,y);ctx.lineTo(W-28,y);ctx.stroke();
-  compass(ctx,48,y+30,18,GREEN_DARK);t(ctx,'TarlaPusula',77,y+28,18,850,GREEN_DARK);t(ctx,'Tarlan için doğru yön.',77,y+48,10,600,MUTED);
-  ctx.textAlign='right';t(ctx,`Rapor Tarihi: ${fmt(snapshot.period.end)}   |   Sayfa ${page}/2`,W-35,y+35,12,600,MUTED);ctx.textAlign='left';
+
+function sectionHeader(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  number: number,
+  titleValue: string,
+  accent: string,
+  symbol: string,
+) {
+  circleIcon(ctx, x + 18, y + 18, 16, accent, symbol, WHITE, 13);
+  text(ctx, `${number}. ${titleValue}`, x + 42, y + 24, 17, 900, accent);
 }
-function imageBitmapFrom(src:string|null|undefined){
-  if(!src)return Promise.resolve<ImageBitmap|null>(null);
-  return fetch(src).then(r=>r.ok?r.blob():Promise.reject()).then(b=>createImageBitmap(b)).catch(()=>null);
-}
-async function drawImage(ctx:CanvasRenderingContext2D,src:string|null|undefined,x:number,y:number,w:number,h:number,cover=true,r=12){
-  rr(ctx,x,y,w,h,r,'#e9efec',LINE);const img=await imageBitmapFrom(src);if(!img){t(ctx,'Görüntü yok',x+20,y+h/2,15,650,MUTED);return false;}
-  const scale=cover?Math.max(w/img.width,h/img.height):Math.min((w-8)/img.width,(h-8)/img.height);const dw=img.width*scale,dh=img.height*scale;
-  ctx.save();ctx.beginPath();ctx.roundRect(x+1,y+1,w-2,h-2,r);ctx.clip();ctx.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh);ctx.restore();img.close();return true;
-}
-function irrigationLabel(v?:string|null){
-  const k=String(v??'').toLocaleLowerCase('tr-TR');
-  if(['irrigated','sulu'].includes(k))return 'Sulu'; if(['rainfed','susuz'].includes(k))return 'Susuz'; if(['partial','kısmi','kismi'].includes(k))return 'Kısmi'; return v||'Kayıt yok';
-}
-function weatherRows(snapshot:PusulaPdfSnapshot){
-  const w:any=snapshot.weather;
-  const candidates=[w?.history,w?.daily,w?.forecast];
-  for(const c of candidates)if(Array.isArray(c)&&c.length)return c;
-  if(Array.isArray(w?.providers))return w.providers.flatMap((p:any)=>p?.history??p?.daily??p?.forecast??[]);
+
+function weatherRows(snapshot: PusulaPdfSnapshot) {
+  const w: any = snapshot.weather;
+  const candidates = [w?.forecast, w?.daily, w?.history];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length) return candidate;
+  }
+  if (Array.isArray(w?.providers)) {
+    return w.providers.flatMap((provider: any) => provider?.forecast ?? provider?.daily ?? provider?.history ?? []);
+  }
   return [];
 }
-function wv(row:any,...keys:string[]){for(const k of keys){const v=row?.[k];if(valid(v))return v}return null}
-function wd(row:any){return String(row?.date??row?.time??row?.datetime??'').slice(0,10)}
-function activityDate(a:any){return String(a?.activity_date??a?.date??a?.created_at??'').slice(0,10)}
-function activityName(a:any){return String(a?.activity_type??a?.type??a?.name??a?.title??'İşlem')}
-function activityIcon(name:string){const u=name.toLocaleUpperCase('tr-TR');if(u.includes('SULA'))return '●';if(u.includes('GÜBRE'))return '◆';if(u.includes('İLAÇ'))return '✦';return '■'}
-function pickSatellite(points:PusulaPdfSatellitePoint[],count=5){if(points.length<=count)return points;return Array.from({length:count},(_,i)=>points[Math.round(i*(points.length-1)/(count-1))]);}
-function avg(values:(number|null|undefined)[]){const a=values.filter(valid);return a.length?a.reduce((s,v)=>s+v,0)/a.length:null}
-function periodCompare(sat:PusulaPdfSatellitePoint[],key:'ndvi'|'ndmi'){
-  const vals=sat.filter(p=>valid(p[key])); if(vals.length<2)return {current:null,previous:null,pct:null};
-  const split=Math.max(1,Math.floor(vals.length/2));const previous=avg(vals.slice(0,split).map(p=>p[key]));const current=avg(vals.slice(split).map(p=>p[key]));
-  const pct=valid(previous)&&previous!==0&&valid(current)?((current-previous)/Math.abs(previous))*100:null;return {current,previous,pct};
-}
-function sectionTitle(ctx:CanvasRenderingContext2D,title:string,x:number,y:number){t(ctx,title,x,y,20,900,INK)}
-function legendDot(ctx:CanvasRenderingContext2D,x:number,y:number,color:string,label:string){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fill();t(ctx,label,x+13,y+5,12,650,MUTED)}
-function seriesChart(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,sat:PusulaPdfSatellitePoint[],weather:any[],activities:any[],compact=false){
-  rr(ctx,x,y,w,h,16,WHITE,LINE);sectionTitle(ctx,'BİTKİ GELİŞİMİ VE SU DURUMU',x+18,y+31);
-  const ly=y+63;legendDot(ctx,x+205,ly,GREEN,'NDVI');legendDot(ctx,x+285,ly,BLUE,'NDMI');legendDot(ctx,x+365,ly,'#69b6ff','Yağış (mm)');legendDot(ctx,x+470,ly,ORANGE,'Sıcaklık (°C)');
-  const gx=x+58,gy=y+95,gw=w-92,gh=h-(compact?150:175);
-  ctx.strokeStyle='#e4e9eb';ctx.lineWidth=1;for(let i=0;i<5;i++){const yy=gy+i*gh/4;ctx.beginPath();ctx.moveTo(gx,yy);ctx.lineTo(gx+gw,yy);ctx.stroke();}
-  const dates=Array.from(new Set([...sat.map(p=>p.date),...weather.map(wd).filter(Boolean)])).sort();
-  if(dates.length<2){lines(ctx,'Karşılaştırmalı grafik için yeterli tarihli veri yok.',gx,gy+55,16,650,MUTED,gw);return;}
-  const xAt=(d:string)=>gx+(Math.max(0,dates.indexOf(d))/(dates.length-1))*gw;
-  const maxRain=Math.max(1,...weather.map(r=>wv(r,'rain','precipitation','precipitationMm')??0));
-  weather.forEach(r=>{const d=wd(r),rain=wv(r,'rain','precipitation','precipitationMm');if(!d||!valid(rain))return;const bh=(rain/maxRain)*gh*.55;ctx.fillStyle='#69b6ff';ctx.fillRect(xAt(d)-4,gy+gh-bh,8,bh)});
-  const draw=(key:'ndvi'|'ndmi',color:string)=>{const pts=sat.filter(p=>valid(p[key]));if(pts.length<2)return;ctx.strokeStyle=color;ctx.lineWidth=4;ctx.beginPath();pts.forEach((p,i)=>{const px=xAt(p.date),py=gy+gh-(clamp(p[key] as number,0,1)*gh);i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke();ctx.fillStyle=color;pts.forEach(p=>{ctx.beginPath();ctx.arc(xAt(p.date),gy+gh-clamp(p[key] as number,0,1)*gh,5,0,Math.PI*2);ctx.fill()})};
-  draw('ndvi',GREEN);draw('ndmi',BLUE);
-  const temps=weather.map(r=>({d:wd(r),v:wv(r,'temperature','temp','tempAvg','avgTemp','tempMax','maxTemp')})).filter((r):r is {d:string;v:number}=>!!r.d&&valid(r.v));
-  if(temps.length>=2){const mn=Math.min(...temps.map(v=>v.v)),mx=Math.max(...temps.map(v=>v.v)),range=Math.max(1,mx-mn);ctx.strokeStyle=ORANGE;ctx.lineWidth=3;ctx.beginPath();temps.forEach((p,i)=>{const px=xAt(p.d),py=gy+gh*.78-((p.v-mn)/range)*gh*.32;i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke();}
-  const labels=[dates[0],dates[Math.floor((dates.length-1)/2)],dates.at(-1)!];labels.forEach((d,i)=>{const px=xAt(d);ctx.textAlign=i===0?'left':i===2?'right':'center';t(ctx,fmt(d,false),px,y+h-20,11,600,MUTED)});ctx.textAlign='left';
-  if(!compact&&activities.length){const ay=y+h-47;pickSatellite(activities.map((a:any)=>({date:activityDate(a)} as any)),Math.min(4,activities.length)).forEach((a:any)=>{const original=activities.find((z:any)=>activityDate(z)===a.date);if(!original||!dates.includes(a.date))return;const px=xAt(a.date);t(ctx,activityIcon(activityName(original)),px-5,ay,15,850,GREEN);});}
-}
-function multiIndexChart(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,sat:PusulaPdfSatellitePoint[]){
-  rr(ctx,x,y,w,h,16,WHITE,LINE);sectionTitle(ctx,'UYDU İNDEKSLERİ · 30 GÜN',x+18,y+31);
-  const defs:[keyof PusulaPdfSatellitePoint,string,string][]=[['ndmi',BLUE,'NDMI'],['ndre',ORANGE,'NDRE'],['savi',GREEN,'SAVI'],['gndvi','#5f6fd6','GNDVI']];
-  const ly=y+63;defs.forEach((d,i)=>legendDot(ctx,x+18+i*108,ly,d[1],d[2]));
-  const dates=Array.from(new Set(sat.map(p=>p.date).filter(Boolean))).sort();
-  const gx=x+58,gy=y+94,gw=w-88,gh=h-142;
-  ctx.strokeStyle='#e4e9eb';ctx.lineWidth=1;for(let i=0;i<5;i++){const yy=gy+i*gh/4;ctx.beginPath();ctx.moveTo(gx,yy);ctx.lineTo(gx+gw,yy);ctx.stroke();}
-  if(dates.length<2){lines(ctx,'Çoklu indeks trendi için yeterli tarihli veri yok.',gx,gy+55,16,650,MUTED,gw);return;}
-  const xAt=(d:string)=>gx+(Math.max(0,dates.indexOf(d))/(dates.length-1))*gw;
-  let drawn=0;
-  defs.forEach(([key,color])=>{const pts=sat.filter(p=>valid(p[key]));if(pts.length<2)return;drawn++;ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const v=clamp(Number(p[key]),-1,1);const px=xAt(p.date),py=gy+gh-((v+1)/2)*gh;i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke();});
-  if(!drawn){lines(ctx,'NDMI / NDRE / SAVI / GNDVI için sayısal geçmiş ölçümü bekleniyor.',gx,gy+55,15,650,MUTED,gw);}
-  ctx.textAlign='left';t(ctx,'+1',gx-35,gy+5,10,600,MUTED);t(ctx,'0',gx-25,gy+gh/2+4,10,600,MUTED);t(ctx,'−1',gx-31,gy+gh+4,10,600,MUTED);
-  const labels=[dates[0],dates[Math.floor((dates.length-1)/2)],dates.at(-1)!];labels.forEach((d,i)=>{const px=xAt(d);ctx.textAlign=i===0?'left':i===2?'right':'center';t(ctx,fmt(d,false),px,y+h-17,10,600,MUTED)});ctx.textAlign='left';
+
+function wv(row: any, ...keys: string[]) {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (valid(value)) return value;
+  }
+  return null;
 }
 
-function radarDelta(points:PusulaPdfRadarPoint[],key:'vv'|'vh'|'water'){
-  const values=points.filter(p=>valid(p[key]));if(values.length<2)return null;return Number(values.at(-1)![key])-Number(values[0][key]);
-}
-function radarValue(value:number|null|undefined,unit:string|null|undefined,digits=2){return valid(value)?`${value.toFixed(digits)}${unit?` ${unit}`:''}`:'—'}
-async function radarHistoryPanel(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,snapshot:PusulaPdfSnapshot){
-  rr(ctx,x,y,w,h,16,WHITE,LINE);sectionTitle(ctx,'SENTINEL-1 RADAR GEÇMİŞİ',x+18,y+31);
-  const points=[...(snapshot.radar?.points??[])].sort((a,b)=>a.date.localeCompare(b.date));
-  if(!points.length){lines(ctx,'Bu rapor döneminde karşılaştırılabilir Sentinel-1 VV / VH / su adayı kaydı yok.',x+18,y+72,15,650,MUTED,w-36);return;}
-  const latest=points.at(-1)!;const cards=[
-    ['VV',radarValue(latest.vv,latest.vvUnit),radarDelta(points,'vv'),GREEN],
-    ['VH',radarValue(latest.vh,latest.vhUnit),radarDelta(points,'vh'),BLUE],
-    ['SU ADAYI',radarValue(latest.water,latest.waterUnit),radarDelta(points,'water'),ORANGE],
-  ] as const;
-  const cardW=190;cards.forEach((c,i)=>{const xx=x+18+i*(cardW+10);rr(ctx,xx,y+50,cardW,72,12,GRAY_SOFT,GRAY_SOFT);t(ctx,c[0],xx+12,y+72,10,850,MUTED);t(ctx,c[1],xx+12,y+101,19,900,INK);const d=c[2];if(valid(d))t(ctx,`${d>=0?'+':''}${d.toFixed(2)}`,xx+125,y+100,10,800,c[3]);});
-  const tableY=y+145;const rows=points.slice(-5).reverse();t(ctx,'Tarih',x+18,tableY,11,850,MUTED);t(ctx,'VV',x+142,tableY,11,850,MUTED);t(ctx,'VH',x+265,tableY,11,850,MUTED);t(ctx,'Su adayı',x+388,tableY,11,850,MUTED);
-  rows.forEach((p,i)=>{const yy=tableY+31+i*30;ctx.strokeStyle='#e8edef';ctx.beginPath();ctx.moveTo(x+18,yy+8);ctx.lineTo(x+570,yy+8);ctx.stroke();t(ctx,fmt(p.date,false),x+18,yy,11,650,INK);t(ctx,radarValue(p.vv,p.vvUnit),x+142,yy,11,700,INK);t(ctx,radarValue(p.vh,p.vhUnit),x+265,yy,11,700,INK);t(ctx,radarValue(p.water,p.waterUnit),x+388,yy,11,700,INK);});
-  const images=snapshot.radar?.images??[];const ix=x+610,iw=(w-646)/Math.max(1,Math.min(2,images.length));for(let i=0;i<Math.min(2,images.length);i++){const image=images[i];await drawImage(ctx,image.imageUrl,ix+i*iw,y+51,iw-10,230,true,9);t(ctx,fmt(image.date,false),ix+i*iw,y+300,11,800,INK);}
-  lines(ctx,'VV ve VH radar geri-saçılım ölçümleridir. Su adayı metriği radar sinyalinden türetilen göstergedir; tek başına sulama veya hastalık nedeni olarak yorumlanmaz.',x+18,y+h-28,10,600,MUTED,w-36,1.2,2);
+function wd(row: any) {
+  return String(row?.date ?? row?.time ?? row?.datetime ?? '').slice(0, 10);
 }
 
-function comparisonCard(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,title:string,value:string,sub:string,accent:string,soft:string){rr(ctx,x,y,w,108,14,soft,soft);t(ctx,title,x+15,y+27,12,850,accent);t(ctx,value,x+15,y+66,27,900,INK);t(ctx,sub,x+15,y+91,11,600,MUTED)}
-function deltaText(pct:number|null){if(!valid(pct))return '—';return `${pct>=0?'↑':'↓'} %${Math.abs(pct).toFixed(0)}`}
-function insightText(guidance:ReturnType<typeof buildPusulaPdfGuidance>,index:number,fallback:string){return guidance.insights[index]?.meaning??guidance.insights[index]?.action??fallback}
-function latestYieldHarvestEvidence(snapshot:PusulaPdfSnapshot){
-  const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
-  const payloads=rows
-    .map((row:any)=>row?.payload??row)
-    .filter((payload:any)=>payload?.layer==='yield-harvest-quality');
-  payloads.sort((a:any,b:any)=>String(a?.archivedAt??a?.observedAt??'').localeCompare(String(b?.archivedAt??b?.observedAt??'')));
-  return payloads.at(-1)??null;
+function avg(values: Array<number | null | undefined>) {
+  const filtered = values.filter(valid);
+  return filtered.length ? filtered.reduce((sum, value) => sum + value, 0) / filtered.length : null;
 }
-function yieldTrendPdfLabel(value:unknown){
-  const trend=String(value??'').toLowerCase();
-  if(trend==='rising')return '↑ artış';
-  if(trend==='falling')return '↓ düşüş';
-  if(trend==='stable')return '→ dengeli';
-  return 'geçmiş sınırlı';
+
+function periodCompare(points: PusulaPdfSatellitePoint[], key: 'ndvi' | 'ndmi') {
+  const usable = points.filter((point) => valid(point[key]));
+  if (usable.length < 2) return { current: null, previous: null, pct: null };
+  const split = Math.max(1, Math.floor(usable.length / 2));
+  const previous = avg(usable.slice(0, split).map((point) => point[key]));
+  const current = avg(usable.slice(split).map((point) => point[key]));
+  const pct = valid(previous) && previous !== 0 && valid(current)
+    ? ((current - previous) / Math.abs(previous)) * 100
+    : null;
+  return { current, previous, pct };
 }
-function yieldHarvestEvidenceCard(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,snapshot:PusulaPdfSnapshot){
-  const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
-  const candidates=rows.map((row:any)=>row?.payload??row).filter((payload:any)=>payload?.layer==='yield-harvest-quality');
-  candidates.sort((a:any,b:any)=>String(a?.observedAt??a?.archivedAt??'').localeCompare(String(b?.observedAt??b?.archivedAt??'')));
-  const payload:any=candidates.at(-1)??null;if(!payload)return false;
-  const metrics:any=payload?.metrics??{};const details:any=payload?.details??{};
-  const asFinite=(value:any)=>value===null||value===undefined||value===''?null:(Number.isFinite(Number(value))?Number(value):null);
-  const kgHa=asFinite(metrics?.currentYieldKgHa);const avgKgHa=asFinite(metrics?.averageYieldKgHa);const currentKg=asFinite(metrics?.currentYieldKg);
-  const current=kgHa!==null?`${Math.round(kgHa/10).toLocaleString('tr-TR')} kg/da`:currentKg!==null?`${Math.round(currentKg).toLocaleString('tr-TR')} kg toplam`:'Gerçek verim kaydı yok';
-  const average=avgKgHa!==null?`${Math.round(avgKgHa/10).toLocaleString('tr-TR')} kg/da`:'geçmiş ortalama yok';
-  const lower=asFinite(metrics?.forecastLowerKgHa);const upper=asFinite(metrics?.forecastUpperKgHa);const central=asFinite(metrics?.forecastCentralKgHa);
-  const forecast=lower!==null&&upper!==null?`${Math.round(lower/10).toLocaleString('tr-TR')}–${Math.round(upper/10).toLocaleString('tr-TR')} kg/da`:central!==null?`${Math.round(central/10).toLocaleString('tr-TR')} kg/da merkez`:'model aralığı yok';
-  const actual=String(details?.actualHarvestDate??'').trim();const expected=String(details?.expectedHarvestDate??'').trim();const timing=details?.harvestTiming??null;
-  const days=Number(metrics?.daysToExpectedHarvest);
-  const harvest=actual?`Hasat ${fmt(actual,false)}`:timing?.lowerDate&&timing?.upperDate?`Pencere ${fmt(String(timing.lowerDate),false)}–${fmt(String(timing.upperDate),false)}`:details?.status==='harvest_window'?(Number.isFinite(days)&&days>0?`Hasada ~${Math.round(days)} gün`:'Hasat penceresi'):expected?`Beklenen ${fmt(expected,false)}`:'Hasat takibi';
-  const quality=details?.qualityMeasurements&&typeof details.qualityMeasurements==='object'?Object.keys(details.qualityMeasurements).filter((key)=>details.qualityMeasurements[key]!==null&&details.qualityMeasurements[key]!==''):[];
-  rr(ctx,x,y,w,112,14,GREEN_SOFT,'#d3ead9');
-  t(ctx,'VERİM · HASAT · KALİTE',x+16,y+23,11,900,GREEN_DARK);
-  t(ctx,current,x+16,y+49,18,900,INK);
-  lines(ctx,`${average} · ${yieldTrendPdfLabel(metrics?.trend)} · ${harvest}`,x+16,y+71,10,650,MUTED,w-32,1.15,2);
-  lines(ctx,`Ensemble: ${forecast} · Kalite: ${quality.length?'ölçüldü':'ölçüm yok'}`,x+16,y+92,9.5,650,MUTED,w-32,1.12,2);
-  ctx.textAlign='right';t(ctx,kgHa!==null?'Gerçek kayıt > model':'Model aralığı = kanıt zarfı',x+w-16,y+23,9,650,MUTED);ctx.textAlign='left';
+
+function latestLayer(snapshot: PusulaPdfSnapshot, layer: string) {
+  return [...(snapshot.layerArchive ?? [])]
+    .filter((row: any) => String(row?.layer ?? row?.payload?.layer ?? '') === layer)
+    .sort((a: any, b: any) => String(a?.observedAt ?? a?.archivedAt ?? '').localeCompare(String(b?.observedAt ?? b?.archivedAt ?? '')))
+    .at(-1) ?? null;
+}
+
+function layerPayload(value: any) {
+  return value?.payload ?? value ?? null;
+}
+
+function metricNumber(payload: any, ...keys: string[]) {
+  const metrics = payload?.metrics ?? {};
+  for (const key of keys) {
+    const n = Number(metrics?.[key]);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function detailText(payload: any, ...keys: string[]) {
+  const details = payload?.details ?? {};
+  for (const key of keys) {
+    const value = String(details?.[key] ?? '').trim();
+    if (value) return value;
+  }
+  return '';
+}
+
+function evidenceValue(insight: PusulaInsight | undefined, labels: string[]) {
+  if (!insight) return '';
+  const normalized = labels.map((label) => label.toLocaleLowerCase('tr-TR'));
+  const hit = insight.evidence.find((item) => normalized.includes(String(item.label).toLocaleLowerCase('tr-TR')));
+  return hit?.value ?? '';
+}
+
+function statusColor(value: string) {
+  const normalized = value.toLocaleLowerCase('tr-TR');
+  if (/yüksek|kritik|kötü|azal|geril|riskli|beklet|ertele/.test(normalized)) return { accent: RED, soft: RED_SOFT };
+  if (/orta|dikkat|takip|kısmi|sinir|sınır|izle/.test(normalized)) return { accent: ORANGE, soft: ORANGE_SOFT };
+  if (/iyi|düşük|dusuk|normal|sağlıklı|yeterli|dengeli|hazır/.test(normalized)) return { accent: GREEN, soft: GREEN_SOFT };
+  return { accent: BLUE, soft: BLUE_SOFT };
+}
+
+function shortStatus(value: string, fallback = 'Takip') {
+  const normalized = String(value ?? '').toLocaleLowerCase('tr-TR');
+  if (/yüksek|kritik|severe|high/.test(normalized)) return 'Yüksek';
+  if (/orta|medium|moderate|attention|partial/.test(normalized)) return 'Orta';
+  if (/düşük|dusuk|low|normal|ready|healthy|good|aligned/.test(normalized)) return 'Düşük';
+  return value ? String(value).slice(0, 16) : fallback;
+}
+
+function imageBitmapFrom(src: string | null | undefined) {
+  if (!src) return Promise.resolve<ImageBitmap | null>(null);
+  return fetch(src)
+    .then((response) => response.ok ? response.blob() : Promise.reject(new Error(`HTTP ${response.status}`)))
+    .then((blob) => createImageBitmap(blob))
+    .catch(() => null);
+}
+
+async function drawImage(
+  ctx: CanvasRenderingContext2D,
+  src: string | null | undefined,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  options: { cover?: boolean; radius?: number; placeholder?: string; overlay?: string } = {},
+) {
+  const { cover = true, radius = 12, placeholder = 'Görüntü yok', overlay } = options;
+  rr(ctx, x, y, w, h, radius, '#edf1f2', LINE);
+  const bitmap = await imageBitmapFrom(src);
+  if (!bitmap) {
+    text(ctx, placeholder, x + 18, y + h / 2, 13, 700, MUTED);
+    return false;
+  }
+
+  const scale = cover
+    ? Math.max(w / bitmap.width, h / bitmap.height)
+    : Math.min((w - 8) / bitmap.width, (h - 8) / bitmap.height);
+  const dw = bitmap.width * scale;
+  const dh = bitmap.height * scale;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x + 1, y + 1, w - 2, h - 2, radius);
+  ctx.clip();
+  ctx.drawImage(bitmap, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  if (overlay) {
+    ctx.fillStyle = overlay;
+    ctx.fillRect(x, y, w, h);
+  }
+  ctx.restore();
+  bitmap.close();
   return true;
 }
 
-function latestIrrigationSynthesis(snapshot:PusulaPdfSnapshot){
-  const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
-  const payloads=rows.map((row:any)=>row?.payload??row).filter((payload:any)=>payload?.layer==='irrigation-synthesis');
-  payloads.sort((a:any,b:any)=>String(a?.details?.generatedAt??a?.observedAt??'').localeCompare(String(b?.details?.generatedAt??b?.observedAt??'')));
-  return payloads.at(-1)??null;
+async function drawLayeredHero(
+  ctx: CanvasRenderingContext2D,
+  trueColor: string | null | undefined,
+  ndvi: string | null | undefined,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  await drawImage(ctx, trueColor ?? ndvi, x, y, w, h, { radius: 15, placeholder: 'Uydu görüntüsü hazırlanıyor' });
+  if (trueColor && ndvi) {
+    const bitmap = await imageBitmapFrom(ndvi);
+    if (bitmap) {
+      const scale = Math.max(w / bitmap.width, h / bitmap.height);
+      const dw = bitmap.width * scale;
+      const dh = bitmap.height * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 15);
+      ctx.clip();
+      ctx.globalAlpha = 0.48;
+      ctx.drawImage(bitmap, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      ctx.restore();
+      bitmap.close();
+    }
+  }
 }
-function fieldBackboneCount(snapshot:PusulaPdfSnapshot){
-  const rows=Array.isArray(snapshot.layerArchive)?snapshot.layerArchive:[];
-  const candidates=rows.filter((row:any)=>(row?.payload??row)?.layer==='field-data-backbone');
-  candidates.sort((a:any,b:any)=>String((a?.payload??a)?.archivedAt??(a?.payload??a)?.observedAt??'').localeCompare(String((b?.payload??b)?.archivedAt??(b?.payload??b)?.observedAt??'')));
-  const latestCandidate:any=candidates.at(-1)??null;
-  const latest:any=latestCandidate?.payload??latestCandidate??null;
-  const active=Number(latest?.metrics?.activeEventCount);
-  const total=Number(latest?.metrics?.eventCount);
-  return Number.isFinite(active)&&active>0?active:Number.isFinite(total)&&total>0?total:0;
-}
-function irrigationSynthesisCard(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,snapshot:PusulaPdfSnapshot){
-  const payload:any=latestIrrigationSynthesis(snapshot);if(!payload)return false;
-  const details=payload?.details??{};const metrics=payload?.metrics??{};
-  const agreement=String(metrics?.synthesisAgreement??'');
-  const accent=agreement==='mixed'?ORANGE:agreement==='aligned'?GREEN:BLUE;
-  const soft=agreement==='mixed'?ORANGE_SOFT:agreement==='aligned'?GREEN_SOFT:BLUE_SOFT;
-  const headline=String(details?.headline??'Sulama sentezi');
-  const summary=String(details?.summary??'').trim();
-  rr(ctx,x,y,w,94,14,soft,soft);t(ctx,'SULAMA SENTEZİ',x+16,y+23,11,900,accent);t(ctx,headline,x+16,y+47,16,900,INK);
-  lines(ctx,summary||'Bağlı sulama modelleri ortak kanıt katmanında değerlendirildi.',x+16,y+70,11,600,MUTED,w-32,1.18,2);
-  ctx.textAlign='right';t(ctx,'Ana sulama motoru karar otoritesidir',x+w-16,y+23,10,650,MUTED);ctx.textAlign='left';
-  return true;
-}
-function decisionEvidenceStrip(
-  ctx:CanvasRenderingContext2D,
-  x:number,
-  y:number,
-  w:number,
-  guidance:ReturnType<typeof buildPusulaPdfGuidance>,
-){
-  const definitions = [
-    { id:'soil-intelligence-evidence', label:'TOPRAK', accent:GREEN, soft:GREEN_SOFT },
-    { id:'planting-window-evidence', label:'EKİM PENCERESİ', accent:BLUE, soft:BLUE_SOFT },
-    { id:'orchard-chill-evidence', label:'SOĞUKLAMA', accent:BLUE, soft:BLUE_SOFT },
-    { id:'plant-health-synthesis-evidence', label:'BİTKİ SAĞLIĞI', accent:ORANGE, soft:ORANGE_SOFT },
-    { id:'field-observation-follow-up-evidence', label:'SAHA TAKİBİ', accent:BLUE, soft:BLUE_SOFT },
-  ] as const;
-  const items = definitions
-    .map((definition) => ({
-      ...definition,
-      insight: guidance.insights.find((item) => item.id === definition.id),
-    }))
-    .filter((item) => Boolean(item.insight));
 
-  if (!items.length) return false;
+function chart(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  points: PusulaPdfSatellitePoint[],
+) {
+  const usable = points.filter((point) => valid(point.ndvi));
+  if (usable.length < 2) {
+    wrap(ctx, 'NDVI trend grafiği için en az iki tarihli ölçüm gerekli.', x + 16, y + 55, 12, 650, MUTED, w - 32, 1.25, 3);
+    return;
+  }
 
-  rr(ctx,x,y,w,105,14,WHITE,LINE);
-  t(ctx,'KARAR KANITLARI',x+16,y+23,11,900,MUTED);
-  t(ctx,'Yalnız rapora bağlı gerçek kaynaklar gösterilir',x+w-300,y+23,10,600,MUTED);
+  const gx = x + 38;
+  const gy = y + 42;
+  const gw = w - 54;
+  const gh = h - 66;
 
-  const gap=10;
-  const innerX=x+16;
-  const innerW=w-32;
-  const cw=(innerW-gap*(items.length-1))/items.length;
+  ctx.strokeStyle = '#e8edef';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i += 1) {
+    const yy = gy + (i * gh) / 3;
+    ctx.beginPath();
+    ctx.moveTo(gx, yy);
+    ctx.lineTo(gx + gw, yy);
+    ctx.stroke();
+  }
 
-  items.forEach((item,index)=>{
-    const insight=item.insight!;
-    const xx=innerX+index*(cw+gap);
-    rr(ctx,xx,y+34,cw,58,10,item.soft,item.soft);
-    t(ctx,item.label,xx+10,y+50,9,900,item.accent);
-    lines(ctx,insight.title,xx+10,y+68,11,850,INK,cw-20,1.15,1);
-    lines(ctx,insight.action,xx+10,y+85,9,600,MUTED,cw-20,1.12,1);
+  ctx.strokeStyle = GREEN;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  usable.forEach((point, index) => {
+    const px = gx + (index / (usable.length - 1)) * gw;
+    const py = gy + gh - clamp(point.ndvi as number, 0, 1) * gh;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  usable.forEach((point, index) => {
+    const px = gx + (index / (usable.length - 1)) * gw;
+    const py = gy + gh - clamp(point.ndvi as number, 0, 1) * gh;
+    ctx.fillStyle = GREEN;
+    ctx.beginPath();
+    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+    ctx.fill();
   });
 
-  return true;
+  const latest = usable.at(-1)!;
+  const px = gx + gw;
+  const py = gy + gh - clamp(latest.ndvi as number, 0, 1) * gh;
+  rr(ctx, px - 50, py - 34, 50, 26, 8, GREEN, GREEN);
+  ctx.textAlign = 'center';
+  text(ctx, num(latest.ndvi), px - 25, py - 16, 11, 900, WHITE);
+  ctx.textAlign = 'left';
+
+  const labels = [usable[0], usable[Math.floor((usable.length - 1) / 2)], latest];
+  labels.forEach((point, index) => {
+    const labelX = index === 0 ? gx : index === 2 ? gx + gw : gx + gw / 2;
+    ctx.textAlign = index === 0 ? 'left' : index === 2 ? 'right' : 'center';
+    text(ctx, fmt(point.date, false), labelX, y + h - 8, 9.5, 650, MUTED);
+  });
+  ctx.textAlign = 'left';
 }
 
-function recommendationColumns(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,guidance:ReturnType<typeof buildPusulaPdfGuidance>){
-  const gap=12,cw=(w-gap*2)/3;const defs=[
-    {title:'İYİ GİDENLER',accent:GREEN,soft:GREEN_SOFT,items:[guidance.weeklyHeadline, insightText(guidance,0,'Mevcut veriler düzenli takip ediliyor.')]},
-    {title:'DİKKAT EDİLMESİ GEREKENLER',accent:ORANGE,soft:ORANGE_SOFT,items:[insightText(guidance,1,guidance.dataQualityNote)]},
-    {title:'ÖNERİLEN AKSİYONLAR',accent:BLUE,soft:BLUE_SOFT,items:guidance.next7Days.slice(0,3)},
+function donut(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  value: number | null,
+  accent: string,
+  suffix = '',
+) {
+  ctx.strokeStyle = '#e4eaed';
+  ctx.lineWidth = 11;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (value !== null) {
+    const pct = clamp(value, 0, 100) / 100;
+    ctx.strokeStyle = accent;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+
+  ctx.textAlign = 'center';
+  text(ctx, value === null ? '—' : `${Math.round(value)}${suffix}`, x, y + 9, 23, 900, INK);
+  ctx.textAlign = 'left';
+}
+
+function progressBar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  value: number | null,
+  accent: string,
+) {
+  rr(ctx, x, y, w, 10, 5, '#e8ecee', '#e8ecee');
+  if (value !== null) rr(ctx, x, y, Math.max(8, w * clamp(value, 0, 100) / 100), 10, 5, accent, accent);
+}
+
+function fieldHealthScore(snapshot: PusulaPdfSnapshot) {
+  const candidates = [
+    latestLayer(snapshot, 'field-health-score'),
+    latestLayer(snapshot, 'plant-health-synthesis'),
+    latestLayer(snapshot, 'satellite-fusion'),
+  ].map(layerPayload).filter(Boolean);
+
+  for (const candidate of candidates) {
+    const value = metricNumber(candidate, 'healthScore', 'fieldHealthScore', 'score');
+    if (value !== null) return clamp(value, 0, 100);
+  }
+  return null;
+}
+
+function phenologyLabel(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
+  const pcse = layerPayload(latestLayer(snapshot, 'phenology-pcse-wofost'));
+  const fromLayer = detailText(pcse, 'stageLabel', 'phenologyStage', 'stage');
+  if (fromLayer) return fromLayer;
+  const insight = guidance.insights.find((item) => item.id === 'pcse-wofost-phenology-evidence');
+  const fromEvidence = evidenceValue(insight, ['Evre', 'Fenoloji']);
+  return fromEvidence || 'Takipte';
+}
+
+function irrigationNeed(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
+  const synthesis = layerPayload(latestLayer(snapshot, 'irrigation-synthesis'));
+  const mm = metricNumber(synthesis, 'netWaterMm', 'recommendedMm', 'irrigationMm');
+  if (mm !== null) return { mm, text: `${Math.round(mm)} mm` };
+  const water = guidance.insights.find((item) => item.id === 'water-scarcity-plan-evidence' || item.id === 'irrigation-synthesis-evidence');
+  const evidence = evidenceValue(water, ['Sulama ihtiyacı', 'Net su', 'Öneri']);
+  return { mm: null, text: evidence || 'Karar bekleniyor' };
+}
+
+function yieldSummary(snapshot: PusulaPdfSnapshot) {
+  const payload = layerPayload(latestLayer(snapshot, 'yield-harvest-quality'))
+    ?? layerPayload(latestLayer(snapshot, 'yield-harvest-ensemble'));
+  const metrics = payload?.metrics ?? {};
+  const details = payload?.details ?? {};
+  const kgHa = Number(metrics.currentYieldKgHa ?? metrics.forecastCentralKgHa);
+  const yieldKgDa = Number.isFinite(kgHa) ? kgHa / 10 : null;
+  const quality = String(details.qualityGrade ?? metrics.qualityScore ?? '').trim();
+  const expected = String(details.expectedHarvestDate ?? details.harvestTiming?.centralDate ?? '').trim();
+  return {
+    yieldKgDa,
+    quality: quality || 'Ölçüm bekleniyor',
+    harvest: expected ? fmt(expected, false) : 'Takipte',
+  };
+}
+
+function photoDiagnosis(photo: PusulaPdfFieldPhoto | undefined) {
+  const root: any = photo?.aiResult ?? {};
+  const diagnosis = root?.diagnosis && typeof root.diagnosis === 'object' ? root.diagnosis : root;
+  const headline = String(diagnosis?.headline ?? diagnosis?.possibleIssue ?? '').trim();
+  const summary = Array.isArray(diagnosis?.observations)
+    ? diagnosis.observations.map((item: unknown) => String(item)).filter(Boolean).slice(0, 2).join(' ')
+    : '';
+  const severity = String(diagnosis?.severity ?? '').trim();
+  return { headline, summary, severity };
+}
+
+function riskItems(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
+  const find = (id: string) => guidance.insights.find((item) => item.id === id);
+  const drought = find('water-scarcity-plan-evidence') ?? find('irrigation-synthesis-evidence');
+  const disease = find('plant-health-synthesis-evidence');
+  const frost = find('frost-pocket-evidence');
+  const disaster = find('disaster-recovery-evidence');
+  const multi = find('multi-stress-synthesis-evidence');
+
+  const rows = [
+    {
+      label: 'Kuraklık Stresi',
+      detail: drought?.meaning ?? 'Su baskısı için yeterli kanıt yok.',
+      status: shortStatus(evidenceValue(drought, ['Risk seviyesi', 'Durum']) || drought?.confidence || ''),
+      accent: ORANGE,
+    },
+    {
+      label: 'Hastalık Riski',
+      detail: disease?.meaning ?? 'Belirti temelli risk sinyali yok.',
+      status: shortStatus(evidenceValue(disease, ['Risk seviyesi']) || disease?.confidence || ''),
+      accent: GREEN,
+    },
+    {
+      label: 'Zararlı Riski',
+      detail: multi?.meaning ?? 'Zararlı saha gözlemiyle doğrulanmalı.',
+      status: shortStatus(multi?.confidence || '', 'Takip'),
+      accent: ORANGE,
+    },
+    {
+      label: 'Don Riski',
+      detail: frost?.meaning ?? disaster?.meaning ?? 'Güncel don riski kanıtı yok.',
+      status: shortStatus(evidenceValue(frost, ['Risk', 'Durum']) || frost?.confidence || ''),
+      accent: BLUE,
+    },
+    {
+      label: 'Su Baskını Riski',
+      detail: disaster?.meaning ?? 'Aşırı yağış sonrası olay sinyali yok.',
+      status: shortStatus(evidenceValue(disaster, ['Olay', 'Durum']) || disaster?.confidence || ''),
+      accent: TEAL,
+    },
   ];
-  defs.forEach((d,i)=>{const xx=x+i*(cw+gap);rr(ctx,xx,y,cw,195,14,d.soft,d.soft);t(ctx,d.title,xx+16,y+30,13,900,d.accent);let yy=y+62;d.items.filter(Boolean).slice(0,3).forEach(item=>{ctx.fillStyle=d.accent;ctx.beginPath();ctx.arc(xx+18,yy-4,6,0,Math.PI*2);ctx.fill();yy=lines(ctx,String(item),xx+32,yy,12,650,INK,cw-48,1.22,2)+35;});});
+
+  return rows.map((row) => {
+    const style = statusColor(row.status);
+    return { ...row, statusAccent: style.accent, statusSoft: style.soft };
+  });
 }
 
-export async function generatePusulaPdf(snapshot:PusulaPdfSnapshot){
-  const doc=new jsPDF({unit:'mm',format:'a4',compress:true});
-  const sat=[...snapshot.satellite.points].sort((a,b)=>a.date.localeCompare(b.date));
-  const weather=weatherRows(snapshot).sort((a,b)=>wd(a).localeCompare(wd(b)));
-  const activities=[...(snapshot.activities??[])].sort((a:any,b:any)=>activityDate(a).localeCompare(activityDate(b)));
-  const backboneCount=fieldBackboneCount(snapshot);
-  const guidance=buildPusulaPdfGuidance(snapshot);
-  const latest=sat.at(-1),first=sat[0];const ndviCmp=periodCompare(sat,'ndvi');const ndmiCmp=periodCompare(sat,'ndmi');
-  const rainTotal=weather.map(r=>wv(r,'rain','precipitation','precipitationMm')).filter(valid).reduce((a,b)=>a+b,0);
-  const temps=weather.map(r=>wv(r,'temperature','temp','tempAvg','avgTemp','tempMax','maxTemp')).filter(valid);
-  const selected=pickSatellite(sat,5);const pages:HTMLCanvasElement[]=[];
+function latestSoilValues(snapshot: PusulaPdfSnapshot) {
+  const latest: any = snapshot.soilAnalyses?.[0] ?? null;
+  if (!latest) return [] as Array<{ label: string; value: number | null; text: string; accent: string }>;
 
-  // SAYFA 1 — referans mockup: 30 günlük tarla hikâyesi
-  {
-    const {c,ctx}=makeCanvas();pages.push(c);topBar(ctx);
-    const heroY=104,heroH=210;
-    await drawImage(ctx,latest?.trueColorImage??latest?.ndviImage,0,heroY,W,heroH,true,0);
-    const shade=ctx.createLinearGradient(0,heroY,W*.72,heroY);shade.addColorStop(0,'rgba(247,249,248,.98)');shade.addColorStop(.58,'rgba(247,249,248,.86)');shade.addColorStop(1,'rgba(247,249,248,.08)');ctx.fillStyle=shade;ctx.fillRect(0,heroY,W,heroH);
-    t(ctx,`${snapshot.field.name.toLocaleUpperCase('tr-TR')} TARLASI`,36,174,39,900,INK);t(ctx,'30 GÜNLÜK TARLA HİKÂYESİ',36,218,28,900,INK);
-    const metaY=252;const meta=[['Ürün',snapshot.field.crop??'Kayıt yok',GREEN],['Alan',snapshot.field.areaDecare!=null?`${snapshot.field.areaDecare} da`:'—',GREEN],['Sulama',irrigationLabel(snapshot.field.irrigationStatus),BLUE],['Rapor Dönemi',`${fmt(snapshot.period.start,false)} – ${fmt(snapshot.period.end)}`,GREEN_DARK]] as const;
-    meta.forEach((m,i)=>{const xx=36+i*150;ctx.fillStyle=m[2];ctx.beginPath();ctx.arc(xx+8,metaY-7,7,0,Math.PI*2);ctx.fill();t(ctx,m[0],xx+22,metaY-11,10,650,MUTED);t(ctx,m[1],xx+22,metaY+11,12,850,INK)});
+  const candidates = [
+    { label: 'Azot (N)', keys: ['nitrogen', 'n', 'total_n', 'nitrogen_ppm'], accent: GREEN },
+    { label: 'Fosfor (P)', keys: ['phosphorus', 'p', 'phosphorus_ppm'], accent: ORANGE },
+    { label: 'Potasyum (K)', keys: ['potassium', 'k', 'potassium_ppm'], accent: GREEN },
+    { label: 'Organik Madde', keys: ['organic_matter', 'organicMatter', 'organic_matter_pct'], accent: GREEN },
+  ];
 
-    seriesChart(ctx,20,330,1200,470,sat,weather,activities);
+  return candidates.map((candidate) => {
+    let value: number | null = null;
+    for (const key of candidate.keys) {
+      const n = Number(latest?.[key]);
+      if (Number.isFinite(n)) {
+        value = n;
+        break;
+      }
+    }
+    const normalized = value === null ? null : value <= 1 ? value * 100 : clamp(value, 0, 100);
+    return {
+      label: candidate.label,
+      value: normalized,
+      text: value === null ? 'Veri yok' : value.toLocaleString('tr-TR', { maximumFractionDigits: 1 }),
+      accent: candidate.accent,
+    };
+  });
+}
 
-    rr(ctx,20,816,1200,150,16,WHITE,LINE);sectionTitle(ctx,'KARŞILAŞTIRMA',36,847);
-    const cw=(1168-30)/4;
-    comparisonCard(ctx,36,866,cw,'BU HAFTA',valid(ndviCmp.current)?`NDVI ${num(ndviCmp.current)}`:'NDVI —',deltaText(ndviCmp.pct),GREEN,GREEN_SOFT);
-    comparisonCard(ctx,36+(cw+10),866,cw,'ÖNCEKİ DÖNEM',valid(ndviCmp.previous)?`NDVI ${num(ndviCmp.previous)}`:'NDVI —','Karşılaştırma tabanı',INK,GRAY_SOFT);
-    comparisonCard(ctx,36+(cw+10)*2,866,cw,'SU DURUMU',valid(ndmiCmp.current)?`NDMI ${num(ndmiCmp.current)}`:'NDMI —',deltaText(ndmiCmp.pct),BLUE,BLUE_SOFT);
-    comparisonCard(ctx,36+(cw+10)*3,866,cw,'30 GÜNLÜK YÖN',valid(first?.ndvi)&&valid(latest?.ndvi)?`${num(first.ndvi)} → ${num(latest.ndvi)}`:'Ölçüm bekleniyor','Gerçek Sentinel ölçümü',GREEN_DARK,GRAY_SOFT);
+function qrImageUrl(target: string) {
+  return `https://quickchart.io/qr?size=180&margin=1&ecLevel=M&text=${encodeURIComponent(target)}`;
+}
 
-    rr(ctx,20,982,1200,360,16,WHITE,LINE);sectionTitle(ctx,'UYDU GÖRÜNTÜLERİNDE ZAMANA GÖRE DEĞİŞİM (NDVI)',36,1014);t(ctx,'Renkler tarihler arası görsel karşılaştırma içindir.',W-355,1014,11,600,MUTED);
-    const iw=(1168-32)/5;for(let i=0;i<5;i++){const p=selected[i],xx=36+i*(iw+8);await drawImage(ctx,p?.ndviImage,xx,1035,iw,225,true,9);t(ctx,p?fmt(p.date):'Veri yok',xx,1283,12,850,INK);t(ctx,p?`NDVI ${num(p.ndvi)} · NDMI ${num(p.ndmi)}`:'—',xx,1303,11,650,MUTED)}
-
-    rr(ctx,20,1358,1200,235,16,ORANGE_SOFT,'#f4dfba');compass(ctx,58,1403,20,GREEN_DARK);t(ctx,"Pusula'nın Kısa Değerlendirmesi",92,1401,16,900,INK);
-    lines(ctx,`${guidance.weeklySummary} ${guidance.insights[0]?.meaning??''}`.trim(),92,1433,14,600,INK,1090,1.34,5);
-    t(ctx,'Dayanak',92,1544,11,850,ORANGE);lines(ctx,`Sentinel-2 · ${sat.length} tarih${weather.length?` · Hava ${weather.length} gün`:''}${activities.length?` · ${activities.length} tarla işlemi`:''}${backboneCount?` · Tarla hafızası ${backboneCount} kayıt`:''}`,155,1544,11,650,MUTED,920,1.2,2);
-    footer(ctx,1,snapshot);
+async function drawQr(
+  ctx: CanvasRenderingContext2D,
+  target: string,
+  x: number,
+  y: number,
+  size: number,
+  label: string,
+  platform: 'android' | 'ios',
+) {
+  rr(ctx, x, y, size + 72, size + 24, 12, WHITE, '#cfd9dd');
+  circleIcon(ctx, x + 21, y + 22, 13, platform === 'android' ? '#34a853' : '#111111', platform === 'android' ? 'A' : 'i', WHITE, 11);
+  text(ctx, platform === 'android' ? 'Android' : 'iOS', x + 41, y + 27, 11, 850, INK);
+  const ok = await drawImage(ctx, qrImageUrl(target), x + size + 8, y + 7, 58, 58, { cover: false, radius: 5, placeholder: 'QR' });
+  if (!ok) {
+    rr(ctx, x + size + 8, y + 7, 58, 58, 5, GRAY_SOFT, LINE);
+    text(ctx, 'QR', x + size + 27, y + 42, 13, 900, MUTED);
   }
+  text(ctx, label, x + 12, y + size + 12, 9, 850, MUTED);
+}
 
-  // SAYFA 2 — hava ilişkisi, değişim ve Pusula önerileri
-  {
-    const {c,ctx}=makeCanvas();pages.push(c);topBar(ctx);
-    const left=20,top=124,chartW=735,sideX=770,sideW=450;
-    multiIndexChart(ctx,left,top,chartW,460,sat);
-    rr(ctx,sideX,top,sideW,460,16,GREEN_SOFT,'#d3ead9');compass(ctx,sideX+36,top+38,19,GREEN_DARK);t(ctx,'Pusula Bu Verileri',sideX+70,top+35,18,900,INK);t(ctx,'Nasıl Okuyor?',sideX+70,top+60,18,900,INK);
-    const readings=[
-      rainTotal>0?`Dönemde ${rainTotal.toFixed(1)} mm yağış kaydı var.`:'Yağış verisi yoksa Pusula miktar üretmez.',
-      valid(ndviCmp.pct)?`NDVI önceki döneme göre ${deltaText(ndviCmp.pct)} yönünde değişti.`:'NDVI dönem karşılaştırması için yeterli sayısal ölçüm bekleniyor.',
-      valid(ndmiCmp.pct)?`NDMI önceki döneme göre ${deltaText(ndmiCmp.pct)} yönünde değişti.`:'NDMI su durumu karşılaştırması için yeterli ölçüm bekleniyor.',
-      guidance.insights[0]?.meaning??guidance.dataQualityNote,
-    ];let ry=top+105;readings.forEach(r=>{ctx.fillStyle=GREEN;ctx.beginPath();ctx.arc(sideX+28,ry-5,8,0,Math.PI*2);ctx.fill();t(ctx,'✓',sideX+23,ry,10,900,WHITE);ry=lines(ctx,r,sideX+48,ry,13,650,INK,sideW-68,1.3,3)+48;});
+function summaryCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  titleValue: string,
+  value: string,
+  sub: string,
+  accent: string,
+  soft: string,
+  symbol: string,
+) {
+  rr(ctx, x, y, w, 104, 12, soft, soft);
+  circleIcon(ctx, x + w / 2, y + 28, 15, accent, symbol, WHITE, 12);
+  ctx.textAlign = 'center';
+  text(ctx, titleValue, x + w / 2, y + 54, 10, 750, MUTED);
+  text(ctx, value, x + w / 2, y + 78, 17, 900, accent);
+  text(ctx, sub, x + w / 2, y + 96, 9, 700, INK);
+  ctx.textAlign = 'left';
+}
 
-    if ((snapshot.radar?.points?.length ?? 0) > 0) {
-      await radarHistoryPanel(ctx,20,602,1200,445,snapshot);
-    } else {
-          rr(ctx,20,602,1200,445,16,WHITE,LINE);sectionTitle(ctx,'TARLADA NE DEĞİŞTİ?',36,634);
-          const bx=36,bw=350,bgap=18;const p0=selected[0]??first,p1=selected.at(-1)??latest;
-          t(ctx,'ÖNCEKİ DÖNEM',bx,666,12,850,MUTED);t(ctx,p0?fmt(p0.date):'—',bx,686,11,650,INK);await drawImage(ctx,p0?.ndviImage,bx,700,bw,245,true,10);t(ctx,p0?`NDVI ${num(p0.ndvi)} · NDMI ${num(p0.ndmi)}`:'—',bx,968,12,800,INK);
-          const x2=bx+bw+bgap;t(ctx,'SON DÖNEM',x2,666,12,850,MUTED);t(ctx,p1?fmt(p1.date):'—',x2,686,11,650,INK);await drawImage(ctx,p1?.ndviImage,x2,700,bw,245,true,10);t(ctx,p1?`NDVI ${num(p1.ndvi)} · NDMI ${num(p1.ndmi)}`:'—',x2,968,12,800,INK);
-          const x3=x2+bw+bgap;rr(ctx,x3,700,430,245,10,GRAY_SOFT,LINE);t(ctx,'DEĞİŞİM ÖZETİ',x3+18,731,13,900,INK);
-          const d1=valid(first?.ndvi)&&valid(latest?.ndvi)?(latest.ndvi-first.ndvi):null;const d2=valid(first?.ndmi)&&valid(latest?.ndmi)?(latest.ndmi-first.ndmi):null;
-          t(ctx,'NDVI',x3+18,775,12,800,MUTED);t(ctx,valid(d1)?`${d1>=0?'+':''}${d1.toFixed(3)}`:'—',x3+115,775,22,900,valid(d1)&&d1<0?RED:GREEN);
-          t(ctx,'NDMI',x3+18,820,12,800,MUTED);t(ctx,valid(d2)?`${d2>=0?'+':''}${d2.toFixed(3)}`:'—',x3+115,820,22,900,valid(d2)&&d2<0?ORANGE:BLUE);
-          lines(ctx,guidance.weeklyHeadline,x3+18,866,14,750,INK,390,1.3,4);
-          rr(ctx,36,992,1168,40,12,GRAY_SOFT,GRAY_SOFT);t(ctx,'BÖLGESEL DEĞERLENDİRME',52,1018,12,900,INK);t(ctx,'Sayısal bölgesel zon verisi bağlıysa değişim haritası burada kullanılabilir; bağlı değilse uydurma zon üretilmez.',245,1018,11,600,MUTED);
-      
+function footerSocial(ctx: CanvasRenderingContext2D, x: number, y: number, symbol: string, fill: string, label: string, value: string) {
+  circleIcon(ctx, x + 17, y + 15, 14, fill, symbol, WHITE, 11);
+  text(ctx, label, x + 38, y + 9, 9.5, 800, MUTED);
+  text(ctx, value, x + 38, y + 26, 11, 850, INK);
+}
+
+export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  const { canvas, ctx } = makeCanvas();
+  const guidance = buildPusulaPdfGuidance(snapshot);
+  const sat = [...snapshot.satellite.points].sort((a, b) => a.date.localeCompare(b.date));
+  const latest = sat.at(-1);
+  const weather = weatherRows(snapshot).sort((a, b) => wd(a).localeCompare(wd(b)));
+  const photos = [...(snapshot.fieldPhotos ?? [])].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+  const latestPhoto = photos[0];
+  const secondPhoto = photos[1];
+  const diagnosis = photoDiagnosis(latestPhoto);
+  const health = fieldHealthScore(snapshot);
+  const ndviCmp = periodCompare(sat, 'ndvi');
+  const ndmiCmp = periodCompare(sat, 'ndmi');
+  const need = irrigationNeed(snapshot, guidance);
+  const yieldInfo = yieldSummary(snapshot);
+  const riskRows = riskItems(snapshot, guidance);
+  const soilRows = latestSoilValues(snapshot);
+  const stage = phenologyLabel(snapshot, guidance);
+  const location = [snapshot.field.city, snapshot.field.district].filter(Boolean).join(' / ') || 'Konum kaydı yok';
+
+  // Header
+  rr(ctx, 12, 12, 1216, 94, 15, WHITE, LINE);
+  logo(ctx, 50, 59);
+  text(ctx, 'Tarım Analiz Raporu', 372, 48, 19, 900, INK);
+  text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 72, 10.5, 650, MUTED);
+
+  const headerMeta = [
+    ['Rapor Tarihi', fmt(snapshot.period.end)],
+    ['Tarla Adı', snapshot.field.name],
+    ['Ürün', snapshot.field.crop ?? 'Kayıt yok'],
+    ['Tarla Büyüklüğü', snapshot.field.areaDecare == null ? '—' : `${snapshot.field.areaDecare.toLocaleString('tr-TR')} da`],
+  ];
+  let hx = 684;
+  headerMeta.forEach(([label, value], index) => {
+    if (index) {
+      ctx.strokeStyle = '#e4eaec';
+      ctx.beginPath();
+      ctx.moveTo(hx - 10, 29);
+      ctx.lineTo(hx - 10, 89);
+      ctx.stroke();
     }
-    rr(ctx,20,1065,1200,430,16,WHITE,LINE);compass(ctx,55,1102,18,GREEN);t(ctx,"PUSULA'NIN ÖNERİLERİ",87,1102,20,900,INK);t(ctx,'Önümüzdeki 7 gün için',87,1126,12,600,MUTED);
-    recommendationColumns(ctx,36,1150,1168,guidance);
-    const hasDecisionEvidence=decisionEvidenceStrip(ctx,36,1362,1168,guidance);
-    if(!hasDecisionEvidence){
-      rr(ctx,36,1362,1168,105,14,'#063a32','#063a32');t(ctx,'“',126,1418,38,900,WHITE);t(ctx,'Veri, toprağı daha iyi anlamanın anahtarıdır.',185,1406,18,750,WHITE);t(ctx,'TarlaPusula her zaman yanında.',185,1434,15,600,'#dcebe6');
-    }
-    const hasYieldHarvest=Boolean(latestYieldHarvestEvidence(snapshot));
-    const hasIrrigationPayload=Boolean(latestIrrigationSynthesis(snapshot));
-    let hasYieldHarvestCard=false;let hasIrrigationSynthesis=false;
-    if(hasYieldHarvest&&hasIrrigationPayload){
-      const gap=18;const cardW=(1168-gap)/2;
-      hasYieldHarvestCard=yieldHarvestEvidenceCard(ctx,36,1480,cardW,snapshot);
-      hasIrrigationSynthesis=irrigationSynthesisCard(ctx,36+cardW+gap,1480,cardW,snapshot);
-    }else if(hasYieldHarvest){
-      hasYieldHarvestCard=yieldHarvestEvidenceCard(ctx,36,1480,1168,snapshot);
-    }else if(hasIrrigationPayload){
-      hasIrrigationSynthesis=irrigationSynthesisCard(ctx,36,1480,1168,snapshot);
-    }
-    const hasEvidenceCard=hasYieldHarvestCard||hasIrrigationSynthesis;
-    const radarCount=snapshot.radar?.points?.length??0;const archiveCount=snapshot.layerArchive?.length??0;const dataLine=[`Sentinel-2 ${sat.length} tarih`,radarCount?`Sentinel-1 ${radarCount} tarih`:null,weather.length?`hava ${weather.length} gün`:null,activities.length?`${activities.length} işlem`:null,backboneCount?`tarla hafızası ${backboneCount} kayıt`:null,temps.length?`${Math.min(...temps).toFixed(0)}–${Math.max(...temps).toFixed(0)} °C`:null,archiveCount?`arşiv ${archiveCount} kayıt`:null].filter(Boolean).join(' · ');
-    const dataY=hasEvidenceCard?1606:1528;const qualityY=hasEvidenceCard?1631:1553;
-    t(ctx,`Kullanılan gerçek veri: ${dataLine||'bağlı veri bekleniyor'}`,36,dataY,11,650,MUTED);
-    lines(ctx,guidance.dataQualityNote,36,qualityY,11,600,MUTED,1160,1.25,3);
-    footer(ctx,2,snapshot);
+    text(ctx, label, hx, 44, 8.5, 800, MUTED);
+    wrap(ctx, value, hx, 65, 10, 850, INK, 120, 1.12, 2);
+    hx += index === 0 ? 136 : 130;
+  });
+
+  const top = 118;
+  const leftX = 12;
+  const leftW = 410;
+  const midX = 432;
+  const midW = 390;
+  const rightX = 832;
+  const rightW = 396;
+
+  // LEFT COLUMN — premium hero
+  rr(ctx, leftX, top, leftW, 532, 15, WHITE, LINE);
+  text(ctx, 'Tarla Sağlık ve Karar Özeti', leftX + 16, top + 38, 26, 900, INK);
+  wrap(ctx, 'Uydu verileri, hava durumu, toprak analizi ve Pusula karar motorlarıyla hazırlanmış premium tarla özeti.', leftX + 16, top + 67, 11.5, 600, MUTED, leftW - 32, 1.28, 3);
+  await drawLayeredHero(ctx, latest?.trueColorImage, latest?.ndviImage, leftX + 8, top + 112, leftW - 16, 318);
+
+  const gradient = ctx.createLinearGradient(leftX + 8, top + 300, leftX + 8, top + 430);
+  gradient.addColorStop(0, 'rgba(0,0,0,0)');
+  gradient.addColorStop(1, 'rgba(0,0,0,.72)');
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(leftX + 8, top + 112, leftW - 16, 318, 15);
+  ctx.clip();
+  ctx.fillStyle = gradient;
+  ctx.fillRect(leftX + 8, top + 112, leftW - 16, 318);
+  ctx.restore();
+
+  rr(ctx, leftX + 22, top + 332, 196, 85, 11, 'rgba(5,20,22,.78)', 'rgba(255,255,255,.18)');
+  circleIcon(ctx, leftX + 43, top + 353, 11, ORANGE, '●', WHITE, 7);
+  text(ctx, snapshot.field.name, leftX + 62, top + 358, 15, 900, WHITE);
+  text(ctx, snapshot.field.areaDecare == null ? 'Alan —' : `${snapshot.field.areaDecare.toLocaleString('tr-TR')} da`, leftX + 39, top + 383, 11, 750, WHITE);
+  text(ctx, snapshot.field.crop ?? 'Ürün kaydı yok', leftX + 39, top + 402, 11, 750, WHITE);
+  text(ctx, location, leftX + 39, top + 421, 10, 700, '#dbe7e7');
+
+  const statY = top + 442;
+  const statGap = 7;
+  const statW = (leftW - 16 - statGap * 3) / 4;
+  const ndmiPercent = valid(latest?.ndmi) ? clamp((latest.ndmi as number) * 100, 0, 100) : null;
+  summaryCard(ctx, leftX + 8, statY, statW, 'Tarla Sağlığı', health === null ? '—' : `${Math.round(health)}`, health === null ? 'Skor bekleniyor' : health >= 70 ? 'İyi' : health >= 45 ? 'Takip' : 'Dikkat', GREEN, GREEN_SOFT, '✓');
+  summaryCard(ctx, leftX + 8 + (statW + statGap), statY, statW, 'Ana Risk', riskRows[0]?.status ?? 'Takip', riskRows[0]?.label.replace(' Stresi', '') ?? 'Risk', RED, RED_SOFT, '!');
+  summaryCard(ctx, leftX + 8 + (statW + statGap) * 2, statY, statW, 'Su Durumu', ndmiPercent === null ? '—' : `%${Math.round(ndmiPercent)}`, ndmiPercent === null ? 'Veri yok' : ndmiPercent >= 45 ? 'Yeterli' : 'Kontrol', BLUE, BLUE_SOFT, '●');
+  summaryCard(ctx, leftX + 8 + (statW + statGap) * 3, statY, statW, 'Gelişim Evresi', stage.length > 13 ? stage.slice(0, 12) : stage, snapshot.field.crop ?? 'Ürün', GREEN, GREEN_SOFT, '↑');
+
+  rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
+  text(ctx, 'Tarlanın Bugünkü Görünümü', leftX + 16, 692, 17, 900, INK);
+  await drawImage(ctx, latest?.ndviImage, leftX + 16, 710, 182, 150, { radius: 9, placeholder: 'NDVI görüntüsü yok' });
+  await drawImage(ctx, latestPhoto?.signedUrl ?? latest?.trueColorImage, leftX + 212, 710, 182, 150, { radius: 9, placeholder: 'Saha fotoğrafı yok' });
+  text(ctx, 'NDVI Görüntüsü', leftX + 16, 878, 10, 850, INK);
+  text(ctx, latest ? fmt(latest.date, false) : '—', leftX + 16, 894, 9, 650, MUTED);
+  text(ctx, latestPhoto ? 'Saha Fotoğrafı' : 'Gerçek Renk', leftX + 212, 878, 10, 850, INK);
+  text(ctx, latestPhoto ? fmt(latestPhoto.capturedAt, false) : latest ? fmt(latest.date, false) : '—', leftX + 212, 894, 9, 650, MUTED);
+
+  rr(ctx, leftX, 914, leftW, 230, 15, PURPLE_SOFT, '#e4d6fb');
+  circleIcon(ctx, leftX + 34, 945, 18, PURPLE, '✦', WHITE, 14);
+  text(ctx, "Pusula'nın Yorumu", leftX + 62, 951, 18, 900, PURPLE);
+  wrap(ctx, guidance.weeklySummary, leftX + 20, 985, 12.5, 650, INK, leftW - 40, 1.38, 7);
+  const action = guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
+  rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
+  text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
+  wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
+
+  await drawImage(ctx, secondPhoto?.signedUrl ?? latestPhoto?.signedUrl ?? latest?.trueColorImage, leftX, 1154, leftW, 436, { radius: 15, placeholder: 'Saha görseli bekleniyor', overlay: 'rgba(1,25,20,.28)' });
+  wrap(ctx, 'Veriye dayalı kararlarla daha güçlü yarınlar.', leftX + 22, 1487, 21, 800, WHITE, leftW - 44, 1.18, 3);
+  text(ctx, 'TarlaPusula', leftX + 22, 1562, 13, 850, WHITE);
+
+  // MIDDLE COLUMN
+  rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
+  sectionHeader(ctx, midX + 10, top + 8, 1, 'Bitki Sağlığı ve Gelişim Analizi', GREEN, '↑');
+  const chipY = top + 54;
+  ['NDVI', 'NDRE', 'GNDVI', 'SAVI'].forEach((label, index) => {
+    const active = index === 0;
+    rr(ctx, midX + 18 + index * 71, chipY, 64, 25, 12, active ? GREEN : WHITE, active ? GREEN : LINE);
+    ctx.textAlign = 'center';
+    text(ctx, label, midX + 50 + index * 71, chipY + 17, 9, 850, active ? WHITE : MUTED);
+    ctx.textAlign = 'left';
+  });
+  chart(ctx, midX + 10, top + 84, 235, 174, sat);
+  await drawImage(ctx, latest?.ndviImage, midX + 255, top + 105, 116, 142, { radius: 8, placeholder: 'NDVI yok' });
+  text(ctx, 'NDVI Haritası', midX + 257, top + 265, 9.5, 850, INK);
+  text(ctx, latest ? fmt(latest.date, false) : '—', midX + 257, top + 280, 8.5, 650, MUTED);
+
+  const miniY = top + 294;
+  const miniW = 86;
+  const miniGap = 7;
+  const growth = valid(ndviCmp.pct) ? (ndviCmp.pct >= 3 ? 'Artışta' : ndviCmp.pct <= -3 ? 'Geriliyor' : 'Dengeli') : 'Takip';
+  const stress = guidance.insights.find((item) => item.id === 'multi-stress-synthesis-evidence');
+  const stressStatus = stress ? shortStatus(stress.confidence, 'Takip') : 'Düşük';
+  [
+    ['Bitki Yoğunluğu', valid(latest?.ndvi) && (latest?.ndvi as number) >= 0.55 ? 'İyi' : 'Takip', GREEN_SOFT, GREEN],
+    ['Gelişim Trendi', growth, GREEN_SOFT, GREEN],
+    ['Stres Seviyesi', stressStatus, ORANGE_SOFT, ORANGE],
+    ['Vigor', valid(latest?.ndvi) && (latest?.ndvi as number) >= 0.5 ? 'Sağlıklı' : 'Takip', GREEN_SOFT, GREEN],
+  ].forEach(([label, value, soft, accent], index) => {
+    rr(ctx, midX + 18 + index * (miniW + miniGap), miniY, miniW, 75, 9, soft, soft);
+    ctx.textAlign = 'center';
+    text(ctx, label, midX + 18 + index * (miniW + miniGap) + miniW / 2, miniY + 31, 8.5, 750, MUTED);
+    text(ctx, value, midX + 18 + index * (miniW + miniGap) + miniW / 2, miniY + 55, 12, 900, accent);
+    ctx.textAlign = 'left';
+  });
+
+  rr(ctx, midX, 512, midW, 204, 15, WHITE, LINE);
+  sectionHeader(ctx, midX + 10, 520, 2, 'Su ve Sulama Analizi', BLUE, '●');
+  const waterCards = [
+    { title: 'Toprak Nem Seviyesi', value: ndmiPercent, main: ndmiPercent === null ? '—' : `%${Math.round(ndmiPercent)}`, sub: ndmiPercent === null ? 'Veri yok' : ndmiPercent >= 45 ? 'Yeterli' : 'Kontrol', accent: BLUE },
+    { title: 'Sulama İhtiyacı', value: need.mm === null ? null : clamp(need.mm * 2, 0, 100), main: need.text, sub: 'Karar motoru', accent: BLUE },
+    { title: 'Su Dengesi', value: valid(ndmiCmp.pct) ? clamp(50 + ndmiCmp.pct, 0, 100) : null, main: valid(ndmiCmp.pct) && ndmiCmp.pct < -5 ? 'Azalıyor' : 'Dengede', sub: valid(ndmiCmp.pct) ? `${ndmiCmp.pct >= 0 ? '+' : ''}%${ndmiCmp.pct.toFixed(0)}` : 'Trend bekleniyor', accent: GREEN },
+  ];
+  waterCards.forEach((card, index) => {
+    const x = midX + 14 + index * 124;
+    rr(ctx, x, 566, 116, 132, 10, index === 0 ? BLUE_SOFT : index === 1 ? '#f3f8ff' : GREEN_SOFT, LINE);
+    ctx.textAlign = 'center';
+    text(ctx, card.title, x + 58, 589, 8.5, 750, MUTED);
+    if (index === 0) donut(ctx, x + 58, 635, 34, card.value, card.accent);
+    else text(ctx, card.main, x + 58, 645, index === 1 ? 14 : 17, 900, card.accent);
+    text(ctx, card.sub, x + 58, 682, 9, 850, index === 1 ? INK : card.accent);
+    ctx.textAlign = 'left';
+  });
+
+  rr(ctx, midX, 726, midW, 210, 15, WHITE, LINE);
+  sectionHeader(ctx, midX + 10, 734, 3, 'Toprak ve Besin Analizi', '#a74627', '●');
+  if (soilRows.length) {
+    soilRows.forEach((row, index) => {
+      const yy = 785 + index * 31;
+      text(ctx, row.label, midX + 18, yy, 9.5, 750, INK);
+      progressBar(ctx, midX + 105, yy - 10, 110, row.value, row.accent);
+      text(ctx, row.text, midX + 226, yy, 9, 850, row.value === null ? MUTED : row.accent);
+    });
+  } else {
+    text(ctx, 'Laboratuvar analizi bekleniyor', midX + 18, 808, 11, 850, MUTED);
+    wrap(ctx, 'Toprak/Besin motoru bağlıdır; ölçüm olmadan N-P-K değeri uydurulmaz.', midX + 18, 834, 10.5, 650, MUTED, 230, 1.3, 4);
   }
+  rr(ctx, midX + 260, 784, 112, 130, 9, ORANGE_SOFT, '#f4dfba');
+  text(ctx, 'Toprak Özeti', midX + 272, 806, 10, 900, INK);
+  const soilInsight = guidance.insights.find((item) => item.id === 'soil-intelligence-evidence' || item.id === 'nutrition-decision-guard-evidence');
+  wrap(ctx, soilInsight?.meaning ?? 'Toprak kararı gerçek analiz veya doğrulanmış kaynak geldiğinde güçlenir.', midX + 272, 831, 9.5, 650, MUTED, 88, 1.25, 6);
 
-  pages.forEach((c,i)=>{if(i)doc.addPage();doc.addImage(c.toDataURL('image/jpeg',.94),'JPEG',0,0,210,297,undefined,'FAST')});
-  doc.setProperties({title:`PUSULAPDF - ${snapshot.field.name}`,author:'TarlaPusula',creator:'TarlaPusula PUSULAPDF'});return doc;
+  rr(ctx, midX, 946, midW, 250, 15, WHITE, LINE);
+  sectionHeader(ctx, midX + 10, 954, 4, 'Hava ve İklim Analizi', BLUE, '☀');
+  const weather5 = weather.slice(0, 5);
+  if (weather5.length) {
+    weather5.forEach((row, index) => {
+      const x = midX + 13 + index * 74;
+      rr(ctx, x, 998, 66, 100, 9, index === 0 ? '#f8fbff' : WHITE, LINE);
+      ctx.textAlign = 'center';
+      text(ctx, index === 0 ? 'Bugün' : fmt(wd(row), false), x + 33, 1017, 8.5, 750, MUTED);
+      const temp = wv(row, 'tempMax', 'maxTemp', 'temperature', 'temp', 'tempAvg', 'avgTemp');
+      const rain = wv(row, 'precipitation', 'rain', 'precipitationMm');
+      text(ctx, rain !== null && rain > 2 ? '☂' : '☀', x + 33, 1054, 19, 900, rain !== null && rain > 2 ? BLUE : ORANGE);
+      text(ctx, temp === null ? '—' : `${Math.round(temp)}°`, x + 33, 1082, 17, 900, INK);
+      ctx.textAlign = 'left';
+    });
+  } else {
+    wrap(ctx, 'Hava tahmini bu rapor için hazır değil.', midX + 18, 1016, 11, 650, MUTED, midW - 36, 1.25, 2);
+  }
+  const temps = weather.map((row) => wv(row, 'tempMax', 'maxTemp', 'temperature', 'temp', 'tempAvg', 'avgTemp')).filter(valid);
+  const rainTotal = weather.map((row) => wv(row, 'precipitation', 'rain', 'precipitationMm')).filter(valid).reduce((sum, value) => sum + value, 0);
+  const weatherBadges = [
+    ['Sıcaklık Trendi', temps.length >= 2 && temps.at(-1)! > temps[0] + 2 ? 'Artıyor' : 'Dengeli', ORANGE, ORANGE_SOFT],
+    ['Yağış Olasılığı', rainTotal > 10 ? 'Yüksek' : rainTotal > 2 ? 'Orta' : 'Düşük', BLUE, BLUE_SOFT],
+    ['Rüzgâr', 'Takip', GREEN, GREEN_SOFT],
+  ];
+  weatherBadges.forEach(([label, value, accent, soft], index) => {
+    const x = midX + 14 + index * 122;
+    rr(ctx, x, 1110, 114, 66, 9, soft, soft);
+    ctx.textAlign = 'center';
+    text(ctx, label, x + 57, 1132, 8, 800, MUTED);
+    text(ctx, value, x + 57, 1157, 11, 900, accent);
+    ctx.textAlign = 'left';
+  });
+
+  rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
+  sectionHeader(ctx, midX + 10, 1214, 5, 'Saha Gözlemleri', PURPLE, '▣');
+  await drawImage(ctx, latestPhoto?.signedUrl, midX + 16, 1260, 174, 195, { radius: 9, placeholder: 'Saha fotoğrafı yok' });
+  await drawImage(ctx, secondPhoto?.signedUrl ?? latest?.trueColorImage, midX + 200, 1260, 174, 195, { radius: 9, placeholder: 'İkinci görsel yok' });
+  text(ctx, latestPhoto ? 'Son Saha Fotoğrafı' : 'Fotoğraf Bekleniyor', midX + 16, 1475, 9.5, 850, INK);
+  text(ctx, latestPhoto ? fmt(latestPhoto.capturedAt, false) : '—', midX + 16, 1491, 8.5, 650, MUTED);
+  text(ctx, secondPhoto ? 'Önceki Saha Fotoğrafı' : 'Genel Görünüm', midX + 200, 1475, 9.5, 850, INK);
+  text(ctx, secondPhoto ? fmt(secondPhoto.capturedAt, false) : latest ? fmt(latest.date, false) : '—', midX + 200, 1491, 8.5, 650, MUTED);
+  const observationInsight = guidance.insights.find((item) => item.id === 'field-observation-follow-up-evidence');
+  rr(ctx, midX + 16, 1510, 358, 62, 9, diagnosis.severity ? RED_SOFT : PURPLE_SOFT, diagnosis.severity ? '#ffd9dc' : '#eadfff');
+  wrap(ctx, diagnosis.headline || observationInsight?.title || 'Saha gözlemleri rapora bağlandı.', midX + 28, 1534, 10, 850, diagnosis.severity ? RED : PURPLE, 334, 1.18, 2);
+  wrap(ctx, diagnosis.summary || latestPhoto?.notes || observationInsight?.meaning || 'Yeni saha fotoğrafı geldikçe aynı noktadan değişim karşılaştırılır.', midX + 28, 1557, 9, 650, MUTED, 334, 1.2, 2);
+
+  // RIGHT COLUMN
+  rr(ctx, rightX, top, rightW, 476, 15, WHITE, LINE);
+  sectionHeader(ctx, rightX + 10, top + 8, 6, 'Risk ve Öneri Analizi', RED, '!');
+  riskRows.forEach((row, index) => {
+    const yy = top + 65 + index * 78;
+    circleIcon(ctx, rightX + 34, yy + 18, 15, row.accent === GREEN ? '#eaf8ed' : row.accent === BLUE ? '#edf5ff' : row.accent === TEAL ? '#ebf9f7' : '#fff0e9', '●', row.accent, 8);
+    text(ctx, row.label, rightX + 58, yy + 11, 11.5, 850, INK);
+    wrap(ctx, row.detail, rightX + 58, yy + 33, 8.7, 600, MUTED, 235, 1.2, 2);
+    progressBar(ctx, rightX + 283, yy + 4, 70, row.status === 'Yüksek' ? 92 : row.status === 'Orta' ? 58 : row.status === 'Düşük' ? 24 : 42, row.statusAccent);
+    rr(ctx, rightX + 305, yy + 25, 62, 23, 11, row.statusSoft, row.statusSoft);
+    ctx.textAlign = 'center';
+    text(ctx, row.status, rightX + 336, yy + 41, 8.7, 900, row.statusAccent);
+    ctx.textAlign = 'left';
+  });
+
+  rr(ctx, rightX, 604, rightW, 216, 15, WHITE, LINE);
+  sectionHeader(ctx, rightX + 10, 612, 7, 'Verim, Hasat ve Kalite', ORANGE, '↑');
+  const yieldCards = [
+    ['Tahmini Verim', yieldInfo.yieldKgDa === null ? '—' : `${Math.round(yieldInfo.yieldKgDa)}`, yieldInfo.yieldKgDa === null ? 'kg/da bekleniyor' : 'kg/da', ORANGE],
+    ['Kalite Skoru', yieldInfo.quality.length <= 6 ? yieldInfo.quality : 'Takip', yieldInfo.quality.length <= 6 ? 'Kalite' : yieldInfo.quality.slice(0, 20), GREEN],
+    ['Hasat Zamanı', yieldInfo.harvest, 'Tahmini', PURPLE],
+  ];
+  yieldCards.forEach(([titleValue, value, sub, accent], index) => {
+    const x = rightX + 14 + index * 124;
+    rr(ctx, x, 655, 116, 145, 10, GRAY_SOFT, LINE);
+    ctx.textAlign = 'center';
+    text(ctx, titleValue, x + 58, 680, 8.5, 800, MUTED);
+    text(ctx, value, x + 58, 726, index === 2 ? 16 : 25, 900, accent);
+    text(ctx, sub, x + 58, 754, 9.5, 850, INK);
+    if (index === 0 && valid(ndviCmp.pct)) text(ctx, `${ndviCmp.pct >= 0 ? '↑' : '↓'} %${Math.abs(ndviCmp.pct).toFixed(0)} bitki trendi`, x + 58, 782, 8.5, 750, ndviCmp.pct >= 0 ? GREEN : RED);
+    ctx.textAlign = 'left';
+  });
+
+  rr(ctx, rightX, 830, rightW, 330, 15, WHITE, LINE);
+  sectionHeader(ctx, rightX + 10, 838, 8, 'Kritik Gözlem', PURPLE, '!');
+  await drawImage(ctx, latestPhoto?.signedUrl ?? latest?.trueColorImage, rightX + 16, 884, 205, 225, { radius: 10, placeholder: 'Kritik gözlem fotoğrafı yok' });
+  rr(ctx, rightX + 231, 884, 149, 225, 10, diagnosis.headline ? RED_SOFT : PURPLE_SOFT, diagnosis.headline ? '#ffd8db' : '#e9dcff');
+  wrap(ctx, diagnosis.headline || observationInsight?.title || 'Kritik saha gözlemi yok', rightX + 244, 912, 11, 900, diagnosis.headline ? RED : PURPLE, 123, 1.2, 4);
+  wrap(ctx, diagnosis.summary || latestPhoto?.notes || observationInsight?.meaning || 'Saha fotoğrafı eklendiğinde Pusula burada kısa gözlem özetini gösterir.', rightX + 244, 982, 9.5, 600, MUTED, 123, 1.28, 8);
+
+  rr(ctx, rightX, 1170, rightW, 250, 15, WHITE, LINE);
+  sectionHeader(ctx, rightX + 10, 1178, 9, "Pusula'nın Kısa Aksiyonları", GREEN, '✓');
+  const actions = [
+    ['Bugün', guidance.next7Days[0] ?? 'Tarlanın güncel durumunu kontrol et.', GREEN, GREEN_SOFT],
+    ['Önümüzdeki 7 Gün', guidance.next7Days[1] ?? 'Uydu ve hava trendini takip et.', BLUE, BLUE_SOFT],
+    ['İzle ve Planla', guidance.next7Days[2] ?? guidance.dataQualityNote, PURPLE, PURPLE_SOFT],
+  ];
+  actions.forEach(([titleValue, value, accent, soft], index) => {
+    const x = rightX + 14 + index * 124;
+    rr(ctx, x, 1224, 116, 176, 9, soft, soft);
+    text(ctx, titleValue, x + 10, 1247, 9.5, 900, accent);
+    wrap(ctx, value, x + 10, 1275, 9.2, 650, INK, 96, 1.28, 7);
+  });
+
+  await drawImage(ctx, latest?.trueColorImage ?? latestPhoto?.signedUrl, rightX, 1430, rightW, 160, { radius: 15, placeholder: 'Tarla görseli', overlay: 'rgba(4,32,25,.28)' });
+  logo(ctx, rightX + 34, 1510, true);
+  wrap(ctx, 'Tarlanı verilerle izle, kararını güvenle ver.', rightX + 150, 1502, 15, 800, WHITE, 220, 1.2, 3);
+
+  // Premium footer — social + QR
+  rr(ctx, 12, 1604, 1216, 138, 15, WHITE, LINE);
+  logo(ctx, 52, 1660, true);
+  footerSocial(ctx, 286, 1634, '◎', '#e1306c', 'Instagram', '@tarlapusula');
+  footerSocial(ctx, 465, 1634, 'f', '#1877f2', 'Facebook', 'tarlapusula');
+  footerSocial(ctx, 632, 1634, '✉', '#15936a', 'E-posta', 'tarlapusula@gmail.com');
+  ctx.strokeStyle = '#dfe6e9';
+  ctx.beginPath();
+  ctx.moveTo(826, 1622);
+  ctx.lineTo(826, 1725);
+  ctx.stroke();
+  await drawQr(ctx, ANDROID_URL, 846, 1623, 57, 'Android indir', 'android');
+  await drawQr(ctx, IOS_URL, 1022, 1623, 57, 'iOS indir', 'ios');
+
+  doc.addImage(canvas.toDataURL('image/jpeg', 0.97), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+  doc.setProperties({
+    title: `PUSULAPDF - ${snapshot.field.name}`,
+    author: 'TarlaPusula',
+    creator: 'TarlaPusula PUSULAPDF',
+    subject: 'Tek sayfalık premium tarla sağlık ve karar raporu',
+  });
+  return doc;
 }
 
 export type PusulaPdfOpenOptions = {
@@ -393,7 +975,6 @@ function pusulaPdfFileName(snapshot: PusulaPdfSnapshot) {
     .toLocaleLowerCase('tr-TR')
     .replace(/[^a-z0-9çğıöşü]+/gi, '-')
     .replace(/^-+|-+$/g, '');
-
   return `PUSULAPDF-${name || 'tarla'}-${snapshot.period.end}.pdf`;
 }
 
@@ -429,8 +1010,6 @@ export async function downloadPusulaPdf(
     }
   }
 
-  // Normal tarayıcı/Vercel kullanımında gerçek indirmeyi de tetikle.
-  // StackBlitz sandbox bunu engellese bile yukarıdaki sekmede PDF açılmış olur.
   try {
     triggerPdfDownload(url, fileName);
   } catch (error) {
@@ -452,11 +1031,6 @@ export async function downloadPusulaPdf(
     }
   }
 
-  // Blob URL PDF görüntüleyici tarafından okunabilsin diye hemen iptal etmiyoruz.
   window.setTimeout(() => URL.revokeObjectURL(url), 2 * 60 * 1000);
-
-  return {
-    fileName,
-    openedInPreview,
-  };
+  return { fileName, openedInPreview };
 }

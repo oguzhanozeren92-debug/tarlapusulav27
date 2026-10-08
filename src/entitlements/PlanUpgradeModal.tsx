@@ -12,6 +12,7 @@ import {
   PLAN_LABELS,
   planAllows,
   planPriceLabel,
+  planYearlyEquivalentLabel,
   type PaidPlan,
 } from './planCatalog';
 import {
@@ -58,8 +59,8 @@ const CSS = String.raw`
 .tp-plan-card-badge{display:inline-flex;min-height:22px;align-items:center;padding:0 8px;border-radius:999px;background:#eceff1;color:#505a63;font-size:7px;font-weight:900;letter-spacing:.08em}
 .tp-plan-card h3{margin:10px 0 0;font-size:18px;letter-spacing:-.035em}
 .tp-plan-card-price{min-height:53px;margin-top:7px}
-.tp-plan-card-price strong{display:block;font-size:17px}
-.tp-plan-card-price span{display:block;margin-top:3px;color:#77818a;font-size:8px;line-height:1.35}
+.tp-plan-card-price strong{display:block;font-size:22px;line-height:1.05;letter-spacing:-.035em;color:#111315}
+.tp-plan-card-price span{display:block;margin-top:5px;color:#69737c;font-size:8.5px;line-height:1.35;font-weight:750}
 .tp-plan-card ul{display:grid;gap:7px;margin:12px 0 0;padding:0;list-style:none}
 .tp-plan-card li{display:grid;grid-template-columns:16px minmax(0,1fr);gap:6px;align-items:flex-start;font-size:8.8px;line-height:1.35}
 .tp-plan-card li svg{width:14px;height:14px;margin-top:-1px}
@@ -126,6 +127,7 @@ function cardFeatures(plan: 'free' | 'plus' | 'premium') {
       '10 aktif tarla',
       'Gelişmiş uydu ve geçmiş',
       'Gelişmiş Pusula AI',
+      'Gelişmiş hava ve tarla iklimi',
       'Sulama optimizasyonu',
       'Gelişmiş bildirimler ve raporlar',
       'Kuru Tarım',
@@ -230,28 +232,63 @@ export default function PlanUpgradeModal() {
 
   if (!request || typeof document === 'undefined') return null;
 
+  const usableStoreLabel = (value: string | null | undefined) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+
+    const normalized = raw
+      .toLocaleLowerCase('tr-TR')
+      .replace(/\s+/g, ' ');
+
+    if (
+      normalized === 'mağazada' ||
+      normalized === 'magazada' ||
+      normalized === 'store' ||
+      normalized === 'n/a' ||
+      normalized === '-'
+    ) {
+      return '';
+    }
+
+    // Gerçek fiyat değilse (rakam / para sembolü yoksa) kullanma.
+    const looksLikePrice = /\d/.test(raw) || /₺|tl|try|\$|€|£/i.test(raw);
+    return looksLikePrice ? raw : '';
+  };
+
   const storePrice = (plan: PaidPlan) => {
+    // Web/StackBlitz önizlemesinde doğrudan lansman fiyatını göster.
+    // Native mağaza fiyatı yalnız gerçek mobil purchase katmanı sağlıklıysa önceliklidir.
+    if (!nativeStorePurchasesSupported()) {
+      return yearly
+        ? {
+            price: planPriceLabel(plan, true),
+            detail: planYearlyEquivalentLabel(plan),
+          }
+        : {
+            price: planPriceLabel(plan, false),
+            detail: 'aylık abonelik',
+          };
+    }
+
     const row = storePrices.find((item) => item.plan === plan);
 
-    if (!row) {
+    if (yearly) {
+      const annual = usableStoreLabel(row?.annual);
+      const equivalent = usableStoreLabel(row?.annualMonthlyEquivalent);
+
       return {
-        price: planPriceLabel(plan, yearly),
-        detail: yearly ? 'yıllık mağaza fiyatı' : 'aylık mağaza fiyatı',
+        price: annual || planPriceLabel(plan, true),
+        detail: equivalent
+          ? `yaklaşık ${equivalent} / ay`
+          : planYearlyEquivalentLabel(plan),
       };
     }
 
-    if (yearly) {
-      return {
-        price: row.annual || planPriceLabel(plan, true),
-        detail: row.annualMonthlyEquivalent
-          ? `yaklaşık ${row.annualMonthlyEquivalent} / ay`
-          : 'yıllık mağaza fiyatı',
-      };
-    }
+    const monthly = usableStoreLabel(row?.monthly);
 
     return {
-      price: row.monthly || planPriceLabel(plan, false),
-      detail: 'aylık mağaza fiyatı',
+      price: monthly || planPriceLabel(plan, false),
+      detail: 'aylık abonelik',
     };
   };
 

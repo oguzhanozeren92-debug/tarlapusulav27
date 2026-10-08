@@ -42,6 +42,14 @@ type FieldMapProps = {
 
   drawButtonLabel?: string;
 
+  /** Dışarıdaki bir butondan çizimi başlatmak için her tetiklemede artırılan token. */
+  drawStartToken?: number;
+
+  /** null/undefined = sınırsız. Değer dekar cinsindedir. */
+  maxDrawAreaDecare?: number | null;
+
+  onDrawLimitExceeded?: (areaDecare: number) => void;
+
   constrainDrawingToParcel?: boolean;
 
   onSectionDrawn?: (result: {
@@ -72,11 +80,15 @@ export default function FieldMap({
   height = 520,
   drawEnabled = true,
   drawButtonLabel = '✏️ Alan Çiz',
+  drawStartToken = 0,
+  maxDrawAreaDecare = null,
+  onDrawLimitExceeded,
   constrainDrawingToParcel = true,
   onSectionDrawn,
 }: FieldMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
+  const lastExternalDrawTokenRef = useRef(0);
 
   const [mapMode, setMapMode] = useState<MapMode>('satellite');
 
@@ -707,6 +719,19 @@ export default function FieldMap({
     setDrawing(true);
   };
 
+  useEffect(() => {
+    if (!drawEnabled || !drawStartToken) return;
+    if (lastExternalDrawTokenRef.current === drawStartToken) return;
+
+    lastExternalDrawTokenRef.current = drawStartToken;
+    setDrawPoints([]);
+    setLastAreaDecare(null);
+    setDrawMessage(
+      'Harita üzerinde tarlanın köşelerine sırayla dokun. En az 3 nokta seç.',
+    );
+    setDrawing(true);
+  }, [drawEnabled, drawStartToken]);
+
   const cancelDrawing = () => {
     setDrawing(false);
 
@@ -755,6 +780,22 @@ export default function FieldMap({
     const areaSquareMeters = turf.area(polygonFeature);
 
     const areaDecare = areaSquareMeters / 1000;
+
+    if (
+      maxDrawAreaDecare !== null &&
+      maxDrawAreaDecare !== undefined &&
+      Number.isFinite(maxDrawAreaDecare) &&
+      areaDecare > maxDrawAreaDecare
+    ) {
+      setLastAreaDecare(null);
+      setDrawMessage(
+        `Bu çizim ${areaDecare.toLocaleString('tr-TR', {
+          maximumFractionDigits: 2,
+        })} dekar. Ücretsiz planda çizerek ekleme en fazla ${maxDrawAreaDecare.toLocaleString('tr-TR')} dekar olabilir. Alanı küçült veya Premium'a geç.`,
+      );
+      onDrawLimitExceeded?.(areaDecare);
+      return;
+    }
 
     setLastAreaDecare(areaDecare);
 

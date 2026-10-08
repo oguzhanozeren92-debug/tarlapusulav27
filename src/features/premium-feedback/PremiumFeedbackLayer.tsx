@@ -16,7 +16,8 @@ export default function PremiumFeedbackLayer() {
   useEffect(() => {
     const seenInsightIds = new Set<string>();
 
-    const prime = () => {
+    const prime = (event: Event) => {
+      if (!event.isTrusted) return;
       void primePremiumFeedback();
     };
 
@@ -56,15 +57,17 @@ export default function PremiumFeedbackLayer() {
       }
     };
 
-    window.addEventListener('pointerdown', prime, { passive: true });
-    window.addEventListener('keydown', prime);
+    // click capture, document'taki Pusula click handlerından önce çalışır.
+    // Böylece AudioContext gerçek kullanıcı aktivasyonu içinde açılır.
+    window.addEventListener('click', prime, true);
+    window.addEventListener('keydown', prime, true);
     window.addEventListener('tp:premium-feedback', onFeedback as EventListener);
     window.addEventListener('tp-pusula-insight', onPusulaInsight as EventListener);
     document.addEventListener('click', onDocumentClick, true);
 
     return () => {
-      window.removeEventListener('pointerdown', prime);
-      window.removeEventListener('keydown', prime);
+      window.removeEventListener('click', prime, true);
+      window.removeEventListener('keydown', prime, true);
       window.removeEventListener('tp:premium-feedback', onFeedback as EventListener);
       window.removeEventListener('tp-pusula-insight', onPusulaInsight as EventListener);
       document.removeEventListener('click', onDocumentClick, true);

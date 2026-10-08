@@ -1101,7 +1101,7 @@
 
 @keyframes pgStableNeedleTurn{
   from{transform:rotate(0deg)}
-  to{transform:rotate(360deg)}
+  to{transform:rotate(720deg)}
 }
 
 .pusula-guide--seek .pusula-guide__needle-layer,
@@ -1109,7 +1109,7 @@
 .pusula-guide--talk .pusula-guide__needle-layer,
 .pusula-guide--hold .pusula-guide__needle-layer{
   animation:none!important;
-  transform:rotate(360deg)!important;
+  transform:rotate(720deg)!important;
 }
 
 .pusula-guide--back .pusula-guide__logo{

@@ -59,9 +59,10 @@ export function setPremiumHapticEnabled(enabled: boolean) {
   }
 }
 
-function getAudioContext() {
+function getAudioContext(createIfMissing = false) {
   if (typeof window === 'undefined') return null;
   if (audioContext) return audioContext;
+  if (!createIfMissing) return null;
 
   const AudioContextCtor =
     window.AudioContext ?? (window as WebkitWindow).webkitAudioContext;
@@ -80,16 +81,41 @@ function getAudioContext() {
   }
 }
 
-export async function primePremiumFeedback() {
+export function primePremiumFeedback() {
   if (primed || !isPremiumSoundEnabled()) return;
-  const context = getAudioContext();
+  if (typeof window === 'undefined') return;
+
+  /*
+    event.isTrusted tek başına yeterli değil: StackBlitz/WebContainer gibi
+    iframe önizlemelerinde tarayıcı olayı güvenilir görse bile ses açma için
+    "transient user activation" vermeyebiliyor. Chrome'un AudioContext
+    uyarısını üretmemek için context'i yalnız gerçek user activation anında
+    oluşturup/resume ediyoruz.
+  */
+  const activation =
+    typeof navigator !== 'undefined' ? navigator.userActivation : undefined;
+
+  if (activation && !activation.isActive) return;
+
+  const context = getAudioContext(true);
   if (!context) return;
 
+  if (context.state === 'running') {
+    primed = true;
+    return;
+  }
+
   try {
-    if (context.state === 'suspended') await context.resume();
-    primed = context.state === 'running';
+    const resumeResult = context.resume();
+    void resumeResult
+      .then(() => {
+        primed = context.state === 'running';
+      })
+      .catch(() => {
+        // Tarayıcı/WebView sesi hâlâ bloke ederse sessizce bekle.
+      });
   } catch {
-    // iOS kullanıcı etkileşimi dışında AudioContext'i açmayabilir.
+    // Ses bağlamı açılamazsa uygulama sessiz şekilde devam eder.
   }
 }
 
@@ -152,7 +178,7 @@ type Note = {
 
 function playNotes(notes: Note[]) {
   if (!isPremiumSoundEnabled()) return;
-  const context = getAudioContext();
+  const context = getAudioContext(false);
   const output = masterGain;
   if (!context || !output || context.state !== 'running') return;
 

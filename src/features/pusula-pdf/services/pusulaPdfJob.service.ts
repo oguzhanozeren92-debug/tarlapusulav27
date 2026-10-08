@@ -16,6 +16,7 @@ import { mirrorLatestFieldWorkabilityEvidenceForPdf } from './pusulaPdfFieldWork
 import { mirrorLatestIrrigationDistributionEvidenceForPdf } from './pusulaPdfIrrigationDistributionEvidence.service';
 import { mirrorLatestWaterScarcityEvidenceForPdf } from './pusulaPdfWaterScarcityEvidence.service';
 import { mirrorLatestMicroclimateEvidenceForPdf } from './pusulaPdfMicroclimateEvidence.service';
+import { mirrorLatestDisasterRecoveryEvidenceForPdf } from './pusulaPdfDisasterRecoveryEvidence.service';
 import { mirrorLatestTaskMapEvidenceForPdf } from './pusulaPdfTaskMapEvidence.service';
 import { mirrorLatestMultiStressEvidenceForPdf } from './pusulaPdfMultiStressEvidence.service';
 import { runAquaCropPilotEvidence } from '../../irrigation/services/aquaCropPilotEvidence.service';
@@ -55,6 +56,7 @@ export async function requestPusulaPdf(fieldId: string) {
       mirrorLatestIrrigationDistributionEvidenceForPdf(fieldId),
       mirrorLatestWaterScarcityEvidenceForPdf(fieldId),
       mirrorLatestMicroclimateEvidenceForPdf(fieldId),
+      mirrorLatestDisasterRecoveryEvidenceForPdf(fieldId),
       mirrorLatestTaskMapEvidenceForPdf(fieldId),
     ]);
   } catch (error) {

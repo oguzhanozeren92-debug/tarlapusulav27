@@ -22,11 +22,11 @@ const rawSupabaseUrl = String(
     DEFAULT_SUPABASE_URL,
 ).trim();
 
-const supabaseUrl = rawSupabaseUrl
+export const supabaseProjectUrl = rawSupabaseUrl
   .replace(/\/rest\/v1\/?$/i, '')
   .replace(/\/+$/, '');
 
-const supabaseKey = String(
+export const supabasePublishableKey = String(
   env.VITE_SUPABASE_PUBLISHABLE_KEY ||
     env.VITE_SUPABASE_ANON_KEY ||
     env.VITE_SUPABASE_KEY ||
@@ -34,12 +34,12 @@ const supabaseKey = String(
 ).trim();
 
 export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabaseKey,
+  supabaseProjectUrl && supabasePublishableKey,
 );
 
-export const supabaseConfigError = !supabaseUrl
+export const supabaseConfigError = !supabaseProjectUrl
   ? 'Supabase URL bulunamadı.'
-  : !supabaseKey
+  : !supabasePublishableKey
     ? 'Supabase publishable key bulunamadı.'
     : '';
 
@@ -52,8 +52,8 @@ function createTarlaPusulaSupabaseClient(): SupabaseClient {
 
   try {
     const client = createClient(
-      supabaseUrl,
-      supabaseKey,
+      supabaseProjectUrl,
+      supabasePublishableKey,
       {
         auth: {
           persistSession: true,
@@ -67,7 +67,7 @@ function createTarlaPusulaSupabaseClient(): SupabaseClient {
 
     console.log(
       'TarlaPusula Supabase bağlantısı hazır:',
-      supabaseUrl,
+      supabaseProjectUrl,
     );
 
     return client;

@@ -94,6 +94,7 @@ function canShowInterstitialNow() {
   return true;
 }
 
+/** @deprecated Web önizlemede artık kullanılmıyor; gerçek reklam yalnız native bridge üzerinden çalışır. */
 function showDevMockAd(kind: 'rewarded' | 'interstitial', placement: AdPlacement) {
   return new Promise<BridgeAdResult>((resolve) => {
     if (typeof document === 'undefined') {
@@ -273,16 +274,23 @@ async function runAd(kind: 'rewarded' | 'interstitial', placement: AdPlacement) 
   const bridge = typeof window !== 'undefined' ? window.TarlaPusulaAds : undefined;
   const fn = kind === 'rewarded' ? bridge?.showRewarded : bridge?.showInterstitial;
 
-  if (fn) {
-    const result = await fn({ placement, userId });
-    return result ? { ...result, shown: true } : { completed: false, shown: true };
+  /*
+    Gerçek reklam yalnız native Android/iOS köprüsü mevcutsa gösterilir.
+    StackBlitz, Vercel ve normal web önizlemesinde sahte reklam UI'sı
+    gösterilmez.
+
+    Rewarded akışında web önizleme "başarılı" kabul edilir ki kullanıcı
+    özelliği test edebilsin; ancak provider / transactionId olmadığı için
+    reklam puanı claim edilmez. Interstitial ise webde tamamen atlanır.
+  */
+  if (!fn) {
+    return kind === 'rewarded'
+      ? ({ completed: true, shown: false } satisfies BridgeAdResult)
+      : ({ completed: false, shown: false } satisfies BridgeAdResult);
   }
 
-  if (import.meta.env.DEV) {
-    return showDevMockAd(kind, placement);
-  }
-
-  return { completed: false, shown: false } satisfies BridgeAdResult;
+  const result = await fn({ placement, userId });
+  return result ? { ...result, shown: true } : { completed: false, shown: true };
 }
 
 function delay(ms: number) {

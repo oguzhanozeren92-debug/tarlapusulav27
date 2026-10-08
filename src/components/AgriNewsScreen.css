@@ -102,3 +102,20 @@
     padding: 8px 10px 72px;
   }
 }
+
+
+/* =========================================================
+   V45 — PUSULA GÜNDEM EKSTRA ÜST BAR KALDIRILDI
+   İçerik kendi Tarım Gündemi başlığını kullanır.
+   ========================================================= */
+.tp-agri-news-main{
+  min-height:100dvh!important;
+  padding-top:8px!important;
+}
+
+@media (max-width:640px){
+  .tp-agri-news-main{
+    min-height:100dvh!important;
+    padding-top:6px!important;
+  }
+}

@@ -7,10 +7,10 @@ import type { HomeNdviAnomalySignal } from '../../satellite/types/homeSatelliteS
 import type { FieldDataBackboneSnapshot } from '../../data-backbone/types/fieldDataBackbone';
 import type { EarthSearchNdviStats } from '../../home-map/services/earthSearchNdvi.service';
 
-export type HomeDecisionTarget = 'home' | 'weather' | 'spray_weather' | 'calendar' | 'ai' | 'irrigation_detail' | 'soil' | 'map_vegetation' | 'field_growth' | 'inventory' | 'terrain';
+export type HomeDecisionTarget = 'home' | 'weather' | 'spray_weather' | 'calendar' | 'ai' | 'irrigation_detail' | 'soil' | 'map_vegetation' | 'field_growth' | 'field_status' | 'inventory' | 'terrain';
 export type HomeDecisionSource =
   | 'field' | 'weather' | 'calendar' | 'satellite' | 'pusula' | 'risk-radar' | 'multi-stress'
-  | 'irrigation' | 'phenology' | 'operation' | 'nutrition' | 'weed-intelligence' | 'yield-harvest' | 'orchard-tree' | 'storage-risk' | 'irrigation-economics' | 'frost-pocket' | 'field-workability' | 'irrigation-distribution' | 'water-scarcity' | 'microclimate-sensor';
+  | 'irrigation' | 'phenology' | 'operation' | 'nutrition' | 'weed-intelligence' | 'yield-harvest' | 'orchard-tree' | 'storage-risk' | 'irrigation-economics' | 'frost-pocket' | 'field-workability' | 'irrigation-distribution' | 'water-scarcity' | 'microclimate-sensor' | 'disaster-recovery';
 export type HomeTodayIconKey = 'water' | 'rain' | 'document' | 'leaf-green' | 'leaf-gold';
 export type HomeDecisionConfidence = 'strong' | 'medium' | 'preliminary';
 /** Kaynak adaptörünün sağladığı veri durumu; olay kimliği gözlem tarihi değildir. */

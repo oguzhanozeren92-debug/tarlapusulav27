@@ -835,7 +835,7 @@ export default function App() {
     );
   }
 
-  if (screen === 'calendar') {
+  if (screen === 'calendar' || screen === 'fieldNotebookHub') {
     return (
       <CalendarScreen
         cmsRuntimeCss={cmsRuntimeCss}
@@ -878,6 +878,7 @@ export default function App() {
         disablePushNotifications={disablePushNotifications}
         sendTestPushNotification={sendTestPushNotification}
         openAiAnalysisScreen={openAiAnalysisScreen}
+        initialView={screen === 'fieldNotebookHub' ? 'notebook' : 'calendar'}
       />
     );
   }

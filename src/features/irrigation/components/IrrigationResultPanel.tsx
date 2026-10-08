@@ -1,5 +1,4 @@
 import IrrigationEconomicsPanel from '../../irrigation-economics/components/IrrigationEconomicsPanel';
-import WaterScarcityPlanPanel from '../../water-scarcity/components/WaterScarcityPlanPanel';
 import QuickCalendarButton from '../../calendar/components/QuickCalendarButton';
 import { calendarDateAfterDays } from '../../calendar/services/quickCalendar.service';
 import type { IrrigationDecisionResult } from '../types/irrigationDecision';
@@ -84,7 +83,7 @@ export default function IrrigationResultPanel({
         : null;
 
   return (
-    <div className="tp-irrigation-result">
+    <div className={`tp-irrigation-result ${needsData ? 'needs-data' : ''}`}>
       <section className="tp-irrigation-result-hero">
         <span>BUGÜNKÜ SULAMA KARARI</span>
         <strong>{decision.display?.headline || 'Sulama durumu hazır'}</strong>
@@ -130,12 +129,21 @@ export default function IrrigationResultPanel({
         ) : null}
       </section>
 
+      {!needsData ? (
+        <>
       <section className="tp-irrigation-result-kpis">
         <article><span>Mevcut su açığı</span><strong>{mm(balance?.currentDeficitMm)}</strong></article>
         <article><span>5 gün sonra</span><strong>{mm(balance?.projected5DayDeficitMm)}</strong></article>
         <article><span>Önerilen net su</span><strong>{mm(decision.recommendation?.netWaterMm)}</strong></article>
       </section>
 
+
+          <details className="tp-irrigation-result-accordion">
+            <summary>
+              <span>AYRINTILI SULAMA VERİLERİ</span>
+              <strong>Yağış, yöntem, stres, ekonomi ve model kanıtları</strong>
+            </summary>
+            <div className="tp-irrigation-result-accordion-body">
       <section className="tp-irrigation-result-facts">
         <div><span>Sulama yöntemi</span><strong>{methodLabel(decision.irrigationMethod)}</strong></div>
         <div><span>Son kayıtlı sulama</span><strong>{balance?.lastIrrigationDate ? trDate(balance.lastIrrigationDate) : 'Kayıt yok'}</strong></div>
@@ -191,8 +199,6 @@ export default function IrrigationResultPanel({
       </section>
 
       {decision.irrigationStatus !== 'rainfed' ? <IrrigationEconomicsPanel fieldId={decision.fieldId} decision={decision} /> : null}
-      {decision.irrigationStatus !== 'rainfed' ? <WaterScarcityPlanPanel fieldId={decision.fieldId} decision={decision} /> : null}
-
       <details className="tp-irrigation-result-details">
         <summary>Neden böyle söylüyor? · teknik doğrulamayı göster</summary>
         {reasons.length ? <ul>{reasons.map((reason, index) => <li key={`${index}-${reason}`}>{reason}</li>)}</ul> : null}
@@ -200,6 +206,12 @@ export default function IrrigationResultPanel({
         <div className="tp-irrigation-result-model-row"><span>AquaCrop · sezon</span><strong>{seasonModel?.status === 'ready' ? 'Kanıt hazır' : seasonModel?.status === 'blocked' ? 'Gerçek veri eksik' : 'Kanıt bekleniyor'}</strong></div>
         {validation ? <div className="tp-irrigation-result-model-row"><span>Saha doğrulaması</span><strong>{validation.consecutiveSupportiveRuns}/{validation.requiredSupportiveRuns} gün · {validation.hasVerifiedSoilWaterEvidence ? 'nem ölçümü var' : 'nem ölçümü gerekli'}</strong></div> : null}
       </details>
+
+
+            </div>
+          </details>
+        </>
+      ) : null}
 
       {decision.missing?.length && onOpenDataEntry ? (
         <button className="tp-irrigation-result-entry-link" type="button" onClick={onOpenDataEntry}>Eksik saha bilgilerini Veri Girişi’nde tamamla</button>

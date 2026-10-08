@@ -80,6 +80,9 @@ import {
   type WeedSatelliteScreeningSignal,
 } from '../../weed/services/weedSatelliteIntelligence.service';
 import { useFieldYieldHarvestQuality } from '../../yield-quality/hooks/useFieldYieldHarvestQuality';
+import { useFieldWorkabilityContext } from '../../field-workability/hooks/useFieldWorkabilityContext';
+import WaterScarcityPlanPanel from '../../water-scarcity/components/WaterScarcityPlanPanel';
+import MicroclimateSensorPanel from '../../microclimate/components/MicroclimateSensorPanel';
 
 import './FieldStatusCenter.css';
 
@@ -655,6 +658,7 @@ export default function FieldStatusCenter({
   const [seasons, setSeasons] = useState<FieldSeason[]>([]);
   const [seasonsLoading, setSeasonsLoading] = useState(false);
   const [fieldObservationOpen, setFieldObservationOpen] = useState(false);
+  const [workabilityOpen, setWorkabilityOpen] = useState(false);
   const [soilGuideOpen, setSoilGuideOpen] = useState(false);
   const [labsOpen, setLabsOpen] = useState(false);
   const [labsLoading, setLabsLoading] = useState(false);
@@ -686,6 +690,9 @@ export default function FieldStatusCenter({
     useState<WeedSatelliteScreeningSignal | null>(null);
 
   const fieldId = String(field?.id ?? '').trim();
+  const workability = useFieldWorkabilityContext({
+    fieldId: open && !field?.demo ? fieldId : null,
+  });
   const yieldHarvest = useFieldYieldHarvestQuality(open ? field : null);
   const yieldHarvestSnapshot = yieldHarvest.snapshot?.snapshot ?? null;
   const currentYieldKgDa = kgHaToKgDa(yieldHarvestSnapshot?.observed.yieldKgHa);
@@ -1675,6 +1682,18 @@ export default function FieldStatusCenter({
     biophysicsInsight.taskCandidate,
   ]);
 
+  const irrigationDistributionSignal = useMemo(() => {
+    const decision = decisions.find((item) => item.source === 'irrigation-distribution');
+    if (decision) return decision;
+    return notifications.find((item) => item.source === 'irrigation-distribution') ?? null;
+  }, [decisions, notifications]);
+
+  const multiStressSignal = useMemo(() => {
+    const decision = decisions.find((item) => item.source === 'multi-stress');
+    if (decision) return decision;
+    return notifications.find((item) => item.source === 'multi-stress') ?? null;
+  }, [decisions, notifications]);
+
   const riskItems = useMemo(() => {
     const isRealRisk = (item: { source?: string; severity?: string; title?: string; detail?: string; kind?: string }) => {
       const title = String(item.title ?? '');
@@ -1685,7 +1704,7 @@ export default function FieldStatusCenter({
       // genel saha kontrolü veya "risk skoru tek başına karar değildir" gibi
       // açıklama metinleri burada yanlışlıkla risk olarak görünmez.
       if (/^(uydu görüntüsü hazır|yeni görev tanımlandı|sulama verisini tamamla|veri|kayıt)/i.test(title.trim())) return false;
-      if (source === 'task-system' || source === 'notification') return false;
+      if (source === 'task-system' || source === 'notification' || source === 'multi-stress') return false;
       if (item.kind === 'avoid') return true;
       if (source === 'risk-radar') return true;
 
@@ -1972,11 +1991,6 @@ export default function FieldStatusCenter({
                           ? biophysicsInsight.headline
                           : 'İlk bilimsel uydu sonucu hazırlanıyor'}
                   </strong>
-                  <p>
-                    {latest
-                      ? biophysicsInsight.summary
-                      : stepReason(sl2pStep) || 'Uygun görüntü bulunduğunda LAI, klorofil, örtü ve bitki suyu otomatik dolacak.'}
-                  </p>
                 </div>
                 <button type="button" className="tp-field-status-score" onClick={() => setTab('data')}>
                   <small>Veri güveni</small>
@@ -1998,7 +2012,6 @@ export default function FieldStatusCenter({
                   <div>
                     <span>VERİ EKSİĞİ</span>
                     <strong>{userMissingItems.length} bilgi tamamlanınca kararlar netleşecek</strong>
-                    <p>{userMissingItems.slice(0, 3).map((item) => item.label).join(' · ')}</p>
                   </div>
                   <ChevronRight size={18} />
                 </button>
@@ -2035,7 +2048,6 @@ export default function FieldStatusCenter({
                   <span className="tp-field-status-field-event-copy">
                     <small>PUSULA TARLADA HAREKETLİLİK FARK ETTİ</small>
                     <strong>{fieldEventSummaryTitle(fieldEventCandidate)}</strong>
-                    <p>{fieldEventSummaryDetail(fieldEventCandidate)}</p>
                     <em>Ne yaptığını belirt</em>
                   </span>
                   <ChevronRight size={18} aria-hidden="true" />
@@ -2061,18 +2073,14 @@ export default function FieldStatusCenter({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setTab('input');
-                    openRecordEditor('season');
-                  }}
+                  onClick={() => setTab('crop')}
                   className="tp-field-status-yield-summary"
-                  aria-label="Verim ve hasat kaydı gir"
+                  aria-label="Verim, hasat ve kalite durumunu aç"
                 >
                   <Sprout size={18} />
                   <span>
-                    <small>Verim & Hasat</small>
+                    <small>Verim • Hasat • Kalite</small>
                     <strong>{yieldHarvestOverview.title}</strong>
-                    <em>{yieldHarvestOverview.detail}</em>
                   </span>
                   <ChevronRight size={17} />
                 </button>
@@ -2098,7 +2106,6 @@ export default function FieldStatusCenter({
                 </button>
                 <button
                   type="button"
-                  style={{ gridColumn: '1 / -1' }}
                   onClick={openWeedSummary}
                   aria-label={`Yabancı ot durumu: ${weedSummary}`}
                 >
@@ -2106,10 +2113,81 @@ export default function FieldStatusCenter({
                   <span><small>Yabancı Ot</small><strong>{weedSummary}</strong></span>
                   <ChevronRight size={17} />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setWorkabilityOpen((value) => !value)}
+                  aria-expanded={workabilityOpen}
+                  aria-label={`Tarlaya girilebilirlik: ${workability.snapshot?.headline ?? 'hesaplanıyor'}`}
+                >
+                  <Tractor size={18} />
+                  <span>
+                    <small>Tarlaya Girilebilirlik</small>
+                    <strong>
+                      {field?.demo
+                        ? 'Örnek tarlada hesaplanmaz'
+                        : workability.loading && !workability.snapshot
+                          ? 'Kontrol ediliyor…'
+                          : workability.snapshot?.headline ?? 'Giriş durumu hazırlanıyor'}
+                    </strong>
+                  </span>
+                  <ChevronRight className={workabilityOpen ? 'is-open' : ''} size={17} />
+                </button>
               </div>
 
+              {workabilityOpen ? (
+                <section className="tp-field-status-workability-detail" aria-label="Tarlaya girilebilirlik ayrıntısı">
+                  <div className="tp-field-status-workability-head">
+                    <div>
+                      <span>TARLAYA GİRİLEBİLİRLİK</span>
+                      <strong>
+                        {field?.demo
+                          ? 'Örnek tarlada gerçek giriş kararı üretilmez'
+                          : workability.snapshot?.headline ?? (workability.loading ? 'Kontrol ediliyor…' : 'Giriş durumu hazırlanamadı')}
+                      </strong>
+                    </div>
+                    <button type="button" onClick={() => setWorkabilityOpen(false)}>Kapat</button>
+                  </div>
+
+                  {workability.error ? <p>{workability.error}</p> : null}
+
+                  {workability.snapshot ? (
+                    <>
+                      <p>{workability.snapshot.summary}</p>
+                      <div className="tp-field-status-workability-facts">
+                        <article>
+                          <span>Yüzey nemi</span>
+                          <strong>
+                            {workability.snapshot.surfaceWater.ratioToFieldCapacity == null
+                              ? 'Ölçüm yok'
+                              : `%${Math.round(workability.snapshot.surfaceWater.ratioToFieldCapacity * 100)}`}
+                          </strong>
+                        </article>
+                        <article>
+                          <span>Son 24 saat yağış</span>
+                          <strong>
+                            {workability.snapshot.wetting.rainLast24hMm == null
+                              ? 'Veri yok'
+                              : `${workability.snapshot.wetting.rainLast24hMm.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} mm`}
+                          </strong>
+                        </article>
+                        <article>
+                          <span>Güven</span>
+                          <strong>
+                            {workability.snapshot.confidence === 'strong'
+                              ? 'Yüksek'
+                              : workability.snapshot.confidence === 'medium'
+                                ? 'Orta'
+                                : 'Ön değerlendirme'}
+                          </strong>
+                        </article>
+                      </div>
+                    </>
+                  ) : null}
+                </section>
+              ) : null}
+
               <button type="button" className="tp-field-status-records primary" onClick={() => setTab('input')}>
-                <div><span>VERİ GİRİŞİ</span><strong>Sezon, verim, işlem, bölüm ve saha kayıtlarını yönet</strong></div>
+                <div><span>VERİ GİRİŞİ</span><strong>Kayıt ekle veya güncelle</strong></div>
                 <ChevronRight size={18} />
               </button>
 
@@ -2122,7 +2200,6 @@ export default function FieldStatusCenter({
                   <div>
                     <span>{shortRiskLabel(riskItems[0].source)}</span>
                     <strong>{riskItems[0].title}</strong>
-                    <p>{riskItems[0].detail}</p>
                   </div>
                   <ChevronRight size={18} />
                 </button>
@@ -2133,25 +2210,31 @@ export default function FieldStatusCenter({
           {tab === 'plant' && (
             <PlantTabErrorBoundary resetKey={`${fieldId}:${recordsRefreshNonce}:${String(phenology?.stage ?? '')}`}>
               <div className="tp-field-status-stack">
-              <section className="tp-field-status-section-head simple">
+              <section className="tp-field-status-result-card">
                 <div>
-                  <span>BİTKİ DURUMU</span>
+                  <span>BİTKİ</span>
                   <strong>
                     {phenologyUsable && stageLabel
-                      ? `Güncel gelişim evresi · ${stageLabel}`
-                      : latest
-                        ? 'Gelişim evresi + gerçek uydu ölçümleri'
-                        : 'Gelişim evresi ve saha gözlemi'}
+                      ? stageLabel
+                      : latest && biophysicsInsight.monitoringScore !== null
+                        ? `Gidişat ${biophysicsInsight.monitoringScore}/100`
+                        : latest
+                          ? biophysicsInsight.headline
+                          : 'Veri bekleniyor'}
                   </strong>
-                  <p>
-                    {phenologyUsable
-                      ? 'Tarla Durumu, Bugün, sulama, besleme ve Pusula yorumları bu ortak gelişim evresini bağlam olarak kullanır.'
-                      : latest
-                        ? 'Takvimdeki gelişim beklentisini, sahadan gözlemi ve Sentinel-2 biyofizik sinyallerini aynı yerde karşılaştır.'
-                        : 'Takvimdeki gelişim beklentisini ve sahada gördüğün gerçek evreyi burada karşılaştır.'}
-                  </p>
                 </div>
+                <span className={`tp-field-status-result-chip ${latest || phenologyUsable ? 'good' : 'muted'}`}>
+                  {latest || phenologyUsable ? 'GÜNCEL' : 'BEKLİYOR'}
+                </span>
               </section>
+              <details className="tp-field-status-detail-fold">
+                <summary>
+                  <span><small>AYRINTILAR</small><strong>Bitki ölçümleri ve gelişim</strong><em>Uydu, evre ve saha gözlemleri</em></span>
+                  <ChevronRight size={18} />
+                </summary>
+                <div className="tp-field-status-detail-fold-body">
+
+
 
               <FieldGrowthStatusView field={field} phenology={phenology} />
               <OrchardChillPanel field={field} />
@@ -2275,16 +2358,39 @@ export default function FieldStatusCenter({
                 </div>
               </details>
 
+
+                </div>
+              </details>
               </div>
             </PlantTabErrorBoundary>
           )}
 
           {tab === 'crop' && (
             <div className="tp-field-status-stack">
+              <section className="tp-field-status-result-card">
+                <div>
+                  <span>VERİM • HASAT • KALİTE</span>
+                  <strong>{yieldHarvestOverview.title}</strong>
+                </div>
+                <span className={`tp-field-status-result-chip ${yieldHarvestSnapshot ? 'good' : 'muted'}`}>
+                  {yieldHarvestSnapshot ? 'TAKİPTE' : 'VERİ BEKLİYOR'}
+                </span>
+              </section>
+              <details className="tp-field-status-detail-fold">
+                <summary>
+                  <span>
+                    <small>AYRINTILAR</small>
+                    <strong>Verim, hasat ve ürün ayrıntıları</strong>
+                    <em>Tahminler, geçmiş, kalite ve ürün uygunluğu</em>
+                  </span>
+                  <ChevronRight size={18} />
+                </summary>
+                <div className="tp-field-status-detail-fold-body">
+
               <section className="tp-field-status-yield-harvest">
                 <header>
                   <div>
-                    <span>VERİM & HASAT</span>
+                    <span>VERİM • HASAT • KALİTE</span>
                     <strong>{yieldHarvestOverview.title}</strong>
                     <p>{yieldHarvestOverview.detail}</p>
                   </div>
@@ -2391,11 +2497,44 @@ export default function FieldStatusCenter({
                 <div><span>ÜRETİM KAYITLARI</span><strong>Ürün tipi, sezon, yıllık verim ve tarla bölümleri</strong></div>
                 <ChevronRight size={18} />
               </button>
+
+                </div>
+              </details>
             </div>
           )}
 
           {tab === 'soil' && (
             <div className="tp-field-status-stack">
+              <section className="tp-field-status-result-card">
+                <div>
+                  <span>TOPRAK</span>
+                  <strong>
+                    {soilLoading && !soilProfile
+                      ? 'Hazırlanıyor'
+                      : soilError
+                        ? 'Kontrol gerekli'
+                        : soilProfile
+                          ? `${textureClass(soilProfile)} · pH ${soilTopsoilValue(soilProfile, 'ph')?.toFixed(1) ?? '—'}`
+                          : soilAnalyses.length
+                            ? `${soilAnalyses.length} laboratuvar kaydı`
+                            : 'Tahmini profil hazır değil'}
+                  </strong>
+                </div>
+                <span className={`tp-field-status-result-chip ${soilProfile || soilAnalyses.length ? 'good' : 'muted'}`}>
+                  {soilProfile || soilAnalyses.length ? 'HAZIR' : 'BEKLİYOR'}
+                </span>
+              </section>
+              <details className="tp-field-status-detail-fold">
+                <summary>
+                  <span>
+                    <small>AYRINTILAR</small>
+                    <strong>Toprak ayrıntıları</strong>
+                    <em>Tahmini profil, laboratuvar ve analiz kayıtları</em>
+                  </span>
+                  <ChevronRight size={18} />
+                </summary>
+                <div className="tp-field-status-detail-fold-body">
+
               <section className="tp-field-status-section-head">
                 <div>
                   <span>TOPRAK</span>
@@ -2500,46 +2639,110 @@ export default function FieldStatusCenter({
                   ))}
                 </div>
               </section>
+
+                </div>
+              </details>
             </div>
           )}
 
           {tab === 'irrigation' && (
             <div className="tp-field-status-stack">
-              <section className="tp-field-status-section-head simple">
+              <section className="tp-field-status-result-card">
                 <div>
                   <span>SULAMA</span>
-                  <strong>Tek sulama sonuç ekranı</strong>
-                  <p>Bugünkü karar, su açığı, yağış, 5 günlük gidişat, ekonomi ve model doğrulaması burada. Veri girişi bu sekmede yapılmaz.</p>
+                  <strong>
+                    {irrigationResult?.display?.headline
+                      ?? (irrigationStatus === 'loading' ? 'Hesaplanıyor' : 'Sulama sonucu bekleniyor')}
+                  </strong>
                 </div>
+                <span className={`tp-field-status-result-chip ${irrigationResult ? 'good' : 'muted'}`}>
+                  {irrigationResult ? 'SONUÇ' : 'BEKLİYOR'}
+                </span>
               </section>
 
-              <IrrigationResultPanel
-                decision={irrigationResult}
-                whatIf={irrigation?.whatIf ?? null}
-                status={irrigationStatus}
-                error={irrigation?.error ?? null}
-                onAddIrrigationRecord={onOpenIrrigationRecord}
-                onOpenDataEntry={() => {
-                  setTab('input');
-                  window.setTimeout(() => {
-                    document
-                      .getElementById('tp-field-status-irrigation-inputs')
-                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }, 120);
-                }}
-              />
+              <details className="tp-field-status-detail-fold">
+                <summary>
+                  <span><small>AYRINTILAR</small><strong>Sulama hesabı</strong><em>Su açığı, yağış, ekonomi ve model kanıtları</em></span>
+                  <ChevronRight size={18} />
+                </summary>
+                <div className="tp-field-status-detail-fold-body">
+                  <IrrigationResultPanel
+                    decision={irrigationResult}
+                    whatIf={irrigation?.whatIf ?? null}
+                    status={irrigationStatus}
+                    error={irrigation?.error ?? null}
+                    onAddIrrigationRecord={onOpenIrrigationRecord}
+                    onOpenDataEntry={() => {
+                      setTab('input');
+                      window.setTimeout(() => {
+                        document
+                          .getElementById('tp-field-status-irrigation-inputs')
+                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 120);
+                    }}
+                  />
+                </div>
+              </details>
+
+              <details className="tp-field-status-intelligence-card tp-field-status-accordion">
+                <summary>
+                  <div className="tp-field-status-intelligence-head">
+                    <div>
+                      <span>SULAMA DAĞILIM ZEKÂSI</span>
+                      <strong>{irrigationDistributionSignal?.title ?? 'Normal takipte'}</strong>
+                    </div>
+                    <span className={`tp-field-status-intelligence-badge ${irrigationDistributionSignal ? 'watch' : 'ready'}`}>
+                      {irrigationDistributionSignal ? 'KONTROL' : 'TAKİPTE'}
+                    </span>
+                  </div>
+                </summary>
+                <div className="tp-field-status-accordion-body">
+                  <p>{irrigationDistributionSignal?.detail ?? 'Son sulama sonrası dağılım farkları uydu ve radar ile kontrol edilir.'}</p>
+                  {irrigationDistributionSignal ? (
+                    <button type="button" onClick={() => onOpenTarget?.(irrigationDistributionSignal.target)}>
+                      Haritada kontrol et <ChevronRight size={15} />
+                    </button>
+                  ) : null}
+                </div>
+              </details>
+
+              {irrigationResult && fieldId && !field?.demo ? (
+                <WaterScarcityPlanPanel fieldId={fieldId} decision={irrigationResult} />
+              ) : (
+                <section className="tp-field-status-intelligence-card muted">
+                  <div className="tp-field-status-intelligence-head">
+                    <div><span>SU KITLIĞI PLANI</span><strong>Sulama kararıyla birlikte hazırlanacak</strong></div>
+                    <span className="tp-field-status-intelligence-badge">BEKLİYOR</span>
+                  </div>
+                  <p>Kullanılabilir su bütçesi, fenoloji ve 5 günlük su ihtiyacı birlikte değerlendirilir.</p>
+                </section>
+              )}
 
             </div>
           )}
 
           {tab === 'risk' && (
             <div className="tp-field-status-stack">
-              <section className="tp-field-status-section-head simple">
+              <section className="tp-field-status-result-card">
                 <div>
                   <span>RİSK</span>
-                  <strong>Dikkat gerektiren gerçek riskler</strong>
-                  <p>Don, hastalık, zararlı, kuraklık, aşırı hava ve benzeri riskler burada görünür. Veri girişi ve hazır bilgi kartları gösterilmez.</p>
+                  <strong>{riskItems.length ? `${riskItems.length} risk kontrol edilmeli` : 'Aktif risk yok'}</strong>
                 </div>
+                <span className={`tp-field-status-result-chip ${riskItems.length ? 'watch' : 'good'}`}>
+                  {riskItems.length ? 'KONTROL' : 'NORMAL'}
+                </span>
+              </section>
+
+              <section className={`tp-field-status-multi-stress ${multiStressSignal ? 'active' : 'quiet'}`}>
+                <div>
+                  <span>BİRLEŞİK ÇOKLU STRES</span>
+                  <strong>{multiStressSignal?.title ?? 'Aktif birleşik stres sinyali yok'}</strong>
+                </div>
+                {multiStressSignal ? (
+                  <button type="button" onClick={() => onOpenTarget?.(multiStressSignal.target)}>
+                    İncele <ChevronRight size={15} />
+                  </button>
+                ) : <span className="tp-field-status-multi-stress-ok">NORMAL</span>}
               </section>
 
               {riskItems.length ? (
@@ -2550,7 +2753,6 @@ export default function FieldStatusCenter({
                       <div>
                         <small>{shortRiskLabel(item.source)}</small>
                         <strong>{item.title}</strong>
-                        <p>{item.detail}</p>
                       </div>
                       <ChevronRight size={17} />
                     </button>
@@ -2564,17 +2766,31 @@ export default function FieldStatusCenter({
 
           {tab === 'data' && (
             <div className="tp-field-status-stack">
-              <section className="tp-field-status-section-head">
+              <section className="tp-field-status-result-card">
                 <div>
-                  <span>VERİ & MODEL</span>
-                  <strong>Ne çalışıyor, ne eksik?</strong>
-                  <p>Kullanıcının tamamlayabileceği kayıtları sistemin beklediği uydu/model verilerinden ayırıyoruz.</p>
+                  <span>VERİ</span>
+                  <strong>
+                    {dataConfidenceScore !== null
+                      ? `Güven ${Math.round(dataConfidenceScore)}/100`
+                      : userMissingItems.length
+                        ? `${userMissingItems.length} eksik veri`
+                        : systemWaitingItems.length
+                          ? `${systemWaitingItems.length} kaynak bekleniyor`
+                          : 'Hazırlanıyor'}
+                  </strong>
                 </div>
-                <button type="button" disabled={refreshing || field?.demo} onClick={() => void refreshScientific(false)}>
-                  <RefreshCw size={16} className={refreshing ? 'is-spinning' : ''} />
-                  {refreshing ? 'Kontrol' : 'Kontrol et'}
-                </button>
+                <span className={`tp-field-status-result-chip ${userMissingItems.length ? 'watch' : dataConfidenceScore !== null ? 'good' : 'muted'}`}>
+                  {userMissingItems.length ? 'EKSİK' : dataConfidenceScore !== null ? 'HAZIR' : 'BEKLİYOR'}
+                </span>
               </section>
+              <details className="tp-field-status-detail-fold">
+                <summary>
+                  <span><small>AYRINTILAR</small><strong>Veri kaynakları</strong><em>Eksikler, uydu ve model durumu</em></span>
+                  <ChevronRight size={18} />
+                </summary>
+                <div className="tp-field-status-detail-fold-body">
+
+
 
               <section className="tp-field-status-confidence-card">
                 <ShieldCheck size={24} />
@@ -2664,17 +2880,32 @@ export default function FieldStatusCenter({
                 </article>
               </div>
 
+              {fieldId ? (
+                <details className="tp-field-status-detail-fold tp-field-status-sensor-fold">
+                  <summary>
+                    <span><small>OPSİYONEL</small><strong>Mikroiklim / sensör</strong><em>Saha sıcaklığı, nem, debi ve basınç</em></span>
+                    <ChevronRight size={18} />
+                  </summary>
+                  <div className="tp-field-status-detail-fold-body">
+                    <MicroclimateSensorPanel fieldId={fieldId} />
+                  </div>
+                </details>
+              ) : null}
+
+
+                </div>
+              </details>
             </div>
           )}
 
           {tab === 'input' && (
             <div className="tp-field-status-stack">
-              <section className="tp-field-status-section-head simple">
+              <section className="tp-field-status-result-card">
                 <div>
                   <span>VERİ GİRİŞİ</span>
-                  <strong>Kayıt ve durum tek merkezde</strong>
-                  <p>Yeni kayıtları buradan başlat; kayıtlı sezon, işlem ve toprak analizlerinin özeti yine Tarla Durumu içinde görünür.</p>
+                  <strong>Ne kaydetmek istiyorsun?</strong>
                 </div>
+                <span className="tp-field-status-result-chip good">KAYIT</span>
               </section>
 
               <div className="tp-field-status-input-grid">
@@ -2690,7 +2921,13 @@ export default function FieldStatusCenter({
                 ))}
               </div>
 
-              <section id="tp-field-status-irrigation-inputs" className="tp-field-status-irrigation-tools">
+              <details className="tp-field-status-detail-fold">
+                <summary>
+                  <span><small>SAHA VERİSİ</small><strong>Sulama bilgileri</strong><em>Profil, yöntem ve ölçüm</em></span>
+                  <ChevronRight size={18} />
+                </summary>
+                <div id="tp-field-status-irrigation-inputs" className="tp-field-status-detail-fold-body">
+              <section className="tp-field-status-irrigation-tools">
                 <div className="tp-field-status-subhead">
                   <span>SULAMA BİLGİLERİ</span>
                   <strong>Sulama motorunun kullanacağı saha kayıtları</strong>
@@ -2711,7 +2948,15 @@ export default function FieldStatusCenter({
                 {onOpenIrrigationRecord ? <button type="button" className="tp-field-status-irrigation-entry" onClick={onOpenIrrigationRecord}><Droplets size={17} /><div><strong>Son sulama kaydını ekle</strong><small>Tarih ve verilen su miktarı sonucu doğrudan günceller.</small></div><ChevronRight size={16} /></button> : null}
                 <button type="button" className="tp-field-status-irrigation-profile-save" onClick={() => setTab('irrigation')}>Sulama sonuçlarını gör</button>
               </section>
+                </div>
+              </details>
 
+              <details className="tp-field-status-detail-fold">
+                <summary>
+                  <span><small>KAYITLAR</small><strong>Bu tarlada kayıtlı veriler</strong><em>Sezon, analiz, işlem ve bölümler</em></span>
+                  <ChevronRight size={18} />
+                </summary>
+                <div className="tp-field-status-detail-fold-body">
               <section className="tp-field-status-recent-records">
                 <div className="tp-field-status-subhead">
                   <span>BU TARLADA KAYITLI</span>
@@ -2753,6 +2998,8 @@ export default function FieldStatusCenter({
                   <div className="tp-field-status-empty">Henüz kayıtlı tarla işlemi yok.</div>
                 )}
               </section>
+                </div>
+              </details>
 
               {recordMessage ? <p className="tp-field-status-inline-message">{recordMessage}</p> : null}
               <p className="tp-field-status-note">Saha gözlemi <b>Bitki</b>, sulama bilgileri <b>Veri Girişi</b>, sulama sonucu <b>Sulama</b>, toprak raporu <b>Toprak</b> sekmesinde. Eski Tarla Detayı artık ana takip ekranı değildir.</p>

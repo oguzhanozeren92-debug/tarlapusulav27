@@ -1039,6 +1039,48 @@ export function buildPusulaPdfGuidance(
     }
   }
 
+  const disasterRecoveryEvidence = latestDecisionEvidence(snapshot, 'disaster-recovery');
+  if (disasterRecoveryEvidence) {
+    const metrics: any = disasterRecoveryEvidence.metrics ?? {};
+    const details: any = disasterRecoveryEvidence.details ?? {};
+    const status = String(metrics.status ?? 'insufficient_evidence');
+    const eventType = String(metrics.eventType ?? details.event?.type ?? '').trim();
+    const eventLabel = String(details.event?.label ?? eventType ?? 'Hava olayı').trim();
+    const eventDate = String(metrics.eventDate ?? details.event?.date ?? '').slice(0, 10);
+    const ndviDropPercent = modelMetric(metrics.ndviDropPercent);
+    const recoveryPct = modelMetric(metrics.percentOfPreEvent);
+    const radarSupport = Boolean(metrics.radarSupport);
+
+    insights.push({
+      id: 'disaster-recovery-evidence',
+      title: status === 'damage_signal_supported'
+        ? `${eventLabel} sonrası tarla değişim sinyali var`
+        : status === 'recovering'
+          ? `${eventLabel} sonrası toparlanma izleniyor`
+          : status === 'recovered'
+            ? `${eventLabel} sonrası uydu sinyali toparlandı`
+            : `${eventLabel} sonrası yeni uydu gözlemi bekleniyor`,
+      meaning: String(details.summary ?? 'Yakın dönem hava olayı ile olay öncesi/sonrası uydu değişimi birlikte değerlendirildi.'),
+      action: String(details.action ?? 'Aynı alanı sahada kontrol et ve yeni gözlemler geldikçe değişimi yeniden değerlendir.'),
+      evidence: [
+        { label: 'Olay', value: `${eventLabel}${eventDate ? ` · ${eventDate}` : ''}` },
+        { label: 'NDVI değişimi', value: ndviDropPercent != null ? `-%${Math.abs(ndviDropPercent).toFixed(1)}` : 'yeterli karşılaştırma yok' },
+        { label: 'Radar desteği', value: radarSupport ? 'Var' : 'Yok / yetersiz' },
+        { label: 'Toparlanma', value: recoveryPct != null ? `olay öncesinin %${Math.round(recoveryPct)}` : String(metrics.recoveryStatus ?? 'izleniyor') },
+        { label: 'Sınır', value: 'Afet/hasar teşhisi değil · saha doğrulaması gerekir' },
+      ],
+      confidence: metrics.confidence === 'high'
+        ? 'high'
+        : metrics.confidence === 'medium'
+          ? 'medium'
+          : 'limited',
+    });
+
+    if (status === 'damage_signal_supported') {
+      next7Days.push(`${eventLabel} sonrası uydu değişim sinyali bulunan alanı sahada doğrula; aynı noktadan fotoğraf ve mümkünse ölçüm kaydı ekle.`);
+    }
+  }
+
   const multiStressEvidence = latestDecisionEvidence(snapshot, 'multi-stress-synthesis');
   if (multiStressEvidence) {
     const metrics: any = multiStressEvidence.metrics ?? {};

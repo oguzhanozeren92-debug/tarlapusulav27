@@ -420,7 +420,7 @@ html.tp-native-app .tp-field-select {
   width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
-  padding-top: 76px !important;
+  padding-top: 74px !important;
 }
 
 @media (max-width: 600px) {
@@ -429,7 +429,7 @@ html.tp-native-app .tp-field-select {
       calc(
         var(--tp-native-header-row, 70px)
         + var(--tp-native-safe-top, env(safe-area-inset-top, 0px))
-        + 10px
+        + 8px
       ) !important;
   }
 
@@ -442,4 +442,69 @@ html.tp-native-app .tp-field-select {
     max-width: none !important;
     transform: none !important;
   }
+}
+
+/* =========================================================
+   GLOBAL MENU CONTENT GAP — 2026-10-07
+   AppShell already reserves the fixed GlobalPusulaBand slot. Some older
+   screens still carried their own 72–84px header spacer, which doubled the
+   empty area below the global header. Keep one shared compact gap instead of
+   fixing every menu independently.
+   ========================================================= */
+:root {
+  --tp-menu-content-gap: 8px;
+}
+
+.tp-app-shell-content--with-global-band .tp-wxr-main,
+.tp-app-shell-content--with-global-band .soil-main,
+.tp-app-shell-content--with-global-band .tp-market-ref-main,
+.tp-app-shell-content--with-global-band .tp-support-main,
+.tp-app-shell-content--with-global-band .tp-knowledge-canvas,
+.tp-app-shell-content--with-global-band .tp-hub-page {
+  padding-top: var(--tp-menu-content-gap) !important;
+}
+
+@media (max-width: 600px) {
+  :root {
+    --tp-menu-content-gap: 8px;
+  }
+}
+
+
+/* =========================================================
+   GLOBAL MENU CONTENT RHYTHM V2 — 2026-10-07
+   Tek kaynak: sabit GlobalPusulaBand'den sonra tüm menülerde aynı kompakt
+   boşluk. Eski ekranların kendi 64–84px spacer'ları AppShell içinde iptal.
+   Ana sayfa etkilenmez; bu kurallar yalnız --with-global-band kabuğunda.
+   ========================================================= */
+.tp-app-shell-content--with-global-band > :first-child {
+  margin-top: 0 !important;
+}
+
+.tp-app-shell-content--with-global-band .tp-calendar-page,
+.tp-app-shell-content--with-global-band .tp-peststore-content {
+  padding-top: 0 !important;
+}
+
+.tp-app-shell-content--with-global-band .tp-calendar-content,
+.tp-app-shell-content--with-global-band .tp-peststore-main,
+.tp-app-shell-content--with-global-band .tp-wxr-main,
+.tp-app-shell-content--with-global-band .soil-main,
+.tp-app-shell-content--with-global-band .tp-market-ref-main,
+.tp-app-shell-content--with-global-band .tp-support-main,
+.tp-app-shell-content--with-global-band .tp-knowledge-canvas,
+.tp-app-shell-content--with-global-band .tp-hub-page {
+  padding-top: var(--tp-menu-content-gap) !important;
+}
+
+/* Başlık/kart ilk bloğu kendi üst marjıyla ikinci bir boşluk üretmesin. */
+.tp-app-shell-content--with-global-band .tp-wxr-main > :first-child,
+.tp-app-shell-content--with-global-band .soil-main > :first-child,
+.tp-app-shell-content--with-global-band .tp-market-ref-main > :first-child,
+.tp-app-shell-content--with-global-band .tp-support-main > :first-child,
+.tp-app-shell-content--with-global-band .tp-knowledge-canvas > :first-child,
+.tp-app-shell-content--with-global-band .tp-hub-page > :first-child,
+.tp-app-shell-content--with-global-band .tp-calendar-content > :first-child,
+.tp-app-shell-content--with-global-band .tp-peststore-main > :first-child {
+  margin-top: 0 !important;
 }

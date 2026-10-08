@@ -293,10 +293,11 @@ function parseAdMobCustomData(value: string) {
 function isAdMobVerificationProbe(req: Request) {
   const url = new URL(req.url);
   const params = url.searchParams;
-  const userAgent = String(req.headers.get('user-agent') || '');
 
+  // AdMob's dashboard URL verifier uses fixed dummy identifiers and omits
+  // user/custom data. Do not rely on User-Agent because some proxies rewrite it.
+  // This branch never awards a reward or writes a receipt.
   return (
-    userAgent === 'Google-AdMob-Reward-Verification' &&
     params.get('ad_network') === '5450213213286189855' &&
     params.get('ad_unit') === '1234567890' &&
     params.get('transaction_id') === '123456789' &&

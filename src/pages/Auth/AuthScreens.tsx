@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useState,
   type Dispatch,
   type FormEvent,
@@ -13,12 +14,13 @@ import {
   isNativeOAuthAvailable,
   startNativeOAuth,
 } from '../../mobile/nativeAuth';
+import {
+  fetchSocialAuthAvailability,
+  socialAuthProviderLabel,
+  type SocialAuthAvailability,
+  type SocialAuthProvider,
+} from '../../features/auth/services/authProviderAvailability.service';
 import './Auth.css';
-
-const appleSignInEnabled =
-  String(import.meta.env.VITE_APPLE_SIGN_IN_ENABLED || '')
-    .trim()
-    .toLowerCase() === 'true';
 
 type AuthScreensProps = {
   screen: Screen;
@@ -214,9 +216,26 @@ export default function AuthScreens({
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryPasswordConfirm, setRecoveryPasswordConfirm] = useState('');
   const [recoveryLoading, setRecoveryLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | 'apple' | null>(null);
+  const [socialLoading, setSocialLoading] = useState<SocialAuthProvider | null>(null);
+  const [socialAvailability, setSocialAvailability] = useState<SocialAuthAvailability | null>(null);
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const [recoveryComplete, setRecoveryComplete] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void fetchSocialAuthAvailability({ signal: controller.signal })
+      .then((availability) => {
+        if (!controller.signal.aborted) {
+          setSocialAvailability(availability);
+        }
+      })
+      .catch(() => {
+        // Unmount/abort sırasında sessiz kal. Gerçek ağ hatasında servis fallback döndürür.
+      });
+
+    return () => controller.abort();
+  }, []);
+
   const [rememberSession, setRememberSession] = useState(() => {
     try {
       return window.localStorage.getItem('tp_remember_session') !== 'false';
@@ -354,8 +373,16 @@ export default function AuthScreens({
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook' | 'apple') => {
+  const handleSocialLogin = async (provider: SocialAuthProvider) => {
     setAuthMessage('');
+
+    if (socialAvailability && !socialAvailability[provider]) {
+      setAuthMessage(
+        `${socialAuthProviderLabel(provider)} ile giriş henüz etkin değil.`,
+      );
+      return;
+    }
+
     setSocialLoading(provider);
 
     try {
@@ -516,43 +543,50 @@ export default function AuthScreens({
                 </Button>
               </form>
 
-              <div className="tp-authv2-social-login" aria-label="Sosyal giriş seçenekleri">
-                <span className="tp-authv2-social-label">veya</span>
-                <div className="tp-authv2-social-icons">
-                  <button
-                    type="button"
-                    className="tp-authv2-social-button"
-                    aria-label="Google ile devam et"
-                    title="Google ile devam et"
-                    disabled={socialLoading !== null}
-                    onClick={() => void handleSocialLogin('google')}
-                  >
-                    <GoogleIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className="tp-authv2-social-button"
-                    aria-label="Facebook ile devam et"
-                    title="Facebook ile devam et"
-                    disabled={socialLoading !== null}
-                    onClick={() => void handleSocialLogin('facebook')}
-                  >
-                    <FacebookIcon />
-                  </button>
-                  {appleSignInEnabled ? (
-                    <button
-                      type="button"
-                      className="tp-authv2-social-button tp-authv2-social-button--apple"
-                      aria-label="Apple ile devam et"
-                      title="Apple ile devam et"
-                      disabled={socialLoading !== null}
-                      onClick={() => void handleSocialLogin('apple')}
-                    >
-                      <AppleIcon />
-                    </button>
-                  ) : null}
+              {socialAvailability &&
+              Object.values(socialAvailability).some(Boolean) ? (
+                <div className="tp-authv2-social-login" aria-label="Sosyal giriş seçenekleri">
+                  <span className="tp-authv2-social-label">veya</span>
+                  <div className="tp-authv2-social-icons">
+                    {socialAvailability.google ? (
+                      <button
+                        type="button"
+                        className="tp-authv2-social-button"
+                        aria-label="Google ile devam et"
+                        title="Google ile devam et"
+                        disabled={socialLoading !== null}
+                        onClick={() => void handleSocialLogin('google')}
+                      >
+                        <GoogleIcon />
+                      </button>
+                    ) : null}
+                    {socialAvailability.facebook ? (
+                      <button
+                        type="button"
+                        className="tp-authv2-social-button"
+                        aria-label="Facebook ile devam et"
+                        title="Facebook ile devam et"
+                        disabled={socialLoading !== null}
+                        onClick={() => void handleSocialLogin('facebook')}
+                      >
+                        <FacebookIcon />
+                      </button>
+                    ) : null}
+                    {socialAvailability.apple ? (
+                      <button
+                        type="button"
+                        className="tp-authv2-social-button tp-authv2-social-button--apple"
+                        aria-label="Apple ile devam et"
+                        title="Apple ile devam et"
+                        disabled={socialLoading !== null}
+                        onClick={() => void handleSocialLogin('apple')}
+                      >
+                        <AppleIcon />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="tp-authv2-footer">
                 <span>Hesabın yok mu?</span>

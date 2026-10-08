@@ -5,6 +5,8 @@ import { TURKEY_CROP_PICKER_OPTIONS } from '../data/crops';
 import type { MapBoundaryCandidate } from '../lib/parcelService';
 import type { CropCycle, LocationOption, Screen } from '../types';
 import type { CropVarietyOption } from '../features/fields/services/cropVarietyCatalog.service';
+import { useEntitlementStore } from '../entitlements/useEntitlementStore';
+import { openPlanUpgrade } from '../entitlements/planAccess';
 import './AddFieldMobile.css';
 
 const PUSULA_BODY_SRC =
@@ -135,6 +137,9 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
   const [mapPickMode, setMapPickMode] = useState(false);
   const [mapStartView, setMapStartView] = useState<MapStartView | null>(null);
   const [mapStartLocationKey, setMapStartLocationKey] = useState('');
+  const [drawStartToken, setDrawStartToken] = useState(0);
+  const entitlement = useEntitlementStore();
+  const manualDrawLimitDecare = entitlement.isPaid ? null : 50;
   const fieldNameRef = useRef<HTMLInputElement>(null);
   const steps = ['Konum','Parsel','Ürün','Tarla Profili'];
 
@@ -307,26 +312,13 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
     void searchBoundaryAtPoint(point);
   };
 
-  const startMapBoundarySelection = () => {
-    if (mapBoundaryLoading) return;
-
+  const startManualDrawing = () => {
+    setMapPickMode(false);
     setPreviewCandidateId(null);
     clearMapBoundarySearch();
-
-    const knownPoint =
-      mapBoundaryAnchor ??
-      (fieldLatitude !== null && fieldLongitude !== null
-        ? { latitude: fieldLatitude, longitude: fieldLongitude }
-        : null);
-
-    if (knownPoint) {
-      void searchBoundaryAtPoint(knownPoint);
-      return;
-    }
-
-    setMapBoundaryAnchor(null);
-    setMapPickMode(true);
+    setDrawStartToken((token) => token + 1);
   };
+
 
   const useCurrentLocation = () => {
     if (!navigator.geolocation || mapBoundaryLoading) return;
@@ -687,7 +679,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
               ) : (
                 <>
                   <p className="tp-map-boundary-help">
-                    Harita seçtiğin il / ilçe / köy çevresinden başlar. “Sınırları Bul” ile tarlanın içine dokunup uydu/model sınır adaylarını getir; istersen konumundan bul veya “Parsel Sınırını Çiz” ile kendin çiz.
+                    Harita seçtiğin il / ilçe / köy çevresinden başlar. “Çizerek Bul” ile parsel sınırını harita üzerinde kendin çiz; istersen konumundan sınır adayı da aratabilirsin.
                   </p>
 
                   <div
@@ -701,16 +693,12 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                   >
                     <button
                       type="button"
-                      className={`tp-choice ${mapPickMode ? 'active' : ''}`}
+                      className="tp-choice"
                       disabled={mapBoundaryLoading}
-                      onClick={startMapBoundarySelection}
+                      onClick={startManualDrawing}
                       style={{margin:0}}
                     >
-                      {mapBoundaryLoading
-                        ? 'Sınırlar aranıyor…'
-                        : mapPickMode
-                          ? '⌖ Tarlanın içine dokun'
-                          : '⌖ Sınırları Bul'}
+                      ✏️ Çizerek Bul
                     </button>
                     <button
                       type="button"
@@ -721,6 +709,13 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                     >
                       ◎ Konumdan Bul
                     </button>
+                  </div>
+
+                  <div className="tp-draw-limit-note">
+                    <strong>Çizim limiti:</strong>{' '}
+                    {entitlement.isPaid
+                      ? `${entitlement.isPremium ? 'Premium' : 'Plus'} · sınırsız çizim`
+                      : 'Ücretsiz · en fazla 50 dekar'}
                   </div>
 
                   {mapBoundaryMessage ? (
@@ -766,7 +761,17 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                       onPointSelected={selectMapPoint}
                       sections={[]}
                       drawEnabled
-                      drawButtonLabel="✏️ Parsel Sınırını Çiz"
+                      drawButtonLabel="✏️ Çizerek Bul"
+                      drawStartToken={drawStartToken}
+                      maxDrawAreaDecare={manualDrawLimitDecare}
+                      onDrawLimitExceeded={() => {
+                        if (!entitlement.isPaid) {
+                          openPlanUpgrade({
+                            requiredPlan: 'plus',
+                            feature: '50 dekardan büyük çizerek tarla ekleme',
+                          });
+                        }
+                      }}
                       constrainDrawingToParcel={false}
                       onSectionDrawn={acceptManualBoundary}
                     />
@@ -780,7 +785,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                             : mapStartView.source === 'district'
                               ? `${selectedDistrictName} ilçesinden`
                               : `${selectedProvinceName} ilinden`
-                        } açıldı. Tarlana yaklaş; sınırı aratabilir veya kendin çizebilirsin.`
+                        } açıldı. Tarlana yaklaş; “Çizerek Bul” ile sınırı kendin çizebilir veya konumundan aday aratabilirsin.`
                       : 'Konum hazırlanıyor… Haritayı yine elle kaydırıp yakınlaştırabilirsin.'}
                   </div>
 
@@ -789,7 +794,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                       ? `✓ Parsel sınırı seçildi. Kaynak: ${parcelLookupSource || 'Harita'}`
                       : mapPickMode
                         ? 'Tarlanın iç kısmına bir kez dokun; Pusula yakın sınır adaylarını arayacak.'
-                        : 'Henüz sınır seçilmedi. “Sınırları Bul”, “Konumdan Bul” veya manuel çizimi kullanabilirsin.'}
+                        : 'Henüz sınır seçilmedi. “Çizerek Bul” veya “Konumdan Bul” seçeneklerinden birini kullanabilirsin.'}
                   </div>
 
                   {mapBoundaryCandidates.length > 0 && (

@@ -643,6 +643,7 @@ export default function DemMapScreen({
           <span>TARLA</span>
 
           <select
+            className="tp-global-field-select"
             value={String(fieldId)}
             onChange={(event) => {
               setFieldId(event.target.value);

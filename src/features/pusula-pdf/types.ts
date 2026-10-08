@@ -52,6 +52,18 @@ export type PusulaPdfWeatherHistory = {
   error?: string;
 };
 
+
+export type PusulaPdfFieldPhoto = {
+  id: string;
+  capturedAt: string;
+  signedUrl: string | null;
+  notes: string | null;
+  aiResult: Record<string, unknown> | null;
+  ndviValue: number | null;
+  relativeHealth: number | null;
+  satelliteDate: string | null;
+};
+
 export type PusulaPdfLayerArchiveSnapshot = {
   schemaVersion?: number;
   fieldId?: string;
@@ -103,6 +115,7 @@ export type PusulaPdfSnapshot = {
   activities: unknown[];
   soilAnalyses: unknown[];
   diagnoses: unknown[];
+  fieldPhotos?: PusulaPdfFieldPhoto[];
   missing: string[];
 };
 

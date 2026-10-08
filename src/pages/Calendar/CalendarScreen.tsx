@@ -1,9 +1,11 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
+import { BookOpenText, CalendarDays } from 'lucide-react';
 import MobileWheelPicker from '../../components/MobileWheelPicker';
 import AppDrawer from '../../components/AppDrawer';
 import GlobalPusulaBand from '../../components/GlobalPusulaBand';
 import ClassicBottomNav from '../../components/ClassicBottomNav';
 import WeeklyFieldPlan from '../../features/calendar/components/WeeklyFieldPlan';
+import CalendarFieldNotebook from '../../features/calendar/components/CalendarFieldNotebook';
 import { calendarLocalDate } from '../../features/calendar/services/weeklyFieldPlan';
 import { onboardingStyles } from '../../styles/onboardingStyles';
 import type {
@@ -93,6 +95,88 @@ const CALENDAR_COMPACT_STYLES = String.raw`
   line-height:1.35;
 }
 
+.tp-calendar-mode-switch{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  padding:6px;
+  border:1px solid #d8dde1;
+  border-radius:18px;
+  background:#fff;
+  box-shadow:0 8px 22px rgba(15,23,42,.055);
+}
+
+.tp-calendar-mode-switch button{
+  min-width:0;
+  min-height:50px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:7px 9px;
+  border:1px solid transparent;
+  border-radius:13px;
+  background:#f4f6f7;
+  color:#59636c;
+  text-align:left;
+  transition:transform .16s ease, background .16s ease, color .16s ease, border-color .16s ease;
+}
+
+.tp-calendar-mode-switch button:active{
+  transform:scale(.985);
+}
+
+.tp-calendar-mode-switch button.active{
+  border-color:#111315;
+  background:#111315;
+  color:#fff;
+  box-shadow:0 5px 14px rgba(0,0,0,.16);
+}
+
+.tp-calendar-mode-icon{
+  width:30px;
+  height:30px;
+  flex:0 0 30px;
+  display:grid;
+  place-items:center;
+  border:1px solid #d7dde1;
+  border-radius:10px;
+  background:#fff;
+  color:#111315;
+}
+
+.tp-calendar-mode-switch button.active .tp-calendar-mode-icon{
+  border-color:rgba(255,255,255,.18);
+  background:rgba(255,255,255,.11);
+  color:#fff;
+}
+
+.tp-calendar-mode-copy{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+
+.tp-calendar-mode-copy strong{
+  font-size:10px;
+  font-weight:900;
+  line-height:1;
+  letter-spacing:-.01em;
+}
+
+.tp-calendar-mode-copy small{
+  overflow:hidden;
+  color:#7c858d;
+  font-size:6.8px;
+  font-weight:700;
+  line-height:1.15;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+
+.tp-calendar-mode-switch button.active .tp-calendar-mode-copy small{
+  color:rgba(255,255,255,.66);
+}
+
 @media(max-width:720px){
   .tp-calendar-content{
     padding:8px!important;
@@ -125,6 +209,32 @@ const CALENDAR_COMPACT_STYLES = String.raw`
 
   .tp-calendar-summary span{
     font-size:5.6px!important;
+  }
+
+  .tp-calendar-mode-switch{
+    gap:5px!important;
+    padding:5px!important;
+    border-radius:16px!important;
+  }
+
+  .tp-calendar-mode-switch button{
+    min-height:46px!important;
+    gap:7px!important;
+    padding:6px 7px!important;
+  }
+
+  .tp-calendar-mode-icon{
+    width:28px!important;
+    height:28px!important;
+    flex-basis:28px!important;
+  }
+
+  .tp-calendar-mode-copy strong{
+    font-size:9px!important;
+  }
+
+  .tp-calendar-mode-copy small{
+    font-size:6px!important;
   }
 }
 `;
@@ -177,6 +287,7 @@ type CalendarScreenProps = {
   disablePushNotifications: () => void | Promise<void>;
   sendTestPushNotification: () => void | Promise<void>;
   openAiAnalysisScreen: () => void;
+  initialView?: 'calendar' | 'notebook';
 };
 
 export default function CalendarScreen({
@@ -220,6 +331,7 @@ export default function CalendarScreen({
   disablePushNotifications,
   sendTestPushNotification,
   openAiAnalysisScreen,
+  initialView = 'calendar',
 }: CalendarScreenProps) {
   const calendarPage = cmsPageFor('calendar');
   const calendarHeaderBlock = cmsBlockFor('calendar', 'page-header');
@@ -227,6 +339,7 @@ export default function CalendarScreen({
   const calendarPushBlock = cmsBlockFor('calendar', 'push-card');
   const calendarToolbarBlock = cmsBlockFor('calendar', 'toolbar');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [view, setView] = useState<'calendar' | 'notebook'>(initialView);
 
   const today = calendarLocalDate(new Date());
   const upcoming = calendarReminders.filter(
@@ -314,8 +427,8 @@ export default function CalendarScreen({
       />
 
       <GlobalPusulaBand
-        screen="calendar"
-        title="Takvim"
+        screen={view === 'notebook' ? 'fieldNotebookHub' : 'calendar'}
+        title={view === 'notebook' ? 'Tarla Defteri' : 'Takvim'}
         fieldName={realFields[0]?.name ?? null}
         onBack={() => setScreen('home')}
         onMenu={() => setDrawerOpen(true)}
@@ -340,6 +453,40 @@ export default function CalendarScreen({
         </header>
 
         <main className="tp-calendar-content">
+          <div className="tp-calendar-mode-switch" role="tablist" aria-label="Takvim görünümü">
+            <button
+              type="button"
+              className={view === 'calendar' ? 'active' : ''}
+              onClick={() => setView('calendar')}
+              role="tab"
+              aria-selected={view === 'calendar'}
+            >
+              <span className="tp-calendar-mode-icon"><CalendarDays size={16} /></span>
+              <span className="tp-calendar-mode-copy">
+                <strong>Takvim</strong>
+                <small>Plan ve hatırlatmalar</small>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={view === 'notebook' ? 'active' : ''}
+              onClick={() => setView('notebook')}
+              role="tab"
+              aria-selected={view === 'notebook'}
+            >
+              <span className="tp-calendar-mode-icon"><BookOpenText size={16} /></span>
+              <span className="tp-calendar-mode-copy">
+                <strong>Tarla Defteri</strong>
+                <small>Gerçekleşen saha işlemleri</small>
+              </span>
+            </button>
+          </div>
+
+          {view === 'notebook' ? (
+            <CalendarFieldNotebook fields={realFields} />
+          ) : (
+            <>
           <section className="tp-calendar-hero">
             <div>
               <span>{calendarHeroBlock?.icon || 'BUGÜNÜ PLANLA'}</span>
@@ -503,9 +650,11 @@ export default function CalendarScreen({
           {reminderMessage && !reminderFormOpen && (
             <div className="tp-field-section-message">{reminderMessage}</div>
           )}
+            </>
+          )}
         </main>
 
-        {reminderFormOpen && (
+        {view === 'calendar' && reminderFormOpen && (
           <div
             className="tp-modal-backdrop"
             onMouseDown={() => {

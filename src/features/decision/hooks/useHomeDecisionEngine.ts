@@ -33,6 +33,19 @@ import { useIrrigationEconomicsContext } from '../../irrigation-economics/hooks/
 import { buildIrrigationEconomicsDecision } from '../../irrigation-economics/services/buildIrrigationEconomicsDecision';
 import { useFrostPocketContext } from '../../frost-pocket/hooks/useFrostPocketContext';
 import { buildFrostPocketDecision } from '../../frost-pocket/services/buildFrostPocketDecision';
+import { useFieldWorkabilityContext } from '../../field-workability/hooks/useFieldWorkabilityContext';
+import { buildFieldWorkabilityDecision } from '../../field-workability/services/buildFieldWorkabilityDecision';
+import { useIrrigationDistributionContext } from '../../irrigation-distribution/hooks/useIrrigationDistributionContext';
+import { buildIrrigationDistributionDecision } from '../../irrigation-distribution/services/buildIrrigationDistributionDecision';
+import { useWaterScarcityPlanContext } from '../../water-scarcity/hooks/useWaterScarcityPlanContext';
+import { buildWaterScarcityDecision } from '../../water-scarcity/services/buildWaterScarcityDecision';
+import { useMicroclimateSensorContext } from '../../microclimate/hooks/useMicroclimateSensorContext';
+import { buildMicroclimateSensorDecision } from '../../microclimate/services/buildMicroclimateSensorDecision';
+import { useDisasterRecoveryContext } from '../../disaster-recovery/hooks/useDisasterRecoveryContext';
+import { buildDisasterRecoveryDecision } from '../../disaster-recovery/services/buildDisasterRecoveryDecision';
+import { buildMultiStressSynthesis } from '../../multi-stress/services/multiStressSynthesis.service';
+import { buildMultiStressDecision } from '../../multi-stress/services/buildMultiStressDecision';
+import { persistMultiStressSynthesis } from '../../multi-stress/services/multiStressPersistence.service';
 import { isOrchardTreePilotCrop } from '../../orchard/services/orchardTree.service';
 import { useOrchardTreeContext } from '../../orchard/hooks/useOrchardTreeContext';
 import { buildCropModeRuntime } from '../../crop-mode/services/cropMode.service';
@@ -44,14 +57,13 @@ import {
   guardNutrientProductionDecision,
   type NutrientProductionDecisionGuardResult,
 } from '../../nutrition/services/nutrientProductionDecisionGuard.service';
-import type { HarmonizedHomeDecisionEvent } from '../types/modelGateway';
 import type {
   HomeDecisionEngineInput,
   HomeDecisionEvent,
-  HomeSystemNotification,
-  HomeTodayDecision,
   HomeTodayIconKey,
 } from '../types/homeDecision';
+import { projectDecisionChannels } from '../services/decisionChannelProjection.service';
+
 
 function todayIconSrc(iconKey: HomeTodayIconKey): string {
   if (iconKey === 'water') return HOME_REFERENCE_ASSETS.iconWater;
@@ -704,90 +716,12 @@ function buildTodayStatusFillers(
   return fillers;
 }
 
-function selectTodayEvents(events: HomeDecisionEvent[]): HomeDecisionEvent[] {
-  const seenGroups = new Set<string>();
-
-  return events
-    .filter((event) => event.channels.includes('today') && event.today)
-    .filter((event) => {
-      if (seenGroups.has(event.group)) return false;
-      seenGroups.add(event.group);
-      return true;
-    })
-    .slice(0, 5);
-}
-
-function makeAllClearEvent(fieldKey: string): HomeDecisionEvent {
-  return {
-    id: `status:${fieldKey || 'home'}:all-clear`,
-    group: 'status',
-    source: 'field',
-    priority: 1,
-    severity: 'info',
-    target: 'home',
-    channels: ['today'],
-    label: 'BUGÜN',
-    title: 'Acil İşlem Görünmüyor',
-    detail: 'Yeni veri geldikçe burası otomatik güncellenecek',
-    today: {
-      tone: 'green',
-      visual: 'irrigation',
-      iconKey: 'leaf-green',
-      iconClass: 'leaf',
-    },
-  };
-}
-
-function toTodayDecision(
-  event: HomeDecisionEvent | HarmonizedHomeDecisionEvent,
-  fieldId?: string | null,
-): HomeTodayDecision | null {
-  if (!event.today) return null;
-
-  return {
-    id: event.id,
-    group: event.group,
-    priority: event.priority,
-    label: event.label,
-    title: event.title,
-    detail: event.detail,
-    tone: event.today.tone,
-    visual: event.today.visual,
-    iconSrc: todayIconSrc(event.today.iconKey),
-    iconClass: event.today.iconClass,
-    target: event.target,
-    fieldId: fieldId ?? null,
-    source: event.source,
-    evidence: event.evidence,
-    confidence: 'gateway' in event ? event.gateway.confidence : event.confidence,
-    kind: event.kind,
-    missingInfoKind: event.missingInfoKind,
-    task: event.task,
-  };
-}
-
-function toNotification(event: HomeDecisionEvent): HomeSystemNotification | null {
-  if (!event.notification || !event.channels.includes('notification')) return null;
-
-  return {
-    id: event.id,
-    priority: event.priority,
-    severity: event.severity,
-    source: event.source,
-    title: event.title,
-    detail: event.detail,
-    iconKey: event.notification.iconKey,
-    iconTone: event.notification.iconTone,
-    dotTone: event.notification.dotTone,
-    target: event.target,
-    task: event.task,
-  };
-}
-
 export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
   const recentOperations = useRecentFieldOperations(input.homeFieldId, 30);
   const nutrientGuardRef = useRef<NutrientProductionDecisionGuardResult | null>(null);
   const archivedNutrientGuardKeyRef = useRef('');
+  const multiStressRef = useRef<ReturnType<typeof buildMultiStressSynthesis> | null>(null);
+  const archivedMultiStressKeyRef = useRef('');
   const dataBackbone = useFieldDataBackbone(input.homeFieldId, 140);
   const activeProduction = useActiveProductionValidation(input.homeFieldId);
   const weedSoilContext = useWeedSoilContext(input.homeFieldId ?? input.fieldKey);
@@ -832,6 +766,30 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
     input.homeFieldId,
     input.quickTemperatureMin ?? null,
   );
+
+  // V58: Önceden ayrı ekranlarda yaşayan saha motorlarını aynı karar omurgasına bağla.
+  // Hiçbiri ikinci bir "otorite" üretmez; yalnız kendi kanonik snapshot'ını
+  // HomeDecisionEvent sözleşmesine çevirir.
+  const workability = useFieldWorkabilityContext({
+    fieldId: input.homeFieldId,
+    rainMm: input.quickRainMm ?? null,
+    rainChance: input.quickRainChance ?? null,
+    terrain: frostPocket.snapshot?.terrain ?? null,
+  });
+  const irrigationDistribution = useIrrigationDistributionContext({
+    fieldId: input.homeFieldId,
+    operations: mergedOperations,
+    satelliteDate: input.resolvedHomeSatelliteDate ?? null,
+    homePusulaResult: input.homePusulaResult,
+    fieldSynthesis: input.fieldSynthesis,
+  });
+  const waterScarcity = useWaterScarcityPlanContext({
+    fieldId: input.homeFieldId,
+    irrigationDecision: input.irrigationDecision ?? null,
+    phenology: input.phenology ?? null,
+  });
+  const microclimate = useMicroclimateSensorContext(input.homeFieldId);
+  const disasterRecovery = useDisasterRecoveryContext(input.homeFieldId);
 
   const cachedAnomaly = getCachedNdviAnomaly(input.homeFieldId);
 
@@ -969,6 +927,13 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
     const storageRiskEvent = buildStorageRiskDecision(storageRisk.snapshot);
     const irrigationEconomicsEvent = buildIrrigationEconomicsDecision(irrigationEconomics.snapshot);
     const frostPocketEvent = buildFrostPocketDecision(frostPocket.snapshot);
+    const workabilityEvent = buildFieldWorkabilityDecision(workability.snapshot);
+    const irrigationDistributionEvent = buildIrrigationDistributionDecision(
+      irrigationDistribution.snapshot,
+    );
+    const waterScarcityEvent = buildWaterScarcityDecision(waterScarcity.snapshot);
+    const microclimateEvent = buildMicroclimateSensorDecision(microclimate.snapshot);
+    const disasterRecoveryEvent = buildDisasterRecoveryDecision(disasterRecovery.data);
     const effectiveWeedSatelliteEvent = weedEvent ? null : weedSatelliteEvent;
 
     // 14.2: HomeDecisionEngine'in ürettiği tek nutrition olayı burada
@@ -1013,7 +978,12 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
       photoEvidenceWasSynthesized && !input.observationFollowUp?.dueForPhoto
         ? null
         : observationFollowUpEvent;
-    const realEvents = [
+    const realBaseEvents = [
+      disasterRecoveryEvent,
+      microclimateEvent,
+      waterScarcityEvent,
+      irrigationDistributionEvent,
+      workabilityEvent,
       frostPocketEvent,
       storageRiskEvent,
       irrigationEconomicsEvent,
@@ -1029,6 +999,21 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
       effectiveNutrientDifferentialEvent,
       effectiveAnomalyEvent,
       ...merged,
+    ].filter((event): event is HomeDecisionEvent => Boolean(event));
+
+    // V58: Çoklu stres artık PDF'ye özel ayrı bir hesap değildir.
+    // Aynı canlı Home karar olaylarından tek kez üretilir; Today, Bildirim,
+    // Tarla Durumu ve Pusula aynı sentezi görür.
+    const multiStressSynthesis = buildMultiStressSynthesis(
+      input.homeFieldId ?? input.fieldKey,
+      realBaseEvents,
+      now,
+    );
+    multiStressRef.current = multiStressSynthesis;
+    const multiStressEvent = buildMultiStressDecision(multiStressSynthesis);
+    const realEvents = [
+      multiStressEvent,
+      ...realBaseEvents,
     ].filter((event): event is HomeDecisionEvent => Boolean(event));
 
     const fillers = buildTodayStatusFillers(resolvedInput, realEvents, now);
@@ -1087,12 +1072,49 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
     storageRisk.snapshot,
     irrigationEconomics.snapshot,
     frostPocket.snapshot,
+    workability.snapshot,
+    irrigationDistribution.snapshot,
+    waterScarcity.snapshot,
+    microclimate.signature,
+    microclimate.snapshot,
+    disasterRecovery.signature,
+    disasterRecovery.data,
     activeProduction.signature,
     activeProduction.data,
     activeProduction.generatedAt,
     weedSoilContext.data,
     weedSoilContext.generatedAt,
   ]);
+
+  useEffect(() => {
+    const synthesis = multiStressRef.current;
+    if (!synthesis?.fieldId || synthesis.status === 'none') return;
+
+    const archiveKey = [
+      synthesis.fieldId,
+      (synthesis.observedAt ?? synthesis.generatedAt).slice(0, 10),
+      synthesis.status,
+      synthesis.dominantFamily ?? 'none',
+      synthesis.signals.map((item) => `${item.family}:${item.level}:${item.confidence}`).join(','),
+    ].join('|');
+
+    if (archivedMultiStressKeyRef.current === archiveKey) return;
+    let cancelled = false;
+
+    void persistMultiStressSynthesis(synthesis)
+      .then((saved) => {
+        if (!cancelled && saved) archivedMultiStressKeyRef.current = archiveKey;
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn('[TarlaPusula] Birleşik stres sentezi arşivlenemedi:', error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [events]);
 
   useEffect(() => {
     const fieldId = String(input.homeFieldId ?? input.fieldKey ?? '').trim();
@@ -1141,40 +1163,29 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
     };
   }, [events, input.homeFieldId, input.fieldKey]);
 
-  const todayDecisions = useMemo(() => {
-    const selected = selectTodayEvents(events);
-    const source = selected.length > 0
-      ? selected
-      : [makeAllClearEvent(input.fieldKey)];
-
-    const fieldId = String(input.homeFieldId ?? input.fieldKey ?? '').trim() || null;
-    return source
-      .map((event) => toTodayDecision(event, fieldId))
-      .filter((item): item is HomeTodayDecision => Boolean(item));
-  }, [events, input.fieldKey]);
-
-  const notifications = useMemo(
+  const projectedChannels = useMemo(
     () =>
-      events
-        .map(toNotification)
-        .filter((item): item is HomeSystemNotification => Boolean(item))
-        .slice(0, 12),
-    [events],
+      projectDecisionChannels({
+        events,
+        fieldKey: input.fieldKey,
+        fieldId: String(input.homeFieldId ?? input.fieldKey ?? '').trim() || null,
+        resolveIcon: todayIconSrc,
+      }),
+    [events, input.fieldKey, input.homeFieldId],
   );
 
-  const primaryDecision = useMemo(
-    () => events.find((event) => event.channels.includes('today')) ?? events[0] ?? null,
-    [events],
-  );
-
-  const pusulaDecision = useMemo(
-    () => events.find((event) => event.channels.includes('pusula')) ?? null,
-    [events],
-  );
+  const {
+    todayDecisions,
+    fieldStatusDecisions,
+    notifications,
+    primaryDecision,
+    pusulaDecision,
+  } = projectedChannels;
 
   return {
     events,
     todayDecisions,
+    fieldStatusDecisions,
     notifications,
     primaryDecision,
     pusulaDecision,
@@ -1194,5 +1205,11 @@ export function useHomeDecisionEngine(input: HomeDecisionEngineInput) {
     storageRiskSnapshot: storageRisk.snapshot,
     irrigationEconomicsSnapshot: irrigationEconomics.snapshot,
     frostPocketSnapshot: frostPocket.snapshot,
+    fieldWorkabilitySnapshot: workability.snapshot,
+    irrigationDistributionSnapshot: irrigationDistribution.snapshot,
+    waterScarcitySnapshot: waterScarcity.snapshot,
+    microclimateSnapshot: microclimate.snapshot,
+    disasterRecoverySnapshot: disasterRecovery.data,
+    multiStressSnapshot: multiStressRef.current,
   };
 }

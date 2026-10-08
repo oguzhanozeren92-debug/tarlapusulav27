@@ -24,6 +24,8 @@ jobs:
   ipa:
     runs-on: macos-15
     env:
+      VITE_PUBLIC_APP_URL: 'https://tarlapusulav27.vercel.app/'
+      VITE_APPLE_SIGN_IN_ENABLED: 'true'
       VITE_REVENUECAT_IOS_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_IOS_PUBLIC_KEY }}
       VITE_REVENUECAT_ANDROID_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_ANDROID_PUBLIC_KEY }}
       VITE_ADMOB_TEST_MODE: 'true'

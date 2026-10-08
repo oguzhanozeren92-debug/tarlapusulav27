@@ -37,7 +37,8 @@ import {
   type UnifiedMapActiveLayer,
 } from '../../services/unifiedMapAiService';
 import { supabase } from '../../supabaseClient';
-import { createSatelliteRasterSource, vividSatellitePaint } from '../../lib/mapStyle';
+import { createResilientSatelliteStyle } from '../../lib/mapStyle';
+import { installMapLifecycleRecovery, swapRecoverableImageOverlay } from '../../lib/mapLayerRecovery';
 import { isOrchardTreePilotCrop } from '../../features/orchard/services/orchardTree.service';
 import { loadOrchardIntelligenceSnapshot } from '../../features/orchard/services/orchardIntelligence.service';
 import type { OrchardTreeMapPoint } from '../../features/orchard/types/orchardTree';
@@ -1040,23 +1041,11 @@ function SoilGeoMap({
       dragRotate: false,
       pitchWithRotate: false,
       touchPitch: false,
-      style: {
-        version: 8,
-        sources: {
-          satellite: createSatelliteRasterSource(),
-        },
-        layers: [
-          {
-            id: 'soil-satellite-base',
-            type: 'raster',
-            source: 'satellite',
-            paint: vividSatellitePaint,
-          },
-        ],
-      },
+      style: createResilientSatelliteStyle('soil-satellite-base'),
     });
 
     mapRef.current = map;
+    const stopMapRecovery = installMapLifecycleRecovery(map);
 
     addTarlaCompass(map, 'top-right');
     map.addControl(
@@ -1115,6 +1104,7 @@ function SoilGeoMap({
     });
 
     return () => {
+      stopMapRecovery();
       mapRef.current = null;
       map.remove();
     };
@@ -1163,35 +1153,17 @@ function SoilGeoMap({
     if (!map || !processedSoilUrl || !soilBbox) return;
 
     const updateSoil = () => {
-      if (map.getLayer('soil-wms-layer')) {
-        map.removeLayer('soil-wms-layer');
-      }
-
-      if (map.getSource('soil-wms-image')) {
-        map.removeSource('soil-wms-image');
-      }
-
-      map.addSource('soil-wms-image', {
-        type: 'image',
+      void swapRecoverableImageOverlay(map, {
+        key: 'soil-wms-overlay',
         url: processedSoilUrl,
         coordinates: bboxImageCoordinates(soilBbox),
-      });
-
-      map.addLayer(
-        {
-          id: 'soil-wms-layer',
-          type: 'raster',
-          source: 'soil-wms-image',
-          paint: {
-            'raster-opacity': 0.72,
-            'raster-resampling': 'linear',
-            'raster-fade-duration': 0,
-          },
+        beforeLayerId: 'soil-parcel-shadow',
+        paint: {
+          'raster-opacity': 0.72,
+          'raster-resampling': 'linear',
+          'raster-fade-duration': 0,
         },
-        map.getLayer('soil-parcel-shadow')
-          ? 'soil-parcel-shadow'
-          : undefined,
-      );
+      });
     };
 
     if (map.isStyleLoaded()) updateSoil();
@@ -1255,23 +1227,11 @@ function VegetationGeoMap({
       dragRotate: false,
       pitchWithRotate: false,
       touchPitch: false,
-      style: {
-        version: 8,
-        sources: {
-          satellite: createSatelliteRasterSource(),
-        },
-        layers: [
-          {
-            id: 'veg-satellite-base',
-            type: 'raster',
-            source: 'satellite',
-            paint: vividSatellitePaint,
-          },
-        ],
-      },
+      style: createResilientSatelliteStyle('veg-satellite-base'),
     });
 
     mapRef.current = map;
+    const stopMapRecovery = installMapLifecycleRecovery(map);
 
     addTarlaCompass(map, 'top-right');
     map.addControl(
@@ -1386,6 +1346,7 @@ function VegetationGeoMap({
     });
 
     return () => {
+      stopMapRecovery();
       mapRef.current = null;
       map.remove();
     };
@@ -1434,13 +1395,6 @@ function VegetationGeoMap({
     if (!imageUrl) return;
 
     const update = () => {
-      if (map.getLayer('veg-image-layer')) {
-        map.removeLayer('veg-image-layer');
-      }
-      if (map.getSource('veg-image')) {
-        map.removeSource('veg-image');
-      }
-
       const coordinates: [
         [number, number],
         [number, number],
@@ -1453,29 +1407,19 @@ function VegetationGeoMap({
         [parcelBounds.west, parcelBounds.south],
       ];
 
-      map.addSource('veg-image', {
-        type: 'image',
+      void swapRecoverableImageOverlay(map, {
+        key: 'veg-image-overlay',
         url: imageUrl,
         coordinates,
-      });
-
-      map.addLayer(
-        {
-          id: 'veg-image-layer',
-          type: 'raster',
-          source: 'veg-image',
-          paint: {
-            'raster-opacity': view === 'ndvi' ? 0.80 : 0.74,
-            'raster-resampling': 'linear',
-            'raster-fade-duration': 0,
-            'raster-saturation': view === 'ndvi' ? 0.10 : -0.04,
-            'raster-contrast': view === 'ndvi' ? -0.04 : 0.02,
-          },
+        beforeLayerId: 'veg-parcel-shadow',
+        paint: {
+          'raster-opacity': view === 'ndvi' ? 0.80 : 0.74,
+          'raster-resampling': 'linear',
+          'raster-fade-duration': 0,
+          'raster-saturation': view === 'ndvi' ? 0.10 : -0.04,
+          'raster-contrast': view === 'ndvi' ? -0.04 : 0.02,
         },
-        map.getLayer('veg-parcel-shadow')
-          ? 'veg-parcel-shadow'
-          : undefined,
-      );
+      });
     };
 
     if (map.isStyleLoaded()) update();
@@ -1546,23 +1490,11 @@ function RadarGeoMap({
       attributionControl: false,
       dragRotate: false,
       pitchWithRotate: false,
-      style: {
-        version: 8,
-        sources: {
-          satellite: createSatelliteRasterSource(),
-        },
-        layers: [
-          {
-            id: 'radar-satellite-base',
-            type: 'raster',
-            source: 'satellite',
-            paint: vividSatellitePaint,
-          },
-        ],
-      },
+      style: createResilientSatelliteStyle('radar-satellite-base'),
     });
 
     mapRef.current = map;
+    const stopMapRecovery = installMapLifecycleRecovery(map);
 
     addTarlaCompass(map, 'top-right');
     map.addControl(
@@ -1631,6 +1563,7 @@ function RadarGeoMap({
     });
 
     return () => {
+      stopMapRecovery();
       mapRef.current = null;
       map.remove();
     };
@@ -1679,37 +1612,19 @@ function RadarGeoMap({
     if (!map || !radar?.imageDataUrl || !Array.isArray(radar?.bbox)) return;
 
     const updateRadar = () => {
-      if (map.getLayer('radar-image-layer')) {
-        map.removeLayer('radar-image-layer');
-      }
-
-      if (map.getSource('radar-image')) {
-        map.removeSource('radar-image');
-      }
-
-      map.addSource('radar-image', {
-        type: 'image',
+      void swapRecoverableImageOverlay(map, {
+        key: 'radar-image-overlay',
         url: radar.imageDataUrl,
         coordinates: radarImageCoordinates(
           radar.bbox as [number, number, number, number],
         ),
-      });
-
-      map.addLayer(
-        {
-          id: 'radar-image-layer',
-          type: 'raster',
-          source: 'radar-image',
-          paint: {
-            'raster-opacity': 0.80,
-            'raster-resampling': 'linear',
-            'raster-fade-duration': 0,
-          },
+        beforeLayerId: 'radar-parcel-fill',
+        paint: {
+          'raster-opacity': 0.80,
+          'raster-resampling': 'linear',
+          'raster-fade-duration': 0,
         },
-        map.getLayer('radar-parcel-fill')
-          ? 'radar-parcel-fill'
-          : undefined,
-      );
+      });
 
       // NEVER focus on radar bbox here.
       // The radar bbox is a processing window around the coordinate, not the farm.
@@ -1984,23 +1899,11 @@ function ClimateGeoMap({
       dragRotate: false,
       pitchWithRotate: false,
       touchPitch: false,
-      style: {
-        version: 8,
-        sources: {
-          satellite: createSatelliteRasterSource(),
-        },
-        layers: [
-          {
-            id: 'climate-satellite-base',
-            type: 'raster',
-            source: 'satellite',
-            paint: vividSatellitePaint,
-          },
-        ],
-      },
+      style: createResilientSatelliteStyle('climate-satellite-base'),
     });
 
     mapRef.current = map;
+    const stopMapRecovery = installMapLifecycleRecovery(map);
 
     addTarlaCompass(map, 'top-right');
     map.addControl(
@@ -2059,6 +1962,7 @@ function ClimateGeoMap({
     });
 
     return () => {
+      stopMapRecovery();
       mapRef.current = null;
       map.remove();
     };
@@ -2107,35 +2011,17 @@ function ClimateGeoMap({
     if (!map || !overlayUrl || !climateBounds) return;
 
     const updateClimate = () => {
-      if (map.getLayer('climate-overlay-layer')) {
-        map.removeLayer('climate-overlay-layer');
-      }
-
-      if (map.getSource('climate-overlay-image')) {
-        map.removeSource('climate-overlay-image');
-      }
-
-      map.addSource('climate-overlay-image', {
-        type: 'image',
+      void swapRecoverableImageOverlay(map, {
+        key: 'climate-image-overlay',
         url: overlayUrl,
         coordinates: bboxImageCoordinates(climateBounds),
-      });
-
-      map.addLayer(
-        {
-          id: 'climate-overlay-layer',
-          type: 'raster',
-          source: 'climate-overlay-image',
-          paint: {
-            'raster-opacity': 0.68,
-            'raster-resampling': 'linear',
-            'raster-fade-duration': 0,
-          },
+        beforeLayerId: 'climate-parcel-shadow',
+        paint: {
+          'raster-opacity': 0.68,
+          'raster-resampling': 'linear',
+          'raster-fade-duration': 0,
         },
-        map.getLayer('climate-parcel-shadow')
-          ? 'climate-parcel-shadow'
-          : undefined,
-      );
+      });
     };
 
     if (map.isStyleLoaded()) updateClimate();
@@ -3191,6 +3077,7 @@ export default function UnifiedMapScreen({
           <label style={styles.contextControl}>
             <span style={styles.controlLabel}>Tarla</span>
             <select
+              className="tp-global-field-select"
               style={styles.contextSelect}
               value={String(selectedField?.id ?? '')}
               onChange={(event) => {

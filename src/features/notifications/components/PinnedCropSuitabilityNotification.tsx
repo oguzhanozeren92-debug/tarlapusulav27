@@ -386,6 +386,7 @@ export default function PinnedCropSuitabilityNotification() {
               <label className="tp-crop-modal-field-select">
                 <span>Tarla</span>
                 <select
+                  className="tp-global-field-select"
                   value={String(field?.id ?? '')}
                   onChange={(event) => {
                     const next = fieldOptions.find(

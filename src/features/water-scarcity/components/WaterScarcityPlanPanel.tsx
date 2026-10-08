@@ -6,7 +6,13 @@ import type { WaterSourceType } from '../types/waterScarcity';
 
 const CSS = String.raw`
 .tp-water-scarcity{margin-top:10px;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:18px;background:#0b0b0b;color:#fff}
-.tp-water-scarcity-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.tp-water-scarcity-head{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;list-style:none;cursor:pointer;padding-right:24px}
+.tp-water-scarcity-head::-webkit-details-marker{display:none}
+.tp-water-scarcity-head:after{content:'›';position:absolute;right:2px;top:50%;transform:translateY(-50%);color:#fff;font-size:19px;font-weight:900;transition:transform .18s ease}
+.tp-water-scarcity[open]>.tp-water-scarcity-head:after{transform:translateY(-50%) rotate(90deg)}
+.tp-water-scarcity-collapsed-note{margin:4px 0 0!important;color:#8e969d!important;font-size:8px!important;line-height:1.3!important}
+.tp-water-scarcity[open]>.tp-water-scarcity-head .tp-water-scarcity-collapsed-note{display:none}
+.tp-water-scarcity[open]>.tp-water-scarcity-head{padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,.08)}
 .tp-water-scarcity-head small,.tp-water-scarcity-grid small,.tp-water-scarcity-form label{color:#b9b9b9;font-size:9px;font-weight:850;letter-spacing:.09em}
 .tp-water-scarcity-head h4{margin:5px 0 0;font-size:15px;color:#fff}
 .tp-water-scarcity-badge{flex:0 0 auto;padding:6px 9px;border:1px solid rgba(255,255,255,.20);border-radius:999px;background:#151515;color:#fff;font-size:9px;font-weight:900}
@@ -91,10 +97,6 @@ export default function WaterScarcityPlanPanel({
     });
   }, [profile?.id, profile?.updatedAt]);
 
-  useEffect(() => {
-    if (!profile && plan.snapshot?.state === 'needs_data') setEditing(true);
-  }, [profile, plan.snapshot?.state]);
-
   const coverage = plan.snapshot?.irrigation.physicalCoverageRatio;
   const coverageLabel = useMemo(
     () => coverage == null ? '—' : `%${Math.round(Math.max(0, coverage) * 100)}`,
@@ -139,16 +141,21 @@ export default function WaterScarcityPlanPanel({
   return (
     <>
       <style>{CSS}</style>
-      <section className="tp-water-scarcity">
-        <div className="tp-water-scarcity-head">
+      <details className="tp-water-scarcity">
+        <summary className="tp-water-scarcity-head">
           <div>
-            <small>23 · SU KAYNAĞI ÖNCELİĞİ</small>
-            <h4>{snapshot?.headline ?? (plan.loading ? 'Su planı hazırlanıyor' : 'Su Kıtlığı Planı')}</h4>
+            <small>SU KITLIĞI PLANI</small>
+            <h4>{snapshot?.headline ?? (plan.loading ? 'Su planı hazırlanıyor' : 'Su bütçesini tanımla')}</h4>
+            <p className="tp-water-scarcity-collapsed-note">
+              {profile
+                ? 'Su bütçesi, ihtiyaç ve fenoloji ayrıntıları için dokun.'
+                : 'Kullanılabilir su miktarını girmek ve planı açmak için dokun.'}
+            </p>
           </div>
           <span className="tp-water-scarcity-badge">
             {plan.loading ? 'HESAPLANIYOR' : stateLabel(snapshot?.state ?? 'needs_data')}
           </span>
-        </div>
+        </summary>
 
         {plan.error ? <p className="tp-water-scarcity-error">{plan.error}</p> : null}
         {snapshot ? <p>{snapshot.summary}</p> : null}
@@ -236,7 +243,7 @@ export default function WaterScarcityPlanPanel({
         <p>
           Kullanılabilir su işletme kaydıdır. Pusula su miktarını tahmin etmez; kayıtlı bütçeyi Production Sulama Motoru ve fenolojiyle birlikte önceliklendirir.
         </p>
-      </section>
+      </details>
     </>
   );
 }

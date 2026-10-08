@@ -933,3 +933,26 @@ html body .tp-chat-field .tp-chat-shell .tp-field-form
 .tp-field-lookup-button,.tp-field-external-button,.tp-field-primary-action{
   border-color:#050607!important;background:#050607!important;color:#fff!important;-webkit-text-fill-color:#fff!important
 }
+
+
+/* TP-V41 — Çizerek Bul / ücretsiz 50 da sınırı */
+.tp-draw-limit-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: -2px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid #d9dde1;
+  border-radius: 11px;
+  background: #f7f8f9;
+  color: #25282b;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.tp-draw-limit-note strong {
+  color: #050505;
+  font-weight: 900;
+}

@@ -24,6 +24,7 @@ jobs:
   aab:
     runs-on: ubuntu-latest
     env:
+      VITE_PUBLIC_APP_URL: 'https://tarlapusulav27.vercel.app/'
       VITE_REVENUECAT_IOS_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_IOS_PUBLIC_KEY }}
       VITE_REVENUECAT_ANDROID_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_ANDROID_PUBLIC_KEY }}
       # This artifact is an unsigned release-configuration compile check.
