@@ -2411,6 +2411,28 @@ function InteractiveHomeHealthMap({
     };
   }, [bbox?.[0], bbox?.[1], bbox?.[2], bbox?.[3], parcelGeometry]);
 
+  // A dedicated one-way resize signal prevents WebKit's fullscreen resize
+  // recursion. This instance owns the MapLibre object; consumers must never
+  // fake a window resize from inside a window resize handler.
+  useEffect(() => {
+    let frame = 0;
+    const onMapLayoutChanged = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        try {
+          mapRef.current?.resize();
+        } catch (error) {
+          console.warn('Harita görünümü yeniden boyutlandırılamadı:', error);
+        }
+      });
+    };
+    window.addEventListener('tp-home-map-resize', onMapLayoutChanged);
+    return () => {
+      window.removeEventListener('tp-home-map-resize', onMapLayoutChanged);
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   return (
     <div className="tp-real-home-map" style={{ height }}>
       <div ref={containerRef} className="tp-real-home-map-canvas" />
@@ -6146,6 +6168,28 @@ export function HomeInlineLayerMap({
       map.remove();
     };
   }, [field?.id, bbox?.[0], bbox?.[1], bbox?.[2], bbox?.[3], parcelGeometry]);
+
+  // A dedicated one-way resize signal prevents WebKit's fullscreen resize
+  // recursion. This instance owns the MapLibre object; consumers must never
+  // fake a window resize from inside a window resize handler.
+  useEffect(() => {
+    let frame = 0;
+    const onMapLayoutChanged = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        try {
+          mapRef.current?.resize();
+        } catch (error) {
+          console.warn('Harita görünümü yeniden boyutlandırılamadı:', error);
+        }
+      });
+    };
+    window.addEventListener('tp-home-map-resize', onMapLayoutChanged);
+    return () => {
+      window.removeEventListener('tp-home-map-resize', onMapLayoutChanged);
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
