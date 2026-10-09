@@ -1,0 +1,53 @@
+name: Sync TarlaPusula Android App Icons
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/generate_android_app_icons.py'
+      - 'scripts/generate_ios_app_icon.py'
+      - '.github/workflows/android-icon-sync.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-tp-android-icons
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Pillow
+        run: python3 -m pip install 'Pillow>=10,<12'
+
+      - name: Generate branded Android icon variants
+        run: python3 scripts/generate_android_app_icons.py
+
+      - name: Commit Android launcher icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add android/app/src/main/res/mipmap-*/ic_launcher*.png
+          git add android/app/src/main/res/values/ic_launcher_background.xml
+          if git diff --cached --quiet; then
+            echo "Android app icons already match real TarlaPusula Pusula branding."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "assets(android): apply authentic Pusula launcher icons for all densities"
+          git push origin HEAD:main
