@@ -3603,18 +3603,18 @@ export default function HomeMapSectionMapFirst(
         date?.getBoundingClientRect().height ?? 28,
       );
 
-      mapStage.style.setProperty(
-        '--tp-pusula-strip-height',
-        `${pusulaHeight}px`,
-      );
-      mapStage.style.setProperty(
-        '--tp-map-legend-height',
-        `${legendHeight}px`,
-      );
-      mapStage.style.setProperty(
-        '--tp-map-date-height',
-        `${dateHeight}px`,
-      );
+      // Avoid feeding our own style writes back into observers. Changing
+      // CSS custom properties on the stage used to cause an endless
+      // mutation/layout cycle on iOS fullscreen transitions.
+      const putIfChanged = (key: string, value: number) => {
+        const next = `${value}px`;
+        if (mapStage.style.getPropertyValue(key) !== next) {
+          mapStage.style.setProperty(key, next);
+        }
+      };
+      putIfChanged('--tp-pusula-strip-height', pusulaHeight);
+      putIfChanged('--tp-map-legend-height', legendHeight);
+      putIfChanged('--tp-map-date-height', dateHeight);
     };
 
     syncBottomStack();
@@ -3650,8 +3650,8 @@ export default function HomeMapSectionMapFirst(
       childList: true,
       subtree: true,
       characterData: true,
-      attributes: true,
-      attributeFilter: ['class', 'style'],
+      // Do NOT watch style/class attributes: this callback itself modifies
+      // mapStage.style; watching attributes caused a self-triggering loop.
     });
 
     window.addEventListener('resize', syncBottomStack);
@@ -3781,18 +3781,35 @@ export default function HomeMapSectionMapFirst(
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
 
-    const resizeMap = () => window.dispatchEvent(new Event('resize'));
+    // MapLibre is resized via a dedicated one-way event, not the window
+    // 'resize' event. Previously fullscreenSize -> dispatch('resize') ->
+    // fullscreenSize recursed indefinitely and locked up iOS WebKit.
+    let alive = true;
+    let frame = 0;
+    let previousGeometry = '';
+    const scheduledTimers: number[] = [];
+
+    const requestMapResize = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (alive) window.dispatchEvent(new Event('tp-home-map-resize'));
+      });
+    };
 
     const syncFullscreenSize = () => {
+      if (!alive) return;
       const viewport = window.visualViewport;
-      const width = Math.round(
+      const width = Math.max(1, Math.round(
         viewport?.width ?? document.documentElement.clientWidth ?? window.innerWidth,
-      );
-      const height = Math.round(
+      ));
+      const height = Math.max(1, Math.round(
         viewport?.height ?? document.documentElement.clientHeight ?? window.innerHeight,
-      );
+      ));
       const left = Math.round(viewport?.offsetLeft ?? 0);
       const top = Math.round(viewport?.offsetTop ?? 0);
+      const geometry = `${left}:${top}:${width}:${height}`;
+      if (geometry === previousGeometry) return;
+      previousGeometry = geometry;
 
       mapStage.style.setProperty('position', 'fixed', 'important');
       mapStage.style.setProperty('left', `${left}px`, 'important');
@@ -3817,13 +3834,13 @@ export default function HomeMapSectionMapFirst(
       mapCanvasRoot?.style.setProperty('height', '100%', 'important');
       mapCanvasRoot?.style.setProperty('min-height', '100%', 'important');
 
-      window.requestAnimationFrame(resizeMap);
-      window.setTimeout(resizeMap, 60);
-      window.setTimeout(resizeMap, 180);
+      requestMapResize();
     };
 
     syncFullscreenSize();
-
+    // Once the fixed layout settles, resynchronize MapLibre only twice.
+    scheduledTimers.push(window.setTimeout(requestMapResize, 70));
+    scheduledTimers.push(window.setTimeout(requestMapResize, 220));
     const viewport = window.visualViewport;
     viewport?.addEventListener('resize', syncFullscreenSize);
     viewport?.addEventListener('scroll', syncFullscreenSize);
@@ -3836,6 +3853,9 @@ export default function HomeMapSectionMapFirst(
     document.addEventListener('keydown', onEscape);
 
     return () => {
+      alive = false;
+      window.cancelAnimationFrame(frame);
+      scheduledTimers.forEach((timer) => window.clearTimeout(timer));
       document.removeEventListener('keydown', onEscape);
       viewport?.removeEventListener('resize', syncFullscreenSize);
       viewport?.removeEventListener('scroll', syncFullscreenSize);
@@ -3863,8 +3883,10 @@ export default function HomeMapSectionMapFirst(
         else mapCanvasRoot.setAttribute('style', oldCanvasRootStyle);
       }
 
-      window.requestAnimationFrame(resizeMap);
-      window.setTimeout(resizeMap, 80);
+      // Map stays in the React tree; one final resize restores its card size.
+      window.requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('tp-home-map-resize'));
+      });
     };
   }, [portraitExpanded, mapStage]);
 
