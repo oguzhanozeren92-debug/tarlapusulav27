@@ -5301,7 +5301,7 @@ body .tp-v1 .tp-ndvi-live-summary{
   /* Previously approved Pusula header adjustment is preserved. */
   body .tp-v1 .tp-v1-header .tp-brand-pusula-wrap {
     left: 50% !important;
-    top: calc(50% + 10px) !important;
+    top: calc(50% + 14px) !important;
     transform: translate(-50%, -50%) !important;
   }
 }
