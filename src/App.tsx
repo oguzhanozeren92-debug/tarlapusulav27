@@ -363,6 +363,12 @@ export default function App() {
     sendTestPushNotification,
   } = useCalendarController({ realFields, selectedField, setScreen });
 
+  useEffect(() => {
+    const openCalendar = () => openCalendarScreen();
+    window.addEventListener('tp:open-calendar', openCalendar);
+    return () => window.removeEventListener('tp:open-calendar', openCalendar);
+  }, [openCalendarScreen]);
+
   const [fieldControlFieldId, setFieldControlFieldId] = useState('');
   const [soilFieldId, setSoilFieldId] = useState('');
 
