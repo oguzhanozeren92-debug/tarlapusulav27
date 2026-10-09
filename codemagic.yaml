@@ -27,6 +27,13 @@ workflows:
           npm run build
           npx cap sync ios
 
+      - name: Generate official Pusula App Store icon
+        script: |
+          set -eu
+          python3 -m venv /tmp/tp-ios-icon-venv
+          /tmp/tp-ios-icon-venv/bin/python -m pip install 'Pillow>=10,<12'
+          /tmp/tp-ios-icon-venv/bin/python scripts/generate_ios_app_icon.py
+
       - name: Set iOS build number
         script: |
           # App Store Connect requires CFBundleVersion to be strictly higher
