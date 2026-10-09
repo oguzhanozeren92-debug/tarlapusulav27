@@ -831,10 +831,12 @@ const CSS = String.raw`
    * hesabı viewport ile birlikte uyarlanır.
    */
   .tp-map-first-shell{
-    width:auto!important;
-    max-width:none!important;
-    margin-left:-11px!important;
-    margin-right:-11px!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin-left:0!important;
+    margin-right:0!important;
   }
 
   .tp-map-first-shell .tp-home-field{
@@ -3283,9 +3285,11 @@ body:not(.tp-map-body-fullscreen)
 /* Mobilde map-first tam genişlikteyse Pusula da aynı kenara kadar uzansın. */
 @media(max-width:760px){
   .tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
-    width:auto!important;
-    margin-left:-11px!important;
-    margin-right:-11px!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:100%!important;
+    margin-left:0!important;
+    margin-right:0!important;
     margin-top:-1px!important;
     border-left:0!important;
     border-right:0!important;
@@ -3314,8 +3318,8 @@ body:not(.tp-map-body-fullscreen)
 
 @media(max-width:430px){
   .tp-home-map-pusula-shell > .tp-home-map-pusula-strip{
-    margin-left:-11px!important;
-    margin-right:-11px!important;
+    margin-left:0!important;
+    margin-right:0!important;
   }
 
   body:not(.tp-map-body-fullscreen)
