@@ -1,0 +1,47 @@
+name: Sync TarlaPusula iOS App Icon
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/generate_ios_app_icon.py
+      - .github/workflows/ios-icon-sync.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-native-icon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install image processing dependency
+        run: python -m pip install "Pillow>=10,<12"
+
+      - name: Generate branded icon from official Pusula layers
+        run: python scripts/generate_ios_app_icon.py
+
+      - name: Commit native iOS icon if changed
+        run: |
+          set -euo pipefail
+          ICON="ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
+          git add "$ICON"
+          if git diff --cached --quiet; then
+            echo "iOS icon already matches official Pusula artwork."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "assets(ios): sync native AppIcon to Pusula brand"
+          git push origin HEAD:main
