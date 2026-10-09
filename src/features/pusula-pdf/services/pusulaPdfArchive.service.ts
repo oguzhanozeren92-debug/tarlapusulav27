@@ -4,6 +4,7 @@ import type { WeeklyPusulaReport } from '../types';
 import { generatePusulaPdf } from './pusulaPdfRenderer.service';
 import {
   openRemoteFileInWeb,
+  shareBlobFileOnDevice,
   shareRemoteFileOnDevice,
 } from '../../../mobile/nativeFileShare';
 
@@ -41,29 +42,62 @@ export async function ensurePusulaPdfArchived(report: WeeklyPusulaReport) {
   return String(data.pdf_path ?? storedPath);
 }
 
+/**
+ * PDF save must never be blocked by R2 signing, CORS, or temporary network
+ * errors. Render from the approved snapshot and let the user save locally.
+ */
+async function saveLocalPusulaPdf(
+  report: WeeklyPusulaReport,
+  fileName: string,
+) {
+  if (!report.report_data) throw new Error('Rapor verileri henüz hazırlanmadı.');
+  const doc = await generatePusulaPdf(report.report_data);
+  const blob = doc.output('blob');
+  if (!blob.size) throw new Error('PDF boş üretildi. Tekrar deneyin.');
+  const saved = await shareBlobFileOnDevice({
+    blob,
+    fileName,
+    title: 'TarlaPusula · Tarla Analiz Raporu',
+    dialogTitle: 'PDF’yi Dosyalara Kaydet',
+  });
+  if (saved.handled) return;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Allow WebKit to start the file transfer before releasing the blob.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export async function openArchivedPusulaPdf(report: WeeklyPusulaReport) {
-  const storedPath = await ensurePusulaPdfArchived(report);
-  const url = await getPrivateFileUrl('reports', storedPath);
-
-  if (!url) {
-    throw new Error('Rapor bağlantısı hazırlanamadı.');
-  }
-
   const fieldName = safePart(report.report_data?.field?.name || 'tarla');
   const periodEnd = safePart(report.period_end || report.generated_at || report.id);
   const fileName = `TarlaPusula-${fieldName}-${periodEnd}.pdf`;
 
-  const nativeResult = await shareRemoteFileOnDevice({
-    url,
-    fileName,
-    title: 'TarlaPusula · Tarla Analiz Raporu',
-    text: `${report.report_data?.field?.name || 'Tarla'} için TarlaPusula raporu`,
-    dialogTitle: 'Raporu paylaş / kaydet',
-  });
+  try {
+    const storedPath = await ensurePusulaPdfArchived(report);
+    const url = await getPrivateFileUrl('reports', storedPath);
+    if (!url) throw new Error('PDF indirme bağlantısı hazırlanamadı.');
 
-  if (!nativeResult.handled) {
-    openRemoteFileInWeb(url);
+    const nativeResult = await shareRemoteFileOnDevice({
+      url,
+      fileName,
+      title: 'TarlaPusula · Tarla Analiz Raporu',
+      text: `${report.report_data?.field?.name || 'Tarla'} için TarlaPusula raporu`,
+      dialogTitle: 'Raporu paylaş / kaydet',
+    });
+
+    if (!nativeResult.handled) openRemoteFileInWeb(url);
+    return storedPath;
+  } catch (error) {
+    // A failed R2 upload, a signed URL/CORS issue or a temporary network
+    // failure cannot prevent saving a successfully rendered PDF on this phone.
+    console.warn('[PUSULAPDF] Bulut indirmesi başarısız; yerel PDF yedeği:', error);
+    await saveLocalPusulaPdf(report, fileName);
+    return report.pdf_path || '';
   }
-
-  return storedPath;
 }
