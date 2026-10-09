@@ -46,6 +46,34 @@ export function isNativeFileShareAvailable() {
   );
 }
 
+export async function shareBlobFileOnDevice(input: {
+  blob: Blob;
+  fileName: string;
+  title?: string;
+  text?: string;
+  dialogTitle?: string;
+}) {
+  if (!isNativeFileShareAvailable()) return { handled: false as const };
+  if (!input.blob.size) throw new Error('PDF dosyası boş; tekrar oluşturmayı deneyin.');
+  const name = safeFileName(input.fileName);
+  const base64 = await blobToBase64(input.blob);
+  const written = await Filesystem.writeFile({
+    path: `tarlapusula-share/${name}`,
+    data: base64,
+    directory: Directory.Cache,
+    recursive: true,
+  });
+  const canShare = await Share.canShare();
+  if (!canShare.value) throw new Error('Bu cihaz dosya kaydetme/paylaşmayı desteklemiyor.');
+  await Share.share({
+    title: input.title ?? 'TarlaPusula',
+    text: input.text,
+    url: written.uri,
+    dialogTitle: input.dialogTitle ?? 'PDF’yi Dosyalara Kaydet',
+  });
+  return { handled: true as const, uri: written.uri, fileName: name };
+}
+
 export async function shareRemoteFileOnDevice(input: NativeFileInput) {
   if (!isNativeFileShareAvailable()) {
     return { handled: false as const };
@@ -57,33 +85,8 @@ export async function shareRemoteFileOnDevice(input: NativeFileInput) {
   }
 
   const blob = await response.blob();
-  const base64 = await blobToBase64(blob);
-  const fileName = safeFileName(input.fileName);
-
-  const written = await Filesystem.writeFile({
-    path: `tarlapusula-share/${fileName}`,
-    data: base64,
-    directory: Directory.Cache,
-    recursive: true,
-  });
-
-  const canShare = await Share.canShare();
-  if (!canShare.value) {
-    throw new Error('Bu cihaz dosya paylaşımını desteklemiyor.');
-  }
-
-  await Share.share({
-    title: input.title ?? 'TarlaPusula',
-    text: input.text,
-    url: written.uri,
-    dialogTitle: input.dialogTitle ?? 'Dosyayı paylaş / kaydet',
-  });
-
-  return {
-    handled: true as const,
-    uri: written.uri,
-    fileName,
-  };
+  if (!blob.size) throw new Error('İndirilen dosya boş. Tekrar deneyin.');
+  return shareBlobFileOnDevice({ ...input, blob });
 }
 
 export function openRemoteFileInWeb(url: string) {
