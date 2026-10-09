@@ -47,6 +47,12 @@ jobs:
           npm run build
           npx cap sync ios
 
+      - name: Generate official Pusula App Store icon
+        shell: bash
+        run: |
+          python3 -m pip install 'Pillow>=10,<12'
+          python3 scripts/generate_ios_app_icon.py
+
       - name: Verify critical native plugins
         shell: bash
         run: |
