@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { urlBase64ToUint8Array } from '../../../utils/fileUtils';
@@ -308,6 +308,14 @@ export function useCalendarController({
       setCalendarLoading(false);
     }
   };
+
+  // Quick buttons elsewhere in the app save directly to calendar_reminders.
+  // Keep this view synchronized without requiring a full app reload.
+  useEffect(() => {
+    const refresh = () => { void loadCalendarReminders(); };
+    window.addEventListener('tp:calendar-reminder-added', refresh);
+    return () => window.removeEventListener('tp:calendar-reminder-added', refresh);
+  }, []);
 
   const openCalendarScreen = () => {
     setScreen('calendar');
