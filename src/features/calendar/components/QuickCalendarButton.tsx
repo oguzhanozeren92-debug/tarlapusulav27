@@ -21,10 +21,16 @@ export default function QuickCalendarButton({
   ...reminder
 }: Props) {
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const add = async () => {
-    if (state === 'saving' || state === 'saved') return;
+    if (state === 'saving') return;
+    if (state === 'saved') {
+      window.dispatchEvent(new CustomEvent('tp:open-calendar'));
+      return;
+    }
     setState('saving');
+    setErrorMessage('');
 
     try {
       const result = await addQuickCalendarReminder(reminder);
@@ -32,6 +38,7 @@ export default function QuickCalendarButton({
       onAdded?.(result.created);
     } catch (error) {
       console.warn('[calendar] Hızlı takvim kaydı eklenemedi:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Takvim kaydı oluşturulamadı.');
       setState('error');
     }
   };
@@ -40,7 +47,7 @@ export default function QuickCalendarButton({
     state === 'saving'
       ? 'Ekleniyor…'
       : state === 'saved'
-        ? savedLabel
+        ? `${savedLabel} · Takvimde göster`
         : state === 'error'
           ? 'Tekrar dene'
           : label;
@@ -50,7 +57,8 @@ export default function QuickCalendarButton({
       type="button"
       className={`tp-quick-calendar ${state === 'saved' ? 'is-saved' : ''} ${className}`.trim()}
       onClick={() => void add()}
-      disabled={state === 'saving' || state === 'saved'}
+      disabled={state === 'saving'}
+      title={state === 'error' ? errorMessage : undefined}
       aria-live="polite"
     >
       {state === 'saving' ? (
@@ -61,6 +69,11 @@ export default function QuickCalendarButton({
         <CalendarPlus size={15} aria-hidden="true" />
       )}
       <span>{text}</span>
+      {state === 'error' && (
+        <small role="alert" style={{ display:'block', fontSize:11, marginTop:3 }}>
+          {errorMessage}
+        </small>
+      )}
     </button>
   );
 }
