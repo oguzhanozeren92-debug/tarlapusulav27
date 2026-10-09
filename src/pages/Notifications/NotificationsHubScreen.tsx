@@ -19,6 +19,9 @@ import {
   type StoredInboxNotification,
 } from '../../features/notifications/services/notificationInboxState.service';
 import './NotificationsHubScreen.css';
+import { supabase } from '../../supabaseClient';
+import { openArchivedPusulaPdf } from '../../features/pusula-pdf/services/pusulaPdfArchive.service';
+import type { WeeklyPusulaReport } from '../../features/pusula-pdf/types';
 
 type FieldLike = {
   id: string | number;
@@ -88,6 +91,8 @@ export default function NotificationsHubScreen({
     () => readStoredInboxNotifications(),
   );
   const [revision, setRevision] = useState(0);
+  const [pdfActionMessage, setPdfActionMessage] = useState('');
+  const [pdfOpening, setPdfOpening] = useState(false);
 
   useEffect(() => {
     if (initialFieldId && !activeFieldId) setActiveFieldId(initialFieldId);
@@ -163,6 +168,33 @@ export default function NotificationsHubScreen({
         return;
       }
 
+      if (target === 'pusulapdf') {
+        if (pdfOpening) return;
+        const reportId = String((item.data as Record<string, unknown> | undefined)?.reportId ?? '').trim();
+        if (!reportId) {
+          setPdfActionMessage('Rapor kimliği bulunamadı. PusulaPDF geçmişinden tekrar deneyin.');
+          return;
+        }
+        setPdfOpening(true);
+        setPdfActionMessage('PusulaPDF hazırlanıyor; raporu açma ve kaydetme ekranı birazdan gelecek.');
+        try {
+          const { data: report, error } = await supabase
+            .from('weekly_field_reports')
+            .select('*')
+            .eq('id', reportId)
+            .single();
+          if (error) throw error;
+          if (!report) throw new Error('Rapor bulunamadı.');
+          await openArchivedPusulaPdf(report as WeeklyPusulaReport);
+          setPdfActionMessage('Raporun paylaşım/kaydetme ekranı açıldı. Dosyalara Kaydet seçeneğini kullanabilirsin.');
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Rapor indirilemedi.';
+          setPdfActionMessage(`PDF açılamadı: ${message} — Bildirime tekrar basarak deneyebilirsin.`);
+        } finally {
+          setPdfOpening(false);
+        }
+        return;
+      }
       if (target === 'weather' || target === 'spray_weather') {
         setScreen('weatherHub');
         return;
@@ -215,7 +247,7 @@ export default function NotificationsHubScreen({
 
       setScreen('home');
     },
-    [activeField, fieldId, onOpenFieldDetail, setScreen],
+    [activeField, fieldId, onOpenFieldDetail, setScreen, pdfOpening],
   );
 
   return (
@@ -275,6 +307,14 @@ export default function NotificationsHubScreen({
             </div>
           </div>
 
+          {pdfActionMessage && (
+            <p role="status" aria-live="polite" style={{
+              margin:'8px 2px 14px',padding:'12px',border:'1px solid #d5dce0',
+              borderRadius:12,background:'#fff',color:'#111',fontSize:13,
+            }}>
+              {pdfActionMessage}
+            </p>
+          )}
           {visibleNotifications.length === 0 ? (
             <div className="tp-notification-empty">
               <Bell size={20} />
@@ -298,6 +338,7 @@ export default function NotificationsHubScreen({
                       type="button"
                       className={`tp-notification-item ${read ? 'is-read' : 'is-unread'}`}
                       onClick={() => void openNotification(item)}
+                      disabled={pdfOpening && item.target === 'pusulapdf'}
                     >
                       <span className="tp-notification-item-icon">
                         {notificationIcon(item)}
