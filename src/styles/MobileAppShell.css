@@ -245,7 +245,7 @@ html.tp-native-app [role='button'] {
 
   html.tp-native-app .tp-brand-pusula-wrap {
     top: auto !important;
-    bottom: 6px !important;
+    bottom: 0px !important;
     transform: translateX(-50%) !important;
   }
 
@@ -301,7 +301,7 @@ html.tp-native-app [role='button'] {
   html.tp-native-app
     .tp-global-pusula-anchor:not(.tp-depot-pusula-active) {
     top: auto !important;
-    bottom: 9px !important;
+    bottom: 3px !important;
     transform: translateX(-50%) !important;
     width: 44px !important;
     height: 44px !important;
