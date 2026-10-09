@@ -129,7 +129,7 @@ export default function NotificationsHubScreen({
     const hidden = readHiddenNotificationIds();
     return [...notifications]
       .filter((item) => !hidden.has(String(item.id)))
-      .filter((item) => !fieldId || !item.fieldId || String(item.fieldId) === fieldId)
+      .filter((item) => item.source === 'pusulapdf' || !fieldId || !item.fieldId || String(item.fieldId) === fieldId)
       .sort((a, b) => {
         const priorityDiff = Number(b.priority ?? 0) - Number(a.priority ?? 0);
         if (priorityDiff) return priorityDiff;
