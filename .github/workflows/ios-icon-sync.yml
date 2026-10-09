@@ -35,8 +35,7 @@ jobs:
       - name: Commit native iOS icon if changed
         run: |
           set -euo pipefail
-          ICON="ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
-          git add "$ICON"
+          git add ios/App/App/Assets.xcassets/AppIcon.appiconset/
           if git diff --cached --quiet; then
             echo "iOS icon already matches official Pusula artwork."
             exit 0
