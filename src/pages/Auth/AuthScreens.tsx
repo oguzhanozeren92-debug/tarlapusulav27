@@ -376,7 +376,12 @@ export default function AuthScreens({
   const handleSocialLogin = async (provider: SocialAuthProvider) => {
     setAuthMessage('');
 
-    if (socialAvailability && !socialAvailability[provider]) {
+    if (!socialAvailability) {
+      setAuthMessage('Giriş seçenekleri kontrol ediliyor. Birkaç saniye sonra tekrar dene.');
+      return;
+    }
+
+    if (!socialAvailability[provider]) {
       setAuthMessage(
         `${socialAuthProviderLabel(provider)} ile giriş henüz etkin değil.`,
       );
@@ -543,50 +548,43 @@ export default function AuthScreens({
                 </Button>
               </form>
 
-              {socialAvailability &&
-              Object.values(socialAvailability).some(Boolean) ? (
-                <div className="tp-authv2-social-login" aria-label="Sosyal giriş seçenekleri">
-                  <span className="tp-authv2-social-label">veya</span>
-                  <div className="tp-authv2-social-icons">
-                    {socialAvailability.google ? (
+              <div className="tp-authv2-social-login" aria-label="Sosyal giriş seçenekleri">
+                <span className="tp-authv2-social-label">veya</span>
+                <div className="tp-authv2-social-icons">
+                  {(['google', 'facebook', 'apple'] as const).map((provider) => {
+                    const available = socialAvailability?.[provider] === true;
+                    const statusKnown = socialAvailability !== null;
+                    const statusText = !statusKnown
+                      ? 'Giriş yöntemi kontrol ediliyor'
+                      : available
+                        ? `${socialAuthProviderLabel(provider)} ile devam et`
+                        : `${socialAuthProviderLabel(provider)} girişi henüz etkinleştirilmedi`;
+                    return (
                       <button
+                        key={provider}
                         type="button"
-                        className="tp-authv2-social-button"
-                        aria-label="Google ile devam et"
-                        title="Google ile devam et"
+                        className={`tp-authv2-social-button${provider === 'apple' ? ' tp-authv2-social-button--apple' : ''}${statusKnown && !available ? ' tp-authv2-social-button--unavailable' : ''}`}
+                        aria-label={statusText}
+                        title={statusText}
                         disabled={socialLoading !== null}
-                        onClick={() => void handleSocialLogin('google')}
+                        onClick={() => void handleSocialLogin(provider)}
                       >
-                        <GoogleIcon />
+                        {provider === 'google' ? <GoogleIcon /> :
+                          provider === 'facebook' ? <FacebookIcon /> : <AppleIcon />}
                       </button>
-                    ) : null}
-                    {socialAvailability.facebook ? (
-                      <button
-                        type="button"
-                        className="tp-authv2-social-button"
-                        aria-label="Facebook ile devam et"
-                        title="Facebook ile devam et"
-                        disabled={socialLoading !== null}
-                        onClick={() => void handleSocialLogin('facebook')}
-                      >
-                        <FacebookIcon />
-                      </button>
-                    ) : null}
-                    {socialAvailability.apple ? (
-                      <button
-                        type="button"
-                        className="tp-authv2-social-button tp-authv2-social-button--apple"
-                        aria-label="Apple ile devam et"
-                        title="Apple ile devam et"
-                        disabled={socialLoading !== null}
-                        onClick={() => void handleSocialLogin('apple')}
-                      >
-                        <AppleIcon />
-                      </button>
-                    ) : null}
-                  </div>
+                    );
+                  })}
                 </div>
-              ) : null}
+                {socialAvailability &&
+                  (!socialAvailability.facebook || !socialAvailability.apple) && (
+                    <small className="tp-authv2-social-unavailable-note">
+                      {[
+                        !socialAvailability.facebook ? 'Facebook' : null,
+                        !socialAvailability.apple ? 'Apple' : null,
+                      ].filter(Boolean).join(' ve ')} girişi henüz etkinleştirilmedi.
+                    </small>
+                  )}
+              </div>
 
               <div className="tp-authv2-footer">
                 <span>Hesabın yok mu?</span>
