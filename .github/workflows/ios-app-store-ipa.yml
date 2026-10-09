@@ -224,8 +224,9 @@ jobs:
       - name: Generate official Pusula App Store icon
         shell: bash
         run: |
-          python3 -m pip install 'Pillow>=10,<12'
-          python3 scripts/generate_ios_app_icon.py
+          python3 -m venv "$RUNNER_TEMP/tp-ios-icon-venv"
+          "$RUNNER_TEMP/tp-ios-icon-venv/bin/python" -m pip install 'Pillow>=10,<12'
+          "$RUNNER_TEMP/tp-ios-icon-venv/bin/python" scripts/generate_ios_app_icon.py
 
       - name: Verify critical native plugins
         shell: bash
