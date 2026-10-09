@@ -39,6 +39,18 @@ export function normalizeCalendarDate(value: unknown) {
   return calendarDateAfterDays(0, parsed);
 }
 
+function notifyCalendarReminderSaved(
+  id: string,
+  fieldId: string,
+  reminderDate: string,
+  created: boolean,
+) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('tp:calendar-reminder-added', {
+    detail: { id, fieldId, reminderDate, created },
+  }));
+}
+
 export async function addQuickCalendarReminder(
   input: QuickCalendarReminderInput,
 ): Promise<QuickCalendarReminderResult> {
@@ -78,6 +90,9 @@ export async function addQuickCalendarReminder(
   if (existingError) throw existingError;
 
   if (existing?.id) {
+    // Duplicates are valid saved entries too. Refresh Calendar, so the
+    // previously saved item is immediately visible after the button is tapped.
+    notifyCalendarReminderSaved(String(existing.id), fieldId, reminderDate, false);
     return { id: String(existing.id), created: false };
   }
 
@@ -101,20 +116,7 @@ export async function addQuickCalendarReminder(
 
   if (error) throw error;
 
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(
-      new CustomEvent('tp:calendar-reminder-added', {
-        detail: {
-          id: String(data.id),
-          fieldId,
-          reminderType,
-          title,
-          reminderDate,
-          reminderTime,
-        },
-      }),
-    );
-  }
+  notifyCalendarReminderSaved(String(data.id), fieldId, reminderDate, true);
 
   return { id: String(data.id), created: true };
 }
