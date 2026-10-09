@@ -5226,66 +5226,11 @@ body .tp-v1 .tp-ndvi-live-summary{
 }
 
 
-/* V63 — Mobil harita yatay hizası ve ana ekran Pusula ince konum ayarı */
-@media (max-width: 760px) {
-  /*
-   * Map-first eski -11px sağ/sol taşırmaları içeriyordu. Kartı ana ekranın
-   * eşit iç boşluklarına oturt; başlık, harita, NDVI ve Pusula altlığı aynı
-   * genişlikte kalsın. Tam ekran harita sınıflarını değiştirme.
-   */
-  body .tp-v1 .tp-main {
-    padding-left: 10px !important;
-    padding-right: 10px !important;
-  }
-
-  body .tp-v1 .tp-home-map-pusula-shell {
-    position: relative !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-
-  body .tp-v1 .tp-home-map-pusula-shell > .tp-map-first-shell {
-    box-sizing: border-box !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-
-  body .tp-v1 .tp-home-map-pusula-shell .tp-map-first-shell > .tp-home-field {
-    box-sizing: border-box !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-
-  body .tp-v1 .tp-home-map-pusula-shell > .tp-home-map-pusula-strip {
-    box-sizing: border-box !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-}
-
-/* Yalnız ana ekran logosu: sabit yatay merkez korunurken 10px aşağı. */
-@media (max-width: 760px) {
-  body .tp-v1 .tp-v1-header .tp-brand-pusula-wrap {
-    left: 50% !important;
-    top: calc(50% + 10px) !important;
-    transform: translate(-50%, -50%) !important;
-  }
-}
-
-
-/* V64 — iOS/Android: viewport-fit home map with zero horizontal page drift */
+/* V66 — One responsive Home map geometry (phone-size independent)
+   The app's viewport/root owns the width; no 100vw on descendants, negative
+   offsets, transforms, or device-specific width guesses. Child, map and
+   Pusula overlay MUST share the same containing block and x origin.
+   NOTE: do not apply normal-view constraints to the fullscreen map. */
 @media (max-width: 760px) {
   body .tp-v1 {
     box-sizing: border-box !important;
@@ -5297,86 +5242,33 @@ body .tp-v1 .tp-ndvi-live-summary{
 
   body .tp-v1 .tp-main {
     box-sizing: border-box !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  /* Map and Pusula overlays share precisely the same available width. */
-  body .tp-v1 .tp-home-map-pusula-shell,
-  body .tp-v1 .tp-home-map-pusula-shell > .tp-map-first-shell,
-  body .tp-v1 .tp-home-map-pusula-shell .tp-map-first-shell > .tp-home-field {
-    box-sizing: border-box !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-
-  body .tp-v1 .tp-home-map-pusula-shell > .tp-home-map-pusula-strip {
-    box-sizing: border-box !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-
-  /* Do not constrain the user-requested full-screen map. */
-  body:not(.tp-map-body-fullscreen)
-  .tp-v1 .tp-map-first-shell .tp-map-stage:not(.tp-map-portrait-fullscreen) {
-    box-sizing: border-box !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  body .tp-v1 .tp-map-first-shell .tp-field-head,
-  body .tp-v1 .tp-map-first-shell .tp-field-toolbar {
-    box-sizing: border-box !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
-}
-
-
-/* V65 — native iPhone map frame: viewport-centered, no asymmetric gutter */
-@media (max-width: 600px) {
-  /*
-   * Center the Home canvas against the real device viewport instead of the
-   * inherited width of older app-preview wrappers. The 8px gutters are equal
-   * on both sides, at any iPhone width.
-   */
-  html.tp-native-app body .tp-v1 .tp-main {
     position: relative !important;
-    box-sizing: border-box !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
-    min-width: 0 !important;
-    margin-left: calc(50% - 50vw) !important;
-    margin-right: 0 !important;
-    padding-left: 8px !important;
-    padding-right: 8px !important;
-  }
-
-  html.tp-native-app body .tp-v1 .tp-main > .tp-home-map-pusula-shell,
-  html.tp-native-app body .tp-v1 .tp-main > .tp-home-map-pusula-shell > .tp-map-first-shell,
-  html.tp-native-app body .tp-v1 .tp-main > .tp-home-map-pusula-shell > .tp-map-first-shell > .tp-home-field {
-    position: relative !important;
-    box-sizing: border-box !important;
-    left: auto !important;
-    right: auto !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     margin-left: auto !important;
     margin-right: auto !important;
+    padding-left: max(8px, env(safe-area-inset-left)) !important;
+    padding-right: max(8px, env(safe-area-inset-right)) !important;
+  }
+
+  body .tp-v1 .tp-main > .tp-home-map-pusula-shell,
+  body .tp-v1 .tp-home-map-pusula-shell > .tp-map-first-shell,
+  body .tp-v1 .tp-home-map-pusula-shell .tp-map-first-shell > .tp-home-field {
+    box-sizing: border-box !important;
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     transform: none !important;
   }
 
-  /* Match all three layers: field card, map surface, and Pusula strip. */
-  html.tp-native-app body:not(.tp-map-body-fullscreen)
-  .tp-v1 .tp-home-map-pusula-shell .tp-map-first-shell
+  body:not(.tp-map-body-fullscreen) .tp-v1
+  .tp-home-map-pusula-shell .tp-map-first-shell
   .tp-map-stage:not(.tp-map-portrait-fullscreen) {
     box-sizing: border-box !important;
     width: 100% !important;
@@ -5386,13 +5278,63 @@ body .tp-v1 .tp-ndvi-live-summary{
     margin-right: 0 !important;
   }
 
-  html.tp-native-app body .tp-v1 .tp-home-map-pusula-shell > .tp-home-map-pusula-strip {
+  body:not(.tp-map-body-fullscreen) .tp-v1
+  .tp-home-map-pusula-shell > .tp-home-map-pusula-strip {
     box-sizing: border-box !important;
     left: 0 !important;
-    right: 0 !important;
+    right: auto !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
+    transform: none !important;
   }
+
+  body .tp-v1 .tp-map-first-shell .tp-field-head,
+  body .tp-v1 .tp-map-first-shell .tp-field-toolbar {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Previously approved Pusula header adjustment is preserved. */
+  body .tp-v1 .tp-v1-header .tp-brand-pusula-wrap {
+    left: 50% !important;
+    top: calc(50% + 10px) !important;
+    transform: translate(-50%, -50%) !important;
+  }
+}
+
+/* Native phones in landscape can be >760 CSS px; still use full width.
+   Keep the same padding source, regardless of physical model/orientation. */
+html.tp-native-app body .tp-v1 .tp-main {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+  padding-left: max(8px, env(safe-area-inset-left)) !important;
+  padding-right: max(8px, env(safe-area-inset-right)) !important;
+}
+html.tp-native-app body .tp-v1 .tp-main > .tp-home-map-pusula-shell,
+html.tp-native-app body .tp-v1 .tp-home-map-pusula-shell > .tp-map-first-shell,
+html.tp-native-app body .tp-v1 .tp-home-map-pusula-shell .tp-map-first-shell > .tp-home-field {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  margin-inline: 0 !important;
+  transform: none !important;
+}
+html.tp-native-app body:not(.tp-map-body-fullscreen) .tp-v1
+.tp-home-map-pusula-shell > .tp-home-map-pusula-strip {
+  box-sizing: border-box !important;
+  left: 0 !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-inline: 0 !important;
 }
