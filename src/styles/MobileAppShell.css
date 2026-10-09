@@ -155,7 +155,7 @@ html.tp-native-app [role='button'] {
   }
 
   html.tp-native-app .tp-brand-pusula-wrap {
-    top: calc(50% + 10px) !important;
+    top: calc(50% + 14px) !important;
   }
 
   html.tp-native-app .tp-brand-pusula-anchor {
@@ -174,7 +174,7 @@ html.tp-native-app [role='button'] {
 
   html.tp-native-app
     .tp-global-pusula-anchor:not(.tp-depot-pusula-active) {
-    top: calc(50% + 8px) !important;
+    top: calc(50% + 12px) !important;
   }
 
   html.tp-native-app .tp-global-pusula-anchor,
@@ -245,7 +245,7 @@ html.tp-native-app [role='button'] {
 
   html.tp-native-app .tp-brand-pusula-wrap {
     top: auto !important;
-    bottom: 10px !important;
+    bottom: 6px !important;
     transform: translateX(-50%) !important;
   }
 
