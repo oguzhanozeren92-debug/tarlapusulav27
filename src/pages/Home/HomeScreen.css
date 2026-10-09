@@ -5283,3 +5283,58 @@ body .tp-v1 .tp-ndvi-live-summary{
     transform: translate(-50%, -50%) !important;
   }
 }
+
+
+/* V64 — iOS/Android: viewport-fit home map with zero horizontal page drift */
+@media (max-width: 760px) {
+  body .tp-v1 {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: clip;
+  }
+
+  body .tp-v1 .tp-main {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Map and Pusula overlays share precisely the same available width. */
+  body .tp-v1 .tp-home-map-pusula-shell,
+  body .tp-v1 .tp-home-map-pusula-shell > .tp-map-first-shell,
+  body .tp-v1 .tp-home-map-pusula-shell .tp-map-first-shell > .tp-home-field {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  body .tp-v1 .tp-home-map-pusula-shell > .tp-home-map-pusula-strip {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Do not constrain the user-requested full-screen map. */
+  body:not(.tp-map-body-fullscreen)
+  .tp-v1 .tp-map-first-shell .tp-map-stage:not(.tp-map-portrait-fullscreen) {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body .tp-v1 .tp-map-first-shell .tp-field-head,
+  body .tp-v1 .tp-map-first-shell .tp-field-toolbar {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
