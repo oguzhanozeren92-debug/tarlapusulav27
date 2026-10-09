@@ -43,6 +43,8 @@ jobs:
           set -euo pipefail
           git add android/app/src/main/res/mipmap-*/ic_launcher*.png
           git add android/app/src/main/res/values/ic_launcher_background.xml
+          git add android/app/src/main/res/values-night/ic_launcher_background.xml
+          git add assets/app-icons/play-store-icon-512.png
           if git diff --cached --quiet; then
             echo "Android app icons already match real TarlaPusula Pusula branding."
             exit 0
