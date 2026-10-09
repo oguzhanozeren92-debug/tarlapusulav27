@@ -5298,11 +5298,14 @@ body .tp-v1 .tp-ndvi-live-summary{
     min-width: 0 !important;
   }
 
-  /* Previously approved Pusula header adjustment is preserved. */
-  body .tp-v1 .tp-v1-header .tp-brand-pusula-wrap {
+  /* Native Pusula sits on the shared header baseline, not the old
+     conflicting top/center transform. Changing the bottom moves it
+     consistently on iPhones of different heights. */
+  html.tp-native-app body .tp-v1 .tp-v1-header .tp-brand-pusula-wrap {
     left: 50% !important;
-    top: calc(50% + 14px) !important;
-    transform: translate(-50%, -50%) !important;
+    top: auto !important;
+    bottom: 0px !important;
+    transform: translateX(-50%) !important;
   }
 }
 
