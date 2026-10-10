@@ -128,7 +128,9 @@ jobs:
               # Prefer the file-safe secret when supplied, even if a previous
               # text-only P8 secret exists with damaged clipboard formatting.
               try:
-                  key_text = base64.b64decode(raw_b64.strip(), validate=True).decode("utf-8-sig").strip()
+                  # iOS Shortcuts may insert line breaks or spaces in Base64 output.
+                  b64_clean = re.sub(r"\s+", "", raw_b64)
+                  key_text = base64.b64decode(b64_clean, validate=True).decode("utf-8-sig").strip()
               except (ValueError, UnicodeError) as exc:
                   raise SystemExit("APP_STORE_CONNECT_API_KEY_P8_B64 is not a valid base64-encoded Apple .p8 file") from exc
           elif raw_text:
