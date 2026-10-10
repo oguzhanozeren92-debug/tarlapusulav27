@@ -124,16 +124,18 @@ jobs:
           raw_text = os.environ.get("APP_STORE_CONNECT_API_KEY_P8", "")
           raw_b64 = os.environ.get("APP_STORE_CONNECT_API_KEY_P8_B64", "")
 
-          if raw_text:
-              key_text = raw_text.strip().lstrip("\ufeff")
-              # iOS clipboard and GitHub entry sometimes turn PEM line breaks
-              # into literal backslash-n sequences. Normalize without logging.
-              key_text = key_text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r", "\n")
-          elif raw_b64:
+          if raw_b64:
+              # Prefer the file-safe secret when supplied, even if a previous
+              # text-only P8 secret exists with damaged clipboard formatting.
               try:
                   key_text = base64.b64decode(raw_b64.strip(), validate=True).decode("utf-8-sig").strip()
               except (ValueError, UnicodeError) as exc:
                   raise SystemExit("APP_STORE_CONNECT_API_KEY_P8_B64 is not a valid base64-encoded Apple .p8 file") from exc
+          elif raw_text:
+              key_text = raw_text.strip().lstrip("\ufeff")
+              # iOS clipboard and GitHub entry sometimes turn PEM line breaks
+              # into literal backslash-n sequences. Normalize without logging.
+              key_text = key_text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r", "\n")
           else:
               raise SystemExit("missing App Store Connect private key secret")
 
