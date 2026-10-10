@@ -99,6 +99,26 @@ async function consentReady() {
   return info.canRequestAds;
 }
 
+/**
+ * Ask for iOS App Tracking Transparency permission before AdMob starts.
+ * AdMob UMP may already have shown its IDFA prompt; avoid a duplicate
+ * request by asking only when Apple's authorization is still undetermined.
+ * Denying ATT must never block contextual (non-tracking) ads.
+ */
+async function ensureIosTrackingAuthorization() {
+  if (Capacitor.getPlatform() !== 'ios') return;
+
+  try {
+    const { status } = await AdMob.trackingAuthorizationStatus();
+    if (status === 'notDetermined') {
+      await AdMob.requestTrackingAuthorization();
+    }
+  } catch (error) {
+    // ATT can be unavailable/restricted; do not block non-tracking ads.
+    console.warn('[AdMob] iOS ATT izni alınamadı:', error);
+  }
+}
+
 export function isNativeAdMobAvailable() {
   return (
     Capacitor.isNativePlatform() &&
@@ -113,6 +133,9 @@ export async function ensureNativeAdMobReady() {
   initPromise = (async () => {
     const canRequestAds = await consentReady();
     if (!canRequestAds) return false;
+
+    // UMP consent and Apple's ATT permission are separate requirements.
+    await ensureIosTrackingAuthorization();
 
     await AdMob.initialize({
       initializeForTesting:
