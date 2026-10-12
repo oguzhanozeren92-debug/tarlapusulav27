@@ -980,8 +980,10 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, top + 8, 1, 'Bitki Sağlığı ve Gelişim Analizi', GREEN, '↑');
+  sectionHeader(ctx, midX + 10, top + 8, 1,
+    hasSatelliteMeasurements?'Bitki Sağlığı ve Gelişim Analizi':'Uydu Kanıtı ve Ölçüm Kapsamı', GREEN, '↑');
   text(ctx, 'Gerçek sayısal ölçümler · tarih ve kaynak doğrulaması', midX + 18, top + 55, 9.5, 700, MUTED);
+  if(hasSatelliteMeasurements){
   const vegCardW = 86;
   VEGETATION_INDICES.forEach((item, index) => {
     const x = midX + 17 + index * 93;
@@ -1007,6 +1009,28 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   if(unmeasuredIndices.length){
     fittedText(ctx,`Sayısal veri yok: ${unmeasuredIndices.map(item=>item.label).join(', ')} · uygun parsel ölçümü gerekli.`,
       midX+17,top+375,midW-34,9,750,MUTED);
+  }
+
+  }else{
+    // This panel becomes a transparent evidence/coverage summary rather than
+    // printing four meaningless empty numeric index cells and another chart.
+    rr(ctx,midX+16,top+71,midW-32,120,11,'#f1f8f3',LINE);
+    fittedText(ctx,`${sat.length} uydu sahne/kontrol tarihi`,midX+29,top+101,midW-62,17,900,GREEN);
+    wrap(ctx,'NDVI, NDRE, GNDVI ve SAVI parsel indeksleri bu tarih aralığında sayısal olarak kaydedilmemiş.',
+      midX+29,top+130,11.3,750,INK,midW-60,1.28,3);
+    const evidenceText=[
+      ['Kayıtlı tarihler',String(sat.length)],
+      ['Sayısal indeks', '0'],
+      ['Kaynak doğrulama','Yeniden hesaplama gerekli'],
+    ];
+    evidenceText.forEach(([label,value],i)=>{
+      const yy=top+218+i*42;
+      rr(ctx,midX+16,yy-21,midW-32,36,9,i%2===0?'#f4f7f9':WHITE,LINE);
+      fittedText(ctx,label,midX+27,yy,155,10.5,800,MUTED);
+      fittedText(ctx,value,midX+191,yy,midW-214,10.5,850,i===1?ORANGE:INK);
+    });
+    wrap(ctx,'Geçersiz veya boş ölçüm yerine aynı dönemin gerçek hava, toprak referansı ve kayıtlı saha kanıtları yorumlanır.',
+      midX+18,top+363,9.5,700,MUTED,midW-36,1.12,2);
   }
 
   const hasIrrigationEvidence=ndmiValue!==null||need.mm!==null;
