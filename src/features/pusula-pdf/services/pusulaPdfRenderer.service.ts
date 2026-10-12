@@ -967,8 +967,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, top + 8, 1,
-    hasSatelliteMeasurements?'Bitki Sağlığı ve Gelişim Analizi':'Uydu Kanıtı ve Ölçüm Kapsamı', GREEN, '↑');
+  sectionHeader(ctx,midX+10,top+8,1,
+    hasSatelliteMeasurements?'Bitki Sağlığı ve Gelişim Analizi':'Uydu Katmanları Ne Anlatır?',GREEN,'↑');
   text(ctx, 'Gerçek sayısal ölçümler · tarih ve kaynak doğrulaması', midX + 18, top + 55, 9.5, 700, MUTED);
   if(hasSatelliteMeasurements){
   const vegCardW = 86;
@@ -999,25 +999,21 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   }
 
   }else{
-    // This panel becomes a transparent evidence/coverage summary rather than
-    // printing four meaningless empty numeric index cells and another chart.
-    rr(ctx,midX+16,top+71,midW-32,120,11,'#f1f8f3',LINE);
-    fittedText(ctx,`${sat.length} uydu sahne/kontrol tarihi`,midX+29,top+101,midW-62,17,900,GREEN);
-    wrap(ctx,'NDVI, NDRE, GNDVI ve SAVI parsel indeksleri bu tarih aralığında sayısal olarak kaydedilmemiş.',
-      midX+29,top+130,11.3,750,INK,midW-60,1.28,3);
-    const evidenceText=[
-      ['Kayıtlı tarihler',String(sat.length)],
-      ['Sayısal indeks', '0'],
-      ['Kaynak doğrulama','Yeniden hesaplama gerekli'],
+    // This is a reading guide, not a second rendering of satellite coverage.
+    const meanings=[
+      ['NDVI','Yeşil bitki örtüsünün canlılık göstergesi',GREEN,GREEN_SOFT],
+      ['NDRE','Klorofil değişimini takip etmeye yardımcı',BLUE,BLUE_SOFT],
+      ['GNDVI','Yeşil doku ve ışık tepkisine duyarlı',TEAL,GREEN_SOFT],
+      ['SAVI','Seyrek örtüde çıplak toprağın etkisini azaltır',ORANGE,ORANGE_SOFT],
     ];
-    evidenceText.forEach(([label,value],i)=>{
-      const yy=top+218+i*42;
-      rr(ctx,midX+16,yy-21,midW-32,36,9,i%2===0?'#f4f7f9':WHITE,LINE);
-      fittedText(ctx,label,midX+27,yy,155,10.5,800,MUTED);
-      fittedText(ctx,value,midX+191,yy,midW-214,10.5,850,i===1?ORANGE:INK);
+    meanings.forEach(([label,meaning,accent,soft],i)=>{
+      const yy=top+77+i*70;
+      rr(ctx,midX+17,yy,midW-34,62,11,soft,LINE);
+      fittedText(ctx,label,midX+31,yy+24,74,13,900,accent);
+      wrap(ctx,meaning,midX+111,yy+20,10.8,700,INK,midW-150,1.18,2);
     });
-    wrap(ctx,'Geçersiz veya boş ölçüm yerine aynı dönemin gerçek hava, toprak referansı ve kayıtlı saha kanıtları yorumlanır.',
-      midX+18,top+363,9.5,700,MUTED,midW-36,1.12,2);
+    fittedText(ctx,'Bu katmanların gerçek sonuçları yalnız tarihli parsel ölçümü varsa gösterilir.',
+      midX+17,top+372,midW-34,9.4,750,MUTED);
   }
 
   const hasIrrigationEvidence=ndmiValue!==null||need.mm!==null;
@@ -1234,12 +1230,13 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     rightX + 29, 1081, 11, 850, BLUE);
 
   rr(ctx, rightX, 1170, rightW, 250, 15, '#f7fbf8', LINE);
-  sectionHeader(ctx, rightX + 10, 1178, 9, "Pusula'nın Kısa Aksiyonları", GREEN, '✓');
+  sectionHeader(ctx,rightX+10,1178,9,
+    isHistoricalReport?'Raporun Kanıt Türleri':"Pusula'nın Kısa Aksiyonları",GREEN,'✓');
   const narrativeActions=(narrative?.actions??[]).filter(Boolean);
   const actions = isHistoricalReport ? [
-    ['Dönem Kaydı','Geçmiş döneme ait sulama, hasat ve işlem kayıtlarını varsa tamamla.',GREEN,GREEN_SOFT],
-    ['Kaynak Kontrolü','Toprak model referansını laboratuvar sonucu gibi yorumlama; gerçek saha verisiyle doğrula.',BLUE,BLUE_SOFT],
-    ['Dönem Kıyasla','Sonraki dönemlerdeki gerçek uydu ve hava kayıtlarıyla değişimi karşılaştır.',PURPLE,PURPLE_SOFT],
+    ['Gözlem','Uydu ve geçmiş hava kayıtları tarihli gözlem verisi niteliğindedir.',GREEN,GREEN_SOFT],
+    ['Model','SoilGrids parsel laboratuvar testi değil; konumsal model referansıdır.',BLUE,BLUE_SOFT],
+    ['Pusula Yorumu','Analitik yorum, doğrulanmış değerler yerine geçmez.',PURPLE,PURPLE_SOFT],
   ] : [
     ['Bugün', narrativeActions[0] ?? guidance.next7Days[0] ?? 'Tarlanın güncel durumunu kontrol et.', GREEN, GREEN_SOFT],
     ['Önümüzdeki 7 Gün', narrativeActions[1] ?? guidance.next7Days[1] ?? 'Uydu ve hava trendini takip et.', BLUE, BLUE_SOFT],
