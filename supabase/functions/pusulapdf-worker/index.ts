@@ -12,7 +12,6 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const PDF_LAYER_ARCHIVE_NAMESPACE = 'pdf-layer-archive-v1';
 const FIELD_MAP_BUCKET = 'field-map-layers';
-const REPORT_DAYS = 30;
 const SATELLITE_HISTORY_DAYS = 180;
 const MAX_HISTORICAL_SCENES = 16;
 const MIN_NUMERIC_DATES = 4;
@@ -58,10 +57,20 @@ const readIndex=(result:any,key:string)=>{
   return null;
 };
 
-function period30(now=new Date()){
-  const end=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
-  const start=new Date(end);start.setUTCDate(start.getUTCDate()-(REPORT_DAYS-1));
-  return {start:isoDate(start),end:isoDate(end)};
+function requestedPeriod(job:any){
+  // For old jobs only, retain the original 30-day fallback.
+  const legacyEnd=isoDate(new Date());
+  const legacyStart=new Date(`${legacyEnd}T00:00:00Z`);
+  legacyStart.setUTCDate(legacyStart.getUTCDate()-29);
+  const start=String(job.requested_start??isoDate(legacyStart)).slice(0,10);
+  const end=String(job.requested_end??legacyEnd).slice(0,10);
+  const startTime=Date.parse(`${start}T00:00:00Z`);
+  const endTime=Date.parse(`${end}T00:00:00Z`);
+  const days=Math.round((endTime-startTime)/86400000)+1;
+  if(!Number.isFinite(days)||days<7||days>180||start>end||end>isoDate(new Date())){
+    throw new Error('Geçersiz rapor tarihi: 7 ile 180 gün arasında, gelecekte olmayan bir dönem seçilmelidir.');
+  }
+  return {start,end,days};
 }
 
 async function setJob(jobId:string, patch:Record<string,unknown>){
@@ -262,10 +271,10 @@ async function persistSatellitePoint(userId:string,fieldId:string,date:string,r:
 }
 async function collectSatellite(userId:string,fieldId:string,geometry:any,archive:CloudLayerSnapshot[],period:{start:string;end:string}){
   const archivedPoints=cloudSatellitePoints(archive);
-  // 180-day satellite history for trends; weather and activity windows remain 30 days.
+  // Fetch records only in the user's selected window; never masquerade old dates as selected-period measurements.
   const historyStart=new Date(`${period.end}T00:00:00Z`);
   historyStart.setUTCDate(historyStart.getUTCDate()-(SATELLITE_HISTORY_DAYS-1));
-  const recentArchived=archivedPoints.filter((point:any)=>new Date(`${point.date}T00:00:00Z`)>=historyStart);
+  const recentArchived=archivedPoints.filter((point:any)=>point.date>=period.start&&point.date<=period.end);
   if(!geometry){
     return {points:recentArchived.slice(0,10).sort((a,b)=>a.date.localeCompare(b.date)),availableDates:archivedPoints.map((p:any)=>p.date),archiveUsed:Math.min(10,recentArchived.length),liveUsed:0};
   }
@@ -285,7 +294,7 @@ async function collectSatellite(userId:string,fieldId:string,geometry:any,archiv
 
   const archiveDates=archivedPoints.map((point:any)=>point.date);
   const dates=[...new Set([...liveDates,...archiveDates])].sort().reverse();
-  const selected=dates.filter(d=>d<=period.end&&new Date(`${d}T00:00:00Z`)>=historyStart).slice(0,MAX_HISTORICAL_SCENES);
+  const selected=dates.filter(d=>d>=period.start&&d<=period.end&&new Date(`${d}T00:00:00Z`)>=historyStart).slice(0,MAX_HISTORICAL_SCENES);
   const archiveByDate=new Map(archivedPoints.map((point:any)=>[point.date,point]));
   const points:any[]=[];let archiveUsed=0;let liveUsed=0;
   const isNumeric=(p:any)=>[p?.ndvi,p?.ndmi,p?.ndre,p?.savi,p?.gndvi]
@@ -421,7 +430,8 @@ async function collectWeather(userId:string,fieldId:string,latitude:number|null,
   const cached=cloudWeatherHistory(archive,period);
   const cacheByDate=new Map(cached.map((row)=>[row.date,row]));
   if(latitude===null||longitude===null)return {history:cached,source:cached.length?'archive':null,archiveUsed:cached.length,liveUsed:0};
-  const needLive=cached.length<Math.min(24,REPORT_DAYS-3)||!cacheByDate.has(period.start);
+  const windowDays=Math.round((Date.parse(period.end)-Date.parse(period.start))/86400000)+1;
+   const needLive=cached.length<Math.min(windowDays,Math.max(4,windowDays-2))||!cacheByDate.has(period.start);
   if(!needLive)return {history:cached,source:'Open-Meteo geçmiş hava / arşiv',archiveUsed:cached.length,liveUsed:0};
   try{
     const live=await withRetry('geçmiş hava',()=>fetchHistoricalWeather(latitude,longitude,period),2);
@@ -591,17 +601,17 @@ async function processJob(jobId:string,userId:string){
 
     const {data:field,error:fieldError}=await admin.from('fields').select(FIELD_COLUMNS).eq('id',job.field_id).eq('user_id',userId).single();
     if(fieldError||!field) throw fieldError??new Error('Tarla bulunamadı');
-    const fieldId=String(field.id);const geometry=field.parcel_geometry??null;const lat=numberOrNull(field.parcel_centroid_lat??field.latitude);const lng=numberOrNull(field.parcel_centroid_lng??field.longitude);const period=period30();
+    const fieldId=String(field.id);const geometry=field.parcel_geometry??null;const lat=numberOrNull(field.parcel_centroid_lat??field.latitude);const lng=numberOrNull(field.parcel_centroid_lng??field.longitude);const period=requestedPeriod(job);
     let layerArchive=await collectCloudLayerArchive(userId,fieldId);
 
-    await setJob(jobId,{stage:'satellite',progress_meta:{message:'30 günlük Sentinel-2 geçmişi birleştiriliyor',cloudArchiveCount:layerArchive.length}});
+    await setJob(jobId,{stage:'satellite',progress_meta:{message:'Seçilen dönemin uydu sahneleri doğrulanıyor',cloudArchiveCount:layerArchive.length}});
     const satellite=await collectSatellite(userId,fieldId,geometry,layerArchive,period).catch((error)=>{
       console.error('[PUSULAPDF] satellite collection failed:',error);const fallback=cloudSatellitePoints(layerArchive).filter((p:any)=>p.date>=period.start&&p.date<=period.end).slice(0,10);
       return {points:fallback.sort((a:any,b:any)=>a.date.localeCompare(b.date)),availableDates:fallback.map((p:any)=>p.date),archiveUsed:fallback.length,liveUsed:0};
     });
     const numericSatellitePoints=satellite.points.filter((p:any)=>[p.ndvi,p.ndmi,p.ndre,p.savi,p.gndvi].some((v)=>typeof v==='number')).length;
 
-    await setJob(jobId,{stage:'weather',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),message:'30 günlük sıcaklık, yağış ve ET0 geçmişi alınıyor'}});
+    await setJob(jobId,{stage:'weather',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),message:'Seçilen dönemin gerçek hava kayıtları toplanıyor'}});
     const weather=await collectWeather(userId,fieldId,lat,lng,layerArchive,period);
 
     layerArchive=await collectCloudLayerArchive(userId,fieldId);
@@ -615,7 +625,7 @@ async function processJob(jobId:string,userId:string){
       optionalRows('activities',fieldId,'activity_date'),optionalRows('soil_analyses',fieldId),optionalRows('ai_diagnosis_sessions',fieldId,'updated_at'),optionalRows('field_irrigation_kc_snapshots',fieldId,'snapshot_date'),
     ]);
 
-    const missing:string[]=[];if(!geometry)missing.push('parcel_geometry');if(!satellite.points.length)missing.push('satellite_30d');if(weather.history.length<2)missing.push('weather_history_30d');if(!radar.points.length)missing.push('radar_history');if(!activities.length)missing.push('activities');if(!soilAnalyses.length)missing.push('soil_analysis');
+    const missing:string[]=[];if(!geometry)missing.push('parcel_geometry');if(!satellite.points.length)missing.push('satellite_period');if(weather.history.length<2)missing.push('weather_history_period');if(!radar.points.length)missing.push('radar_history');if(!activities.length)missing.push('activities');if(!soilAnalyses.length)missing.push('soil_analysis');
     const resolved=diagnoses.filter((d:any)=>d.status==='resolved');if(!resolved.length)missing.push('resolved_diagnosis');if(!kcSnapshots.length)missing.push('irrigation_kc');
 
     const snapshot={
@@ -626,12 +636,24 @@ async function processJob(jobId:string,userId:string){
 
     await setJob(jobId,{stage:'interpreting',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Pusula değerlendirmesi hazırlanıyor'}});
 
-    const {data:latest}=await admin.from('weekly_field_reports').select('*').eq('user_id',userId).eq('field_id',field.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
-    let report:any=null;const current=latest&&(Date.now()-new Date(latest.created_at).getTime())<7*24*60*60*1000;
-    if(current){const {data,error}=await admin.from('weekly_field_reports').update({period_start:period.start,period_end:period.end,status:'ready',report_data:snapshot,pdf_bucket:null,pdf_path:null,generated_at:null,updated_at:new Date().toISOString()}).eq('id',latest.id).select('*').single();if(error)throw error;report=data}
-    else{const {data,error}=await admin.from('weekly_field_reports').insert({user_id:userId,field_id:field.id,period_start:period.start,period_end:period.end,status:'ready',report_data:snapshot}).select('*').single();if(error)throw error;report=data}
+    const {data:existing,error:findError}=await admin.from('weekly_field_reports')
+      .select('*').eq('user_id',userId).eq('field_id',field.id)
+      .eq('period_start',period.start).eq('period_end',period.end).limit(1).maybeSingle();
+    if(findError)throw findError;
+    let report:any;
+    if(existing){
+      const {data,error}=await admin.from('weekly_field_reports')
+        .update({status:'ready',report_data:snapshot,pdf_bucket:null,pdf_path:null,generated_at:null,updated_at:new Date().toISOString()})
+        .eq('id',existing.id).eq('user_id',userId).select('*').single();
+      if(error)throw error;report=data;
+    }else{
+      const {data,error}=await admin.from('weekly_field_reports')
+        .insert({user_id:userId,field_id:field.id,period_start:period.start,period_end:period.end,status:'ready',report_data:snapshot})
+        .select('*').single();
+      if(error)throw error;report=data;
+    }
 
-    await setJob(jobId,{report_id:report.id,status:'ready',stage:'ready',finished_at:new Date().toISOString(),progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,weatherArchiveUsed:Number(weather.archiveUsed??0),weatherLiveUsed:Number(weather.liveUsed??0),radarPoints:radar.points.length,radarImages:radar.images.length,radarArchiveUsed:Number(radar.archiveUsed??0),radarLiveUsed:Number(radar.liveUsed??0),cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'PusulaPDF rapor verisi hazır',notificationPending:false}});
+    await setJob(jobId,{report_id:report.id,status:'ready',stage:'ready',finished_at:new Date().toISOString(),progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,weatherArchiveUsed:Number(weather.archiveUsed??0),weatherLiveUsed:Number(weather.liveUsed??0),radarPoints:radar.points.length,radarImages:radar.images.length,radarArchiveUsed:Number(radar.archiveUsed??0),radarLiveUsed:Number(radar.liveUsed??0),cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Seçilen dönemin PusulaPDF verileri doğrulandı',notificationPending:false}});
     await notifyPdfOutcome(userId,jobId,fieldId,String(report.id),String(field.name??'Tarlan'),true);
   }catch(error){
     console.error('[PUSULAPDF] worker failed:',error);await setJob(jobId,{status:'failed',stage:'failed',finished_at:new Date().toISOString(),error_code:'WORKER_FAILED',error_message:error instanceof Error?error.message:String(error)});
