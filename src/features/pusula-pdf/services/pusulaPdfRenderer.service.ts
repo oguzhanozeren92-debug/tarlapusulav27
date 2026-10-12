@@ -1124,7 +1124,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     midX+17,1167,9.1,700,MUTED,midW-34,1.15,2);
 
   rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, 1214, 5, 'Saha Gözlemleri', PURPLE, '▣');
+  sectionHeader(ctx, midX + 10, 1214, 5, latestPhoto?'Saha Gözlemleri':'Saha Kayıtlarının Kapsamı', PURPLE, '▣');
   const observationInsight = guidance.insights.find((item) => item.id === 'field-observation-follow-up-evidence');
   if (latestPhoto?.signedUrl) {
     await drawImage(ctx, latestPhoto.signedUrl, midX + 16, 1260, 174, 195, { radius: 9, placeholder: 'Fotoğraf açılamadı' });
@@ -1134,17 +1134,26 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     wrap(ctx, englishFree(diagnosis.headline || diagnosis.summary || latestPhoto.notes || 'Fotoğraf yüklenmiş, teşhis kaydı henüz yok.'),
       midX + 212, 1360, 10.5, 650, INK, 150, 1.3, 6);
   } else {
-    rr(ctx, midX + 16, 1260, 358, 195, 10, '#f8fafb', LINE);
-    circleIcon(ctx, midX + 45, 1300, 19, PURPLE_SOFT, '◉', PURPLE, 16);
-    text(ctx, 'Saha fotoğrafı henüz eklenmedi', midX + 73, 1306, 15, 900, INK);
-    wrap(ctx, 'Pusula AI ile yaprak, meyve veya sorunlu bölgeden fotoğraf ekle. Gerçek saha gözlemi olmadan hastalık teşhisi üretilemez.',
-      midX + 25, 1351, 12, 650, MUTED, 322, 1.3, 5);
-    text(ctx, 'Yeni fotoğraf → Pusula AI / Fotoğraf Analizi', midX + 24, 1433, 10, 800, PURPLE);
-  }
-  text(ctx, latestPhoto ? 'Saha gözlemi arşivi' : 'Saha gözlemi gerekli', midX + 16, 1478, 10, 850, INK);
+    rr(ctx,midX+16,1260,358,195,10,'#f5f8fb',LINE);
+    const fieldEvidence=[
+      ['Tarla işlem kaydı',String(snapshot.activities?.length??0)+' kayıt'],
+      ['Laboratuvar analizi',String(snapshot.soilAnalyses?.length??0)+' kayıt'],
+      ['Sulama/Kc geçmişi',String(snapshot.irrigation?.kcSnapshots?.length??0)+' kayıt'],
+      ['Saha fotoğrafı','Bu dönemde yok'],
+    ];
+    fieldEvidence.forEach(([name,value],i)=>{
+      const yy=1283+i*41;
+      if(i>0){ctx.beginPath();ctx.strokeStyle='#dce5ed';ctx.moveTo(midX+30,yy-14);ctx.lineTo(midX+362,yy-14);ctx.stroke();}
+      fittedText(ctx,name,midX+29,yy,184,10.5,800,INK);
+      ctx.textAlign='right';
+      fittedText(ctx,value,midX+354,yy,135,10.2,850,i===3?ORANGE:BLUE);
+      ctx.textAlign='left';
+    });
+    }
+  text(ctx,latestPhoto?'Saha gözlemi arşivi':'Saha kanıtı eksikliği',midX+16,1478,10,850,INK);
   const observationText = latestPhoto
     ? (diagnosis.summary || diagnosis.headline || latestPhoto.notes || 'Gözlem kaydı mevcut; kesin teşhis için ek kanıt gerekebilir.')
-    : (observationInsight?.meaning || 'Bir sonraki incelemede gerçek fotoğraf ile uydu işaretleri birlikte karşılaştırılabilir.');
+    : 'Bu dönem saha fotoğrafı veya doğrulanmış yerinde teşhis bulunmuyor. Hastalık ve zararlı sonuçları bu nedenle kesinleştirilemez.';
   rr(ctx, midX + 16, 1509, 358, 65, 9, PURPLE_SOFT, '#eadfff');
   wrap(ctx, englishFree(observationText), midX + 28, 1535, 10, 650, INK, 333, 1.22, 3);
 
@@ -1220,15 +1229,17 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   });
 
   rr(ctx, rightX, 830, rightW, 330, 15, '#fbf8ff', LINE);
-  sectionHeader(ctx, rightX + 10, 838, 8, 'Kritik Gözlem', PURPLE, '!');
+  sectionHeader(ctx,rightX+10,838,8,latestPhoto?'Kritik Gözlem':'Dönem Sonu Değerlendirmesi',PURPLE,'!');
   rr(ctx, rightX + 16, 884, rightW - 32, 224, 12,
     latestPhoto?.signedUrl ? PURPLE_SOFT : GRAY_SOFT, LINE);
   circleIcon(ctx, rightX + 45, 920, 16, latestPhoto ? PURPLE : BLUE, '!', WHITE, 12);
-  text(ctx, latestPhoto ? 'Doğrulanacak saha bulgusu' : 'Kritik saha bulgusu yok',
-    rightX + 75, 926, 16, 900, INK);
+  fittedText(ctx,latestPhoto?'Doğrulanacak saha bulgusu':'Geçmiş veriye dayalı yorum',
+    rightX+75,926,rightW-98,16,900,INK);
   const criticalText = latestPhoto
     ? (diagnosis.headline || diagnosis.summary || 'Fotoğraftaki belirtiler saha gözlemiyle birlikte değerlendirilmelidir.')
-    : (narrative?.risk || 'Fotoğraf, güncel tarla notu veya yerinde doğrulama olmadan kesin hastalık ve zararlı teşhisi üretilmez.');
+    : (climate.observedDays>0
+      ? 'Hava geçmişi dönem koşullarını gösterir. Hastalık, zararlı, gerçek su açığı ve verim için saha ölçümü ve ek ürün verisi gerekir. Bu rapor olmayan kanıttan sonuç üretmez.'
+      : 'Dönemin yeterli saha ve iklim kanıtı bulunmadığından güvenilir üretim kararı verilemez.');
   wrap(ctx, englishFree(criticalText), rightX + 29, 975, 13, 650, MUTED, rightW - 61, 1.35, 5);
   text(ctx, latestPhoto ? 'Kanıt: Kullanıcı saha fotoğrafı' : 'İstenen kanıt: Güncel saha fotoğrafı',
     rightX + 29, 1081, 11, 850, BLUE);
