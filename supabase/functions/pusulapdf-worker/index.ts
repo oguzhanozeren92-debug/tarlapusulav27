@@ -59,7 +59,8 @@ const readIndex=(result:any,key:string)=>{
 
 function requestedPeriod(job:any){
   // For old jobs only, retain the original 30-day fallback.
-  const legacyEnd=isoDate(new Date());
+  const todayIstanbul=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const legacyEnd=todayIstanbul;
   const legacyStart=new Date(`${legacyEnd}T00:00:00Z`);
   legacyStart.setUTCDate(legacyStart.getUTCDate()-29);
   const start=String(job.requested_start??isoDate(legacyStart)).slice(0,10);
@@ -67,7 +68,7 @@ function requestedPeriod(job:any){
   const startTime=Date.parse(`${start}T00:00:00Z`);
   const endTime=Date.parse(`${end}T00:00:00Z`);
   const days=Math.round((endTime-startTime)/86400000)+1;
-  if(!Number.isFinite(days)||days<7||days>180||start>end||end>isoDate(new Date())){
+  if(!Number.isFinite(days)||days<7||days>180||start>end||end>todayIstanbul){
     throw new Error('Geçersiz rapor tarihi: 7 ile 180 gün arasında, gelecekte olmayan bir dönem seçilmelidir.');
   }
   return {start,end,days};
