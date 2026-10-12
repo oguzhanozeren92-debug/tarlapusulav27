@@ -367,6 +367,59 @@ async function collectSatellite(userId:string,fieldId:string,geometry:any,archiv
     examinedDates:points.length,historyDays:SATELLITE_HISTORY_DAYS};
 }
 
+// A verified archived optical series already used by Tarla Durumu is a valid
+// source of historical NDVI values. It is not a substitute for missing NDRE,
+// SAVI, GNDVI or SL2P outputs; preserve those as null.
+async function readFusionNdvi(userId:string,fieldId:string,period:{start:string;end:string}){
+  const {data,error}=await admin.from('field_satellite_fusion_snapshots')
+    .select('optical,analysis_day,qc,source,status')
+    .eq('user_id',userId).eq('field_id',fieldId)
+    .order('analysis_day',{ascending:false}).limit(3);
+  if(error){console.warn('[PUSULAPDF] fusion geçmişi alınamadı:',error.message);return [] as any[];}
+  const byDate=new Map<string,any>();
+  for(const snapshot of data??[]){
+    const series=snapshot?.optical?.ndvi?.series;
+    if(!Array.isArray(series))continue;
+    for(const row of series){
+      const date=dateOnly(row?.date);
+      const value=numberOrNull(row?.mean);
+      if(!date||date<period.start||date>period.end||value===null||value< -1||value>1)continue;
+      if(!byDate.has(date)){
+        byDate.set(date,{
+          date,ndvi:value,ndmi:null,ndre:null,gndvi:null,savi:null,
+          source:'Tarla Durumu · tarihli Sentinel-2 NDVI arşivi',
+          dataQuality:String(snapshot?.qc?.overall_quality??'unknown'),
+          fromArchive:true,
+        });
+      }
+    }
+  }
+  return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+async function readFieldBiophysics(userId:string,fieldId:string,period:{start:string;end:string}){
+  const {data,error}=await admin.from('field_biophysical_snapshots')
+    .select('acquired_at,algorithm,collection,metrics,qc,source')
+    .eq('user_id',userId).eq('field_id',fieldId)
+    .gte('acquired_at',period.start+'T00:00:00Z')
+    .lt('acquired_at',new Date(Date.parse(period.end+'T00:00:00Z')+86400000).toISOString())
+    .order('acquired_at',{ascending:false}).limit(12);
+  if(error){console.warn('[PUSULAPDF] SL2P arşivi alınamadı:',error.message);return [] as any[];}
+  return (data??[]).filter((row:any)=>
+    row?.metrics&&typeof row.metrics==='object'
+    &&['sl2p','rscm'].includes(String(row.algorithm??'').toLowerCase())
+    &&Object.values(row.metrics).some((metric:any)=>numberOrNull(metric?.mean??metric?.value)!==null)
+  ).map((row:any)=>({
+    date:dateOnly(row.acquired_at),
+    source:String(row.algorithm??'SL2P').toUpperCase()+' · '+String(row.collection??'Sentinel-2'),
+    qc:{quality:row.qc?.quality??'unknown',validPixelFraction:numberOrNull(row.qc?.valid_pixel_fraction)},
+    metrics:Object.fromEntries(['LAI','CCC','CWC','fCOVER','fAPAR','Albedo'].map(key=>{
+      const metric=row.metrics[key]??row.metrics[key.toLowerCase()];
+      return [key,numberOrNull(metric?.mean??metric?.value)];
+    })),
+  }));
+}
+
 type WeatherDay={date:string;tempMin:number|null;tempMax:number|null;tempAvg:number|null;precipitation:number|null;windSpeed:number|null;et0:number|null;source:string};
 
 function cloudWeatherHistory(archive:CloudLayerSnapshot[],period:{start:string;end:string}){
@@ -611,7 +664,27 @@ async function processJob(jobId:string,userId:string){
       console.error('[PUSULAPDF] satellite collection failed:',error);const fallback=cloudSatellitePoints(layerArchive).filter((p:any)=>p.date>=period.start&&p.date<=period.end).slice(0,10);
       return {points:fallback.sort((a:any,b:any)=>a.date.localeCompare(b.date)),availableDates:fallback.map((p:any)=>p.date),archiveUsed:fallback.length,liveUsed:0};
     });
-    const numericSatellitePoints=satellite.points.filter((p:any)=>[p.ndvi,p.ndmi,p.ndre,p.savi,p.gndvi].some((v)=>typeof v==='number')).length;
+    const [fusionNdvi,biophysical] = await Promise.all([
+      readFusionNdvi(userId,fieldId,period),
+      readFieldBiophysics(userId,fieldId,period),
+    ]);
+    // Match by actual observation date. Preserve higher-quality satellite
+    // measurements and images, enrich only an otherwise missing NDVI.
+    const satelliteByDate=new Map<string,any>();
+    for(const row of satellite.points) satelliteByDate.set(row.date,row);
+    for(const row of fusionNdvi){
+      const existing=satelliteByDate.get(row.date);
+      if(existing){
+        if(numberOrNull(existing.ndvi)===null){
+          existing.ndvi=row.ndvi;
+          existing.ndviSource=row.source;
+          existing.dataQuality=row.dataQuality;
+        }
+      }else satelliteByDate.set(row.date,row);
+    }
+    satellite.points=[...satelliteByDate.values()].sort((a:any,b:any)=>a.date.localeCompare(b.date));
+    satellite.fusionArchiveDates=fusionNdvi.length;
+    const numericSatellitePoints=satellite.points.filter((p:any)=>[p.ndvi,p.ndmi,p.ndre,p.savi,p.gndvi].some((v)=>typeof v==='number'&&Number.isFinite(v))).length;
 
     await setJob(jobId,{stage:'weather',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),message:'Seçilen dönemin gerçek hava kayıtları toplanıyor'}});
     const weather=await collectWeather(userId,fieldId,lat,lng,layerArchive,period);
@@ -648,7 +721,7 @@ async function processJob(jobId:string,userId:string){
     const snapshot={
       schemaVersion:2,
       field:{id:fieldId,name:field.name??'Tarla',city:field.city??null,district:field.district??null,village:field.village??null,areaDecare:numberOrNull(field.area_decare),crop:field.crop??null,cropSubtype:field.crop_subtype??null,season:numberOrNull(field.season),irrigationStatus:field.irrigation_status??null,irrigationMethod:field.irrigation_method??null,geometry,latitude:lat,longitude:lng},
-      period:{start:period.start,end:period.end,createdAt:new Date().toISOString()},satellite,radar,weather,layerArchive:layerArchive.slice(0,220),irrigation:{kcSnapshots},activities,soilAnalyses,diagnoses:resolved,missing,
+      period:{start:period.start,end:period.end,createdAt:new Date().toISOString()},satellite,radar,weather,biophysical,layerArchive:layerArchive.slice(0,220),irrigation:{kcSnapshots},activities,soilAnalyses,diagnoses:resolved,missing,
     };
 
     await setJob(jobId,{stage:'interpreting',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Pusula değerlendirmesi hazırlanıyor'}});
