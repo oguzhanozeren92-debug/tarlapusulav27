@@ -938,6 +938,51 @@ html body #root .tp-ai-page .tp-ai-tool-card--report .tp-ai-page-error{
   overflow-wrap:anywhere!important;
 }
 
+/* Separate photo-intro card and readable disabled buttons */
+html body #root .tp-ai-page .tp-ai-photo-intro {
+  box-sizing:border-box!important;width:100%!important;min-width:0!important;
+  display:grid!important;grid-template-columns:47px minmax(0,1fr)!important;gap:13px!important;
+  align-items:start!important;margin:0!important;padding:18px 15px!important;
+  border:1px solid #d5dde3!important;border-radius:17px!important;
+  background:#f4f6f8!important;box-shadow:none!important;color:#171b20!important;
+}
+html body #root .tp-ai-page .tp-ai-photo-intro-symbol {
+  width:47px!important;height:47px!important;display:grid!important;place-items:center!important;
+  background:#ecf6eb!important;border:1px solid #d1e9cd!important;border-radius:13px!important;
+  color:#206e40!important;font-size:22px!important;
+}
+html body #root .tp-ai-page .tp-ai-photo-intro-copy {min-width:0!important}
+html body #root .tp-ai-page .tp-ai-photo-intro-copy>span{
+  display:block!important;margin:0 0 4px!important;color:#307447!important;
+  font-size:9px!important;font-weight:900!important;letter-spacing:.12em!important
+}
+html body #root .tp-ai-page .tp-ai-photo-intro-copy h2{
+  margin:0!important;color:#171b20!important;font-size:clamp(18px,5.5vw,25px)!important;
+  line-height:1.16!important;font-weight:900!important;letter-spacing:-.025em!important;
+  overflow-wrap:anywhere!important
+}
+html body #root .tp-ai-page .tp-ai-photo-intro-copy p{
+  margin:9px 0 0!important;color:#52606e!important;font-size:12px!important;
+  line-height:1.5!important;overflow-wrap:anywhere!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled{
+  opacity:1!important;background:#e9edf0!important;border-color:#d6dde3!important;
+  -webkit-text-fill-color:#27323b!important;color:#27323b!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled
+  :is(.tp-ai-tool-primary-copy>strong,.tp-ai-tool-primary-copy>small){
+  opacity:1!important;color:#27323b!important;-webkit-text-fill-color:#27323b!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled>span:first-child{
+  background:#fff!important;color:#26323e!important;-webkit-text-fill-color:#26323e!important
+}
+@media(max-width:380px){
+  html body #root .tp-ai-page .tp-ai-photo-intro {
+    grid-template-columns:40px minmax(0,1fr)!important;padding:14px 12px!important;gap:10px!important
+  }
+  html body #root .tp-ai-page .tp-ai-photo-intro-symbol {width:40px!important;height:40px!important}
+}
+
 /* QUICK CALENDAR ACTION — PUSULAPDF */
 html body #root .tp-ai-page .tp-ai-pdf-calendar{
   box-sizing:border-box!important;
@@ -1721,26 +1766,6 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
         />
         <main className="tp-ai-page-content">
         <style>{PUSULA_HUB_FINAL_STYLES}</style>
-          <section className="tp-ai-hero">
-            <div className="tp-ai-hero-icon">✦</div>
-
-            <div>
-              <span>{aiHeroBlock?.icon || 'AI TARLA ASİSTANI'}</span>
-              <h1>
-                {cmsText(
-                  aiHeroBlock,
-                  'Fotoğrafla saha gözlemi ekle.',
-                )}
-              </h1>
-              <p>
-                {cmsSub(
-                  aiHeroBlock,
-                  'Yaprak, meyve veya sorunlu bölgenin net bir fotoğrafını yükle. Fotoğraf sonucu tek başına kesin teşhis değildir; Pusula bunu saha kanıtı olarak değerlendirir.',
-                )}
-              </p>
-            </div>
-          </section>
-
           <section className="tp-pusula-hub-intro">
             <span className="tp-pusula-hub-kicker">PUSULA AI MERKEZİ</span>
             <h1>{synthesisField ? synthesisField.name : 'Tarlanı seç'}</h1>
@@ -1791,7 +1816,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     <span className="tp-ai-tool-kicker">PUSULAPDF</span>
                     <strong>7 Günlük Tarla Raporu</strong>
                     <small>
-                      Son 7 günlük tarla verilerini tek PDF'te toplar. Her 7 günde bir yenilenir.
+                      Uydu, hava, sulama, risk ve tarla kayıtlarını tek raporda birleştirir. Hazır olduğunda Pusula haber verir; raporu açabilir, paylaşabilir ve cihazında saklayabilirsin.
                     </small>
                   </div>
                   {!isPremiumPlan ? <b className="tp-premium-badge">PREMIUM</b> : null}
@@ -1951,6 +1976,15 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
             ) : null}
             {pusulaPdfStatus === 'error' && pusulaPdfError ? <div className="tp-ai-page-error" style={{ marginTop: 10, padding: 11 }}>PUSULAPDF: {pusulaPdfError}</div> : null}
 
+              </section>
+
+              <section className="tp-ai-photo-intro" aria-label="AI Tarla Asistanı tanıtımı">
+                <span className="tp-ai-photo-intro-symbol" aria-hidden="true">✦</span>
+                <div className="tp-ai-photo-intro-copy">
+                  <span>AI TARLA ASİSTANI</span>
+                  <h2>Fotoğrafı çek, tarladaki belirtiyi birlikte inceleyelim.</h2>
+                  <p>Yaprak, meyve veya sorunlu bölgenin net bir fotoğrafını yükle. Fotoğraf sonucu tek başına kesin teşhis değildir; Pusula bunu saha kanıtı olarak değerlendirir.</p>
+                </div>
               </section>
 
               <section className="tp-ai-tool-card tp-ai-tool-card--photo">
