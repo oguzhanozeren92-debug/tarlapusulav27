@@ -473,15 +473,31 @@ async function buildGroundedNarrative(snapshot:any){
   const bio=(snapshot.biophysical??[]).slice(0,2).map((p:any)=>({
     date:p.date,quality:p.qc?.quality,metrics:p.metrics,
   }));
-  const weather=(snapshot.weather?.history??[]).slice(-12).map((row:any)=>({
-    date:row.date,tempMin:numberOrNull(row.tempMin),tempMax:numberOrNull(row.tempMax),
-    precipitation:numberOrNull(row.precipitation),et0:numberOrNull(row.et0),
-  }));
+  const weatherAll=(snapshot.weather?.history??[]).filter((row:any)=>
+    row.date>=snapshot.period.start&&row.date<=snapshot.period.end);
+  const validField=(row:any,key:string)=>numberOrNull(row?.[key]);
+  const sumMetric=(key:string)=>{
+    const vals=weatherAll.map((row:any)=>validField(row,key)).filter((n:number|null):n is number=>n!==null);
+    return vals.length===weatherAll.length&&vals.length>0
+      ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)*100)/100:null;
+  };
+  const temps=weatherAll.map((row:any)=>validField(row,'tempMax')).filter((n:number|null):n is number=>n!==null);
+  const weatherSummary={
+    daysRecorded:weatherAll.length,periodStart:snapshot.period.start,periodEnd:snapshot.period.end,
+    totalRainMm:sumMetric('precipitation'),totalReferenceET0Mm:sumMetric('et0'),
+    hottestC:temps.length?Math.max(...temps):null,
+    hotDays30C:temps.length===weatherAll.length?temps.filter((v:number)=>v>=30).length:null,
+  };
+  const weather=weatherAll.filter((_:any,index:number)=>index%Math.max(1,Math.ceil(weatherAll.length/12))===0)
+    .slice(-12).map((row:any)=>({
+      date:row.date,tempMin:numberOrNull(row.tempMin),tempMax:numberOrNull(row.tempMax),
+      precipitation:numberOrNull(row.precipitation),et0:numberOrNull(row.et0),
+    }));
   const soil=(snapshot.layerArchive??[]).findLast((r:any)=>r.layer==='soil-intelligence');
   const irrigation=(snapshot.layerArchive??[]).findLast((r:any)=>r.layer==='irrigation-synthesis');
   const input={
     crop:snapshot.field?.crop??null,period:snapshot.period,
-    satellite,biophysical:bio,weather,
+    satellite,biophysical:bio,weather,weatherSummary,soilReference:snapshot.soilReference,
     soil:{
       labCount:snapshot.soilAnalyses?.length??0,
       soilGridsIsModel:true,
@@ -776,6 +792,26 @@ async function notifyPdfOutcome(
   if(error) console.warn('[PUSULAPDF] notification:',error.message);
 }
 
+// SoilGrids is a location-specific, largely static model reference. It is
+// deliberately NOT inserted into period layerArchive as a June measurement:
+ // its snapshot may have been collected later. Keep provenance separately.
+function modelSoilReference(archive:CloudLayerSnapshot[]){
+  const matches=archive.filter(x=>x.layer==='soil-intelligence'
+    && (x.metrics?.soilGridsContextAvailable===true
+    || numberOrNull(x.metrics?.phTopsoil0To30)!==null))
+    .sort((a,b)=>String(b.observedAt??b.archivedAt??'').localeCompare(String(a.observedAt??a.archivedAt??'')));
+  const chosen=matches[0];
+  if(!chosen)return null;
+  const keys=['phTopsoil0To30','organicCarbonTopsoil0To30','clayPercent','sandPercent','siltPercent'];
+  const metrics=Object.fromEntries(keys.map(k=>[k,numberOrNull(chosen.metrics?.[k])]));
+  if(Object.values(metrics).every(n=>n===null))return null;
+  return {
+    kind:'SoilGrids250m-model-context',recordedAt:dateOnly(chosen.observedAt??chosen.archivedAt),
+    source:'ISRIC SoilGrids · 250 m model referansı',metrics,
+    historicalMeasurement:false,
+  };
+}
+
 async function processJob(jobId:string,userId:string){
   try{
     const {data:job,error:jobError}=await admin.from('pusulapdf_jobs').select('*').eq('id',jobId).eq('user_id',userId).single();
@@ -833,7 +869,9 @@ async function processJob(jobId:string,userId:string){
     await setJob(jobId,{stage:'field_memory',progress_meta:{weatherDays:weather.history.length,weatherArchiveUsed:Number(weather.archiveUsed??0),weatherLiveUsed:Number(weather.liveUsed??0),message:'Sentinel-1 VV, VH ve su adayı geçmişi birleştiriliyor'}});
     const radar=await collectRadar(userId,fieldId,lat,lng,geometry,layerArchive,period);
     // Bu raporda canlı kaynaktan çekilip yeni yazılan kayıtları da snapshot'a dahil et.
-    layerArchive=(await collectCloudLayerArchive(userId,fieldId))
+    const completeArchive=await collectCloudLayerArchive(userId,fieldId);
+    const soilReference=modelSoilReference(completeArchive);
+    layerArchive=completeArchive
       .filter((row:any)=>{ const observed=dateOnly(row.observedAt??row.archivedAt); return !observed||observed<=period.end; });
 
     await setJob(jobId,{stage:'field_memory',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,message:'Tarla geçmişi birleştiriliyor'}});
@@ -860,7 +898,7 @@ async function processJob(jobId:string,userId:string){
     const snapshot={
       schemaVersion:2,
       field:{id:fieldId,name:field.name??'Tarla',city:field.city??null,district:field.district??null,village:field.village??null,areaDecare:numberOrNull(field.area_decare),crop:field.crop??null,cropSubtype:field.crop_subtype??null,season:numberOrNull(field.season),irrigationStatus:field.irrigation_status??null,irrigationMethod:field.irrigation_method??null,geometry,latitude:lat,longitude:lng},
-      period:{start:period.start,end:period.end,createdAt:new Date().toISOString()},satellite,radar,weather,biophysical,layerArchive:layerArchive.slice(0,220),irrigation:{kcSnapshots},activities,soilAnalyses,diagnoses:resolved,missing,
+      period:{start:period.start,end:period.end,createdAt:new Date().toISOString()},satellite,radar,weather,biophysical,soilReference,layerArchive:layerArchive.slice(0,220),irrigation:{kcSnapshots},activities,soilAnalyses,diagnoses:resolved,missing,
     };
 
     await setJob(jobId,{stage:'interpreting',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Pusula AI gerçek ölçüm ve kanıtları yorumluyor'}});
