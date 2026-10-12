@@ -1030,50 +1030,28 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     : 'Doğrulanmış ölçüm olmadan besin dozu önerilmez.',
     midX + 272, 831, 9.5, 650, MUTED, 90, 1.25, 7);
 
-  rr(ctx, midX, 946, midW, 250, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, 954, 4, 'Hava ve İklim Analizi', BLUE, '●');
-  text(ctx, 'Son 5 gün · geçmiş gözlemler (tahmin değil)', midX + 17, 992, 9.5, 800, MUTED);
-  const weather5 = weather.slice(-5);
-  if (weather5.length) {
-    weather5.forEach((row, index) => {
-      const x = midX + 13 + index * 74;
-      rr(ctx, x, 998, 66, 100, 9, index % 2 === 0 ? '#f8fbff' : WHITE, LINE);
-      ctx.textAlign = 'center';
-      text(ctx, fmt(wd(row), false), x + 33, 1018, 8.5, 750, MUTED);
-      const maximum = wv(row, 'tempMax', 'maxTemp', 'maxTemperature');
-      const minimum = wv(row, 'tempMin', 'minTemp', 'minTemperature');
-      const rain = wv(row, 'precipitation', 'rain', 'precipitationMm');
-      text(ctx, maximum === null ? '—' : `${maximum.toLocaleString('tr-TR', {maximumFractionDigits:1})}°`,
-        x + 33, 1048, 14, 900, INK);
-      text(ctx, minimum === null ? 'Min —' : `Min ${Math.round(minimum)}°`,
-        x + 33, 1068, 8.5, 800, BLUE);
-      text(ctx, rain === null ? 'Yağış —' : `${rain.toLocaleString('tr-TR', {maximumFractionDigits:1})} mm`,
-        x + 33, 1089, 8.5, 800, rain !== null && rain > 0 ? BLUE : MUTED);
-      ctx.textAlign = 'left';
-    });
-  } else {
-    wrap(ctx, 'Bu dönem için doğrulanmış geçmiş hava ölçümü bulunmuyor; geleceğe dönük hava durumu üretilmedi.',
-      midX + 18, 1042, 11, 650, MUTED, midW - 36, 1.25, 3);
-  }
-  const measuredTemps = weather5.map((row) => wv(row, 'tempMax','maxTemp','maxTemperature')).filter(valid);
-  const precip = weather5.map((row) => wv(row,'precipitation','rain','precipitationMm')).filter(valid);
-  const wind = weather5.map((row) => wv(row,'windSpeed','windSpeedKmh','windKmh')).filter(valid);
-  const measuredBadges = [
-    ['En yüksek sıcaklık', measuredTemps.length ? `${Math.max(...measuredTemps).toLocaleString('tr-TR',{maximumFractionDigits:1})}°C` : '—', ORANGE, ORANGE_SOFT],
-    ['Toplam yağış', precip.length ? `${precip.reduce((a,b)=>a+b,0).toLocaleString('tr-TR',{maximumFractionDigits:1})} mm` : '—', BLUE, BLUE_SOFT],
-    ['En yüksek rüzgâr', wind.length ? `${Math.max(...wind).toLocaleString('tr-TR',{maximumFractionDigits:1})} km/sa` : '—', GREEN, GREEN_SOFT],
-  ];
-  measuredBadges.forEach(([label,value,accent,soft],index) => {
-    const x = midX + 14 + index * 122;
-    rr(ctx, x, 1110, 114, 66, 9, soft, soft);
-    ctx.textAlign = 'center';
-    text(ctx, label, x + 57, 1132, 8, 800, MUTED);
-    text(ctx, value, x + 57, 1157, 10, 900, accent);
-    ctx.textAlign = 'left';
+  rr(ctx,midX,946,midW,250,15,'#f5faff',LINE);
+  sectionHeader(ctx,midX+10,954,4,'Dönemin Hava ve İklimi',BLUE,'●');
+  fittedText(ctx,`${fmt(snapshot.period.start,false)} – ${fmt(snapshot.period.end,false)} · ${climate.observedDays}/${climate.days} gün`,
+    midX+17,993,midW-34,10,750,MUTED);
+  const monthlyMetrics=[
+    ['Toplam yağış',climate.totalRain===null?'Veri eksik':numTr(climate.totalRain)+' mm',BLUE,BLUE_SOFT],
+    ['Referans ET₀',climate.totalEt0===null?'Veri eksik':numTr(climate.totalEt0)+' mm',TEAL,GREEN_SOFT],
+    ['30°C+ gün',climate.hotDays===null?'Veri eksik':String(climate.hotDays)+' gün',ORANGE,ORANGE_SOFT],
+    ['En yüksek',climate.maximum===null?'—':numTr(climate.maximum)+'°C',ORANGE,ORANGE_SOFT],
+    ['En düşük',climate.minimum===null?'—':numTr(climate.minimum)+'°C',BLUE,BLUE_SOFT],
+    ['Yağışlı gün',climate.rainyDays===null?'—':String(climate.rainyDays)+' gün',GREEN,GREEN_SOFT],
+  ] as const;
+  monthlyMetrics.forEach(([label,value,accent,soft],i)=>{
+    const col=i%3,row=Math.floor(i/3);
+    const x=midX+13+col*124,y=1004+row*72;
+    rr(ctx,x,y,116,63,9,soft,LINE);
+    fittedText(ctx,label,x+8,y+21,100,9,750,MUTED);
+    fittedText(ctx,value,x+8,y+47,100,15,900,accent);
   });
-  const weatherSource = String((snapshot.weather as any)?.source ?? weather5.at(-1)?.source ?? 'Kaynak kaydı yok').trim();
-  wrap(ctx, `Kaynak: ${weatherSource} · ${weather5.length} kayıtlı gün · geleceğe dönük tahmin değildir.`,
-    midX + 16, 1187, 9, 700, MUTED, midW - 28, 1.1, 2);
+  const weatherSource=String((snapshot.weather as any)?.source??'Kayıtlı hava ölçümleri').trim();
+  wrap(ctx,`Kaynak: ${weatherSource} · Dönem toplamlarıdır; hava tahmini değildir. ET₀ tek başına sulama ihtiyacı değildir.`,
+    midX+17,1167,9.1,700,MUTED,midW-34,1.15,2);
 
   rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 1214, 5, 'Saha Gözlemleri', PURPLE, '▣');
