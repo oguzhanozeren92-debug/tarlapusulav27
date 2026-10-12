@@ -420,6 +420,84 @@ async function readFieldBiophysics(userId:string,fieldId:string,period:{start:st
   }));
 }
 
+// Supplement deterministic risk and crop engines with a guarded narrative.
+// The model has no authority to calculate water, yield, disease or treatment.
+async function buildGroundedNarrative(snapshot:any){
+  const key=Deno.env.get('NVIDIA_API_KEY');
+  if(!key)return null;
+  const satellite=(snapshot.satellite?.points??[]).slice(-12).map((p:any)=>({
+    date:p.date,ndvi:numberOrNull(p.ndvi),ndre:numberOrNull(p.ndre),
+    gndvi:numberOrNull(p.gndvi),savi:numberOrNull(p.savi),ndmi:numberOrNull(p.ndmi),
+  }));
+  const bio=(snapshot.biophysical??[]).slice(0,2).map((p:any)=>({
+    date:p.date,quality:p.qc?.quality,metrics:p.metrics,
+  }));
+  const weather=(snapshot.weather?.history??[]).slice(-12).map((row:any)=>({
+    date:row.date,tempMin:numberOrNull(row.tempMin),tempMax:numberOrNull(row.tempMax),
+    precipitation:numberOrNull(row.precipitation),et0:numberOrNull(row.et0),
+  }));
+  const soil=(snapshot.layerArchive??[]).findLast((r:any)=>r.layer==='soil-intelligence');
+  const irrigation=(snapshot.layerArchive??[]).findLast((r:any)=>r.layer==='irrigation-synthesis');
+  const input={
+    crop:snapshot.field?.crop??null,period:snapshot.period,
+    satellite,biophysical:bio,weather,
+    soil:{
+      labCount:snapshot.soilAnalyses?.length??0,
+      soilGridsIsModel:true,
+      ph:numberOrNull(soil?.metrics?.phTopsoil0To30),
+      clayPercent:numberOrNull(soil?.metrics?.clayPercent),
+      organicCarbon:numberOrNull(soil?.metrics?.organicCarbonTopsoil0To30),
+    },
+    irrigation:{
+      status:irrigation?.metrics?.synthesisStatus??null,
+      decision:irrigation?.metrics?.decision??null,
+      decisionConfidence:irrigation?.metrics?.decisionConfidence??null,
+    },
+    recordedActivities:snapshot.activities?.length??0,
+    evidenceGaps:snapshot.missing,
+  };
+  const system=[
+    'Sen TarlaPusula Pusula AI rapor yorumcususun.',
+    'Yalnız iletilen tarihli kaynakların desteklediği çıkarımları doğal Türkçe ile açıkla.',
+    'Verilmeyen sayısal değer, değişim, eşik, neden, sulama/gübre/ilaç dozu, hastalık teşhisi veya hasat tarihi ASLA uydurma.',
+    'Sadece NDVI değişimi hastalık, su stresi, azot eksikliği, hasat veya sulama ihtiyacı kanıtı değildir.',
+    'SL2P düşük kalite ise teşhis/karar için kullanma; SoilGrids laboratuvar sonucu değildir.',
+    'İki gerçek tarih yoksa artış veya düşüş iddiasında bulunma. Eksik alanların neden kesinleştirilemediğini kısa belirt.',
+    'Rapor yalnızca açıklama ve saha doğrulama önerileri içerir; üretim kararı mevcut yetkili motorlardan gelir.',
+    'Sadece JSON nesnesi döndür: {"summary":"","plant":"","water":"","soil":"","risk":"","actions":[]}.',
+    'Her metin tam cümle ve 1-2 cümle uzunluğunda, actions tam 3 kısa güvenli adım olmalı.',
+  ].join(' ');
+  try{
+    const response=await fetch('https://integrate.api.nvidia.com/v1/chat/completions',{
+      method:'POST',signal:AbortSignal.timeout(35000),
+      headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'deepseek-ai/deepseek-v4-flash-0731',temperature:0.1,max_tokens:700,
+        messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(input)}],
+        stream:false,
+      }),
+    });
+    if(!response.ok){console.warn('[PUSULAPDF] AI yorum sağlayıcısı yanıtı:',response.status);return null;}
+    const payload=await response.json();
+    const raw=String(payload?.choices?.[0]?.message?.content??'').trim();
+    const jsonText=raw.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+    const parsed=JSON.parse(jsonText);
+    if(!parsed||typeof parsed!=='object')return null;
+    const clean=(v:unknown)=>typeof v==='string'
+      ? v.trim().slice(0,480) : '';
+    const summary=clean(parsed.summary);
+    if(!summary||summary.length<20)return null;
+    const actions=(Array.isArray(parsed.actions)?parsed.actions:[])
+      .map(clean).filter(Boolean).slice(0,3);
+    return {source:'Pusula AI · açıklayıcı model',summary,
+      plant:clean(parsed.plant),water:clean(parsed.water),
+      soil:clean(parsed.soil),risk:clean(parsed.risk),actions};
+  }catch(error){
+    console.warn('[PUSULAPDF] AI değerlendirmesi yapılamadı, kanıt rehberi kullanılacak:',error);
+    return null;
+  }
+}
+
 type WeatherDay={date:string;tempMin:number|null;tempMax:number|null;tempAvg:number|null;precipitation:number|null;windSpeed:number|null;et0:number|null;source:string};
 
 function cloudWeatherHistory(archive:CloudLayerSnapshot[],period:{start:string;end:string}){
@@ -723,7 +801,10 @@ async function processJob(jobId:string,userId:string){
       period:{start:period.start,end:period.end,createdAt:new Date().toISOString()},satellite,radar,weather,biophysical,layerArchive:layerArchive.slice(0,220),irrigation:{kcSnapshots},activities,soilAnalyses,diagnoses:resolved,missing,
     };
 
-    await setJob(jobId,{stage:'interpreting',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Pusula değerlendirmesi hazırlanıyor'}});
+    await setJob(jobId,{stage:'interpreting',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Pusula AI gerçek ölçüm ve kanıtları yorumluyor'}});
+    const aiNarrative=await buildGroundedNarrative(snapshot);
+    if(aiNarrative)Object.assign(snapshot,{aiNarrative});
+    await setJob(jobId,{stage:'rendering',progress_meta:{message:'Rapor içerik bütünlüğü son kez kontrol ediliyor',aiNarrativeReady:Boolean(aiNarrative)}});
 
     const {data:existing,error:findError}=await admin.from('weekly_field_reports')
       .select('*').eq('user_id',userId).eq('field_id',field.id)
