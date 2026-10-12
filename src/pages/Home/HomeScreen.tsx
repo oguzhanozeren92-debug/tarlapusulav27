@@ -7,6 +7,7 @@ import { openPlanUpgrade } from '../../entitlements/planAccess';
 import AppDrawer from '../../components/AppDrawer';
 import PusulaPointsModal from '../../components/PusulaPointsModal';
 import PusulaGuide, { type PusulaInsight } from '../../assets/pusula/PusulaGuide';
+import { PUSULAPDF_ALERT_KEY } from '../../features/pusula-pdf/PusulaPdfReadyBridge';
 import ClassicBottomNav from '../../components/ClassicBottomNav';
 import { persistHomeNotifications } from '../../features/notifications/services/notificationQueue';
 import {
@@ -209,6 +210,21 @@ export default function HomeScreen(props: HomeScreenProps) {
   const [pointsOpen, setPointsOpen] = useState(false);
   const [homeHeaderPusulaInsight, setHomeHeaderPusulaInsight] =
     useState<PusulaInsight | null>(null);
+  const [readyPdfNotice, setReadyPdfNotice] = useState<{ reportId: string; fieldName: string } | null>(null);
+  useEffect(() => {
+    const update = (event?: Event) => {
+      try {
+        const data = event
+          ? (event as CustomEvent<{ reportId?: string; fieldName?: string }>).detail
+          : JSON.parse(sessionStorage.getItem(PUSULAPDF_ALERT_KEY) || 'null');
+        if (!data?.reportId) return;
+        setReadyPdfNotice({ reportId: String(data.reportId), fieldName: String(data.fieldName || 'Tarlan') });
+      } catch { /* No pending report. */ }
+    };
+    update();
+    window.addEventListener('tp:pusulapdf-ready', update as EventListener);
+    return () => window.removeEventListener('tp:pusulapdf-ready', update as EventListener);
+  }, []);
   const [seenHomePusulaDecisionId, setSeenHomePusulaDecisionId] =
     useState('');
   const [taskQuestionTarget, setTaskQuestionTarget] =
@@ -1207,6 +1223,13 @@ export default function HomeScreen(props: HomeScreenProps) {
   };
 
   const handleHomeHeaderPusulaClick = () => {
+    if (readyPdfNotice) {
+      const reportId = readyPdfNotice.reportId;
+      setReadyPdfNotice(null);
+      try { sessionStorage.removeItem(PUSULAPDF_ALERT_KEY); } catch { /* noop */ }
+      window.dispatchEvent(new CustomEvent('tp:open-pusulapdf', { detail: { reportId } }));
+      return;
+    }
     if (fieldEventPrompt.candidate) {
       fieldEventPrompt.openPrompt();
       return;
@@ -1302,7 +1325,7 @@ export default function HomeScreen(props: HomeScreenProps) {
           anchorSelector=".tp-brand-pusula-anchor"
           hasUnread={Boolean(
             (fieldEventPrompt.candidate && fieldEventPrompt.needsAttention) ||
-              homePusulaDecisionAttention,
+              homePusulaDecisionAttention || Boolean(readyPdfNotice),
           )}
           onLogoClick={handleHomeHeaderPusulaClick}
         />
@@ -1383,22 +1406,14 @@ export default function HomeScreen(props: HomeScreenProps) {
                 pusulaGuideAway || operationQuestionVisible ? ' tp-brand-pusula-away' : ''
               }${
                 ((fieldEventPrompt.candidate && fieldEventPrompt.needsAttention) ||
-                  homePusulaDecisionAttention) &&
+                  homePusulaDecisionAttention || readyPdfNotice) &&
                 !pusulaGuideAway &&
                 !operationQuestionVisible
                   ? ' tp-brand-pusula-event-attention'
                   : ''
               }`}
-              aria-label={
-                fieldEventPrompt.candidate || homePusulaDecisionAttention
-                  ? 'Pusula bir şey fark etti'
-                  : 'Pusula'
-              }
-              title={
-                fieldEventPrompt.candidate || homePusulaDecisionAttention
-                  ? 'Pusula bir şey fark etti'
-                  : 'Pusula'
-              }
+              aria-label={readyPdfNotice ? `${readyPdfNotice.fieldName} için PusulaPDF hazır. Açmak için dokun.` : 'Pusula'}
+              title={readyPdfNotice ? 'PusulaPDF raporun hazır · Aç' : 'Pusula'}
               onClick={handleHomeHeaderPusulaClick}
             >
               <img
