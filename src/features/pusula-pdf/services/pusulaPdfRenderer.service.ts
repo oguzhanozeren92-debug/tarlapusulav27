@@ -99,6 +99,20 @@ function text(
   ctx.fillText(String(value ?? ''), x, y);
 }
 
+function fittedText(ctx:CanvasRenderingContext2D,value:string,x:number,y:number,maxWidth:number,
+ size=12,weight=750,color=INK){
+  let actual=size;
+  const copy=String(value??'');
+  while(actual>8){
+    font(ctx,actual,weight);
+    if(ctx.measureText(copy).width<=maxWidth)break;
+    actual-=0.5;
+  }
+  font(ctx,actual,weight);
+  ctx.fillStyle=color;
+  ctx.fillText(copy,x,y,Math.max(8,maxWidth));
+}
+
 function wrap(
   ctx: CanvasRenderingContext2D,
   value: string,
@@ -619,9 +633,9 @@ function summaryCard(
   rr(ctx, x, y, w, 104, 12, soft, soft);
   circleIcon(ctx, x + w / 2, y + 28, 15, accent, symbol, WHITE, 12);
   ctx.textAlign = 'center';
-  text(ctx, titleValue, x + w / 2, y + 54, 10, 750, MUTED);
-  text(ctx, value, x + w / 2, y + 78, 17, 900, accent);
-  text(ctx, sub, x + w / 2, y + 96, 9, 700, INK);
+  fittedText(ctx, titleValue, x + w / 2, y + 54, w-10, 10, 750, MUTED);
+  fittedText(ctx, value, x + w / 2, y + 78, w-10, 17, 900, accent);
+  fittedText(ctx, sub, x + w / 2, y + 96, w-10, 9, 700, INK);
   ctx.textAlign = 'left';
 }
 
@@ -657,7 +671,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   // Header
   rr(ctx, 12, 12, 1216, 94, 15, WHITE, LINE);
   await logo(ctx, 50, 59);
-  text(ctx, 'Tarım Analiz Raporu', 372, 48, 19, 900, INK);
+  fittedText(ctx, 'Tarım Analiz Raporu', 372, 48, 280, 19, 900, INK);
   text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 72, 10.5, 650, MUTED);
 
   const headerMeta = [
@@ -690,29 +704,29 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   // LEFT COLUMN — premium hero
   rr(ctx, leftX, top, leftW, 532, 15, WHITE, LINE);
-  text(ctx, 'Tarla Sağlık ve Karar Özeti', leftX + 16, top + 38, 26, 900, INK);
+  fittedText(ctx, 'Tarla Sağlık ve Karar Özeti', leftX + 16, top + 38, leftW-32, 25, 900, INK);
   wrap(ctx, 'Uydu verileri, hava durumu, toprak analizi ve Pusula karar motorlarıyla hazırlanmış premium tarla özeti.', leftX + 16, top + 67, 11.5, 600, MUTED, leftW - 32, 1.28, 3);
-  await drawLayeredHero(ctx, latest?.trueColorImage, latest?.ndviImage, leftX + 8, top + 112, leftW - 16, 318);
+  await drawLayeredHero(ctx, latest?.trueColorImage, latest?.ndviImage, leftX + 8, top + 112, leftW - 16, 272);
 
-  const gradient = ctx.createLinearGradient(leftX + 8, top + 300, leftX + 8, top + 430);
+  const gradient = ctx.createLinearGradient(leftX + 8, top + 267, leftX + 8, top + 384);
   gradient.addColorStop(0, 'rgba(0,0,0,0)');
   gradient.addColorStop(1, 'rgba(0,0,0,.72)');
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(leftX + 8, top + 112, leftW - 16, 318, 15);
+  ctx.roundRect(leftX + 8, top + 112, leftW - 16, 272, 15);
   ctx.clip();
   ctx.fillStyle = gradient;
-  ctx.fillRect(leftX + 8, top + 112, leftW - 16, 318);
+  ctx.fillRect(leftX + 8, top + 112, leftW - 16, 272);
   ctx.restore();
 
-  rr(ctx, leftX + 22, top + 332, 196, 85, 11, 'rgba(5,20,22,.78)', 'rgba(255,255,255,.18)');
-  circleIcon(ctx, leftX + 43, top + 353, 11, ORANGE, '●', WHITE, 7);
-  text(ctx, snapshot.field.name, leftX + 62, top + 358, 15, 900, WHITE);
-  text(ctx, snapshot.field.areaDecare == null ? 'Alan —' : `${snapshot.field.areaDecare.toLocaleString('tr-TR')} da`, leftX + 39, top + 383, 11, 750, WHITE);
-  text(ctx, snapshot.field.crop ?? 'Ürün kaydı yok', leftX + 39, top + 402, 11, 750, WHITE);
-  text(ctx, location, leftX + 39, top + 421, 10, 700, '#dbe7e7');
+  rr(ctx, leftX + 22, top + 284, 196, 87, 11, 'rgba(5,20,22,.82)', 'rgba(255,255,255,.18)');
+  circleIcon(ctx, leftX + 43, top + 302, 11, ORANGE, '●', WHITE, 7);
+  fittedText(ctx, snapshot.field.name, leftX + 62, top + 307, 140, 14, 900, WHITE);
+  fittedText(ctx, snapshot.field.areaDecare == null ? 'Alan —' : `${snapshot.field.areaDecare.toLocaleString('tr-TR')} da`, leftX + 39, top + 328, 170, 10, 750, WHITE);
+  fittedText(ctx, snapshot.field.crop ?? 'Ürün kaydı yok', leftX + 39, top + 348, 170, 10, 750, WHITE);
+  fittedText(ctx, location, leftX + 39, top + 365, 170, 9.5, 700, '#dbe7e7');
 
-  const statY = top + 442;
+  const statY = top + 399;
   const statGap = 7;
   const statW = (leftW - 16 - statGap * 3) / 4;
   const lastMeasured = knownSeries(sat, 'ndvi').at(-1);
@@ -1011,8 +1025,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const compassNeedle=await imageBitmapFrom(BRAND_NEEDLE);
   if(compassBody){ctx.drawImage(compassBody,rightX+18,1461,59,59);compassBody.close();}
   if(compassNeedle){ctx.drawImage(compassNeedle,rightX+18,1461,59,59);compassNeedle.close();}
-  text(ctx,'TarlaPusula',rightX+91,1471,22,900,WHITE);
-  text(ctx,'TARLANIN AKLI, YANINDA.',rightX+92,1492,9,750,'#d2e7dd');
+  fittedText(ctx,'TarlaPusula',rightX+91,1471,rightW-110,22,900,WHITE);
+  fittedText(ctx,'TARLANIN AKLI, YANINDA.',rightX+92,1492,rightW-110,9,750,'#d2e7dd');
   wrap(ctx,'Veriye dayalı kararlarla daha güçlü yarınlar.',rightX+92,1521,12,800,WHITE,rightW-111,1.2,2);
   text(ctx,'Uydu · Toprak · Hava · Saha',rightX+22,1570,10,700,'#d6eee5');
 
