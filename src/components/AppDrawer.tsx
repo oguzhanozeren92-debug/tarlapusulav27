@@ -1092,7 +1092,7 @@ export default function AppDrawer({
           })}
         </nav>
 
-        <DrawerSupportFooter screen={String(activeScreen ?? '')} />
+        <DrawerSupportFooter screen={String(activeScreen ?? '')} onCloseDrawer={onClose} />
 
         <button
           type="button"
