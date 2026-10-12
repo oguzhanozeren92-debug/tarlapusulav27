@@ -976,12 +976,23 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       midX+17,top+375,midW-34,9,750,MUTED);
   }
 
-  rr(ctx, midX, 512, midW, 204, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, 520, 2, 'Su ve Sulama Analizi', BLUE, '●');
-  const waterCards = [
-    { title: 'NDMI (bitki nem)', value: null, main: numericIndexText(ndmiValue), sub: 'Toprak nem ölçümü değil', accent: BLUE },
-    { title: 'Sulama İhtiyacı', value: null, main: need.mm === null ? '—' : `${need.mm.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} mm`, sub: need.mm === null ? 'Model verisi eksik' : 'Hesaplanan net su', accent: BLUE },
-    { title: 'Nem Eğilimi', value: null, main: valid(ndmiCmp.pct) ? (ndmiCmp.pct < -5 ? 'Azalıyor' : ndmiCmp.pct > 5 ? 'Artıyor' : 'Dengeli') : '—', sub: valid(ndmiCmp.pct) ? 'İki dönem karşılaştırıldı' : 'İki ölçüm gerekiyor', accent: GREEN },
+  const hasIrrigationEvidence=ndmiValue!==null||need.mm!==null;
+  rr(ctx, midX, 512, midW, 204, 15, hasIrrigationEvidence?WHITE:'#f4f9ff', LINE);
+  sectionHeader(ctx, midX + 10, 520, 2,
+    hasIrrigationEvidence?'Su ve Sulama Analizi':'Su Yönetimi · Hava Kanıtları', BLUE, '●');
+  const waterCards = hasIrrigationEvidence ? [
+    { title: 'NDMI (bitki nem)', main: numericIndexText(ndmiValue),sub:'Toprak nem ölçümü değil',accent:BLUE},
+    { title: 'Sulama İhtiyacı', main:need.mm===null?'—':numTr(need.mm)+' mm',
+      sub:need.mm===null?'Model kanıtı eksik':'Kayıtlı su hesabı',accent:BLUE},
+    { title: 'Nem Eğilimi',main:valid(ndmiCmp.pct)?(ndmiCmp.pct < -5?'Azalıyor':ndmiCmp.pct > 5?'Artıyor':'Dengeli'):'—',
+      sub:valid(ndmiCmp.pct)?'İki dönem NDMI':'İki ölçüm gerekli',accent:GREEN},
+  ] : [
+    {title:'Dönem yağışı',main:climate.totalRain===null?'Eksik':numTr(climate.totalRain)+' mm',
+      sub:'Geçmiş hava kaydı',accent:BLUE},
+    {title:'Referans ET₀',main:climate.totalEt0===null?'Eksik':numTr(climate.totalEt0)+' mm',
+      sub:'Atmosferik talep',accent:TEAL},
+    {title:'Sulama kararı',main:'Hesaplanmadı',
+      sub:'Toprak ve ürün bilgisi gerekli',accent:ORANGE},
   ];
   waterCards.forEach((card, index) => {
     const x = midX + 14 + index * 124;
@@ -993,7 +1004,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     wrap(ctx, card.sub, x + 9, 664, 9, 750, MUTED, 98, 1.2, 3);
   });
 
-  rr(ctx, midX, 726, midW, 210, 15, WHITE, LINE);
+  rr(ctx, midX, 726, midW, 210, 15, '#fffaf4', LINE);
   sectionHeader(ctx, midX + 10, 734, 3, 'Toprak ve Besin Analizi', '#a74627', '●');
   // Laboratory samples remain authoritative; SoilGrids is explicitly a 250m model estimate.
   if (soilRows.length && soilRows.some((row) => row.value !== null)) {
@@ -1004,7 +1015,9 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       text(ctx, row.text, midX + 221, yy, 9, 850, row.value === null ? MUTED : row.accent);
     });
   } else if (soilGrids.available) {
-    text(ctx, 'SoilGrids · 0–30 cm · 250 m tahmin', midX + 18, 782, 10, 900, GREEN_DARK);
+    fittedText(ctx,soilGrids.isHistoricalRecord
+      ? 'SoilGrids · 0–30 cm · 250 m model'
+      : 'SoilGrids · sonradan alınan model referansı',midX+18,782,235,9.8,900,GREEN_DARK);
     const soilMetrics = [
       ['pH', soilGrids.ph === null ? '—' : soilGrids.ph.toLocaleString('tr-TR', { maximumFractionDigits: 1 })],
       ['Organik C', soilGrids.carbon === null ? '—' : `${soilGrids.carbon.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} g/kg`],
@@ -1016,8 +1029,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       text(ctx, label, midX + 18, yy, 10, 700, MUTED);
       text(ctx, value, midX + 106, yy, 10, 900, INK);
     });
-    wrap(ctx, 'Laboratuvar değildir. Gübre dozu ve su kapasitesi hesaplanmaz.',
-      midX + 18, 914, 9, 700, MUTED, 234, 1.18, 2);
+    wrap(ctx,'Laboratuvar değildir. Sonradan sorgulandıysa geçmiş Haziran ölçümü sayılmaz; gübre dozu çıkarılmaz.',
+      midX+18,914,8.5,700,MUTED,234,1.16,2);
   } else {
     text(ctx, 'Toprak model ölçümü bekleniyor', midX + 18, 809, 10, 850, MUTED);
     wrap(ctx, 'Uygun veri gelmeden besin miktarı ve pH tahmini yapılmaz.',
