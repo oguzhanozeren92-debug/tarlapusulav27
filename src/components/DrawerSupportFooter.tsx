@@ -2,9 +2,11 @@ import { useState, type ReactNode } from 'react';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import IssueReportModal from './IssueReportModal';
+import { useEntitlementStore } from '../entitlements/useEntitlementStore';
+import { openPlanUpgrade } from '../entitlements/planAccess';
 import './DrawerSupportFooter.css';
 
-type Props = { screen?: string };
+type Props = { screen?: string; onCloseDrawer?: () => void };
 
 const facebookUrl = String(import.meta.env.VITE_TARLAPUSULA_FACEBOOK_URL || '').trim();
 const instagramUrl = String(import.meta.env.VITE_TARLAPUSULA_INSTAGRAM_URL || '').trim();
@@ -31,8 +33,17 @@ function SocialButton({
   return <button type="button" aria-label={label} title={`${label} · hesap açıldığında aktif olacak`}>{children}</button>;
 }
 
-export default function DrawerSupportFooter({ screen }: Props) {
+export default function DrawerSupportFooter({ screen, onCloseDrawer }: Props) {
   const [reportOpen, setReportOpen] = useState(false);
+  const { effectivePlan, status } = useEntitlementStore();
+  const planLoading = status === 'loading' || status === 'idle';
+  const membershipLabel = planLoading
+    ? 'Kontrol ediliyor…'
+    : effectivePlan === 'premium'
+      ? 'Premium Üye'
+      : effectivePlan === 'plus'
+        ? 'Plus Üye'
+        : 'Ücretsiz Üye';
   const openPrivacyPolicy = async () => {
     if (Capacitor.isNativePlatform()) {
       await Browser.open({ url: privacyPolicyUrl });
@@ -81,6 +92,41 @@ export default function DrawerSupportFooter({ screen }: Props) {
               <span>Hata Bildir</span>
             </button>
           </div>
+        </div>
+
+        <div className={`tp-drawer-membership tp-drawer-membership--${effectivePlan}`} aria-label={`Mevcut üyelik: ${membershipLabel}`}>
+          <div className="tp-drawer-membership-title">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m3.5 8 4.1 3.6L12 5l4.4 6.6L20.5 8l-1.4 10H4.9L3.5 8Z"/>
+              <path d="M5 20h14"/>
+            </svg>
+            <span>ÜYELİĞİN</span>
+          </div>
+          <strong className="tp-drawer-membership-plan">{membershipLabel}</strong>
+
+          {planLoading ? (
+            <span className="tp-drawer-membership-pending">Üyelik bilgisi alınıyor</span>
+          ) : effectivePlan === 'premium' ? (
+            <span className="tp-drawer-membership-confirmed">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg>
+              Ayrıcalıklar aktif
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="tp-drawer-membership-cta"
+              onClick={() => {
+                openPlanUpgrade({
+                  requiredPlan: 'premium',
+                  feature: effectivePlan === 'plus' ? 'Premium’a yükselt' : 'Premium üyelik',
+                });
+                onCloseDrawer?.();
+              }}
+            >
+              {effectivePlan === 'plus' ? 'Premium’a Yükselt' : 'Premium Ol'}
+              <span aria-hidden="true">›</span>
+            </button>
+          )}
         </div>
       </div>
 
