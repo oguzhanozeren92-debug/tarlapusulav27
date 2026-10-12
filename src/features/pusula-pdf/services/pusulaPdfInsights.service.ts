@@ -144,7 +144,13 @@ export function buildPusulaPdfGuidance(
   const ndmiSeries = validSeries(points, 'ndmi');
   const ndviDelta = delta(points, 'ndvi');
   const ndmiDelta = delta(points, 'ndmi');
-  const weather = weatherRows(snapshot).slice(0, 7);
+  const weather = weatherRows(snapshot)
+    .filter((row) => {
+      const date = String(row?.date ?? row?.time ?? '').slice(0, 10);
+      return date && date >= snapshot.period.start && date <= snapshot.period.end;
+    })
+    .sort((a,b) => String(a?.date ?? '').localeCompare(String(b?.date ?? '')))
+    .slice(-7);
   const rainValues = weather
     .map((row) => firstNumber(row, ['rain', 'precipitation', 'precipitationMm']))
     .filter(finite);
