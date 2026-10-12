@@ -74,7 +74,19 @@ export async function requestPusulaPdf(fieldId: string) {
   const { data, error } = await supabase.rpc('request_pusulapdf', {
     p_field_id: fieldId,
   });
-  if (error) throw error;
+  if (error) {
+    const detail = String(error.message ?? '').trim();
+    if (detail.includes('PREMIUM_REQUIRED')) {
+      throw new Error('PusulaPDF için gerçek Premium aboneliği gerekiyor. TEST PREMIUM görünümü tek başına rapor yetkisi vermez.');
+    }
+    if (detail.includes('AUTH_REQUIRED')) {
+      throw new Error('Rapor hazırlamak için tekrar giriş yapmalısın.');
+    }
+    if (detail.includes('FIELD_NOT_FOUND_OR_FORBIDDEN')) {
+      throw new Error('Bu tarla rapor talebi için bulunamadı veya erişim yetkin yok.');
+    }
+    throw new Error(`PusulaPDF rapor isteği başlatılamadı: ${detail || error.code || 'Sunucu hatası'}`);
+  }
 
   const result = data as { job_id: string; report_id: string | null; reused: boolean };
 
