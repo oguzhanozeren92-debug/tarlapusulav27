@@ -929,16 +929,28 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 1214, 5, 'Saha Gözlemleri', PURPLE, '▣');
-  await drawImage(ctx, latestPhoto?.signedUrl, midX + 16, 1260, 174, 195, { radius: 9, placeholder: 'Saha fotoğrafı yok' });
-  await drawImage(ctx, secondPhoto?.signedUrl ?? latest?.trueColorImage, midX + 200, 1260, 174, 195, { radius: 9, placeholder: 'İkinci görsel yok' });
-  text(ctx, latestPhoto ? 'Son Saha Fotoğrafı' : 'Fotoğraf Bekleniyor', midX + 16, 1475, 9.5, 850, INK);
-  text(ctx, latestPhoto ? fmt(latestPhoto.capturedAt, false) : '—', midX + 16, 1491, 8.5, 650, MUTED);
-  text(ctx, secondPhoto ? 'Önceki Saha Fotoğrafı' : 'Genel Görünüm', midX + 200, 1475, 9.5, 850, INK);
-  text(ctx, secondPhoto ? fmt(secondPhoto.capturedAt, false) : latest ? fmt(latest.date, false) : '—', midX + 200, 1491, 8.5, 650, MUTED);
   const observationInsight = guidance.insights.find((item) => item.id === 'field-observation-follow-up-evidence');
-  rr(ctx, midX + 16, 1510, 358, 62, 9, diagnosis.severity ? RED_SOFT : PURPLE_SOFT, diagnosis.severity ? '#ffd9dc' : '#eadfff');
-  wrap(ctx, diagnosis.headline || observationInsight?.title || 'Saha gözlemleri rapora bağlandı.', midX + 28, 1534, 10, 850, diagnosis.severity ? RED : PURPLE, 334, 1.18, 2);
-  wrap(ctx, diagnosis.summary || latestPhoto?.notes || observationInsight?.meaning || 'Yeni saha fotoğrafı geldikçe aynı noktadan değişim karşılaştırılır.', midX + 28, 1557, 9, 650, MUTED, 334, 1.2, 2);
+  if (latestPhoto?.signedUrl) {
+    await drawImage(ctx, latestPhoto.signedUrl, midX + 16, 1260, 174, 195, { radius: 9, placeholder: 'Fotoğraf açılamadı' });
+    rr(ctx, midX + 200, 1260, 174, 195, 9, '#f8fafb', LINE);
+    text(ctx, 'Son saha kaydı', midX + 212, 1294, 13, 900, INK);
+    text(ctx, fmt(latestPhoto.capturedAt, false), midX + 212, 1320, 11, 750, MUTED);
+    wrap(ctx, englishFree(diagnosis.headline || diagnosis.summary || latestPhoto.notes || 'Fotoğraf yüklenmiş, teşhis kaydı henüz yok.'),
+      midX + 212, 1360, 10.5, 650, INK, 150, 1.3, 6);
+  } else {
+    rr(ctx, midX + 16, 1260, 358, 195, 10, '#f8fafb', LINE);
+    circleIcon(ctx, midX + 45, 1300, 19, PURPLE_SOFT, '◉', PURPLE, 16);
+    text(ctx, 'Saha fotoğrafı henüz eklenmedi', midX + 73, 1306, 15, 900, INK);
+    wrap(ctx, 'Pusula AI ile yaprak, meyve veya sorunlu bölgeden fotoğraf ekle. Gerçek saha gözlemi olmadan hastalık teşhisi üretilemez.',
+      midX + 25, 1351, 12, 650, MUTED, 322, 1.3, 5);
+    text(ctx, 'Yeni fotoğraf → Pusula AI / Fotoğraf Analizi', midX + 24, 1433, 10, 800, PURPLE);
+  }
+  text(ctx, latestPhoto ? 'Saha gözlemi arşivi' : 'Saha gözlemi gerekli', midX + 16, 1478, 10, 850, INK);
+  const observationText = latestPhoto
+    ? (diagnosis.summary || diagnosis.headline || latestPhoto.notes || 'Gözlem kaydı mevcut; kesin teşhis için ek kanıt gerekebilir.')
+    : (observationInsight?.meaning || 'Bir sonraki incelemede gerçek fotoğraf ile uydu işaretleri birlikte karşılaştırılabilir.');
+  rr(ctx, midX + 16, 1509, 358, 65, 9, PURPLE_SOFT, '#eadfff');
+  wrap(ctx, englishFree(observationText), midX + 28, 1535, 10, 650, INK, 333, 1.22, 3);
 
   // RIGHT COLUMN
   rr(ctx, rightX, top, rightW, 476, 15, WHITE, LINE);
@@ -976,10 +988,17 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   rr(ctx, rightX, 830, rightW, 330, 15, WHITE, LINE);
   sectionHeader(ctx, rightX + 10, 838, 8, 'Kritik Gözlem', PURPLE, '!');
-  await drawImage(ctx, latestPhoto?.signedUrl ?? latest?.trueColorImage, rightX + 16, 884, 205, 225, { radius: 10, placeholder: 'Kritik gözlem fotoğrafı yok' });
-  rr(ctx, rightX + 231, 884, 149, 225, 10, diagnosis.headline ? RED_SOFT : PURPLE_SOFT, diagnosis.headline ? '#ffd8db' : '#e9dcff');
-  wrap(ctx, diagnosis.headline || observationInsight?.title || 'Kritik saha gözlemi yok', rightX + 244, 912, 11, 900, diagnosis.headline ? RED : PURPLE, 123, 1.2, 4);
-  wrap(ctx, diagnosis.summary || latestPhoto?.notes || observationInsight?.meaning || 'Saha fotoğrafı eklendiğinde Pusula burada kısa gözlem özetini gösterir.', rightX + 244, 982, 9.5, 600, MUTED, 123, 1.28, 8);
+  rr(ctx, rightX + 16, 884, rightW - 32, 224, 12,
+    latestPhoto?.signedUrl ? PURPLE_SOFT : GRAY_SOFT, LINE);
+  circleIcon(ctx, rightX + 45, 920, 16, latestPhoto ? PURPLE : BLUE, '!', WHITE, 12);
+  text(ctx, latestPhoto ? 'Doğrulanacak saha bulgusu' : 'Kritik saha bulgusu yok',
+    rightX + 75, 926, 16, 900, INK);
+  const criticalText = latestPhoto
+    ? (diagnosis.headline || diagnosis.summary || 'Fotoğraftaki belirtiler saha gözlemiyle birlikte değerlendirilmelidir.')
+    : 'Fotoğraf, güncel tarla notu veya yerinde doğrulama olmadan kesin hastalık ve zararlı teşhisi üretilmez.';
+  wrap(ctx, englishFree(criticalText), rightX + 29, 975, 13, 650, MUTED, rightW - 61, 1.35, 5);
+  text(ctx, latestPhoto ? 'Kanıt: Kullanıcı saha fotoğrafı' : 'İstenen kanıt: Güncel saha fotoğrafı',
+    rightX + 29, 1081, 11, 850, BLUE);
 
   rr(ctx, rightX, 1170, rightW, 250, 15, WHITE, LINE);
   sectionHeader(ctx, rightX + 10, 1178, 9, "Pusula'nın Kısa Aksiyonları", GREEN, '✓');
@@ -995,9 +1014,12 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     wrap(ctx, value, x + 10, 1275, 9.2, 650, INK, 96, 1.28, 7);
   });
 
-  await drawImage(ctx, latest?.trueColorImage ?? latestPhoto?.signedUrl, rightX, 1430, rightW, 160, { radius: 15, placeholder: 'Tarla görseli', overlay: 'rgba(4,32,25,.28)' });
-  await logo(ctx, rightX + 34, 1510, true);
-  wrap(ctx, 'Tarlanı verilerle izle, kararını güvenle ver.', rightX + 150, 1502, 15, 800, WHITE, 220, 1.2, 3);
+  rr(ctx, rightX, 1430, rightW, 160, 15, GREEN_SOFT, LINE);
+  await logo(ctx, rightX + 37, 1495, true);
+  wrap(ctx, 'Tarlanı verilerle izle, kararını güvenle ver.',
+    rightX + 150, 1502, 14, 800, INK, 218, 1.2, 3);
+  text(ctx, 'TarlaPusula · Kaynakları belirtilmiş tarla analizi',
+    rightX + 20, 1570, 10, 700, MUTED);
 
   // Premium footer — social + QR
   rr(ctx, 12, 1604, 1216, 138, 15, WHITE, LINE);
