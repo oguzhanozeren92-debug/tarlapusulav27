@@ -15,7 +15,7 @@ function safePart(value: unknown) {
 }
 
 export async function ensurePusulaPdfArchived(report: WeeklyPusulaReport) {
-  if (report.pdf_path) return report.pdf_path;
+  if (report.pdf_path?.endsWith('-rev4.pdf')) return report.pdf_path;
   if (!report.report_data) throw new Error('Rapor snapshot verisi bulunamadı.');
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -28,7 +28,7 @@ export async function ensurePusulaPdfArchived(report: WeeklyPusulaReport) {
     authData.user.id,
     report.field_id,
     safePart(report.report_data.field?.name),
-    `${report.id}.pdf`,
+    `${report.id}-rev4.pdf`,
   ].join('/');
 
   const storedPath = await uploadPrivateFile('reports', objectPath, blob, 'application/pdf');
