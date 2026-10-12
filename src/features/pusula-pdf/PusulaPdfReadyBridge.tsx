@@ -81,7 +81,13 @@ export default function PusulaPdfReadyBridge() {
           if (Capacitor.isNativePlatform()) {
             // Cache as soon as the app is active. iOS cannot execute this JS
             // while force-closed; the next app launch completes the download.
-            void savePusulaPdfOnDevice(item).catch((err) => {
+            void savePusulaPdfOnDevice(item).then((saved) => {
+              if (saved && live) {
+                window.dispatchEvent(new CustomEvent('tp:pusulapdf-cached', {
+                  detail: { reportId: item.id, fileName: saved.fileName },
+                }));
+              }
+            }).catch((err) => {
               console.warn('[PUSULAPDF] Cihaz içi otomatik kayıt ertelendi:', err);
             });
           }
