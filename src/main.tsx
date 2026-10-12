@@ -20,6 +20,7 @@ import './styles/FieldSelectChevron.css';
 import './styles/MobileViewportFit.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
+import PusulaPdfReadyBridge from './features/pusula-pdf/PusulaPdfReadyBridge';
 import { installNativeFeedback } from './mobile/nativeFeedback';
 import { installNativeAdsBridge } from './mobile/nativeAds';
 import NativePushBridge from './mobile/NativePushBridge';
@@ -66,6 +67,7 @@ createRoot(document.getElementById('root')!).render(
         <AppNotificationBridge />
         <AppActivityTracker />
         <NativePushBridge />
+        <PusulaPdfReadyBridge />
         <NativeAuthBridge />
         <NativeShellBridge />
         <NativePurchasesBridge />
