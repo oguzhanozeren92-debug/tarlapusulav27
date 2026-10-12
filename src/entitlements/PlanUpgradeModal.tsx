@@ -157,6 +157,7 @@ export default function PlanUpgradeModal() {
   const [request, setRequest] = useState<PlanUpgradeRequest | null>(null);
   const [yearly, setYearly] = useState(false);
   const [message, setMessage] = useState('');
+  const [messagePlan, setMessagePlan] = useState<PaidPlan | null>(null);
   const [storePrices, setStorePrices] = useState<StorePlanPrice[]>([]);
   const [purchaseLoading, setPurchaseLoading] = useState<PaidPlan | null>(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
@@ -169,6 +170,7 @@ export default function PlanUpgradeModal() {
       if (!detail?.requiredPlan) return;
       setRequest(detail);
       setMessage('');
+      setMessagePlan(null);
     };
 
     const intercept = (event: MouseEvent) => {
@@ -294,6 +296,8 @@ export default function PlanUpgradeModal() {
 
   const selectPlan = async (plan: PaidPlan) => {
     if (planAllows(entitlement.effectivePlan, plan)) return;
+    setMessagePlan(plan);
+    setMessage('');
 
     if (!nativeStorePurchasesSupported()) {
       window.dispatchEvent(
@@ -350,6 +354,7 @@ export default function PlanUpgradeModal() {
   };
 
   const manageSubscription = async () => {
+    setMessagePlan(null);
     try {
       await manageNativeStoreSubscription();
     } catch (error) {
@@ -362,6 +367,7 @@ export default function PlanUpgradeModal() {
   };
 
   const restore = async () => {
+    setMessagePlan(null);
     if (!nativeStorePurchasesSupported()) {
       setMessage('Satın alımları geri yükleme mobil uygulamada kullanılabilir.');
       return;
@@ -483,6 +489,11 @@ export default function PlanUpgradeModal() {
                             ? 'Mevcut planın kapsamında'
                             : `${PLAN_LABELS[plan]} abone ol`}
                   </button>
+                  {message && messagePlan === plan ? (
+                    <div className="tp-plan-gate-message" role="alert" aria-live="assertive">
+                      {message}
+                    </div>
+                  ) : null}
                 </article>
               );
             })}
@@ -517,7 +528,9 @@ export default function PlanUpgradeModal() {
             ) : null}
           </div>
 
-          {message ? <div className="tp-plan-gate-message">{message}</div> : null}
+          {message && !messagePlan ? (
+            <div className="tp-plan-gate-message" role="alert">{message}</div>
+          ) : null}
           <p className="tp-plan-gate-note">
             Satın alma onaylandığında ücret App Store / Google Play hesabına yansıtılır.
             Aylık veya yıllık abonelikler iptal edilmediği sürece seçilen dönem sonunda otomatik yenilenir
