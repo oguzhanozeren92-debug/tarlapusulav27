@@ -603,7 +603,7 @@ async function processJob(jobId:string,userId:string){
     if(fieldError||!field) throw fieldError??new Error('Tarla bulunamadı');
     const fieldId=String(field.id);const geometry=field.parcel_geometry??null;const lat=numberOrNull(field.parcel_centroid_lat??field.latitude);const lng=numberOrNull(field.parcel_centroid_lng??field.longitude);const period=requestedPeriod(job);
     let layerArchive=(await collectCloudLayerArchive(userId,fieldId))
-      .filter((row:any)=>!dateOnly(row.observedAt??row.archivedAt)||dateOnly(row.observedAt??row.archivedAt)!<=period.end);
+      .filter((row:any)=>{ const observed=dateOnly(row.observedAt??row.archivedAt); return !observed||observed<=period.end; });
 
     await setJob(jobId,{stage:'satellite',progress_meta:{message:'Seçilen dönemin uydu sahneleri doğrulanıyor',cloudArchiveCount:layerArchive.length}});
     const satellite=await collectSatellite(userId,fieldId,geometry,layerArchive,period).catch((error)=>{
@@ -616,12 +616,12 @@ async function processJob(jobId:string,userId:string){
     const weather=await collectWeather(userId,fieldId,lat,lng,layerArchive,period);
 
     layerArchive=(await collectCloudLayerArchive(userId,fieldId))
-      .filter((row:any)=>!dateOnly(row.observedAt??row.archivedAt)||dateOnly(row.observedAt??row.archivedAt)!<=period.end);
+      .filter((row:any)=>{ const observed=dateOnly(row.observedAt??row.archivedAt); return !observed||observed<=period.end; });
     await setJob(jobId,{stage:'field_memory',progress_meta:{weatherDays:weather.history.length,weatherArchiveUsed:Number(weather.archiveUsed??0),weatherLiveUsed:Number(weather.liveUsed??0),message:'Sentinel-1 VV, VH ve su adayı geçmişi birleştiriliyor'}});
     const radar=await collectRadar(userId,fieldId,lat,lng,geometry,layerArchive,period);
     // Bu raporda canlı kaynaktan çekilip yeni yazılan kayıtları da snapshot'a dahil et.
     layerArchive=(await collectCloudLayerArchive(userId,fieldId))
-      .filter((row:any)=>!dateOnly(row.observedAt??row.archivedAt)||dateOnly(row.observedAt??row.archivedAt)!<=period.end);
+      .filter((row:any)=>{ const observed=dateOnly(row.observedAt??row.archivedAt); return !observed||observed<=period.end; });
 
     await setJob(jobId,{stage:'field_memory',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,message:'Tarla geçmişi birleştiriliyor'}});
     const [allActivities,allSoilAnalyses,allDiagnoses,allKcSnapshots]=await Promise.all([
