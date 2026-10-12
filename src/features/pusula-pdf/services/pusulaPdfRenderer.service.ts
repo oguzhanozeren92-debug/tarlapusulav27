@@ -561,6 +561,34 @@ function englishFree(value: string) {
     .replace(/\bcontext-only\b/gi, 'Ön değerlendirme');
 }
 
+type PusulaBioMetric = {key:string;title:string;unit:string;accent:string;soft:string};
+const BIO_METRICS: PusulaBioMetric[] = [
+  {key:'LAI',title:'Yaprak Alanı',unit:'LAI',accent:GREEN,soft:GREEN_SOFT},
+  {key:'CCC',title:'Klorofil',unit:'CCC',accent:BLUE,soft:BLUE_SOFT},
+  {key:'CWC',title:'Bitki Suyu',unit:'CWC',accent:TEAL,soft:GREEN_SOFT},
+  {key:'fCOVER',title:'Bitki Örtüsü',unit:'%',accent:PURPLE,soft:PURPLE_SOFT},
+  {key:'fAPAR',title:'Işık Kullanımı',unit:'%',accent:ORANGE,soft:ORANGE_SOFT},
+  {key:'Albedo',title:'Yansıtım',unit:'Albedo',accent:BLUE,soft:BLUE_SOFT},
+];
+function bioValue(metric: PusulaBioMetric, value:number|null|undefined){
+  if(!valid(value))return 'Ölçüm yok';
+  const shown=(metric.unit==='%'?value*100:value);
+  return shown.toLocaleString('tr-TR',{minimumFractionDigits:metric.unit==='%'?0:2,maximumFractionDigits:metric.unit==='%'?0:3})+(metric.unit==='%'?'%':'');
+}
+function indexEvidenceSummary(points:PusulaPdfSatellitePoint[]){
+  const summaries=VEGETATION_INDICES.map(item=>{
+    const series=knownSeries(points,item.key);
+    if(!series.length)return item.label+': doğrulanmış sayısal ölçüm bulunmuyor.';
+    const last=series.at(-1)!;
+    if(series.length<2)return item.label+': '+numericIndexText(last[item.key])+' (tek tarih, eğilim hesaplanamaz).';
+    const previous=series.at(-2)!;
+    const change=Number(last[item.key])-Number(previous[item.key]);
+    const direction=Math.abs(change)<.015?'belirgin değişim yok':change>0?'artış':'azalış';
+    return item.label+': '+numericIndexText(last[item.key])+'; önceki ölçüme göre '+direction+'.';
+  });
+  return summaries;
+}
+
 function qrImageUrl(target: string) {
   return `https://quickchart.io/qr?size=180&margin=1&ecLevel=M&text=${encodeURIComponent(target)}`;
 }
@@ -721,35 +749,44 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   rr(ctx, leftX, 914, leftW, 230, 15, PURPLE_SOFT, '#e4d6fb');
   circleIcon(ctx, leftX + 34, 945, 18, PURPLE, '✦', WHITE, 14);
   text(ctx, "Pusula'nın Yorumu", leftX + 62, 951, 18, 900, PURPLE);
-  wrap(ctx, guidance.weeklySummary, leftX + 20, 985, 12.5, 650, INK, leftW - 40, 1.38, 7);
+  const ndviNote=knownSeries(sat,'ndvi').length>=2
+    ? 'Geçmiş NDVI ölçümleri var; ölçüm yönü grafik üzerinden karşılaştırılabilir.'
+    : 'Tek geçerli sayısal NDVI varsa değişim kesinleştirilemez.';
+  const summary = guidance.weeklySummary;
+  wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 11.7, 650, INK, leftW - 40, 1.32, 6);
   const action = guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
   rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
   text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
   wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
 
-  // Replacing a repeated decorative field picture with verifiable provenance.
-  rr(ctx, leftX, 1154, leftW, 436, 15, WHITE, LINE);
-  text(ctx, 'Veri Kaynakları ve Güvenilirlik', leftX + 18, 1190, 18, 900, INK);
-  wrap(ctx, 'Bu rapor yalnız kayda geçmiş veri ve doğrulanmış model çıktılarıyla oluşturulur. Verisi eksik alanlar tahminmiş gibi doldurulmaz.',
-    leftX + 18, 1223, 12, 650, MUTED, leftW - 36, 1.37, 4);
-  const sources = [
-    ['Uydu kayıtları', `${sat.length} tarih / ${numericDates.length} sayısal ölçüm`],
-    ['Son ölçüm', lastMeasured ? fmt(lastMeasured.date) : 'Henüz yok'],
-    ['Toprak', soilGrids.available ? 'SoilGrids 250 m · model tahmini' : 'Kaynak bekleniyor'],
-    ['Hava', weather.length ? `Geçmiş gözlem · ${weather.length} gün` : 'Doğrulanmış veri yok'],
-    ['Saha fotoğrafı', photos.length ? `${photos.length} kayıt` : 'Fotoğraf kaydı yok'],
-  ];
-  sources.forEach(([label, value], index) => {
-    const yy = 1334 + index * 44;
-    ctx.strokeStyle = '#e4ebef'; ctx.beginPath();
-    ctx.moveTo(leftX + 18, yy + 14); ctx.lineTo(leftX + leftW - 18, yy + 14); ctx.stroke();
-    text(ctx, label, leftX + 20, yy, 11, 800, MUTED);
-    ctx.textAlign = 'right';
-    text(ctx, value, leftX + leftW - 18, yy, 10, 850, INK);
-    ctx.textAlign = 'left';
+  // Plant measurements from the actual field SL2P archive (never mock values).
+  rr(ctx, leftX, 1154, leftW, 436, 15, '#f9fbfa', LINE);
+  text(ctx, 'Uydu Bitki Ölçümleri', leftX + 18, 1190, 18, 900, INK);
+  const bio = (snapshot.biophysical??[]).find(row=>
+    row.date && row.date>=snapshot.period.start && row.date<=snapshot.period.end);
+  const bioQuality=String(bio?.qc?.quality??'unknown').toLowerCase();
+  const bioProof=bio
+    ? ('SL2P · '+fmt(bio.date,false)+' · '+(bioQuality==='high'?'Yüksek kalite':bioQuality==='medium'?'Orta kalite':'Ön değerlendirme'))
+    : 'Seçilen dönem için SL2P kayıtlı değil';
+  text(ctx, bioProof, leftX + 18, 1212, 9.5, 750, MUTED);
+  BIO_METRICS.forEach((item,index)=>{
+    const col=index%3,row=Math.floor(index/3);
+    const x=leftX+15+col*129, y=1227+row*112;
+    rr(ctx,x,y,119,101,10,item.soft,LINE);
+    text(ctx,item.title,x+9,y+22,10.3,800,INK);
+    const number=bio?.metrics?.[item.key];
+    text(ctx,bioValue(item,number),x+9,y+55,number==null?11:18,900,item.accent);
+    text(ctx,item.unit==='%'?'Model yüzdesi':item.unit,x+9,y+80,8.6,700,MUTED);
   });
-  wrap(ctx, 'Kaynaklar: Sentinel-2 / tarla arşivi, SoilGrids ve kayıtlı hava ölçümleri.',
-    leftX + 18, 1570, 9.5, 600, MUTED, leftW - 36, 1.2, 2);
+  rr(ctx,leftX+15,1458,leftW-30,111,11,WHITE,LINE);
+  text(ctx,'Pusula’nın Bitki Yorumu',leftX+27,1480,12,900,GREEN_DARK);
+  const bioNote=bio
+    ? ('Yaprak alanı ve bitki örtüsü SL2P uydu tahminidir; '+(bioQuality==='low'
+      ? 'piksel kalitesi düşük olduğu için kesin bir tarla teşhisi sayılmaz.'
+      : 'saha gözlemi ve çok tarihli ölçümlerle birlikte değerlendirilmelidir.'))
+    : 'Seçilen dönemde uygun SL2P sayısal ölçümü bulunmuyor. Görüntü olması tek başına güvenilir klorofil veya su ölçümü anlamına gelmez.';
+  wrap(ctx,bioNote,leftX+27,1503,11,650,INK,leftW-55,1.33,4);
+  text(ctx,'Kaynak: Sentinel-2 · SL2P / arşiv · tarla özelinde',leftX+27,1552,9.2,750,MUTED);
 
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
