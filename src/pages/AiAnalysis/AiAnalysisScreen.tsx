@@ -11,6 +11,7 @@ import type { UnifiedClimateContext } from '../../features/weather/hooks/useAppW
 import { useEntitlementStore } from '../../entitlements/useEntitlementStore';
 import { getCurrentWeeklyPusulaReport, getPusulaPdfCycleState, listPusulaPdfReports, type PusulaPdfHistoryItem } from '../../features/pusula-pdf/services/pusulaPdfData.service';
 import { openArchivedPusulaPdf } from '../../features/pusula-pdf/services/pusulaPdfArchive.service';
+import { canSavePusulaPdfLocally, getSavedPusulaPdf } from '../../features/pusula-pdf/services/pusulaPdfLocalFile.service';
 import { getPusulaPdfJob, requestPusulaPdf, subscribePusulaPdfJob } from '../../features/pusula-pdf/services/pusulaPdfJob.service';
 import { PUSULAPDF_STAGE_LABEL, type PusulaPdfJob } from '../../features/pusula-pdf/types.async';
 import type { WeeklyPusulaReport } from '../../features/pusula-pdf/types';
@@ -983,6 +984,13 @@ html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled>span:f
   html body #root .tp-ai-page .tp-ai-photo-intro-symbol {width:40px!important;height:40px!important}
 }
 
+html body #root .tp-ai-page .tp-pdf-local-status {
+  display:block!important;margin:9px 0 0!important;
+  padding:9px 10px!important;border:1px solid #dce3e9!important;
+  border-radius:10px!important;background:#f5f7f9!important;color:#34404b!important;
+  font-size:11px!important;font-weight:700!important;line-height:1.4!important;
+}
+
 /* QUICK CALENDAR ACTION — PUSULAPDF */
 html body #root .tp-ai-page .tp-ai-pdf-calendar{
   box-sizing:border-box!important;
@@ -1080,6 +1088,24 @@ export default function AiAnalysisScreen({
   const [pusulaPdfError, setPusulaPdfError] = useState('');
   const [pusulaPdfJob, setPusulaPdfJob] = useState<PusulaPdfJob | null>(null);
   const [pusulaPdfDownloading, setPusulaPdfDownloading] = useState(false);
+  const [pusulaPdfSavedLocal, setPusulaPdfSavedLocal] = useState(false);
+  useEffect(() => {
+    const report = pusulaPdfReport;
+    if (!report) { setPusulaPdfSavedLocal(false); return; }
+    let active = true;
+    void getSavedPusulaPdf(report)
+      .then((saved) => { if (active) setPusulaPdfSavedLocal(Boolean(saved)); })
+      .catch(() => { if (active) setPusulaPdfSavedLocal(false); });
+    const onSaved = (event: Event) => {
+      const detail = (event as CustomEvent<{ reportId?: string }>).detail;
+      if (detail?.reportId === report.id) setPusulaPdfSavedLocal(true);
+    };
+    window.addEventListener('tp:pusulapdf-cached', onSaved as EventListener);
+    return () => {
+      active = false;
+      window.removeEventListener('tp:pusulapdf-cached', onSaved as EventListener);
+    };
+  }, [pusulaPdfReport?.id]);
   const [pusulaPdfHistory, setPusulaPdfHistory] = useState<PusulaPdfHistoryItem[]>([]);
   const [pusulaPdfHistoryOpen, setPusulaPdfHistoryOpen] = useState(false);
   const [pusulaPdfNextAt, setPusulaPdfNextAt] = useState<string | null>(null);
@@ -1970,8 +1996,15 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   onClick={() => void handleReadyPusulaPdf()}
                   disabled={pusulaPdfDownloading}
                 >
-                  {pusulaPdfDownloading ? 'PDF açılıyor…' : 'PDF’yi Aç'}
+                  {pusulaPdfDownloading ? 'PDF açılıyor…' : 'PDF’yi Aç / Paylaş'}
                 </button>
+                {canSavePusulaPdfLocally() ? (
+                  <small className="tp-pdf-local-status" role="status">
+                    {pusulaPdfSavedLocal
+                      ? '✓ Rapor telefonuna kaydedildi. Dosyalara aktarmak için Aç / Paylaş seç.'
+                      : 'Rapor telefonuna kaydediliyor. Uygulama kapalıyken hazır olursa açtığında kaydedilecek.'}
+                  </small>
+                ) : null}
               </div>
             ) : null}
             {pusulaPdfStatus === 'error' && pusulaPdfError ? <div className="tp-ai-page-error" style={{ marginTop: 10, padding: 11 }}>PUSULAPDF: {pusulaPdfError}</div> : null}
