@@ -363,63 +363,40 @@ function chart(
   h: number,
   points: PusulaPdfSatellitePoint[],
 ) {
-  const usable = points.filter((point) => valid(point.ndvi));
-  if (usable.length < 2) {
-    wrap(ctx, 'NDVI trend grafiği için en az iki tarihli ölçüm gerekli.', x + 16, y + 55, 12, 650, MUTED, w - 32, 1.25, 3);
+  const series = VEGETATION_INDICES.map((item) => ({
+    ...item,
+    points: knownSeries(points, item.key),
+  }));
+  const ready = series.filter((item) => item.points.length >= 2);
+  if (!ready.length) {
+    const latestMeasurement = series.find((item) => item.points.length)?.points.at(-1);
+    text(ctx, 'Karşılaştırma için ikinci ölçüm bekleniyor', x + 10, y + 49, 12, 850, INK);
+    wrap(ctx, 'Harita tarihleri mevcut olsa da yalnız sayısal ölçümü doğrulanmış tarihler grafik oluşturabilir.', x + 10, y + 77, 10, 650, MUTED, w - 20, 1.35, 4);
+    if (latestMeasurement) text(ctx, `Son sayısal ölçüm: ${fmt(latestMeasurement.date, false)}`, x + 10, y + h - 15, 9.5, 750, BLUE);
     return;
   }
-
-  const gx = x + 38;
-  const gy = y + 42;
-  const gw = w - 54;
-  const gh = h - 66;
-
-  ctx.strokeStyle = '#e8edef';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 4; i += 1) {
-    const yy = gy + (i * gh) / 3;
-    ctx.beginPath();
-    ctx.moveTo(gx, yy);
-    ctx.lineTo(gx + gw, yy);
+  const dates = [...new Set(ready.flatMap((item) => item.points.map((p) => p.date)))].sort();
+  const gx = x + 24, gy = y + 20, gw = w - 41, gh = h - 55;
+  ctx.strokeStyle = '#e4ebee'; ctx.lineWidth = 1;
+  for (let k = 0; k < 4; k++) {
+    const yy = gy + gh * k / 3;
+    ctx.beginPath(); ctx.moveTo(gx, yy); ctx.lineTo(gx + gw, yy); ctx.stroke();
+  }
+  for (const item of ready) {
+    ctx.beginPath(); ctx.strokeStyle = item.color; ctx.lineWidth = 3;
+    item.points.forEach((point, index) => {
+      const px = gx + dates.indexOf(point.date) / Math.max(dates.length - 1, 1) * gw;
+      const py = gy + gh - clamp(((point[item.key] as number) + 0.2) / 1.3, 0, 1) * gh;
+      if (!index) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
     ctx.stroke();
   }
-
-  ctx.strokeStyle = GREEN;
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  usable.forEach((point, index) => {
-    const px = gx + (index / (usable.length - 1)) * gw;
-    const py = gy + gh - clamp(point.ndvi as number, 0, 1) * gh;
-    if (index === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  });
-  ctx.stroke();
-
-  usable.forEach((point, index) => {
-    const px = gx + (index / (usable.length - 1)) * gw;
-    const py = gy + gh - clamp(point.ndvi as number, 0, 1) * gh;
-    ctx.fillStyle = GREEN;
-    ctx.beginPath();
-    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  const latest = usable.at(-1)!;
-  const px = gx + gw;
-  const py = gy + gh - clamp(latest.ndvi as number, 0, 1) * gh;
-  rr(ctx, px - 50, py - 34, 50, 26, 8, GREEN, GREEN);
-  ctx.textAlign = 'center';
-  text(ctx, num(latest.ndvi), px - 25, py - 16, 11, 900, WHITE);
-  ctx.textAlign = 'left';
-
-  const labels = [usable[0], usable[Math.floor((usable.length - 1) / 2)], latest];
-  labels.forEach((point, index) => {
-    const labelX = index === 0 ? gx : index === 2 ? gx + gw : gx + gw / 2;
-    ctx.textAlign = index === 0 ? 'left' : index === 2 ? 'right' : 'center';
-    text(ctx, fmt(point.date, false), labelX, y + h - 8, 9.5, 650, MUTED);
-  });
+  text(ctx, fmt(dates[0], false), gx, y + h - 7, 9.5, 700, MUTED);
+  ctx.textAlign = 'right';
+  text(ctx, fmt(dates.at(-1), false), gx + gw, y + h - 7, 9.5, 700, MUTED);
   ctx.textAlign = 'left';
 }
+
 
 function donut(
   ctx: CanvasRenderingContext2D,
@@ -770,20 +747,27 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const statY = top + 442;
   const statGap = 7;
   const statW = (leftW - 16 - statGap * 3) / 4;
-  const ndmiPercent = valid(latest?.ndmi) ? clamp((latest.ndmi as number) * 100, 0, 100) : null;
-  summaryCard(ctx, leftX + 8, statY, statW, 'Tarla Sağlığı', health === null ? '—' : `${Math.round(health)}`, health === null ? 'Skor bekleniyor' : health >= 70 ? 'İyi' : health >= 45 ? 'Takip' : 'Dikkat', GREEN, GREEN_SOFT, '✓');
-  summaryCard(ctx, leftX + 8 + (statW + statGap), statY, statW, 'Ana Risk', riskRows[0]?.status ?? 'Takip', riskRows[0]?.label.replace(' Stresi', '') ?? 'Risk', RED, RED_SOFT, '!');
-  summaryCard(ctx, leftX + 8 + (statW + statGap) * 2, statY, statW, 'Su Durumu', ndmiPercent === null ? '—' : `%${Math.round(ndmiPercent)}`, ndmiPercent === null ? 'Veri yok' : ndmiPercent >= 45 ? 'Yeterli' : 'Kontrol', BLUE, BLUE_SOFT, '●');
-  summaryCard(ctx, leftX + 8 + (statW + statGap) * 3, statY, statW, 'Gelişim Evresi', stage.length > 13 ? stage.slice(0, 12) : stage, snapshot.field.crop ?? 'Ürün', GREEN, GREEN_SOFT, '↑');
+  const lastMeasured = knownSeries(sat, 'ndvi').at(-1);
+  const lastNdmi = [...sat].filter((p) => valid(p.ndmi)).at(-1);
+  const ndmiValue = lastNdmi?.ndmi ?? null;
+  summaryCard(ctx, leftX + 8, statY, statW, 'Tarla Sağlığı',
+    health === null ? '—' : `${Math.round(health)}`,
+    health === null ? 'Skor eksik' : 'Model skoru', GREEN, GREEN_SOFT, '✓');
+  const primaryRisk = riskRows.find((r) => r.status !== 'Doğrulanmadı');
+  summaryCard(ctx, leftX + 8 + statW + statGap, statY, statW, 'Ana Risk',
+    primaryRisk?.status ?? 'Belirsiz', 'Kanıt kontrolü', RED, RED_SOFT, '!');
+  summaryCard(ctx, leftX + 8 + (statW + statGap) * 2, statY, statW, 'Bitki Nem İndeksi',
+    numericIndexText(ndmiValue), 'NDMI · uydu', BLUE, BLUE_SOFT, '●');
+  summaryCard(ctx, leftX + 8 + (statW + statGap) * 3, statY, statW, 'Gelişim Evresi',
+    stage.length > 10 ? 'Takipte' : stage, 'Fenoloji kaydı', GREEN, GREEN_SOFT, '↑');
 
   rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
-  text(ctx, 'Tarlanın Bugünkü Görünümü', leftX + 16, 692, 17, 900, INK);
-  await drawImage(ctx, latest?.ndviImage, leftX + 16, 710, 182, 150, { radius: 9, placeholder: 'NDVI görüntüsü yok' });
-  await drawImage(ctx, latestPhoto?.signedUrl ?? latest?.trueColorImage, leftX + 212, 710, 182, 150, { radius: 9, placeholder: 'Saha fotoğrafı yok' });
-  text(ctx, 'NDVI Görüntüsü', leftX + 16, 878, 10, 850, INK);
-  text(ctx, latest ? fmt(latest.date, false) : '—', leftX + 16, 894, 9, 650, MUTED);
-  text(ctx, latestPhoto ? 'Saha Fotoğrafı' : 'Gerçek Renk', leftX + 212, 878, 10, 850, INK);
-  text(ctx, latestPhoto ? fmt(latestPhoto.capturedAt, false) : latest ? fmt(latest.date, false) : '—', leftX + 212, 894, 9, 650, MUTED);
+  text(ctx, 'Uydu Geçmişi ve Karşılaştırma', leftX + 16, 691, 17, 900, INK);
+  const numericDates = [...new Set(sat.filter((p) => VEGETATION_INDICES.some((v) => valid(p[v.key]))).map((p) => p.date))];
+  text(ctx, `${numericDates.length} doğrulanmış sayısal ölçüm · ${sat.length} görüntü tarihi`,
+    leftX + 16, 712, 10, 750, MUTED);
+  chart(ctx, leftX + 14, 717, leftW - 28, 151, sat);
+  text(ctx, 'NDVI • NDRE • GNDVI • SAVI', leftX + 16, 891, 9.8, 800, GREEN_DARK);
 
   rr(ctx, leftX, 914, leftW, 230, 15, PURPLE_SOFT, '#e4d6fb');
   circleIcon(ctx, leftX + 34, 945, 18, PURPLE, '✦', WHITE, 14);
@@ -794,9 +778,29 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
   wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
 
-  await drawImage(ctx, secondPhoto?.signedUrl ?? latestPhoto?.signedUrl ?? latest?.trueColorImage, leftX, 1154, leftW, 436, { radius: 15, placeholder: 'Saha görseli bekleniyor', overlay: 'rgba(1,25,20,.28)' });
-  wrap(ctx, 'Veriye dayalı kararlarla daha güçlü yarınlar.', leftX + 22, 1487, 21, 800, WHITE, leftW - 44, 1.18, 3);
-  text(ctx, 'TarlaPusula', leftX + 22, 1562, 13, 850, WHITE);
+  // Replacing a repeated decorative field picture with verifiable provenance.
+  rr(ctx, leftX, 1154, leftW, 436, 15, WHITE, LINE);
+  text(ctx, 'Veri Kaynakları ve Güvenilirlik', leftX + 18, 1190, 18, 900, INK);
+  wrap(ctx, 'Bu rapor yalnız kayda geçmiş veri ve doğrulanmış model çıktılarıyla oluşturulur. Verisi eksik alanlar tahminmiş gibi doldurulmaz.',
+    leftX + 18, 1223, 12, 650, MUTED, leftW - 36, 1.37, 4);
+  const sources = [
+    ['Uydu kayıtları', `${sat.length} tarih / ${numericDates.length} sayısal ölçüm`],
+    ['Son ölçüm', lastMeasured ? fmt(lastMeasured.date) : 'Henüz yok'],
+    ['Toprak', soilGrids.available ? 'SoilGrids 250 m · model tahmini' : 'Kaynak bekleniyor'],
+    ['Hava', weather.length ? `Geçmiş gözlem · ${weather.length} gün` : 'Doğrulanmış veri yok'],
+    ['Saha fotoğrafı', photos.length ? `${photos.length} kayıt` : 'Fotoğraf kaydı yok'],
+  ];
+  sources.forEach(([label, value], index) => {
+    const yy = 1334 + index * 44;
+    ctx.strokeStyle = '#e4ebef'; ctx.beginPath();
+    ctx.moveTo(leftX + 18, yy + 14); ctx.lineTo(leftX + leftW - 18, yy + 14); ctx.stroke();
+    text(ctx, label, leftX + 20, yy, 11, 800, MUTED);
+    ctx.textAlign = 'right';
+    text(ctx, value, leftX + leftW - 18, yy, 10, 850, INK);
+    ctx.textAlign = 'left';
+  });
+  wrap(ctx, 'Kaynaklar: Sentinel-2 / tarla arşivi, SoilGrids ve kayıtlı hava ölçümleri.',
+    leftX + 18, 1570, 9.5, 600, MUTED, leftW - 36, 1.2, 2);
 
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
