@@ -572,10 +572,72 @@ function knownSeries(points: PusulaPdfSatellitePoint[], key: VegetationKey) {
   return points.filter((point) => valid(point[key])).sort((a,b) => a.date.localeCompare(b.date));
 }
 
+type PeriodClimateBucket = {
+  start:string;end:string;days:number;rainMm:number|null;et0Mm:number|null;
+  meanMaxC:number|null;
+};
+function periodWeatherSummary(rows:any[],from:string,to:string){
+  const start=Date.parse(from+'T00:00:00Z'),end=Date.parse(to+'T00:00:00Z');
+  const days=Math.max(0,Math.round((end-start)/86400000)+1);
+  const inPeriod=rows.filter(r=>wd(r)&&wd(r)>=from&&wd(r)<=to);
+  const observedDays=new Set(inPeriod.map(r=>wd(r))).size;
+  const vals=(key:string[])=>inPeriod.map(r=>wv(r,...key)).filter(valid);
+  const rainy=vals(['precipitation','rain','precipitationMm']);
+  const et0=vals(['et0','referenceEt0']);
+  const maxTemps=vals(['tempMax','maxTemp','maxTemperature']);
+  const minTemps=vals(['tempMin','minTemp','minTemperature']);
+  const winds=vals(['windSpeed','windSpeedKmh','windKmh']);
+  const total=(v:number[])=>v.length===days&&observedDays===days
+    ? v.reduce((a,b)=>a+b,0):null;
+  const totalRain=total(rainy),totalEt0=total(et0);
+  const hotDays=maxTemps.length===days&&observedDays===days
+    ? maxTemps.filter(v=>v>=30).length:null;
+  const bucketDays=Math.max(7,Math.ceil(days/5));
+  const buckets:PeriodClimateBucket[]=[];
+  for(let ix=0;ix<days;ix+=bucketDays){
+    const fromDate=new Date(start+ix*86400000).toISOString().slice(0,10);
+    const toDate=new Date(Math.min(end,start+(ix+bucketDays-1)*86400000)).toISOString().slice(0,10);
+    const period=inPeriod.filter(r=>wd(r)>=fromDate&&wd(r)<=toDate);
+    const count=Math.min(bucketDays,days-ix);
+    const validTotal=(keys:string[])=>{
+      const v=period.map(r=>wv(r,...keys)).filter(valid);
+      return v.length===count?v.reduce((a,b)=>a+b,0):null;
+    };
+    const temperatures=period.map(r=>wv(r,'tempMax','maxTemp','maxTemperature')).filter(valid);
+    buckets.push({start:fromDate,end:toDate,days:count,
+      rainMm:validTotal(['precipitation','rain','precipitationMm']),
+      et0Mm:validTotal(['et0','referenceEt0']),
+      meanMaxC:temperatures.length===count?temperatures.reduce((a,b)=>a+b,0)/count:null,
+    });
+  }
+  return {days,observedDays,totalRain,totalEt0,hotDays,
+    maximum:maxTemps.length?Math.max(...maxTemps):null,
+    minimum:minTemps.length?Math.min(...minTemps):null,
+    maximumWind:winds.length?Math.max(...winds):null,
+    averageMax:maxTemps.length?maxTemps.reduce((a,b)=>a+b,0)/maxTemps.length:null,
+    rainyDays:rainy.length===days?rainy.filter(v=>v>0).length:null,
+    buckets};
+}
+const numTr=(n:number|null,decimals=1)=>n===null?'—':n.toLocaleString('tr-TR',{maximumFractionDigits:decimals});
+function climateInterpretation(c:ReturnType<typeof periodWeatherSummary>){
+  if(c.totalRain===null||c.totalEt0===null) return 'Seçilen dönemin hava kayıtlarında eksik günler var. Eksik yağış ve buharlaşma değerleri tamamlanmadan kesin dönem yorumu yapılmaz.';
+  const rainText='Dönem yağışı '+numTr(c.totalRain)+' mm, referans ET₀ toplamı '+numTr(c.totalEt0)+' mm.';
+  const caution='ET₀ yağışla çıkarılarak sulama ihtiyacı hesaplanamaz; ürün katsayısı, sulama ve toprak su deposu ayrıca gerekir.';
+  return rainText+' '+(c.totalRain<5?'Yağış oldukça sınırlı; ':'')+caution;
+}
+
 function soilGridsProfile(snapshot: PusulaPdfSnapshot) {
   const layers = [...(snapshot.layerArchive ?? [])]
-    .filter((v) => v.layer === 'soil-intelligence')
+    .filter((v) => v.layer === 'soil-intelligence'
+      && String(v.observedAt??v.archivedAt??'').slice(0,10)<=snapshot.period.end)
     .sort((a,b) => String(b.observedAt ?? b.archivedAt ?? '').localeCompare(String(a.observedAt ?? a.archivedAt ?? '')));
+  const isHistoricalRecord=layers.length>0;
+  // This later-query static model is context, NOT an observation from the
+  // historical reporting period.
+  if(!isHistoricalRecord && snapshot.soilReference?.metrics){
+    layers.push({layer:'soil-intelligence',source:snapshot.soilReference.source,
+      observedAt:snapshot.soilReference.recordedAt,metrics:snapshot.soilReference.metrics});
+  }
   const read = (key: string, min: number, max: number) => {
     for (const row of layers) {
       const value = row.metrics?.[key];
@@ -590,7 +652,9 @@ function soilGridsProfile(snapshot: PusulaPdfSnapshot) {
   const clay = read('clayPercent', 0, 100);
   const silt = read('siltPercent', 0, 100);
   const sand = read('sandPercent', 0, 100);
-  return { ph, carbon, clay, silt, sand, available: [ph, carbon, clay, silt, sand].some((n) => n !== null) };
+  return { ph, carbon, clay, silt, sand, isHistoricalRecord,
+    referenceDate:snapshot.soilReference?.recordedAt??layers[0]?.observedAt??null,
+    available: [ph, carbon, clay, silt, sand].some((n) => n !== null) };
 }
 
 function numericIndexText(value: number | null | undefined) {
@@ -682,6 +746,12 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const allWeather = historicalWeather.filter((row) => wd(row) && wd(row) <= snapshot.period.end).sort((a,b) => wd(a).localeCompare(wd(b)));
   // Weather history is NOT a future forecast. Report the most recent recorded days.
   const weather = allWeather.filter((row) => wd(row) >= snapshot.period.start);
+  const climate=periodWeatherSummary(weather,snapshot.period.start,snapshot.period.end);
+  const isHistoricalReport=snapshot.period.end<new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const hasSatelliteMeasurements=sat.some(p=>VEGETATION_INDICES.some(i=>valid(p[i.key])));
+  const hasBiophysics=(snapshot.biophysical??[]).some(p=>
+    p.date&&p.date>=snapshot.period.start&&p.date<=snapshot.period.end
+    &&Object.values(p.metrics??{}).some(valid));
   const photos = [...(snapshot.fieldPhotos ?? [])].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
   const latestPhoto = photos[0];
   const diagnosis = photoDiagnosis(latestPhoto);
@@ -712,7 +782,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   rr(ctx, 355, 21, 311, 76, 11, 'rgba(255,255,255,.78)', '');
   rr(ctx, 674, 21, 539, 76, 11, 'rgba(255,255,255,.85)', '');
   await logo(ctx, 50, 59);
-  fittedText(ctx, 'Tarım Analiz Raporu', 372, 48, 280, 19, 900, INK);
+  fittedText(ctx, 'Dönemsel Tarla Analizi', 372, 48, 280, 19, 900, INK);
   text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 72, 10.5, 650, MUTED);
 
   const headerMeta = [
@@ -773,6 +843,17 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const lastMeasured = knownSeries(sat, 'ndvi').at(-1);
   const lastNdmi = [...sat].filter((p) => valid(p.ndmi)).at(-1);
   const ndmiValue = lastNdmi?.ndmi ?? null;
+  if(!hasSatelliteMeasurements){
+    summaryCard(ctx,leftX+8,statY,statW,'Hava Kapsamı',
+      `${climate.observedDays}/${climate.days}`,'Kayıtlı gün',BLUE,BLUE_SOFT,'●');
+    summaryCard(ctx,leftX+8+statW+statGap,statY,statW,'Dönem Yağışı',
+      climate.totalRain===null?'—':numTr(climate.totalRain)+' mm',
+      'Kayıtlı yağış',TEAL,GREEN_SOFT,'●');
+    summaryCard(ctx,leftX+8+(statW+statGap)*2,statY,statW,'Uydu Ölçümü',
+      '0 indeks','Tarihler mevcut',ORANGE,ORANGE_SOFT,'!');
+    summaryCard(ctx,leftX+8+(statW+statGap)*3,statY,statW,'Ürün',
+      snapshot.field.crop??'Kayıtsız','Tarla kaydı',GREEN,GREEN_SOFT,'✓');
+  }else{
   summaryCard(ctx, leftX + 8, statY, statW, health === null ? 'Bitki Canlılığı':'Tarla Sağlığı',
     health === null ? numericIndexText(lastMeasured?.ndvi) : `${Math.round(health)}/100`,
     health === null ? (lastMeasured ? 'NDVI · uydu' : 'Dönem ölçümü yok') : 'Gerçek sağlık skoru',
@@ -784,14 +865,34 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     lastNdmi ? 'NDMI · uydu' : 'Dönemde kayıt yok', BLUE, BLUE_SOFT, '●');
   summaryCard(ctx, leftX + 8 + (statW + statGap) * 3, statY, statW, 'Gelişim Evresi',
     stage.value, stage.sub, GREEN, GREEN_SOFT, '↑');
+  }
 
   rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
-  text(ctx, 'Uydu Geçmişi ve Karşılaştırma', leftX + 16, 691, 17, 900, INK);
+  text(ctx, hasSatelliteMeasurements?'Uydu Geçmişi ve Karşılaştırma':'Uydu Arşivi ve Ölçüm Kapsamı', leftX + 16, 691, 17, 900, INK);
   const numericDates = [...new Set(sat.filter((p) => VEGETATION_INDICES.some((v) => valid(p[v.key]))).map((p) => p.date))];
-  text(ctx, `${numericDates.length} doğrulanmış sayısal ölçüm · ${sat.length} görüntü tarihi`,
+  text(ctx, `${numericDates.length} geçerli indeks tarihi · ${sat.length} sahne/kontrol tarihi`,
     leftX + 16, 712, 10, 750, MUTED);
-  chart(ctx, leftX + 14, 717, leftW - 28, 151, sat);
-  text(ctx, 'NDVI • NDRE • GNDVI • SAVI', leftX + 16, 891, 9.8, 800, GREEN_DARK);
+  if(hasSatelliteMeasurements){
+    chart(ctx, leftX + 14, 717, leftW - 28, 151, sat);
+  }else{
+    rr(ctx,leftX+14,731,leftW-28,145,10,'#f3f8fa',LINE);
+    const sceneDates=[...new Set(sat.map(p=>p.date))].sort();
+    if(sceneDates.length){
+      fittedText(ctx,`Kontrol edilen dönem: ${fmt(sceneDates[0],false)} – ${fmt(sceneDates.at(-1)!,false)}`,
+        leftX+28,754,leftW-56,10.2,800,INK);
+      sceneDates.slice(0,14).forEach((d,i)=>{
+        const x=leftX+28+i*24;
+        ctx.beginPath();ctx.fillStyle='#9fadb4';ctx.arc(x,785,4,0,Math.PI*2);ctx.fill();
+      });
+      wrap(ctx,'Uydu sahne tarihleri mevcut; bu döneme ait parsel ortalaması sayısal olarak arşivlenmemiş. Görüntü sayısı ölçüm değildir.',
+        leftX+28,816,10.8,750,INK,leftW-57,1.25,3);
+    }else{
+      wrap(ctx,'Seçilen tarihler için kaydedilmiş uydu sahnesi yok. Hava geçmişi varsa rapor onunla hazırlanır.',
+        leftX+28,779,11.5,750,INK,leftW-56,1.28,3);
+    }
+  }
+  text(ctx, hasSatelliteMeasurements?'NDVI • NDRE • GNDVI • SAVI':'İndeksler: sayısal parsel ölçümü gerekli',
+    leftX + 16, 891, 9.8, 800, GREEN_DARK);
 
   rr(ctx, leftX, 914, leftW, 230, 15, PURPLE_SOFT, '#e4d6fb');
   circleIcon(ctx, leftX + 34, 945, 18, PURPLE, '✦', WHITE, 14);
@@ -811,13 +912,19 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       :delta>0?'artış gösteriyor':'azalış gösteriyor';
     ndviNote=`NDVI ${fmt(prev.date,false)} tarihinde ${numericIndexText(prev.ndvi)}, ${fmt(last.date,false)} tarihinde ${numericIndexText(last.ndvi)}: ${signal}. Tek başına hastalık, su stresi veya verim kanıtı değildir.`;
   }
-  const summary=narrative?.summary || guidance.weeklySummary;
+  const summary=narrative?.summary ||
+    (!hasSatelliteMeasurements&&climate.observedDays===climate.days
+      ? climateInterpretation(climate)
+      : guidance.weeklySummary);
   wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 10.8, 650, INK, leftW - 40, 1.27, 6);
-  const action = guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
+  const action = !hasSatelliteMeasurements
+    ? 'Bu dönem uydu indeksleri sayısal değil; gerçek NDVI ve diğer katmanlar için yeni tarihli parsel analizi gerekir.'
+    : guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
   rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
-  text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
+  text(ctx,isHistoricalReport?'DÖNEM':'7 GÜN',leftX+30,1102,8.5,900,PURPLE);
   wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
 
+  if(hasBiophysics){
   // Plant measurements from the actual field SL2P archive (never mock values).
   rr(ctx, leftX, 1154, leftW, 436, 15, '#f9fbfa', LINE);
   text(ctx, 'Uydu Bitki Ölçümleri', leftX + 18, 1190, 18, 900, INK);
@@ -849,10 +956,38 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   wrap(ctx,bioNote,leftX+27,1503,11,650,INK,leftW-55,1.33,4);
   text(ctx,'Kaynak: Sentinel-2 · SL2P / arşiv · tarla özelinde',leftX+27,1552,9.2,750,MUTED);
 
+
+  }else{
+    // A period without SL2P should NOT waste six cells on "Ölçüm yok".
+    // Show meaningful recorded climate variation without pretending to have
+    // LAI / chlorophyll / water content measurements.
+    rr(ctx,leftX,1154,leftW,436,15,'#f7fbff',LINE);
+    text(ctx,'Dönemsel İklim Seyri',leftX+18,1190,19,900,INK);
+    fittedText(ctx,`${fmt(snapshot.period.start,false)} – ${fmt(snapshot.period.end,false)} · ${climate.observedDays}/${climate.days} kayıtlı gün`,
+      leftX+18,1213,leftW-36,10,750,MUTED);
+    rr(ctx,leftX+15,1223,leftW-30,27,7,'#e7f1fa','');
+    text(ctx,'TARİH',leftX+23,1241,9,850,MUTED);
+    text(ctx,'YAĞIŞ',leftX+147,1241,9,850,BLUE);
+    text(ctx,'REFERANS ET₀',leftX+239,1241,9,850,TEAL);
+    climate.buckets.slice(0,5).forEach((bucket,index)=>{
+      const yy=1255+index*40;
+      rr(ctx,leftX+15,yy,leftW-30,35,8,index%2===0?WHITE:'#edf5fc',LINE);
+      fittedText(ctx,`${fmt(bucket.start,false)}–${fmt(bucket.end,false)}`,leftX+23,yy+22,120,9.7,800,INK);
+      fittedText(ctx,bucket.rainMm===null?'Eksik':numTr(bucket.rainMm)+' mm',leftX+147,yy+22,87,10,900,BLUE);
+      fittedText(ctx,bucket.et0Mm===null?'Eksik':numTr(bucket.et0Mm)+' mm',leftX+240,yy+22,144,10,900,TEAL);
+    });
+    rr(ctx,leftX+15,1463,leftW-30,108,10,WHITE,LINE);
+    text(ctx,'Pusula’nın Dönem Yorumu',leftX+27,1486,12,900,GREEN_DARK);
+    wrap(ctx,climateInterpretation(climate),leftX+27,1510,10.5,650,INK,leftW-55,1.25,4);
+    fittedText(ctx,'Kaynak: kayıtlı geçmiş hava · SL2P ölçümü yok',leftX+27,1559,leftW-54,8.5,750,MUTED);
+  }
+
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, top + 8, 1, 'Bitki Sağlığı ve Gelişim Analizi', GREEN, '↑');
+  sectionHeader(ctx, midX + 10, top + 8, 1,
+    hasSatelliteMeasurements?'Bitki Sağlığı ve Gelişim Analizi':'Uydu Kanıtı ve Ölçüm Kapsamı', GREEN, '↑');
   text(ctx, 'Gerçek sayısal ölçümler · tarih ve kaynak doğrulaması', midX + 18, top + 55, 9.5, 700, MUTED);
+  if(hasSatelliteMeasurements){
   const vegCardW = 86;
   VEGETATION_INDICES.forEach((item, index) => {
     const x = midX + 17 + index * 93;
@@ -880,12 +1015,45 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       midX+17,top+375,midW-34,9,750,MUTED);
   }
 
-  rr(ctx, midX, 512, midW, 204, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, 520, 2, 'Su ve Sulama Analizi', BLUE, '●');
-  const waterCards = [
-    { title: 'NDMI (bitki nem)', value: null, main: numericIndexText(ndmiValue), sub: 'Toprak nem ölçümü değil', accent: BLUE },
-    { title: 'Sulama İhtiyacı', value: null, main: need.mm === null ? '—' : `${need.mm.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} mm`, sub: need.mm === null ? 'Model verisi eksik' : 'Hesaplanan net su', accent: BLUE },
-    { title: 'Nem Eğilimi', value: null, main: valid(ndmiCmp.pct) ? (ndmiCmp.pct < -5 ? 'Azalıyor' : ndmiCmp.pct > 5 ? 'Artıyor' : 'Dengeli') : '—', sub: valid(ndmiCmp.pct) ? 'İki dönem karşılaştırıldı' : 'İki ölçüm gerekiyor', accent: GREEN },
+  }else{
+    // This panel becomes a transparent evidence/coverage summary rather than
+    // printing four meaningless empty numeric index cells and another chart.
+    rr(ctx,midX+16,top+71,midW-32,120,11,'#f1f8f3',LINE);
+    fittedText(ctx,`${sat.length} uydu sahne/kontrol tarihi`,midX+29,top+101,midW-62,17,900,GREEN);
+    wrap(ctx,'NDVI, NDRE, GNDVI ve SAVI parsel indeksleri bu tarih aralığında sayısal olarak kaydedilmemiş.',
+      midX+29,top+130,11.3,750,INK,midW-60,1.28,3);
+    const evidenceText=[
+      ['Kayıtlı tarihler',String(sat.length)],
+      ['Sayısal indeks', '0'],
+      ['Kaynak doğrulama','Yeniden hesaplama gerekli'],
+    ];
+    evidenceText.forEach(([label,value],i)=>{
+      const yy=top+218+i*42;
+      rr(ctx,midX+16,yy-21,midW-32,36,9,i%2===0?'#f4f7f9':WHITE,LINE);
+      fittedText(ctx,label,midX+27,yy,155,10.5,800,MUTED);
+      fittedText(ctx,value,midX+191,yy,midW-214,10.5,850,i===1?ORANGE:INK);
+    });
+    wrap(ctx,'Geçersiz veya boş ölçüm yerine aynı dönemin gerçek hava, toprak referansı ve kayıtlı saha kanıtları yorumlanır.',
+      midX+18,top+363,9.5,700,MUTED,midW-36,1.12,2);
+  }
+
+  const hasIrrigationEvidence=ndmiValue!==null||need.mm!==null;
+  rr(ctx, midX, 512, midW, 204, 15, hasIrrigationEvidence?WHITE:'#f4f9ff', LINE);
+  sectionHeader(ctx, midX + 10, 520, 2,
+    hasIrrigationEvidence?'Su ve Sulama Analizi':'Su Yönetimi · Hava Kanıtları', BLUE, '●');
+  const waterCards = hasIrrigationEvidence ? [
+    { title: 'NDMI (bitki nem)', main: numericIndexText(ndmiValue),sub:'Toprak nem ölçümü değil',accent:BLUE},
+    { title: 'Sulama İhtiyacı', main:need.mm===null?'—':numTr(need.mm)+' mm',
+      sub:need.mm===null?'Model kanıtı eksik':'Kayıtlı su hesabı',accent:BLUE},
+    { title: 'Nem Eğilimi',main:valid(ndmiCmp.pct)?(ndmiCmp.pct < -5?'Azalıyor':ndmiCmp.pct > 5?'Artıyor':'Dengeli'):'—',
+      sub:valid(ndmiCmp.pct)?'İki dönem NDMI':'İki ölçüm gerekli',accent:GREEN},
+  ] : [
+    {title:'Dönem yağışı',main:climate.totalRain===null?'Eksik':numTr(climate.totalRain)+' mm',
+      sub:'Geçmiş hava kaydı',accent:BLUE},
+    {title:'Referans ET₀',main:climate.totalEt0===null?'Eksik':numTr(climate.totalEt0)+' mm',
+      sub:'Atmosferik talep',accent:TEAL},
+    {title:'Sulama kararı',main:'Hesaplanmadı',
+      sub:'Toprak ve ürün bilgisi gerekli',accent:ORANGE},
   ];
   waterCards.forEach((card, index) => {
     const x = midX + 14 + index * 124;
@@ -897,7 +1065,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     wrap(ctx, card.sub, x + 9, 664, 9, 750, MUTED, 98, 1.2, 3);
   });
 
-  rr(ctx, midX, 726, midW, 210, 15, WHITE, LINE);
+  rr(ctx, midX, 726, midW, 210, 15, '#fffaf4', LINE);
   sectionHeader(ctx, midX + 10, 734, 3, 'Toprak ve Besin Analizi', '#a74627', '●');
   // Laboratory samples remain authoritative; SoilGrids is explicitly a 250m model estimate.
   if (soilRows.length && soilRows.some((row) => row.value !== null)) {
@@ -908,7 +1076,9 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       text(ctx, row.text, midX + 221, yy, 9, 850, row.value === null ? MUTED : row.accent);
     });
   } else if (soilGrids.available) {
-    text(ctx, 'SoilGrids · 0–30 cm · 250 m tahmin', midX + 18, 782, 10, 900, GREEN_DARK);
+    fittedText(ctx,soilGrids.isHistoricalRecord
+      ? 'SoilGrids · 0–30 cm · 250 m model'
+      : 'SoilGrids · sonradan alınan model referansı',midX+18,782,235,9.8,900,GREEN_DARK);
     const soilMetrics = [
       ['pH', soilGrids.ph === null ? '—' : soilGrids.ph.toLocaleString('tr-TR', { maximumFractionDigits: 1 })],
       ['Organik C', soilGrids.carbon === null ? '—' : `${soilGrids.carbon.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} g/kg`],
@@ -920,8 +1090,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       text(ctx, label, midX + 18, yy, 10, 700, MUTED);
       text(ctx, value, midX + 106, yy, 10, 900, INK);
     });
-    wrap(ctx, 'Laboratuvar değildir. Gübre dozu ve su kapasitesi hesaplanmaz.',
-      midX + 18, 914, 9, 700, MUTED, 234, 1.18, 2);
+    wrap(ctx,'Laboratuvar değildir. Sonradan sorgulandıysa geçmiş Haziran ölçümü sayılmaz; gübre dozu çıkarılmaz.',
+      midX+18,914,8.5,700,MUTED,234,1.16,2);
   } else {
     text(ctx, 'Toprak model ölçümü bekleniyor', midX + 18, 809, 10, 850, MUTED);
     wrap(ctx, 'Uygun veri gelmeden besin miktarı ve pH tahmini yapılmaz.',
@@ -934,53 +1104,31 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     : 'Doğrulanmış ölçüm olmadan besin dozu önerilmez.',
     midX + 272, 831, 9.5, 650, MUTED, 90, 1.25, 7);
 
-  rr(ctx, midX, 946, midW, 250, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, 954, 4, 'Hava ve İklim Analizi', BLUE, '●');
-  text(ctx, 'Son 5 gün · geçmiş gözlemler (tahmin değil)', midX + 17, 992, 9.5, 800, MUTED);
-  const weather5 = weather.slice(-5);
-  if (weather5.length) {
-    weather5.forEach((row, index) => {
-      const x = midX + 13 + index * 74;
-      rr(ctx, x, 998, 66, 100, 9, index % 2 === 0 ? '#f8fbff' : WHITE, LINE);
-      ctx.textAlign = 'center';
-      text(ctx, fmt(wd(row), false), x + 33, 1018, 8.5, 750, MUTED);
-      const maximum = wv(row, 'tempMax', 'maxTemp', 'maxTemperature');
-      const minimum = wv(row, 'tempMin', 'minTemp', 'minTemperature');
-      const rain = wv(row, 'precipitation', 'rain', 'precipitationMm');
-      text(ctx, maximum === null ? '—' : `${maximum.toLocaleString('tr-TR', {maximumFractionDigits:1})}°`,
-        x + 33, 1048, 14, 900, INK);
-      text(ctx, minimum === null ? 'Min —' : `Min ${Math.round(minimum)}°`,
-        x + 33, 1068, 8.5, 800, BLUE);
-      text(ctx, rain === null ? 'Yağış —' : `${rain.toLocaleString('tr-TR', {maximumFractionDigits:1})} mm`,
-        x + 33, 1089, 8.5, 800, rain !== null && rain > 0 ? BLUE : MUTED);
-      ctx.textAlign = 'left';
-    });
-  } else {
-    wrap(ctx, 'Bu dönem için doğrulanmış geçmiş hava ölçümü bulunmuyor; geleceğe dönük hava durumu üretilmedi.',
-      midX + 18, 1042, 11, 650, MUTED, midW - 36, 1.25, 3);
-  }
-  const measuredTemps = weather5.map((row) => wv(row, 'tempMax','maxTemp','maxTemperature')).filter(valid);
-  const precip = weather5.map((row) => wv(row,'precipitation','rain','precipitationMm')).filter(valid);
-  const wind = weather5.map((row) => wv(row,'windSpeed','windSpeedKmh','windKmh')).filter(valid);
-  const measuredBadges = [
-    ['En yüksek sıcaklık', measuredTemps.length ? `${Math.max(...measuredTemps).toLocaleString('tr-TR',{maximumFractionDigits:1})}°C` : '—', ORANGE, ORANGE_SOFT],
-    ['Toplam yağış', precip.length ? `${precip.reduce((a,b)=>a+b,0).toLocaleString('tr-TR',{maximumFractionDigits:1})} mm` : '—', BLUE, BLUE_SOFT],
-    ['En yüksek rüzgâr', wind.length ? `${Math.max(...wind).toLocaleString('tr-TR',{maximumFractionDigits:1})} km/sa` : '—', GREEN, GREEN_SOFT],
-  ];
-  measuredBadges.forEach(([label,value,accent,soft],index) => {
-    const x = midX + 14 + index * 122;
-    rr(ctx, x, 1110, 114, 66, 9, soft, soft);
-    ctx.textAlign = 'center';
-    text(ctx, label, x + 57, 1132, 8, 800, MUTED);
-    text(ctx, value, x + 57, 1157, 10, 900, accent);
-    ctx.textAlign = 'left';
+  rr(ctx,midX,946,midW,250,15,'#f5faff',LINE);
+  sectionHeader(ctx,midX+10,954,4,'Dönemin Hava ve İklimi',BLUE,'●');
+  fittedText(ctx,`${fmt(snapshot.period.start,false)} – ${fmt(snapshot.period.end,false)} · ${climate.observedDays}/${climate.days} gün`,
+    midX+17,993,midW-34,10,750,MUTED);
+  const monthlyMetrics=[
+    ['Toplam yağış',climate.totalRain===null?'Veri eksik':numTr(climate.totalRain)+' mm',BLUE,BLUE_SOFT],
+    ['Referans ET₀',climate.totalEt0===null?'Veri eksik':numTr(climate.totalEt0)+' mm',TEAL,GREEN_SOFT],
+    ['30°C+ gün',climate.hotDays===null?'Veri eksik':String(climate.hotDays)+' gün',ORANGE,ORANGE_SOFT],
+    ['En yüksek',climate.maximum===null?'—':numTr(climate.maximum)+'°C',ORANGE,ORANGE_SOFT],
+    ['En düşük',climate.minimum===null?'—':numTr(climate.minimum)+'°C',BLUE,BLUE_SOFT],
+    ['Yağışlı gün',climate.rainyDays===null?'—':String(climate.rainyDays)+' gün',GREEN,GREEN_SOFT],
+  ] as const;
+  monthlyMetrics.forEach(([label,value,accent,soft],i)=>{
+    const col=i%3,row=Math.floor(i/3);
+    const x=midX+13+col*124,y=1004+row*72;
+    rr(ctx,x,y,116,63,9,soft,LINE);
+    fittedText(ctx,label,x+8,y+21,100,9,750,MUTED);
+    fittedText(ctx,value,x+8,y+47,100,15,900,accent);
   });
-  const weatherSource = String((snapshot.weather as any)?.source ?? weather5.at(-1)?.source ?? 'Kaynak kaydı yok').trim();
-  wrap(ctx, `Kaynak: ${weatherSource} · ${weather5.length} kayıtlı gün · geleceğe dönük tahmin değildir.`,
-    midX + 16, 1187, 9, 700, MUTED, midW - 28, 1.1, 2);
+  const weatherSource=String((snapshot.weather as any)?.source??'Kayıtlı hava ölçümleri').trim();
+  wrap(ctx,`Kaynak: ${weatherSource} · Dönem toplamlarıdır; hava tahmini değildir. ET₀ tek başına sulama ihtiyacı değildir.`,
+    midX+17,1167,9.1,700,MUTED,midW-34,1.15,2);
 
   rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, 1214, 5, 'Saha Gözlemleri', PURPLE, '▣');
+  sectionHeader(ctx, midX + 10, 1214, 5, latestPhoto?'Saha Gözlemleri':'Saha Kayıtlarının Kapsamı', PURPLE, '▣');
   const observationInsight = guidance.insights.find((item) => item.id === 'field-observation-follow-up-evidence');
   if (latestPhoto?.signedUrl) {
     await drawImage(ctx, latestPhoto.signedUrl, midX + 16, 1260, 174, 195, { radius: 9, placeholder: 'Fotoğraf açılamadı' });
@@ -990,65 +1138,112 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     wrap(ctx, englishFree(diagnosis.headline || diagnosis.summary || latestPhoto.notes || 'Fotoğraf yüklenmiş, teşhis kaydı henüz yok.'),
       midX + 212, 1360, 10.5, 650, INK, 150, 1.3, 6);
   } else {
-    rr(ctx, midX + 16, 1260, 358, 195, 10, '#f8fafb', LINE);
-    circleIcon(ctx, midX + 45, 1300, 19, PURPLE_SOFT, '◉', PURPLE, 16);
-    text(ctx, 'Saha fotoğrafı henüz eklenmedi', midX + 73, 1306, 15, 900, INK);
-    wrap(ctx, 'Pusula AI ile yaprak, meyve veya sorunlu bölgeden fotoğraf ekle. Gerçek saha gözlemi olmadan hastalık teşhisi üretilemez.',
-      midX + 25, 1351, 12, 650, MUTED, 322, 1.3, 5);
-    text(ctx, 'Yeni fotoğraf → Pusula AI / Fotoğraf Analizi', midX + 24, 1433, 10, 800, PURPLE);
-  }
-  text(ctx, latestPhoto ? 'Saha gözlemi arşivi' : 'Saha gözlemi gerekli', midX + 16, 1478, 10, 850, INK);
+    rr(ctx,midX+16,1260,358,195,10,'#f5f8fb',LINE);
+    const fieldEvidence=[
+      ['Tarla işlem kaydı',String(snapshot.activities?.length??0)+' kayıt'],
+      ['Laboratuvar analizi',String(snapshot.soilAnalyses?.length??0)+' kayıt'],
+      ['Sulama/Kc geçmişi',String(snapshot.irrigation?.kcSnapshots?.length??0)+' kayıt'],
+      ['Saha fotoğrafı','Bu dönemde yok'],
+    ];
+    fieldEvidence.forEach(([name,value],i)=>{
+      const yy=1283+i*41;
+      if(i>0){ctx.beginPath();ctx.strokeStyle='#dce5ed';ctx.moveTo(midX+30,yy-14);ctx.lineTo(midX+362,yy-14);ctx.stroke();}
+      fittedText(ctx,name,midX+29,yy,184,10.5,800,INK);
+      ctx.textAlign='right';
+      fittedText(ctx,value,midX+354,yy,135,10.2,850,i===3?ORANGE:BLUE);
+      ctx.textAlign='left';
+    });
+    }
+  text(ctx,latestPhoto?'Saha gözlemi arşivi':'Saha kanıtı eksikliği',midX+16,1478,10,850,INK);
   const observationText = latestPhoto
     ? (diagnosis.summary || diagnosis.headline || latestPhoto.notes || 'Gözlem kaydı mevcut; kesin teşhis için ek kanıt gerekebilir.')
-    : (observationInsight?.meaning || 'Bir sonraki incelemede gerçek fotoğraf ile uydu işaretleri birlikte karşılaştırılabilir.');
+    : 'Bu dönem saha fotoğrafı veya doğrulanmış yerinde teşhis bulunmuyor. Hastalık ve zararlı sonuçları bu nedenle kesinleştirilemez.';
   rr(ctx, midX + 16, 1509, 358, 65, 9, PURPLE_SOFT, '#eadfff');
   wrap(ctx, englishFree(observationText), midX + 28, 1535, 10, 650, INK, 333, 1.22, 3);
 
   // RIGHT COLUMN
-  rr(ctx, rightX, top, rightW, 476, 15, '#f9fbfe', LINE);
-  sectionHeader(ctx, rightX + 10, top + 8, 6, 'Risk ve Öneri Analizi', RED, '!');
-  riskRows.forEach((row, index) => {
-    const yy = top + 64 + index * 78;
-    rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?'#ffffff':'#f1f5f9',LINE);
-    circleIcon(ctx, rightX + 34, yy + 15, 12, row.statusSoft, '●', row.statusAccent, 8);
-    text(ctx, row.label, rightX + 56, yy + 18, 12, 900, INK);
-    const pillW = 95;
-    rr(ctx, rightX + rightW - pillW - 13, yy - 3, pillW, 26, 12, row.statusSoft, row.statusSoft);
-    ctx.textAlign = 'center';
-    text(ctx, row.status, rightX + rightW - pillW / 2 - 13, yy + 14, 9, 850, row.statusAccent);
-    ctx.textAlign = 'left';
-    // A risk without validated risk score never gets a fabricated 24/58/92% bar.
-    wrap(ctx, englishFree(row.detail), rightX + 20, yy + 39, 10, 650, MUTED, rightW - 39, 1.17, 3);
-  });
+  const hasPeriodRiskEvidence=!!latestPeriodLayer(snapshot,'plant-health-synthesis');
+  rr(ctx,rightX,top,rightW,476,15,hasPeriodRiskEvidence?'#fffafa':'#f6fbff',LINE);
+  sectionHeader(ctx,rightX+10,top+8,6,
+    hasPeriodRiskEvidence?'Risk ve Öneri Analizi':'İklim Koşulları ve Kanıt Sınırları',
+    hasPeriodRiskEvidence?RED:BLUE,'!');
+  if(hasPeriodRiskEvidence){
+    riskRows.forEach((row,index)=>{
+      const yy=top+64+index*78;
+      rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?WHITE:'#f1f5f9',LINE);
+      circleIcon(ctx,rightX+34,yy+15,12,row.statusSoft,'●',row.statusAccent,8);
+      fittedText(ctx,row.label,rightX+56,yy+18,180,12,900,INK);
+      const pillW=95;
+      rr(ctx,rightX+rightW-pillW-13,yy-3,pillW,26,12,row.statusSoft,row.statusSoft);
+      ctx.textAlign='center';
+      fittedText(ctx,row.status,rightX+rightW-pillW/2-13,yy+14,pillW-8,9,850,row.statusAccent);
+      ctx.textAlign='left';
+      wrap(ctx,englishFree(row.detail),rightX+20,yy+39,10,650,MUTED,rightW-39,1.17,2);
+    });
+  }else{
+    const climateEvidence=[
+      {title:'Yağış',value:climate.totalRain===null?'Eksik':numTr(climate.totalRain)+' mm',
+        detail:'Seçilen dönemin toplam geçmiş yağışı. Bitki hastalığı kanıtı değildir.',accent:BLUE,soft:BLUE_SOFT},
+      {title:'Referans ET₀',value:climate.totalEt0===null?'Eksik':numTr(climate.totalEt0)+' mm',
+        detail:'Atmosferik buharlaşma talebi; sulama miktarı veya gerçek su açığı değildir.',accent:TEAL,soft:GREEN_SOFT},
+      {title:'Sıcak günler',value:climate.hotDays===null?'Eksik':String(climate.hotDays)+' gün',
+        detail:'Günlük en yüksek sıcaklık 30°C veya üzerinde. Ürün evresi bilinmeden zarar belirlenmez.',accent:ORANGE,soft:ORANGE_SOFT},
+      {title:'En yüksek rüzgâr',value:climate.maximumWind===null?'Eksik':numTr(climate.maximumWind)+' km/sa',
+        detail:'Dönemdeki en yüksek kayıtlı rüzgâr. Hasar kanıtı olarak kullanılmaz.',accent:BLUE,soft:BLUE_SOFT},
+      {title:'Hastalık / zararlı',value:'Tanı yok',
+        detail:'Bu dönemde kayıtlı doğrulanmış saha teşhisi yok. Bu, hiç risk olmadığı anlamına gelmez.',accent:PURPLE,soft:PURPLE_SOFT},
+    ];
+    climateEvidence.forEach((row,index)=>{
+      const yy=top+64+index*78;
+      rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?WHITE:'#edf4f8',LINE);
+      circleIcon(ctx,rightX+34,yy+15,12,row.soft,'●',row.accent,8);
+      fittedText(ctx,row.title,rightX+56,yy+18,174,11,900,INK);
+      rr(ctx,rightX+rightW-122,yy-3,109,26,12,row.soft,row.soft);
+      ctx.textAlign='center';
+      fittedText(ctx,row.value,rightX+rightW-67,yy+14,100,9.4,850,row.accent);
+      ctx.textAlign='left';
+      wrap(ctx,row.detail,rightX+20,yy+39,9.5,650,INK,rightW-39,1.13,2);
+    });
+  }
 
-  rr(ctx, rightX, 604, rightW, 216, 15, WHITE, LINE);
-  sectionHeader(ctx, rightX + 10, 612, 7, 'Verim, Hasat ve Kalite', ORANGE, '↑');
-  const yieldCards = [
-    ['Tahmini Verim', yieldInfo.yieldKgDa === null ? '—' : `${Math.round(yieldInfo.yieldKgDa)}`, yieldInfo.yieldKgDa === null ? 'Ölçüm/model yok' : 'kg/da', ORANGE],
-    ['Kalite', yieldInfo.quality === 'Ölçüm bekleniyor' ? '—' : yieldInfo.quality, 'Ölçüm gerek', GREEN],
-    ['Hasat Zamanı', yieldInfo.harvest, yieldInfo.harvestNote, PURPLE],
+  const hasYieldEstimate=yieldInfo.yieldKgDa!==null||
+    (yieldInfo.quality!=='Ölçüm bekleniyor'&&yieldInfo.quality!=='')||
+    yieldInfo.harvest!=='Doğrulanmadı';
+  rr(ctx,rightX,604,rightW,216,15,hasYieldEstimate?WHITE:'#fffaf4',LINE);
+  sectionHeader(ctx,rightX+10,612,7,
+    hasYieldEstimate?'Verim, Hasat ve Kalite':'Verim ve Hasat · Kanıt Durumu',ORANGE,'↑');
+  const yieldCards=hasYieldEstimate?[
+    ['Tahmini Verim',yieldInfo.yieldKgDa===null?'—':String(Math.round(yieldInfo.yieldKgDa)),
+      yieldInfo.yieldKgDa===null?'Model hesabı yok':'kg/da',ORANGE],
+    ['Kalite',yieldInfo.quality==='Ölçüm bekleniyor'?'—':yieldInfo.quality,'Kayıtlı değerlendirme',GREEN],
+    ['Hasat Zamanı',yieldInfo.harvest,yieldInfo.harvestNote,PURPLE],
+  ]:[
+    ['Saha İşlemleri',String(snapshot.activities?.length??0),'Bu dönemde kayıtlı',ORANGE],
+    ['Toprak Testi',String(snapshot.soilAnalyses?.length??0),'Laboratuvar kayıtları',GREEN],
+    ['Verim / Hasat','Hesaplanmadı','Güvenilir model ve kayıt gerekli',PURPLE],
   ];
-  yieldCards.forEach(([titleValue,value,sub,accent],index) => {
-    const x = rightX + 14 + index * 124;
-    rr(ctx, x, 655, 116, 145, 10, GRAY_SOFT, LINE);
-    ctx.textAlign = 'center';
-    fittedText(ctx, titleValue, x + 58, 680, 103, 9.5, 800, MUTED);
-    const large = String(value).length <= 11;
-    fittedText(ctx, value, x + 58, 727, 102, large ? 17 : 11, 900, accent);
-    ctx.textAlign = 'left';
-    wrap(ctx, sub, x + 10, 758, 9, 750, MUTED, 95, 1.2, 3);
+  yieldCards.forEach(([titleValue,value,sub,accent],index)=>{
+    const x=rightX+14+index*124;
+    rr(ctx,x,655,116,145,10,index===0?ORANGE_SOFT:index===1?GREEN_SOFT:PURPLE_SOFT,LINE);
+    ctx.textAlign='center';
+    fittedText(ctx,titleValue,x+58,680,103,9.5,800,MUTED);
+    fittedText(ctx,value,x+58,727,102,String(value).length<=11?17:11,900,accent);
+    ctx.textAlign='left';
+    wrap(ctx,sub,x+10,758,9,750,MUTED,95,1.2,3);
   });
 
   rr(ctx, rightX, 830, rightW, 330, 15, '#fbf8ff', LINE);
-  sectionHeader(ctx, rightX + 10, 838, 8, 'Kritik Gözlem', PURPLE, '!');
+  sectionHeader(ctx,rightX+10,838,8,latestPhoto?'Kritik Gözlem':'Dönem Sonu Değerlendirmesi',PURPLE,'!');
   rr(ctx, rightX + 16, 884, rightW - 32, 224, 12,
     latestPhoto?.signedUrl ? PURPLE_SOFT : GRAY_SOFT, LINE);
   circleIcon(ctx, rightX + 45, 920, 16, latestPhoto ? PURPLE : BLUE, '!', WHITE, 12);
-  text(ctx, latestPhoto ? 'Doğrulanacak saha bulgusu' : 'Kritik saha bulgusu yok',
-    rightX + 75, 926, 16, 900, INK);
+  fittedText(ctx,latestPhoto?'Doğrulanacak saha bulgusu':'Geçmiş veriye dayalı yorum',
+    rightX+75,926,rightW-98,16,900,INK);
   const criticalText = latestPhoto
     ? (diagnosis.headline || diagnosis.summary || 'Fotoğraftaki belirtiler saha gözlemiyle birlikte değerlendirilmelidir.')
-    : (narrative?.risk || 'Fotoğraf, güncel tarla notu veya yerinde doğrulama olmadan kesin hastalık ve zararlı teşhisi üretilmez.');
+    : (climate.observedDays>0
+      ? 'Hava geçmişi dönem koşullarını gösterir. Hastalık, zararlı, gerçek su açığı ve verim için saha ölçümü ve ek ürün verisi gerekir. Bu rapor olmayan kanıttan sonuç üretmez.'
+      : 'Dönemin yeterli saha ve iklim kanıtı bulunmadığından güvenilir üretim kararı verilemez.');
   wrap(ctx, englishFree(criticalText), rightX + 29, 975, 13, 650, MUTED, rightW - 61, 1.35, 5);
   text(ctx, latestPhoto ? 'Kanıt: Kullanıcı saha fotoğrafı' : 'İstenen kanıt: Güncel saha fotoğrafı',
     rightX + 29, 1081, 11, 850, BLUE);
@@ -1056,7 +1251,11 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   rr(ctx, rightX, 1170, rightW, 250, 15, '#f7fbf8', LINE);
   sectionHeader(ctx, rightX + 10, 1178, 9, "Pusula'nın Kısa Aksiyonları", GREEN, '✓');
   const narrativeActions=(narrative?.actions??[]).filter(Boolean);
-  const actions = [
+  const actions = isHistoricalReport ? [
+    ['Dönem Kaydı','Geçmiş döneme ait sulama, hasat ve işlem kayıtlarını varsa tamamla.',GREEN,GREEN_SOFT],
+    ['Kaynak Kontrolü','Toprak model referansını laboratuvar sonucu gibi yorumlama; gerçek saha verisiyle doğrula.',BLUE,BLUE_SOFT],
+    ['Dönem Kıyasla','Sonraki dönemlerdeki gerçek uydu ve hava kayıtlarıyla değişimi karşılaştır.',PURPLE,PURPLE_SOFT],
+  ] : [
     ['Bugün', narrativeActions[0] ?? guidance.next7Days[0] ?? 'Tarlanın güncel durumunu kontrol et.', GREEN, GREEN_SOFT],
     ['Önümüzdeki 7 Gün', narrativeActions[1] ?? guidance.next7Days[1] ?? 'Uydu ve hava trendini takip et.', BLUE, BLUE_SOFT],
     ['İzle ve Planla', narrativeActions[2] ?? guidance.next7Days[2] ?? guidance.dataQualityNote, PURPLE, PURPLE_SOFT],
@@ -1124,7 +1323,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     title: `PUSULAPDF - ${snapshot.field.name}`,
     author: 'TarlaPusula',
     creator: 'TarlaPusula PUSULAPDF',
-    subject: 'Tek sayfalık premium tarla sağlık ve karar raporu',
+    subject: 'Seçilen döneme göre uyarlanan, kaynakları ayrıştırılmış tarla analizi',
   });
   return doc;
 }
