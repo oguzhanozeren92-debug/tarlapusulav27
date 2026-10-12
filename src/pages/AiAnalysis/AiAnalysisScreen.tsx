@@ -1127,6 +1127,32 @@ html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled
  color:#202932!important;-webkit-text-fill-color:#202932!important;opacity:1!important
 }
 
+/* PusulaPDF action contrast; black buttons keep white copy even inside disabled states. */
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history,
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history:disabled {
+  background:#0b0e11!important;
+  border:1px solid #171c20!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  opacity:1!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history :is(strong,b),
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history:disabled :is(strong,b) {
+  color:#fff!important;-webkit-text-fill-color:#fff!important;opacity:1!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history small,
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history:disabled small {
+  color:#e1e5e8!important;-webkit-text-fill-color:#e1e5e8!important;opacity:1!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history>span,
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history:disabled>span {
+  color:#111820!important;-webkit-text-fill-color:#111820!important;
+  background:#fff!important;border-color:#fff!important;opacity:1!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card button.tp-ai-tool-history:focus-visible {
+  outline:3px solid #8cb5ff!important;outline-offset:3px!important;
+}
+/* Keep empty archive accessible; don't hide the history action. */
 /* QUICK CALENDAR ACTION — PUSULAPDF */
 html body #root .tp-ai-page .tp-ai-pdf-calendar{
   box-sizing:border-box!important;
