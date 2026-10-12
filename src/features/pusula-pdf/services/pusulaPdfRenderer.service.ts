@@ -843,29 +843,14 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const lastMeasured = knownSeries(sat, 'ndvi').at(-1);
   const lastNdmi = [...sat].filter((p) => valid(p.ndmi)).at(-1);
   const ndmiValue = lastNdmi?.ndmi ?? null;
-  if(!hasSatelliteMeasurements){
-    summaryCard(ctx,leftX+8,statY,statW,'Hava Kapsamı',
-      `${climate.observedDays}/${climate.days}`,'Kayıtlı gün',BLUE,BLUE_SOFT,'●');
-    summaryCard(ctx,leftX+8+statW+statGap,statY,statW,'Dönem Yağışı',
-      climate.totalRain===null?'—':numTr(climate.totalRain)+' mm',
-      'Kayıtlı yağış',TEAL,GREEN_SOFT,'●');
-    summaryCard(ctx,leftX+8+(statW+statGap)*2,statY,statW,'Uydu Ölçümü',
-      '0 indeks','Tarihler mevcut',ORANGE,ORANGE_SOFT,'!');
-    summaryCard(ctx,leftX+8+(statW+statGap)*3,statY,statW,'Ürün',
-      snapshot.field.crop??'Kayıtsız','Tarla kaydı',GREEN,GREEN_SOFT,'✓');
-  }else{
-  summaryCard(ctx, leftX + 8, statY, statW, health === null ? 'Bitki Canlılığı':'Tarla Sağlığı',
-    health === null ? numericIndexText(lastMeasured?.ndvi) : `${Math.round(health)}/100`,
-    health === null ? (lastMeasured ? 'NDVI · uydu' : 'Dönem ölçümü yok') : 'Gerçek sağlık skoru',
-    GREEN, GREEN_SOFT, '✓');
-  summaryCard(ctx, leftX + 8 + statW + statGap, statY, statW, 'Ana Risk',
-    primaryRisk.value, primaryRisk.sub, RED, RED_SOFT, '!');
-  summaryCard(ctx, leftX + 8 + (statW + statGap) * 2, statY, statW, 'Bitki Nem İndeksi',
-    ndmiValue === null ? 'Veri yok' : numericIndexText(ndmiValue),
-    lastNdmi ? 'NDMI · uydu' : 'Dönemde kayıt yok', BLUE, BLUE_SOFT, '●');
-  summaryCard(ctx, leftX + 8 + (statW + statGap) * 3, statY, statW, 'Gelişim Evresi',
-    stage.value, stage.sub, GREEN, GREEN_SOFT, '↑');
-  }
+  // The cover identifies the REPORT'S FOCUS, not a second copy of its metrics.
+  // All numbers live only in their dedicated evidence sections below.
+  rr(ctx,leftX+8,statY,leftW-16,104,12,'#f3f8f5',LINE);
+  fittedText(ctx,'BU RAPORUN ODAĞI',leftX+20,statY+24,leftW-40,9,850,GREEN_DARK);
+  const focus=hasSatelliteMeasurements
+    ? 'Uydu indeksleri, saha ve toprak kanıtları dönem tarihleriyle karşılaştırılır.'
+    : 'Bu tarih aralığında değerlendirme arşiv kayıtları, model referansı ve kayıtlı saha kanıtlarıyla sınırlıdır.';
+  wrap(ctx,focus,leftX+20,statY+48,12,750,INK,leftW-40,1.35,3);
 
   rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
   text(ctx, hasSatelliteMeasurements?'Uydu Geçmişi ve Karşılaştırma':'Uydu Arşivi ve Ölçüm Kapsamı', leftX + 16, 691, 17, 900, INK);
@@ -912,14 +897,13 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       :delta>0?'artış gösteriyor':'azalış gösteriyor';
     ndviNote=`NDVI ${fmt(prev.date,false)} tarihinde ${numericIndexText(prev.ndvi)}, ${fmt(last.date,false)} tarihinde ${numericIndexText(last.ndvi)}: ${signal}. Tek başına hastalık, su stresi veya verim kanıtı değildir.`;
   }
-  const summary=narrative?.summary ||
-    (!hasSatelliteMeasurements&&climate.observedDays===climate.days
-      ? climateInterpretation(climate)
-      : guidance.weeklySummary);
-  wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 10.8, 650, INK, leftW - 40, 1.27, 6);
-  const action = !hasSatelliteMeasurements
-    ? 'Bu dönem uydu indeksleri sayısal değil; gerçek NDVI ve diğer katmanlar için yeni tarihli parsel analizi gerekir.'
-    : guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
+  const summary=!hasSatelliteMeasurements
+    ? 'Bu geçmiş dönemde yalnızca doğrulanmış kaynakların desteklediği çıkarımlar yapılabilir. İklim koşullarının bağın gelişimine etkisi, saha gözlemleri ve sulama kayıtları olmadan kesinleştirilemez.'
+    : (narrative?.summary||guidance.weeklySummary)+' '+ndviNote;
+  wrap(ctx,summary,leftX+20,985,11,650,INK,leftW-40,1.3,6);
+  const action=!hasSatelliteMeasurements
+    ? 'Gerçek sulama ve saha işlem tarihlerini kaydederek geriye dönük değerlendirmeyi güçlendir.'
+    : guidance.next7Days[0]??'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
   rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
   text(ctx,isHistoricalReport?'DÖNEM':'7 GÜN',leftX+30,1102,8.5,900,PURPLE);
   wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
