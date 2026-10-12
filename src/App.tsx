@@ -14,6 +14,9 @@ import HomeScreen from './pages/Home/HomeScreen';
 import PusulaTest from './pages/PusulaTest/PusulaTest';
 import CalendarScreen from './pages/Calendar/CalendarScreen';
 import AiAnalysisScreen from './pages/AiAnalysis/AiAnalysisScreen';
+import { supabase } from './supabaseClient';
+import { openArchivedPusulaPdf } from './features/pusula-pdf/services/pusulaPdfArchive.service';
+import type { WeeklyPusulaReport } from './features/pusula-pdf/types';
 import AddFieldScreen from './pages/AddFieldScreen';
 import WeatherHubScreen from './pages/Weather/WeatherHubScreen';
 import DemMapScreen from './pages/DemMap/DemMapScreen';
@@ -668,6 +671,31 @@ export default function App() {
   };
 
   useEffect(() => {
+    const openPusulaPdfReport = async (reportId: string) => {
+      setScreen('notificationsHub');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      if (!reportId) return;
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        if (!auth.user) throw new Error('Raporu açmak için oturum açmalısın.');
+        const { data: report, error } = await supabase
+          .from('weekly_field_reports').select('*')
+          .eq('id', reportId).eq('user_id', auth.user.id).eq('status', 'ready')
+          .single();
+        if (error || !report) throw error ?? new Error('Hazır rapor bulunamadı.');
+        await openArchivedPusulaPdf(report as WeeklyPusulaReport);
+      } catch (error) {
+        console.error('[PUSULAPDF] Bildirimden rapor açılamadı:', error);
+        window.alert(error instanceof Error ? error.message : 'Rapor açılmadı. Bildirimler bölümünden yeniden deneyebilirsin.');
+      }
+    };
+
+    const handleOpenPusulaPdf = (event: Event) => {
+      const detail = (event as CustomEvent<{ reportId?: string }>).detail;
+      void openPusulaPdfReport(String(detail?.reportId ?? '').trim());
+    };
+
+    window.addEventListener('tp:open-pusulapdf', handleOpenPusulaPdf as EventListener);
     const handleNativeNotificationOpen = (event: Event) => {
       const detail =
         (event as CustomEvent<Record<string, unknown>>).detail ?? {};
@@ -683,6 +711,12 @@ export default function App() {
       ).trim();
       const source = String(detail.source ?? '').trim();
       const url = String(detail.url ?? '').trim();
+
+      if (target === 'pusulapdf' || source === 'pusulapdf') {
+        const reportId = String(detail.reportId ?? detail.report_id ?? '').trim();
+        void openPusulaPdfReport(reportId);
+        return;
+      }
 
       const shouldOpenSatellite =
         source === 'satellite' ||
@@ -757,6 +791,7 @@ export default function App() {
     );
 
     return () => {
+      window.removeEventListener('tp:open-pusulapdf', handleOpenPusulaPdf as EventListener);
       window.removeEventListener(
         'tp:native-notification-open',
         handleNativeNotificationOpen as EventListener,
