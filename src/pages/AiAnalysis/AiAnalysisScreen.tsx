@@ -2048,7 +2048,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     style={{ marginTop: 8 }}
                     onClick={() => void openArchivedPusulaPdf(report).catch((error) => setPusulaPdfError(error instanceof Error ? error.message : 'Rapor açılamadı.'))}
                   >
-                    {formatPusulaPdfDate(report.period_end)}  · Raporu aç
+                    {formatPusulaPdfDate(report.period_start)} – {formatPusulaPdfDate(report.period_end)} · Raporu aç
                   </button>
                 )) : <small>Henüz kaydedilmiş rapor yok.</small>}
               </div>
