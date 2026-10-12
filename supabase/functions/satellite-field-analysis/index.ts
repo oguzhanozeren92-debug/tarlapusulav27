@@ -614,6 +614,9 @@ Deno.serve(async (req) => {
       ? buildDayTimeRange(selectedScene.date)
       : searchTimeRange;
 
+    // PusulaPDF can retrieve per-scene numerical indices without generating large
+    // image payloads on every historical date (the image-only preview is separate).
+    const statisticsOnly = body.statisticsOnly === true;
     const [statisticsRaw, ndviBase64, trueColorBase64] = await Promise.all([
       fetchStatistics(
         token,
@@ -621,19 +624,11 @@ Deno.serve(async (req) => {
         imageTimeRange,
         maxCloudCoverage,
       ),
-      fetchImage(
-        token,
-        geometry,
-        imageTimeRange,
-        maxCloudCoverage,
-        NDVI_IMAGE_SCRIPT,
+      statisticsOnly ? Promise.resolve(null) : fetchImage(
+        token, geometry, imageTimeRange, maxCloudCoverage, NDVI_IMAGE_SCRIPT,
       ),
-      fetchImage(
-        token,
-        geometry,
-        imageTimeRange,
-        maxCloudCoverage,
-        TRUE_COLOR_SCRIPT,
+      statisticsOnly ? Promise.resolve(null) : fetchImage(
+        token, geometry, imageTimeRange, maxCloudCoverage, TRUE_COLOR_SCRIPT,
       ),
     ]);
 
@@ -687,8 +682,12 @@ Deno.serve(async (req) => {
       ndreAverage: statistics.ndreAverage,
       saviAverage: statistics.saviAverage,
       gndviAverage: statistics.gndviAverage,
-      ndviImage: `data:image/png;base64,${ndviBase64}`,
-      trueColorImage: `data:image/png;base64,${trueColorBase64}`,
+      ndviImage: ndviBase64 ? `data:image/png;base64,${ndviBase64}` : null,
+      trueColorImage: trueColorBase64 ? `data:image/png;base64,${trueColorBase64}` : null,
+      statisticsStatus: statistics.ndviAverage === null
+        ? (statisticsRaw === null ? 'statistics-service-unavailable' : 'no-clear-pixels')
+        : 'measured',
+      statisticsOnly,
       healthyPercent: null,
       warningPercent: null,
       stressedPercent: null,
