@@ -17,6 +17,7 @@ import './styles/MonochromeUI.css';
 import './styles/MapReadabilityFix.css';
 import './styles/HomeFieldsSheetWhiteAccent.css';
 import './styles/FieldSelectChevron.css';
+import './styles/MobileViewportFit.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 import { installNativeFeedback } from './mobile/nativeFeedback';
