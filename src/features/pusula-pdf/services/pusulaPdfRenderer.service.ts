@@ -747,6 +747,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   // Weather history is NOT a future forecast. Report the most recent recorded days.
   const weather = allWeather.filter((row) => wd(row) >= snapshot.period.start);
   const climate=periodWeatherSummary(weather,snapshot.period.start,snapshot.period.end);
+  const isHistoricalReport=snapshot.period.end<new Date(Date.now()-7*86400000).toISOString().slice(0,10);
   const hasSatelliteMeasurements=sat.some(p=>VEGETATION_INDICES.some(i=>valid(p[i.key])));
   const hasBiophysics=(snapshot.biophysical??[]).some(p=>
     p.date&&p.date>=snapshot.period.start&&p.date<=snapshot.period.end
@@ -781,7 +782,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   rr(ctx, 355, 21, 311, 76, 11, 'rgba(255,255,255,.78)', '');
   rr(ctx, 674, 21, 539, 76, 11, 'rgba(255,255,255,.85)', '');
   await logo(ctx, 50, 59);
-  fittedText(ctx, 'Tarım Analiz Raporu', 372, 48, 280, 19, 900, INK);
+  fittedText(ctx, 'Dönemsel Tarla Analizi', 372, 48, 280, 19, 900, INK);
   text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 72, 10.5, 650, MUTED);
 
   const headerMeta = [
@@ -911,13 +912,16 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       :delta>0?'artış gösteriyor':'azalış gösteriyor';
     ndviNote=`NDVI ${fmt(prev.date,false)} tarihinde ${numericIndexText(prev.ndvi)}, ${fmt(last.date,false)} tarihinde ${numericIndexText(last.ndvi)}: ${signal}. Tek başına hastalık, su stresi veya verim kanıtı değildir.`;
   }
-  const summary=narrative?.summary || guidance.weeklySummary;
+  const summary=narrative?.summary ||
+    (!hasSatelliteMeasurements&&climate.observedDays===climate.days
+      ? climateInterpretation(climate)
+      : guidance.weeklySummary);
   wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 10.8, 650, INK, leftW - 40, 1.27, 6);
   const action = !hasSatelliteMeasurements
     ? 'Bu dönem uydu indeksleri sayısal değil; gerçek NDVI ve diğer katmanlar için yeni tarihli parsel analizi gerekir.'
     : guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
   rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
-  text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
+  text(ctx,isHistoricalReport?'DÖNEM':'7 GÜN',leftX+30,1102,8.5,900,PURPLE);
   wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
 
   if(hasBiophysics){
@@ -1247,7 +1251,11 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   rr(ctx, rightX, 1170, rightW, 250, 15, '#f7fbf8', LINE);
   sectionHeader(ctx, rightX + 10, 1178, 9, "Pusula'nın Kısa Aksiyonları", GREEN, '✓');
   const narrativeActions=(narrative?.actions??[]).filter(Boolean);
-  const actions = [
+  const actions = isHistoricalReport ? [
+    ['Dönem Kaydı','Geçmiş döneme ait sulama, hasat ve işlem kayıtlarını varsa tamamla.',GREEN,GREEN_SOFT],
+    ['Kaynak Kontrolü','Toprak model referansını laboratuvar sonucu gibi yorumlama; gerçek saha verisiyle doğrula.',BLUE,BLUE_SOFT],
+    ['Dönem Kıyasla','Sonraki dönemlerdeki gerçek uydu ve hava kayıtlarıyla değişimi karşılaştır.',PURPLE,PURPLE_SOFT],
+  ] : [
     ['Bugün', narrativeActions[0] ?? guidance.next7Days[0] ?? 'Tarlanın güncel durumunu kontrol et.', GREEN, GREEN_SOFT],
     ['Önümüzdeki 7 Gün', narrativeActions[1] ?? guidance.next7Days[1] ?? 'Uydu ve hava trendini takip et.', BLUE, BLUE_SOFT],
     ['İzle ve Planla', narrativeActions[2] ?? guidance.next7Days[2] ?? guidance.dataQualityNote, PURPLE, PURPLE_SOFT],
@@ -1315,7 +1323,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     title: `PUSULAPDF - ${snapshot.field.name}`,
     author: 'TarlaPusula',
     creator: 'TarlaPusula PUSULAPDF',
-    subject: 'Tek sayfalık premium tarla sağlık ve karar raporu',
+    subject: 'Seçilen döneme göre uyarlanan, kaynakları ayrıştırılmış tarla analizi',
   });
   return doc;
 }
