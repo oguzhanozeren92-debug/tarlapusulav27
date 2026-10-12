@@ -5,6 +5,9 @@ import { buildPusulaPdfGuidance } from './pusulaPdfInsights.service';
 
 const W = 1240;
 const H = 1754;
+const OUTPUT_SCALE = 2; // A4: ~300 dpi instead of the old ~150 dpi.
+const BRAND_BODY = 'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/compass-body.webp';
+const BRAND_NEEDLE = 'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/compass-needle-centered.webp';
 const INK = '#10243a';
 const MUTED = '#667784';
 const LINE = '#dfe6e9';
@@ -44,10 +47,13 @@ const num = (value: unknown, digits = 2) => valid(value) ? value.toFixed(digits)
 
 function makeCanvas() {
   const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = W * OUTPUT_SCALE;
+  canvas.height = H * OUTPUT_SCALE;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('PDF çizim alanı oluşturulamadı.');
+  ctx.scale(OUTPUT_SCALE, OUTPUT_SCALE);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = PAGE;
   ctx.fillRect(0, 0, W, H);
   ctx.textBaseline = 'alphabetic';
@@ -151,37 +157,23 @@ function circleIcon(
   ctx.textAlign = 'left';
 }
 
-function logo(ctx: CanvasRenderingContext2D, x: number, y: number, compact = false) {
-  const r = compact ? 24 : 30;
-  const g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-  g.addColorStop(0, '#35c760');
-  g.addColorStop(1, '#06763d');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.roundRect(x - r, y - r, r * 2, r * 2, compact ? 13 : 17);
-  ctx.fill();
-
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.strokeStyle = WHITE;
-  ctx.lineWidth = compact ? 2.5 : 3;
-  ctx.beginPath();
-  ctx.moveTo(-5, 13);
-  ctx.quadraticCurveTo(-6, -8, 12, -17);
-  ctx.stroke();
-  ctx.fillStyle = '#dcffe4';
-  ctx.beginPath();
-  ctx.ellipse(-8, -6, 10, 5, -0.65, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(8, -1, 11, 5.5, 0.55, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  text(ctx, 'TarlaPusula', x + r + 12, y - 1, compact ? 24 : 31, 900, INK);
-  text(ctx, 'TARLANIN AKLI, YANINDA.', x + r + 14, y + (compact ? 20 : 24), compact ? 9 : 11, 800, MUTED);
+async function logo(ctx: CanvasRenderingContext2D, x: number, y: number, compact = false) {
+  const radius = compact ? 24 : 30;
+  // Use the exact same 2-image compass mark as the app header.
+  const body = await imageBitmapFrom(BRAND_BODY);
+  const needle = await imageBitmapFrom(BRAND_NEEDLE);
+  if (body) {
+    ctx.drawImage(body, x - radius, y - radius, radius * 2, radius * 2);
+    body.close();
+  }
+  if (needle) {
+    ctx.drawImage(needle, x - radius, y - radius, radius * 2, radius * 2);
+    needle.close();
+  }
+  // Never synthesize a surrogate green seed icon if the real mark is offline.
+  text(ctx, 'TarlaPusula', x + radius + 12, y - 1, compact ? 24 : 31, 900, INK);
+  text(ctx, 'TARLANIN AKLI, YANINDA.', x + radius + 14, y + (compact ? 20 : 24), compact ? 9 : 11, 800, MUTED);
 }
-
 function sectionHeader(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -250,7 +242,9 @@ function layerPayload(value: any) {
 function metricNumber(payload: any, ...keys: string[]) {
   const metrics = payload?.metrics ?? {};
   for (const key of keys) {
-    const n = Number(metrics?.[key]);
+    const raw = metrics?.[key];
+    if (raw === null || raw === undefined || raw === '') continue;
+    const n = Number(raw);
     if (Number.isFinite(n)) return n;
   }
   return null;
@@ -506,14 +500,24 @@ function yieldSummary(snapshot: PusulaPdfSnapshot) {
     ?? layerPayload(latestLayer(snapshot, 'yield-harvest-ensemble'));
   const metrics = payload?.metrics ?? {};
   const details = payload?.details ?? {};
-  const kgHa = Number(metrics.currentYieldKgHa ?? metrics.forecastCentralKgHa);
-  const yieldKgDa = Number.isFinite(kgHa) ? kgHa / 10 : null;
+  const rawYield = metrics.currentYieldKgHa ?? metrics.forecastCentralKgHa;
+  const kgHa = rawYield == null || rawYield === '' ? null : Number(rawYield);
+  const yieldKgDa = kgHa !== null && Number.isFinite(kgHa) && kgHa > 0 ? kgHa / 10 : null;
   const quality = String(details.qualityGrade ?? metrics.qualityScore ?? '').trim();
-  const expected = String(details.expectedHarvestDate ?? details.harvestTiming?.centralDate ?? '').trim();
+  const rawHarvest = String(details.actualHarvestDate ?? details.expectedHarvestDate ?? details.harvestTiming?.centralDate ?? '').trim();
+  const isObserved = Boolean(details.actualHarvestDate) || Boolean(details.provenance?.currentHarvestOperationIds?.length);
+  const validatedModel = (Number(details.harvestTiming?.memberCount ?? 0) >= 2)
+    && !['low', 'limited', 'unknown'].includes(String(details.harvestTiming?.confidence ?? '').toLowerCase())
+    && details.harvestTiming?.status !== 'phenology_only';
+  const reportDay = String(snapshot.period.end ?? '').slice(0, 10);
+  const currentHarvest = /^\\d{4}-\\d{2}-\\d{2}$/.test(rawHarvest)
+    && (isObserved || (validatedModel && rawHarvest >= reportDay));
+  // A phenology-only placeholder (e.g. cherry on 12 October) is not a harvest forecast.
   return {
     yieldKgDa,
     quality: quality || 'Ölçüm bekleniyor',
-    harvest: expected ? fmt(expected, false) : 'Takipte',
+    harvest: currentHarvest ? fmt(rawHarvest, false) : 'Doğrulanmadı',
+    harvestNote: currentHarvest ? (isObserved ? 'Kaydedilmiş tarih' : 'Model tahmini') : 'Saha/çeşit verisi gerekli',
   };
 }
 
@@ -589,7 +593,9 @@ function latestSoilValues(snapshot: PusulaPdfSnapshot) {
   return candidates.map((candidate) => {
     let value: number | null = null;
     for (const key of candidate.keys) {
-      const n = Number(latest?.[key]);
+      const raw = latest?.[key];
+      if (raw === null || raw === undefined || raw === '') continue;
+      const n = Number(raw);
       if (Number.isFinite(n)) {
         value = n;
         break;
@@ -679,7 +685,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   // Header
   rr(ctx, 12, 12, 1216, 94, 15, WHITE, LINE);
-  logo(ctx, 50, 59);
+  await logo(ctx, 50, 59);
   text(ctx, 'Tarım Analiz Raporu', 372, 48, 19, 900, INK);
   text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 72, 10.5, 650, MUTED);
 
@@ -939,12 +945,12 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   });
 
   await drawImage(ctx, latest?.trueColorImage ?? latestPhoto?.signedUrl, rightX, 1430, rightW, 160, { radius: 15, placeholder: 'Tarla görseli', overlay: 'rgba(4,32,25,.28)' });
-  logo(ctx, rightX + 34, 1510, true);
+  await logo(ctx, rightX + 34, 1510, true);
   wrap(ctx, 'Tarlanı verilerle izle, kararını güvenle ver.', rightX + 150, 1502, 15, 800, WHITE, 220, 1.2, 3);
 
   // Premium footer — social + QR
   rr(ctx, 12, 1604, 1216, 138, 15, WHITE, LINE);
-  logo(ctx, 52, 1660, true);
+  await logo(ctx, 52, 1660, true);
   footerSocial(ctx, 286, 1634, '◎', '#e1306c', 'Instagram', '@tarlapusula');
   footerSocial(ctx, 465, 1634, 'f', '#1877f2', 'Facebook', 'tarlapusula');
   footerSocial(ctx, 632, 1634, '✉', '#15936a', 'E-posta', 'tarlapusula@gmail.com');
@@ -956,7 +962,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   await drawQr(ctx, ANDROID_URL, 846, 1623, 57, 'Android indir', 'android');
   await drawQr(ctx, IOS_URL, 1022, 1623, 57, 'iOS indir', 'ios');
 
-  doc.addImage(canvas.toDataURL('image/jpeg', 0.97), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+  // PNG avoids JPG halos around 8-12px labels and keeps parcel edges sharp.
+  doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'MEDIUM');
   doc.setProperties({
     title: `PUSULAPDF - ${snapshot.field.name}`,
     author: 'TarlaPusula',
