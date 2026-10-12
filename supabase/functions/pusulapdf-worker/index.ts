@@ -683,7 +683,6 @@ async function processJob(jobId:string,userId:string){
       }else satelliteByDate.set(row.date,row);
     }
     satellite.points=[...satelliteByDate.values()].sort((a:any,b:any)=>a.date.localeCompare(b.date));
-    satellite.fusionArchiveDates=fusionNdvi.length;
     const numericSatellitePoints=satellite.points.filter((p:any)=>[p.ndvi,p.ndmi,p.ndre,p.savi,p.gndvi].some((v)=>typeof v==='number'&&Number.isFinite(v))).length;
 
     await setJob(jobId,{stage:'weather',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),message:'Seçilen dönemin gerçek hava kayıtları toplanıyor'}});
