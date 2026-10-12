@@ -471,13 +471,18 @@ function riskItems(guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
     // Confidence is about evidence quality, NOT risk severity.
     const observed = evidenceValue(insight, ['Risk seviyesi', 'Risk düzeyi', 'Risk']);
     const riskLevel = /^(yüksek|orta|düşük|kritik)$/i.test(observed.trim()) ? observed.trim() : null;
-    const status = riskLevel ?? 'Doğrulanmadı';
+    const status = riskLevel ?? (insight ? 'Ön değerlendirme' : 'Veri eksik');
     const description = String(insight?.meaning ?? '').trim();
     // Split at an actual sentence boundary, not at decimal dots such as 0.3.
     const firstSentence = description.split(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ])/u)[0] ?? '';
-    const detail = firstSentence || 'Bu risk için doğrulanmış bir saha ölçümü veya yeterli model kanıtı henüz bulunmuyor.';
+    const detail = (firstSentence && firstSentence.length <= 165 ? firstSentence : '')
+      || (insight
+        ? 'Mevcut kanıtlar kesin risk düzeyi hesaplamaya yetmiyor. Saha kontrolü önerilir.'
+        : 'Bu risk için doğrulanmış saha ölçümü veya yeterli model kanıtı bulunmuyor.');
     const action = String(insight?.action ?? '').trim();
-    const style = riskLevel ? statusColor(riskLevel) : { accent: MUTED, soft: GRAY_SOFT };
+    const style = riskLevel ? statusColor(riskLevel) : insight
+      ? {accent:ORANGE,soft:ORANGE_SOFT}
+      : {accent:MUTED,soft:GRAY_SOFT};
     return { label, detail, action, status, statusAccent: style.accent, statusSoft: style.soft };
   });
 }
@@ -575,20 +580,6 @@ function bioValue(metric: PusulaBioMetric, value:number|null|undefined){
   const shown=(metric.unit==='%'?value*100:value);
   return shown.toLocaleString('tr-TR',{minimumFractionDigits:metric.unit==='%'?0:2,maximumFractionDigits:metric.unit==='%'?0:3})+(metric.unit==='%'?'%':'');
 }
-function indexEvidenceSummary(points:PusulaPdfSatellitePoint[]){
-  const summaries=VEGETATION_INDICES.map(item=>{
-    const series=knownSeries(points,item.key);
-    if(!series.length)return item.label+': doğrulanmış sayısal ölçüm bulunmuyor.';
-    const last=series.at(-1)!;
-    if(series.length<2)return item.label+': '+numericIndexText(last[item.key])+' (tek tarih, eğilim hesaplanamaz).';
-    const previous=series.at(-2)!;
-    const change=Number(last[item.key])-Number(previous[item.key]);
-    const direction=Math.abs(change)<.015?'belirgin değişim yok':change>0?'artış':'azalış';
-    return item.label+': '+numericIndexText(last[item.key])+'; önceki ölçüme göre '+direction+'.';
-  });
-  return summaries;
-}
-
 function qrImageUrl(target: string) {
   return `https://quickchart.io/qr?size=180&margin=1&ecLevel=M&text=${encodeURIComponent(target)}`;
 }
@@ -938,10 +929,11 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   wrap(ctx, englishFree(observationText), midX + 28, 1535, 10, 650, INK, 333, 1.22, 3);
 
   // RIGHT COLUMN
-  rr(ctx, rightX, top, rightW, 476, 15, WHITE, LINE);
+  rr(ctx, rightX, top, rightW, 476, 15, '#f9fbfe', LINE);
   sectionHeader(ctx, rightX + 10, top + 8, 6, 'Risk ve Öneri Analizi', RED, '!');
   riskRows.forEach((row, index) => {
     const yy = top + 64 + index * 78;
+    rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?'#ffffff':'#f1f5f9',LINE);
     circleIcon(ctx, rightX + 34, yy + 15, 12, row.statusSoft, '●', row.statusAccent, 8);
     text(ctx, row.label, rightX + 56, yy + 18, 12, 900, INK);
     const pillW = 95;
@@ -971,7 +963,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     ctx.textAlign = 'left';
   });
 
-  rr(ctx, rightX, 830, rightW, 330, 15, WHITE, LINE);
+  rr(ctx, rightX, 830, rightW, 330, 15, '#fbf8ff', LINE);
   sectionHeader(ctx, rightX + 10, 838, 8, 'Kritik Gözlem', PURPLE, '!');
   rr(ctx, rightX + 16, 884, rightW - 32, 224, 12,
     latestPhoto?.signedUrl ? PURPLE_SOFT : GRAY_SOFT, LINE);
@@ -985,7 +977,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   text(ctx, latestPhoto ? 'Kanıt: Kullanıcı saha fotoğrafı' : 'İstenen kanıt: Güncel saha fotoğrafı',
     rightX + 29, 1081, 11, 850, BLUE);
 
-  rr(ctx, rightX, 1170, rightW, 250, 15, WHITE, LINE);
+  rr(ctx, rightX, 1170, rightW, 250, 15, '#f7fbf8', LINE);
   sectionHeader(ctx, rightX + 10, 1178, 9, "Pusula'nın Kısa Aksiyonları", GREEN, '✓');
   const actions = [
     ['Bugün', guidance.next7Days[0] ?? 'Tarlanın güncel durumunu kontrol et.', GREEN, GREEN_SOFT],
@@ -999,12 +991,30 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     wrap(ctx, value, x + 10, 1275, 9.2, 650, INK, 96, 1.28, 7);
   });
 
-  rr(ctx, rightX, 1430, rightW, 160, 15, GREEN_SOFT, LINE);
-  await logo(ctx, rightX + 37, 1495, true);
-  wrap(ctx, 'Tarlanı verilerle izle, kararını güvenle ver.',
-    rightX + 150, 1502, 14, 800, INK, 218, 1.2, 3);
-  text(ctx, 'TarlaPusula · Kaynakları belirtilmiş tarla analizi',
-    rightX + 20, 1570, 10, 700, MUTED);
+  // Fixed satellite-field motif, drawn as a background illustration.
+  // The original compass image is retained above the pattern, never repeated
+  // as a separate branded title inside the same text region.
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(rightX,1430,rightW,160,15); ctx.clip();
+  const motif=ctx.createLinearGradient(rightX,1430,rightX+rightW,1590);
+  motif.addColorStop(0,'#071918'); motif.addColorStop(0.55,'#17433a');
+  motif.addColorStop(1,'#0b2325');
+  ctx.fillStyle=motif;ctx.fillRect(rightX,1430,rightW,160);
+  const farmland=['rgba(131,205,141,.13)','rgba(232,211,125,.13)','rgba(72,154,131,.19)'];
+  for(let i=0;i<7;i++){
+    ctx.fillStyle=farmland[i%farmland.length];
+    ctx.beginPath();const xx=rightX+180+i*54;
+    ctx.moveTo(xx,1430);ctx.lineTo(xx+51,1430);ctx.lineTo(xx-34,1590);ctx.lineTo(xx-85,1590);ctx.closePath();ctx.fill();
+  }
+  ctx.restore();
+  const compassBody=await imageBitmapFrom(BRAND_BODY);
+  const compassNeedle=await imageBitmapFrom(BRAND_NEEDLE);
+  if(compassBody){ctx.drawImage(compassBody,rightX+18,1461,59,59);compassBody.close();}
+  if(compassNeedle){ctx.drawImage(compassNeedle,rightX+18,1461,59,59);compassNeedle.close();}
+  text(ctx,'TarlaPusula',rightX+91,1471,22,900,WHITE);
+  text(ctx,'TARLANIN AKLI, YANINDA.',rightX+92,1492,9,750,'#d2e7dd');
+  wrap(ctx,'Veriye dayalı kararlarla daha güçlü yarınlar.',rightX+92,1521,12,800,WHITE,rightW-111,1.2,2);
+  text(ctx,'Uydu · Toprak · Hava · Saha',rightX+22,1570,10,700,'#d6eee5');
 
   // Premium footer — social + QR
   rr(ctx, 12, 1604, 1216, 138, 15, WHITE, LINE);
