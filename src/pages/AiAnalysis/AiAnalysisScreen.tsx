@@ -1252,6 +1252,13 @@ export default function AiAnalysisScreen({
     : presetReportPeriod(pusulaPdfPeriodPreset);
   const pusulaPdfPeriodError = reportPeriodValidation(pusulaPdfSelectedPeriod.start, pusulaPdfSelectedPeriod.end);
 
+  // An error describes the previously submitted period. Never keep showing
+  // the previous failed job's warning after the user changes the dates.
+  useEffect(() => {
+    setPusulaPdfError('');
+    setPusulaPdfStatus((current) => current === 'error' ? 'idle' : current);
+  }, [pusulaPdfPeriodPreset, pusulaPdfCustomStart, pusulaPdfCustomEnd]);
+
   const pusulaPdfStages: PusulaPdfJob['stage'][] = [
     'queued', 'collecting', 'satellite', 'weather', 'field_memory', 'interpreting', 'rendering',
   ];
