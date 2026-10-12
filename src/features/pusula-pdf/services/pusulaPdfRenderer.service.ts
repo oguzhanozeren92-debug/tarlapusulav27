@@ -942,29 +942,28 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
 
   }else{
-    // A period without SL2P should NOT waste six cells on "Ölçüm yok".
-    // Show meaningful recorded climate variation without pretending to have
-    // LAI / chlorophyll / water content measurements.
-    rr(ctx,leftX,1154,leftW,436,15,'#f7fbff',LINE);
-    text(ctx,'Dönemsel İklim Seyri',leftX+18,1190,19,900,INK);
-    fittedText(ctx,`${fmt(snapshot.period.start,false)} – ${fmt(snapshot.period.end,false)} · ${climate.observedDays}/${climate.days} kayıtlı gün`,
-      leftX+18,1213,leftW-36,10,750,MUTED);
-    rr(ctx,leftX+15,1223,leftW-30,27,7,'#e7f1fa','');
-    text(ctx,'TARİH',leftX+23,1241,9,850,MUTED);
-    text(ctx,'YAĞIŞ',leftX+147,1241,9,850,BLUE);
-    text(ctx,'REFERANS ET₀',leftX+239,1241,9,850,TEAL);
-    climate.buckets.slice(0,5).forEach((bucket,index)=>{
-      const yy=1255+index*40;
-      rr(ctx,leftX+15,yy,leftW-30,35,8,index%2===0?WHITE:'#edf5fc',LINE);
-      fittedText(ctx,`${fmt(bucket.start,false)}–${fmt(bucket.end,false)}`,leftX+23,yy+22,120,9.7,800,INK);
-      fittedText(ctx,bucket.rainMm===null?'Eksik':numTr(bucket.rainMm)+' mm',leftX+147,yy+22,87,10,900,BLUE);
-      fittedText(ctx,bucket.et0Mm===null?'Eksik':numTr(bucket.et0Mm)+' mm',leftX+240,yy+22,144,10,900,TEAL);
+    // No repeated weather chart here: climate metrics have ONE home below.
+    // This entire panel is a practical record-keeping plan instead.
+    rr(ctx,leftX,1154,leftW,436,15,'#f5f9f7',LINE);
+    text(ctx,'Tarla Takip ve Kayıt Planı',leftX+18,1190,18,900,INK);
+    wrap(ctx,'Eksik ölçümleri uydurmak yerine gelecek dönemlerde daha güçlü tarla değerlendirmesi sağlayan kayıt adımları.',
+      leftX+18,1214,10.1,700,MUTED,leftW-36,1.23,3);
+    const checks=[
+      ['Tarihli saha gözlemi','Yaprak, sürgün ve meyvedeki belirtileri konum ve tarih ile kaydet.'],
+      ['Sulama günlüğü','Uygulanan su miktarını, yöntemi ve sulama gününü not et.'],
+      ['Toprak laboratuvar testi','pH ve besin kararlarını güvenilir parsel örnekleriyle doğrula.'],
+      ['Hasat ve kalite defteri','Gerçek hasat tarihi, miktarı ve kaliteyi sonraki yıl için sakla.'],
+    ];
+    checks.forEach(([title,detail],i)=>{
+      const yy=1260+i*71;
+      rr(ctx,leftX+15,yy,leftW-30,64,10,i%2===0?WHITE:'#e9f3ee',LINE);
+      circleIcon(ctx,leftX+34,yy+23,12,GREEN,i+1+'',WHITE,10);
+      fittedText(ctx,title,leftX+54,yy+24,leftW-78,12,850,INK);
+      wrap(ctx,detail,leftX+54,yy+44,9.5,670,MUTED,leftW-80,1.14,2);
     });
-    rr(ctx,leftX+15,1463,leftW-30,108,10,WHITE,LINE);
-    text(ctx,'Pusula’nın Dönem Yorumu',leftX+27,1486,12,900,GREEN_DARK);
-    wrap(ctx,climateInterpretation(climate),leftX+27,1510,10.5,650,INK,leftW-55,1.25,4);
-    fittedText(ctx,'Kaynak: kayıtlı geçmiş hava · SL2P ölçümü yok',leftX+27,1559,leftW-54,8.5,750,MUTED);
+    text(ctx,'Not: Bunlar hesaplanmış ölçüm değil, kayıt önerileridir.',leftX+19,1568,9,750,GREEN_DARK);
   }
+
 
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
@@ -1022,32 +1021,33 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   }
 
   const hasIrrigationEvidence=ndmiValue!==null||need.mm!==null;
-  rr(ctx, midX, 512, midW, 204, 15, hasIrrigationEvidence?WHITE:'#f4f9ff', LINE);
-  sectionHeader(ctx, midX + 10, 520, 2,
-    hasIrrigationEvidence?'Su ve Sulama Analizi':'Su Yönetimi · Hava Kanıtları', BLUE, '●');
-  const waterCards = hasIrrigationEvidence ? [
-    { title: 'NDMI (bitki nem)', main: numericIndexText(ndmiValue),sub:'Toprak nem ölçümü değil',accent:BLUE},
-    { title: 'Sulama İhtiyacı', main:need.mm===null?'—':numTr(need.mm)+' mm',
-      sub:need.mm===null?'Model kanıtı eksik':'Kayıtlı su hesabı',accent:BLUE},
-    { title: 'Nem Eğilimi',main:valid(ndmiCmp.pct)?(ndmiCmp.pct < -5?'Azalıyor':ndmiCmp.pct > 5?'Artıyor':'Dengeli'):'—',
-      sub:valid(ndmiCmp.pct)?'İki dönem NDMI':'İki ölçüm gerekli',accent:GREEN},
-  ] : [
-    {title:'Dönem yağışı',main:climate.totalRain===null?'Eksik':numTr(climate.totalRain)+' mm',
-      sub:'Geçmiş hava kaydı',accent:BLUE},
-    {title:'Referans ET₀',main:climate.totalEt0===null?'Eksik':numTr(climate.totalEt0)+' mm',
-      sub:'Atmosferik talep',accent:TEAL},
-    {title:'Sulama kararı',main:'Hesaplanmadı',
-      sub:'Toprak ve ürün bilgisi gerekli',accent:ORANGE},
-  ];
-  waterCards.forEach((card, index) => {
-    const x = midX + 14 + index * 124;
-    rr(ctx, x, 566, 116, 132, 10, index === 0 ? BLUE_SOFT : index === 1 ? '#f3f8ff' : GREEN_SOFT, LINE);
-    ctx.textAlign = 'center';
-    fittedText(ctx, card.title, x + 58, 589, 104, 8.5, 750, MUTED);
-    fittedText(ctx, card.main, x + 58, 635, 101, 14, 900, card.accent);
-    ctx.textAlign = 'left';
-    wrap(ctx, card.sub, x + 9, 664, 9, 750, MUTED, 98, 1.2, 3);
-  });
+  rr(ctx,midX,512,midW,204,15,hasIrrigationEvidence?WHITE:'#f4f9ff',LINE);
+  sectionHeader(ctx,midX+10,520,2,
+    hasIrrigationEvidence?'Su ve Sulama Analizi':'Sulama Kararının Sınırları',BLUE,'●');
+  if(hasIrrigationEvidence){
+    const waterCards=[
+      {title:'NDMI (bitki nem)',main:numericIndexText(ndmiValue),sub:'Toprak nem sensörü değil',accent:BLUE},
+      {title:'Sulama İhtiyacı',main:need.mm===null?'—':numTr(need.mm)+' mm',sub:need.mm===null?'Model kanıtı eksik':'Kayıtlı model kararı',accent:BLUE},
+      {title:'Nem Eğilimi',main:valid(ndmiCmp.pct)?(ndmiCmp.pct < -5?'Azalıyor':ndmiCmp.pct>5?'Artıyor':'Dengeli'):'—',
+       sub:valid(ndmiCmp.pct)?'Dönem NDMI kıyası':'İki ölçüm gerekli',accent:GREEN},
+    ];
+    waterCards.forEach((card,index)=>{
+      const x=midX+14+index*124;
+      rr(ctx,x,566,116,132,10,index===0?BLUE_SOFT:index===1?'#f3f8ff':GREEN_SOFT,LINE);
+      ctx.textAlign='center';
+      fittedText(ctx,card.title,x+58,589,104,8.5,750,MUTED);
+      fittedText(ctx,card.main,x+58,635,101,14,900,card.accent);
+      ctx.textAlign='left';
+      wrap(ctx,card.sub,x+9,664,9,750,MUTED,98,1.2,3);
+    });
+  }else{
+    rr(ctx,midX+16,567,midW-32,129,11,WHITE,LINE);
+    text(ctx,'Kesin sulama miktarı hesaplanmadı.',midX+28,594,13,900,INK);
+    wrap(ctx,'Bu dönemde geçerli NDMI ve sulama modeli bulunmadığından hava toplamları su ihtiyacı olarak yeniden gösterilmez.',
+      midX+28,620,10.6,700,MUTED,midW-60,1.22,3);
+    fittedText(ctx,'Karar için: ürün evresi + toprak nemi + sulama kaydı',
+      midX+28,679,midW-60,10,850,BLUE);
+  }
 
   rr(ctx, midX, 726, midW, 210, 15, '#fffaf4', LINE);
   sectionHeader(ctx, midX + 10, 734, 3, 'Toprak ve Besin Analizi', '#a74627', '●');
