@@ -135,24 +135,26 @@ function revenueCatEntitlementActive(value: any) {
 
 function revenueCatPlanFromSubscriber(subscriber: any) {
   const entitlements = subscriber?.entitlements || {};
+  const premium = entitlements.tarlapusula_premium || entitlements.premium;
+  const plus = entitlements.tarlapusula_plus || entitlements.plus;
 
-  if (revenueCatEntitlementActive(entitlements.premium)) {
+  if (revenueCatEntitlementActive(premium)) {
     return {
       plan: "premium",
       productId:
-        String(entitlements.premium?.product_identifier || "").trim() || null,
+        String(premium?.product_identifier || "").trim() || null,
       expiresAt:
-        String(entitlements.premium?.expires_date || "").trim() || null,
+        String(premium?.expires_date || "").trim() || null,
     };
   }
 
-  if (revenueCatEntitlementActive(entitlements.plus)) {
+  if (revenueCatEntitlementActive(plus)) {
     return {
       plan: "plus",
       productId:
-        String(entitlements.plus?.product_identifier || "").trim() || null,
+        String(plus?.product_identifier || "").trim() || null,
       expiresAt:
-        String(entitlements.plus?.expires_date || "").trim() || null,
+        String(plus?.expires_date || "").trim() || null,
     };
   }
 
