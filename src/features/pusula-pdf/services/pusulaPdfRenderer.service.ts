@@ -805,73 +805,81 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, top + 8, 1, 'Bitki Sağlığı ve Gelişim Analizi', GREEN, '↑');
-  const chipY = top + 54;
-  ['NDVI', 'NDRE', 'GNDVI', 'SAVI'].forEach((label, index) => {
-    const active = index === 0;
-    rr(ctx, midX + 18 + index * 71, chipY, 64, 25, 12, active ? GREEN : WHITE, active ? GREEN : LINE);
-    ctx.textAlign = 'center';
-    text(ctx, label, midX + 50 + index * 71, chipY + 17, 9, 850, active ? WHITE : MUTED);
-    ctx.textAlign = 'left';
+  text(ctx, 'Gerçek sayısal ölçümler · tarih ve kaynak doğrulaması', midX + 18, top + 55, 9.5, 700, MUTED);
+  const vegCardW = 86;
+  VEGETATION_INDICES.forEach((item, index) => {
+    const x = midX + 17 + index * 93;
+    const series = knownSeries(sat, item.key);
+    const value = series.at(-1)?.[item.key] ?? null;
+    rr(ctx, x, top + 69, vegCardW, 91, 10, index % 2 === 0 ? GREEN_SOFT : BLUE_SOFT, LINE);
+    text(ctx, item.label, x + 9, top + 91, 11, 900, item.color);
+    text(ctx, numericIndexText(value), x + 9, top + 117, valid(value) ? 16 : 10, 900, INK);
+    text(ctx, series.length ? fmt(series.at(-1)?.date, false) : 'Kaynak yok', x + 9, top + 142, 9, 650, MUTED);
   });
-  chart(ctx, midX + 10, top + 84, 235, 174, sat);
-  await drawImage(ctx, latest?.ndviImage, midX + 255, top + 105, 116, 142, { radius: 8, placeholder: 'NDVI yok' });
-  text(ctx, 'NDVI Haritası', midX + 257, top + 265, 9.5, 850, INK);
-  text(ctx, latest ? fmt(latest.date, false) : '—', midX + 257, top + 280, 8.5, 650, MUTED);
-
-  const miniY = top + 294;
-  const miniW = 86;
-  const miniGap = 7;
-  const growth = valid(ndviCmp.pct) ? (ndviCmp.pct >= 3 ? 'Artışta' : ndviCmp.pct <= -3 ? 'Geriliyor' : 'Dengeli') : 'Takip';
-  const stress = guidance.insights.find((item) => item.id === 'multi-stress-synthesis-evidence');
-  const stressStatus = stress ? shortStatus(stress.confidence, 'Takip') : 'Düşük';
-  [
-    ['Bitki Yoğunluğu', valid(latest?.ndvi) && (latest?.ndvi as number) >= 0.55 ? 'İyi' : 'Takip', GREEN_SOFT, GREEN],
-    ['Gelişim Trendi', growth, GREEN_SOFT, GREEN],
-    ['Stres Seviyesi', stressStatus, ORANGE_SOFT, ORANGE],
-    ['Vigor', valid(latest?.ndvi) && (latest?.ndvi as number) >= 0.5 ? 'Sağlıklı' : 'Takip', GREEN_SOFT, GREEN],
-  ].forEach(([label, value, soft, accent], index) => {
-    rr(ctx, midX + 18 + index * (miniW + miniGap), miniY, miniW, 75, 9, soft, soft);
-    ctx.textAlign = 'center';
-    text(ctx, label, midX + 18 + index * (miniW + miniGap) + miniW / 2, miniY + 31, 8.5, 750, MUTED);
-    text(ctx, value, midX + 18 + index * (miniW + miniGap) + miniW / 2, miniY + 55, 12, 900, accent);
-    ctx.textAlign = 'left';
+  // Multi-index trend: each line uses its own real observations; never interpolate empty dates.
+  chart(ctx, midX + 18, top + 169, midW - 36, 130, sat);
+  VEGETATION_INDICES.forEach((item, index) => {
+    const col = index % 2, row = Math.floor(index / 2);
+    const x = midX + 19 + col * 185;
+    const yy = top + 316 + row * 29;
+    rr(ctx, x, yy - 11, 174, 27, 7, index % 2 === 0 ? GREEN_SOFT : BLUE_SOFT, '');
+    text(ctx, item.label, x + 7, yy + 2, 9, 900, item.color);
+    text(ctx, item.meaning, x + 52, yy + 2, 8.5, 650, INK);
   });
 
   rr(ctx, midX, 512, midW, 204, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 520, 2, 'Su ve Sulama Analizi', BLUE, '●');
   const waterCards = [
-    { title: 'Toprak Nem Seviyesi', value: ndmiPercent, main: ndmiPercent === null ? '—' : `%${Math.round(ndmiPercent)}`, sub: ndmiPercent === null ? 'Veri yok' : ndmiPercent >= 45 ? 'Yeterli' : 'Kontrol', accent: BLUE },
-    { title: 'Sulama İhtiyacı', value: need.mm === null ? null : clamp(need.mm * 2, 0, 100), main: need.text, sub: 'Karar motoru', accent: BLUE },
-    { title: 'Su Dengesi', value: valid(ndmiCmp.pct) ? clamp(50 + ndmiCmp.pct, 0, 100) : null, main: valid(ndmiCmp.pct) && ndmiCmp.pct < -5 ? 'Azalıyor' : 'Dengede', sub: valid(ndmiCmp.pct) ? `${ndmiCmp.pct >= 0 ? '+' : ''}%${ndmiCmp.pct.toFixed(0)}` : 'Trend bekleniyor', accent: GREEN },
+    { title: 'NDMI (bitki nem)', value: null, main: numericIndexText(ndmiValue), sub: 'Toprak nem ölçümü değil', accent: BLUE },
+    { title: 'Sulama İhtiyacı', value: null, main: need.mm === null ? '—' : `${need.mm.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} mm`, sub: need.mm === null ? 'Model verisi eksik' : 'Hesaplanan net su', accent: BLUE },
+    { title: 'Nem Eğilimi', value: null, main: valid(ndmiCmp.pct) ? (ndmiCmp.pct < -5 ? 'Azalıyor' : ndmiCmp.pct > 5 ? 'Artıyor' : 'Dengeli') : '—', sub: valid(ndmiCmp.pct) ? 'İki dönem karşılaştırıldı' : 'İki ölçüm gerekiyor', accent: GREEN },
   ];
   waterCards.forEach((card, index) => {
     const x = midX + 14 + index * 124;
     rr(ctx, x, 566, 116, 132, 10, index === 0 ? BLUE_SOFT : index === 1 ? '#f3f8ff' : GREEN_SOFT, LINE);
     ctx.textAlign = 'center';
     text(ctx, card.title, x + 58, 589, 8.5, 750, MUTED);
-    if (index === 0) donut(ctx, x + 58, 635, 34, card.value, card.accent);
-    else text(ctx, card.main, x + 58, 645, index === 1 ? 14 : 17, 900, card.accent);
-    text(ctx, card.sub, x + 58, 682, 9, 850, index === 1 ? INK : card.accent);
+    text(ctx, card.main, x + 58, 635, 14, 900, card.accent);
+    wrap(ctx, card.sub, x + 8, 664, 9, 750, MUTED, 100, 1.2, 3);
     ctx.textAlign = 'left';
   });
 
   rr(ctx, midX, 726, midW, 210, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 734, 3, 'Toprak ve Besin Analizi', '#a74627', '●');
-  if (soilRows.length) {
+  // Laboratory samples remain authoritative; SoilGrids is explicitly a 250m model estimate.
+  if (soilRows.length && soilRows.some((row) => row.value !== null)) {
     soilRows.forEach((row, index) => {
-      const yy = 785 + index * 31;
+      const yy = 782 + index * 33;
       text(ctx, row.label, midX + 18, yy, 9.5, 750, INK);
-      progressBar(ctx, midX + 105, yy - 10, 110, row.value, row.accent);
-      text(ctx, row.text, midX + 226, yy, 9, 850, row.value === null ? MUTED : row.accent);
+      progressBar(ctx, midX + 101, yy - 10, 110, row.value, row.accent);
+      text(ctx, row.text, midX + 221, yy, 9, 850, row.value === null ? MUTED : row.accent);
     });
+  } else if (soilGrids.available) {
+    text(ctx, 'SoilGrids · 0–30 cm · 250 m tahmin', midX + 18, 782, 10, 900, GREEN_DARK);
+    const soilMetrics = [
+      ['pH', soilGrids.ph === null ? '—' : soilGrids.ph.toLocaleString('tr-TR', { maximumFractionDigits: 1 })],
+      ['Organik C', soilGrids.carbon === null ? '—' : `${soilGrids.carbon.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} g/kg`],
+      ['Kil / kum / silt', [soilGrids.clay,soilGrids.sand,soilGrids.silt].every(valid)
+        ? `${Math.round(soilGrids.clay!)} / ${Math.round(soilGrids.sand!)} / ${Math.round(soilGrids.silt!)} %` : '—'],
+    ];
+    soilMetrics.forEach(([label, value], index) => {
+      const yy = 815 + index * 31;
+      text(ctx, label, midX + 18, yy, 10, 700, MUTED);
+      text(ctx, value, midX + 106, yy, 10, 900, INK);
+    });
+    wrap(ctx, 'Laboratuvar değildir. Gübre dozu ve su kapasitesi hesaplanmaz.',
+      midX + 18, 914, 9, 700, MUTED, 234, 1.18, 2);
   } else {
-    text(ctx, 'Laboratuvar analizi bekleniyor', midX + 18, 808, 11, 850, MUTED);
-    wrap(ctx, 'Toprak/Besin motoru bağlıdır; ölçüm olmadan N-P-K değeri uydurulmaz.', midX + 18, 834, 10.5, 650, MUTED, 230, 1.3, 4);
+    text(ctx, 'Toprak model ölçümü bekleniyor', midX + 18, 809, 10, 850, MUTED);
+    wrap(ctx, 'Uygun veri gelmeden besin miktarı ve pH tahmini yapılmaz.',
+      midX + 18, 841, 9.5, 650, MUTED, 232, 1.25, 3);
   }
   rr(ctx, midX + 260, 784, 112, 130, 9, ORANGE_SOFT, '#f4dfba');
-  text(ctx, 'Toprak Özeti', midX + 272, 806, 10, 900, INK);
-  const soilInsight = guidance.insights.find((item) => item.id === 'soil-intelligence-evidence' || item.id === 'nutrition-decision-guard-evidence');
-  wrap(ctx, soilInsight?.meaning ?? 'Toprak kararı gerçek analiz veya doğrulanmış kaynak geldiğinde güçlenir.', midX + 272, 831, 9.5, 650, MUTED, 88, 1.25, 6);
+  text(ctx, 'Toprak Kararı', midX + 272, 806, 10, 900, INK);
+  wrap(ctx, soilGrids.available
+    ? 'SoilGrids yalnız bölgesel referanstır. Parsel gübreleme planı için laboratuvar analizi ekle.'
+    : 'Doğrulanmış ölçüm olmadan besin dozu önerilmez.',
+    midX + 272, 831, 9.5, 650, MUTED, 90, 1.25, 7);
 
   rr(ctx, midX, 946, midW, 250, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 954, 4, 'Hava ve İklim Analizi', BLUE, '☀');
