@@ -9,14 +9,15 @@ import {
 import { onboardingStyles } from '../../styles/onboardingStyles';
 import type { UnifiedClimateContext } from '../../features/weather/hooks/useAppWeatherData';
 import { useEntitlementStore } from '../../entitlements/useEntitlementStore';
-import { getCurrentWeeklyPusulaReport, getPusulaPdfCycleState, listPusulaPdfReports, type PusulaPdfHistoryItem } from '../../features/pusula-pdf/services/pusulaPdfData.service';
+import { listPusulaPdfReports, type PusulaPdfHistoryItem } from '../../features/pusula-pdf/services/pusulaPdfData.service';
+import { presetReportPeriod, reportPeriodValidation, todayLocalIso, type PusulaPdfPeriodPreset } from '../../features/pusula-pdf/services/pusulaPdfPeriod.service';
+import { supabase } from '../../supabaseClient';
 import { openArchivedPusulaPdf } from '../../features/pusula-pdf/services/pusulaPdfArchive.service';
 import { canSavePusulaPdfLocally, getSavedPusulaPdf } from '../../features/pusula-pdf/services/pusulaPdfLocalFile.service';
 import { getPusulaPdfJob, requestPusulaPdf, subscribePusulaPdfJob } from '../../features/pusula-pdf/services/pusulaPdfJob.service';
 import { PUSULAPDF_STAGE_LABEL, type PusulaPdfJob } from '../../features/pusula-pdf/types.async';
 import type { WeeklyPusulaReport } from '../../features/pusula-pdf/types';
 import OfficialVerificationCard from '../../features/official-verification/components/OfficialVerificationCard';
-import QuickCalendarButton from '../../features/calendar/components/QuickCalendarButton';
 import type {
   AiAccessStatus,
   AiFieldAnalysis,
@@ -1108,19 +1109,19 @@ export default function AiAnalysisScreen({
   }, [pusulaPdfReport?.id]);
   const [pusulaPdfHistory, setPusulaPdfHistory] = useState<PusulaPdfHistoryItem[]>([]);
   const [pusulaPdfHistoryOpen, setPusulaPdfHistoryOpen] = useState(false);
-  const [pusulaPdfNextAt, setPusulaPdfNextAt] = useState<string | null>(null);
+  const [pusulaPdfPeriodPreset, setPusulaPdfPeriodPreset] = useState<PusulaPdfPeriodPreset>('7');
+  const [pusulaPdfCustomStart, setPusulaPdfCustomStart] = useState(() => presetReportPeriod('30').start);
+  const [pusulaPdfCustomEnd, setPusulaPdfCustomEnd] = useState(() => todayLocalIso());
+  const pusulaPdfSelectedPeriod = pusulaPdfPeriodPreset === 'custom'
+    ? { start: pusulaPdfCustomStart, end: pusulaPdfCustomEnd }
+    : presetReportPeriod(pusulaPdfPeriodPreset);
+  const pusulaPdfPeriodError = reportPeriodValidation(pusulaPdfSelectedPeriod.start, pusulaPdfSelectedPeriod.end);
 
-  const pusulaPdfProgress: Record<PusulaPdfJob['stage'], number> = {
-    queued: 5,
-    collecting: 15,
-    satellite: 35,
-    weather: 50,
-    field_memory: 65,
-    interpreting: 80,
-    rendering: 95,
-    ready: 100,
-    failed: 0,
-  };
+  const pusulaPdfStages: PusulaPdfJob['stage'][] = [
+    'queued', 'collecting', 'satellite', 'weather', 'field_memory', 'interpreting', 'rendering',
+  ];
+  const currentJobStageIndex = pusulaPdfStages.indexOf(pusulaPdfJob?.stage ?? 'queued');
+  const completedStages = Math.max(0, currentJobStageIndex);
 
   const pusulaPdfMissingLabels: Record<string, string> = {
     parcel_geometry: 'Parsel geometrisi',
@@ -1198,50 +1199,26 @@ export default function AiAnalysisScreen({
     }
   };
 
-  const queuePusulaPdf = async (refreshMeasurements = false) => {
+  const queuePusulaPdf = async () => {
     if (!isPremiumPlan) { setPremiumInfoOpen(true); return; }
     if (!synthesisField?.id || pusulaPdfStatus === 'loading') return;
-
-    try {
-      const cycle = await getPusulaPdfCycleState(String(synthesisField.id));
-      setPusulaPdfNextAt(cycle.nextReportAt);
-      if (!refreshMeasurements && !cycle.canCreateNew && cycle.latest) {
-        setPusulaPdfReport(cycle.latest);
-        setPusulaPdfStatus('ready');
-        setPusulaPdfHistory(await listPusulaPdfReports(String(synthesisField.id)));
-        return;
-      }
-    } catch (error) {
-      console.warn('[PUSULAPDF] 7 günlük döngü kontrolü alınamadı:', error);
+    if (pusulaPdfPeriodError) {
+      setPusulaPdfError(pusulaPdfPeriodError);
+      setPusulaPdfStatus('error');
+      return;
     }
-
     setPusulaPdfStatus('loading');
     setPusulaPdfError('');
     setPusulaPdfReport(null);
-
     try {
-      const request = await requestPusulaPdf(String(synthesisField.id));
-      setPusulaPdfJob({
-        id: request.job_id,
-        user_id: '',
-        field_id: String(synthesisField.id),
-        report_id: request.report_id,
-        stage: 'queued',
-        status: 'queued',
-        attempts: 0,
-        max_attempts: 3,
-        error_code: null,
-        error_message: null,
-        progress_meta: {},
-        created_at: new Date().toISOString(),
-        started_at: null,
-        finished_at: null,
-        updated_at: new Date().toISOString(),
-      });
+      const request = await requestPusulaPdf(String(synthesisField.id), pusulaPdfSelectedPeriod);
+      // A resumed job may already be several stages in: ask the server.
+      const job = await getPusulaPdfJob(request.job_id);
+      setPusulaPdfJob(job);
     } catch (error) {
-      console.error('[PUSULAPDF] Kuyruğa alınamadı:', error);
+      console.error('[PUSULAPDF] Rapor isteği başlatılamadı:', error);
       setPusulaPdfJob(null);
-      setPusulaPdfError(error instanceof Error ? error.message : 'PUSULAPDF kuyruğa alınamadı.');
+      setPusulaPdfError(error instanceof Error ? error.message : 'Rapor isteği başlatılamadı.');
       setPusulaPdfStatus('error');
     }
   };
@@ -1291,11 +1268,18 @@ export default function AiAnalysisScreen({
 
     if (!synthesisField?.id) return;
     let cancelled = false;
-    void getCurrentWeeklyPusulaReport(String(synthesisField.id))
-      .then((report) => {
-        if (cancelled || !report) return;
-        setPusulaPdfReport(report);
+    void supabase.from('weekly_field_reports').select('*')
+      .eq('id', String(pusulaPdfJob.report_id ?? ''))
+      .eq('field_id', String(synthesisField.id))
+      .eq('status','ready')
+      .single()
+      .then(({ data: report, error }) => {
+        if (cancelled) return;
+        if (error || !report) throw error ?? new Error('Tamamlanan rapor bulunamadı.');
+        setPusulaPdfReport(report as WeeklyPusulaReport);
         setPusulaPdfStatus('ready');
+        void listPusulaPdfReports(String(synthesisField.id))
+          .then((items) => { if (!cancelled) setPusulaPdfHistory(items); });
       })
       .catch((error) => {
         if (cancelled) return;
@@ -1310,22 +1294,29 @@ export default function AiAnalysisScreen({
   useEffect(() => {
     if (!synthesisField?.id || !isPremiumPlan) {
       setPusulaPdfHistory([]);
-      setPusulaPdfNextAt(null);
       return;
     }
     let cancelled = false;
-    void Promise.all([
-      listPusulaPdfReports(String(synthesisField.id)),
-      getPusulaPdfCycleState(String(synthesisField.id)),
-    ]).then(([history, cycle]) => {
-      if (cancelled) return;
-      setPusulaPdfHistory(history);
-      setPusulaPdfNextAt(cycle.nextReportAt);
-      if (cycle.latest && !cycle.canCreateNew) {
-        setPusulaPdfReport(cycle.latest);
-        setPusulaPdfStatus('ready');
+    const fieldId = String(synthesisField.id);
+    void listPusulaPdfReports(fieldId).then((history) => {
+      if (!cancelled) {
+        setPusulaPdfHistory(history);
+        if (history.length) {
+          setPusulaPdfReport(history[0]);
+          setPusulaPdfStatus((prior) => prior === 'loading' ? prior : 'ready');
+        }
       }
     }).catch((error) => console.warn('[PUSULAPDF] Rapor geçmişi alınamadı:', error));
+    // If user returns to the screen while processing, attach to the existing
+    // job instead of initiating another worker or losing the live status.
+    void supabase.from('pusulapdf_jobs').select('*').eq('field_id',fieldId)
+      .in('status',['queued','processing'])
+      .order('created_at',{ascending:false}).limit(1).maybeSingle()
+      .then(({data}) => {
+        if (cancelled || !data) return;
+        setPusulaPdfJob(data as PusulaPdfJob);
+        setPusulaPdfStatus('loading');
+      });
     return () => { cancelled = true; };
   }, [synthesisField?.id, isPremiumPlan]);
 
