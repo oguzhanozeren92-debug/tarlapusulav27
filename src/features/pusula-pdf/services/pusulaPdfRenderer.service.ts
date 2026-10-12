@@ -669,8 +669,21 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const stage = phenologyLabel(snapshot, guidance);
   const location = [snapshot.field.city, snapshot.field.district].filter(Boolean).join(' / ') || 'Konum kaydı yok';
 
-  // Header
-  rr(ctx, 12, 12, 1216, 94, 15, WHITE, LINE);
+  // Print-safe header: a fixed, subtle topographic motif, with protected
+  // logo and metadata zones. Draw decoration before any text.
+  rr(ctx, 12, 12, 1216, 94, 15, '#f4f9f8', LINE);
+  ctx.save();
+  ctx.beginPath();ctx.roundRect(12,12,1216,94,15);ctx.clip();
+  ctx.strokeStyle='rgba(29,116,88,.10)';ctx.lineWidth=1.5;
+  for(let n=0;n<11;n++){
+    const offset=n*26;
+    ctx.beginPath();ctx.moveTo(310+offset,12);
+    ctx.bezierCurveTo(390+offset,35,350+offset,88,480+offset,108);ctx.stroke();
+  }
+  ctx.restore();
+  rr(ctx, 25, 21, 319, 76, 11, 'rgba(255,255,255,.86)', '');
+  rr(ctx, 355, 21, 311, 76, 11, 'rgba(255,255,255,.78)', '');
+  rr(ctx, 674, 21, 539, 76, 11, 'rgba(255,255,255,.85)', '');
   await logo(ctx, 50, 59);
   fittedText(ctx, 'Tarım Analiz Raporu', 372, 48, 280, 19, 900, INK);
   text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 72, 10.5, 650, MUTED);
@@ -772,16 +785,16 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     row.date && row.date>=snapshot.period.start && row.date<=snapshot.period.end);
   const bioQuality=String(bio?.qc?.quality??'unknown').toLowerCase();
   const bioProof=bio
-    ? ('SL2P · '+fmt(bio.date,false)+' · '+(bioQuality==='high'?'Yüksek kalite':bioQuality==='medium'?'Orta kalite':'Ön değerlendirme'))
-    : 'Seçilen dönem için SL2P kayıtlı değil';
+    ? ('SL2P · '+fmt(bio.date,false)+' · '+(bioQuality==='high'?'Yüksek kalite':bioQuality==='medium'?'Orta kalite':'Düşük güven, yalnız ön inceleme'))
+    : 'Bu dönemde ölçüm arşivi yok; farklı tarihlerden değer taşınmadı.';
   text(ctx, bioProof, leftX + 18, 1212, 9.5, 750, MUTED);
   BIO_METRICS.forEach((item,index)=>{
     const col=index%3,row=Math.floor(index/3);
     const x=leftX+15+col*129, y=1227+row*112;
     rr(ctx,x,y,119,101,10,item.soft,LINE);
-    text(ctx,item.title,x+9,y+22,10.3,800,INK);
+    fittedText(ctx,item.title,x+9,y+22,101,10.3,800,INK);
     const number=bio?.metrics?.[item.key];
-    text(ctx,bioValue(item,number),x+9,y+55,number==null?11:18,900,item.accent);
+    fittedText(ctx,bioValue(item,number),x+9,y+55,102,number==null?11:18,900,item.accent);
     text(ctx,item.unit==='%'?'Model yüzdesi':item.unit,x+9,y+80,8.6,700,MUTED);
   });
   rr(ctx,leftX+15,1458,leftW-30,111,11,WHITE,LINE);
@@ -838,10 +851,10 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     const x = midX + 14 + index * 124;
     rr(ctx, x, 566, 116, 132, 10, index === 0 ? BLUE_SOFT : index === 1 ? '#f3f8ff' : GREEN_SOFT, LINE);
     ctx.textAlign = 'center';
-    text(ctx, card.title, x + 58, 589, 8.5, 750, MUTED);
-    text(ctx, card.main, x + 58, 635, 14, 900, card.accent);
-    wrap(ctx, card.sub, x + 8, 664, 9, 750, MUTED, 100, 1.2, 3);
+    fittedText(ctx, card.title, x + 58, 589, 104, 8.5, 750, MUTED);
+    fittedText(ctx, card.main, x + 58, 635, 101, 14, 900, card.accent);
     ctx.textAlign = 'left';
+    wrap(ctx, card.sub, x + 9, 664, 9, 750, MUTED, 98, 1.2, 3);
   });
 
   rr(ctx, midX, 726, midW, 210, 15, WHITE, LINE);
@@ -979,11 +992,11 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     const x = rightX + 14 + index * 124;
     rr(ctx, x, 655, 116, 145, 10, GRAY_SOFT, LINE);
     ctx.textAlign = 'center';
-    text(ctx, titleValue, x + 58, 680, 9.5, 800, MUTED);
+    fittedText(ctx, titleValue, x + 58, 680, 103, 9.5, 800, MUTED);
     const large = String(value).length <= 11;
-    text(ctx, value, x + 58, 727, large ? 17 : 11, 900, accent);
-    wrap(ctx, sub, x + 10, 758, 9, 750, MUTED, 95, 1.2, 3);
+    fittedText(ctx, value, x + 58, 727, 102, large ? 17 : 11, 900, accent);
     ctx.textAlign = 'left';
+    wrap(ctx, sub, x + 10, 758, 9, 750, MUTED, 95, 1.2, 3);
   });
 
   rr(ctx, rightX, 830, rightW, 330, 15, '#fbf8ff', LINE);
@@ -1040,8 +1053,19 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   wrap(ctx,'Veriye dayalı kararlarla daha güçlü yarınlar.',rightX+92,1521,12,800,WHITE,rightW-111,1.2,2);
   text(ctx,'Uydu · Toprak · Hava · Saha',rightX+22,1570,10,700,'#d6eee5');
 
-  // Premium footer — social + QR
-  rr(ctx, 12, 1604, 1216, 138, 15, WHITE, LINE);
+  // Branded footer; social contacts remain on dedicated contrast surfaces.
+  rr(ctx, 12, 1604, 1216, 138, 15, '#f0f6f3', LINE);
+  ctx.save();ctx.beginPath();ctx.roundRect(12,1604,1216,138,15);ctx.clip();
+  ctx.fillStyle='rgba(31,117,83,.065)';
+  for(let i=0;i<9;i++){
+    ctx.beginPath();const x=90+i*158;
+    ctx.moveTo(x,1604);ctx.lineTo(x+89,1604);
+    ctx.lineTo(x-23,1742);ctx.lineTo(x-101,1742);ctx.fill();
+  }
+  ctx.restore();
+  rr(ctx, 27, 1617, 244, 111, 12, 'rgba(255,255,255,.80)', '');
+  rr(ctx, 277, 1617, 541, 111, 12, 'rgba(255,255,255,.70)', '');
+  rr(ctx, 835, 1617, 377, 111, 12, 'rgba(255,255,255,.84)', '');
   await logo(ctx, 52, 1660, true);
   footerSocial(ctx, 286, 1634, '◎', '#e1306c', 'Instagram', '@tarlapusula');
   footerSocial(ctx, 465, 1634, 'f', '#1877f2', 'Facebook', 'tarlapusula');
