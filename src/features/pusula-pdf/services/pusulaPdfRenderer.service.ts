@@ -842,6 +842,17 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const lastMeasured = knownSeries(sat, 'ndvi').at(-1);
   const lastNdmi = [...sat].filter((p) => valid(p.ndmi)).at(-1);
   const ndmiValue = lastNdmi?.ndmi ?? null;
+  if(!hasSatelliteMeasurements){
+    summaryCard(ctx,leftX+8,statY,statW,'Hava Kapsamı',
+      `${climate.observedDays}/${climate.days}`,'Kayıtlı gün',BLUE,BLUE_SOFT,'●');
+    summaryCard(ctx,leftX+8+statW+statGap,statY,statW,'Dönem Yağışı',
+      climate.totalRain===null?'—':numTr(climate.totalRain)+' mm',
+      'Kayıtlı yağış',TEAL,GREEN_SOFT,'●');
+    summaryCard(ctx,leftX+8+(statW+statGap)*2,statY,statW,'Uydu Ölçümü',
+      '0 indeks','Tarihler mevcut',ORANGE,ORANGE_SOFT,'!');
+    summaryCard(ctx,leftX+8+(statW+statGap)*3,statY,statW,'Ürün',
+      snapshot.field.crop??'Kayıtsız','Tarla kaydı',GREEN,GREEN_SOFT,'✓');
+  }else{
   summaryCard(ctx, leftX + 8, statY, statW, health === null ? 'Bitki Canlılığı':'Tarla Sağlığı',
     health === null ? numericIndexText(lastMeasured?.ndvi) : `${Math.round(health)}/100`,
     health === null ? (lastMeasured ? 'NDVI · uydu' : 'Dönem ölçümü yok') : 'Gerçek sağlık skoru',
@@ -853,14 +864,34 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     lastNdmi ? 'NDMI · uydu' : 'Dönemde kayıt yok', BLUE, BLUE_SOFT, '●');
   summaryCard(ctx, leftX + 8 + (statW + statGap) * 3, statY, statW, 'Gelişim Evresi',
     stage.value, stage.sub, GREEN, GREEN_SOFT, '↑');
+  }
 
   rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
-  text(ctx, 'Uydu Geçmişi ve Karşılaştırma', leftX + 16, 691, 17, 900, INK);
+  text(ctx, hasSatelliteMeasurements?'Uydu Geçmişi ve Karşılaştırma':'Uydu Arşivi ve Ölçüm Kapsamı', leftX + 16, 691, 17, 900, INK);
   const numericDates = [...new Set(sat.filter((p) => VEGETATION_INDICES.some((v) => valid(p[v.key]))).map((p) => p.date))];
-  text(ctx, `${numericDates.length} doğrulanmış sayısal ölçüm · ${sat.length} görüntü tarihi`,
+  text(ctx, `${numericDates.length} geçerli indeks tarihi · ${sat.length} sahne/kontrol tarihi`,
     leftX + 16, 712, 10, 750, MUTED);
-  chart(ctx, leftX + 14, 717, leftW - 28, 151, sat);
-  text(ctx, 'NDVI • NDRE • GNDVI • SAVI', leftX + 16, 891, 9.8, 800, GREEN_DARK);
+  if(hasSatelliteMeasurements){
+    chart(ctx, leftX + 14, 717, leftW - 28, 151, sat);
+  }else{
+    rr(ctx,leftX+14,731,leftW-28,145,10,'#f3f8fa',LINE);
+    const sceneDates=[...new Set(sat.map(p=>p.date))].sort();
+    if(sceneDates.length){
+      fittedText(ctx,`Kontrol edilen dönem: ${fmt(sceneDates[0],false)} – ${fmt(sceneDates.at(-1)!,false)}`,
+        leftX+28,754,leftW-56,10.2,800,INK);
+      sceneDates.slice(0,14).forEach((d,i)=>{
+        const x=leftX+28+i*24;
+        ctx.beginPath();ctx.fillStyle='#9fadb4';ctx.arc(x,785,4,0,Math.PI*2);ctx.fill();
+      });
+      wrap(ctx,'Uydu sahne tarihleri mevcut; bu döneme ait parsel ortalaması sayısal olarak arşivlenmemiş. Görüntü sayısı ölçüm değildir.',
+        leftX+28,816,10.8,750,INK,leftW-57,1.25,3);
+    }else{
+      wrap(ctx,'Seçilen tarihler için kaydedilmiş uydu sahnesi yok. Hava geçmişi varsa rapor onunla hazırlanır.',
+        leftX+28,779,11.5,750,INK,leftW-56,1.28,3);
+    }
+  }
+  text(ctx, hasSatelliteMeasurements?'NDVI • NDRE • GNDVI • SAVI':'İndeksler: sayısal parsel ölçümü gerekli',
+    leftX + 16, 891, 9.8, 800, GREEN_DARK);
 
   rr(ctx, leftX, 914, leftW, 230, 15, PURPLE_SOFT, '#e4d6fb');
   circleIcon(ctx, leftX + 34, 945, 18, PURPLE, '✦', WHITE, 14);
@@ -882,7 +913,9 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   }
   const summary=narrative?.summary || guidance.weeklySummary;
   wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 10.8, 650, INK, leftW - 40, 1.27, 6);
-  const action = guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
+  const action = !hasSatelliteMeasurements
+    ? 'Bu dönem uydu indeksleri sayısal değil; gerçek NDVI ve diğer katmanlar için yeni tarihli parsel analizi gerekir.'
+    : guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
   rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
   text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
   wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
