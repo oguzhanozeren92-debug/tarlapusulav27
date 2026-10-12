@@ -1831,56 +1831,81 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 <div className="tp-ai-tool-card-head">
                   <div>
                     <span className="tp-ai-tool-kicker">PUSULAPDF</span>
-                    <strong>7 Günlük Tarla Raporu</strong>
+                    <strong>Tarla Analiz Raporu</strong>
                     <small>
-                      Uydu, hava, sulama, risk ve tarla kayıtlarını tek raporda birleştirir. Hazır olduğunda Pusula haber verir; raporu açabilir, paylaşabilir ve cihazında saklayabilirsin.
+                      Uydu, hava, toprak, risk ve saha kayıtlarını seçtiğin dönemde
+                      birleştirir. Veriler doğrulanır; rapor hazır olduğunda Pusula sana haber verir.
                     </small>
                   </div>
                   {!isPremiumPlan ? <b className="tp-premium-badge">PREMIUM</b> : null}
                 </div>
 
+                <div className="tp-pdf-period-picker">
+                  <strong className="tp-pdf-period-label">Rapor dönemi</strong>
+                  <div className="tp-pdf-period-options" role="group" aria-label="Rapor dönemi seç">
+                    {([
+                      ['7', '7 Gün'],
+                      ['14', '14 Gün'],
+                      ['30', '30 Gün'],
+                      ['custom', 'Tarih Seç'],
+                    ] as const).map(([option, label]) => (
+                      <button
+                        key={option}
+                        type="button"
+                        disabled={pusulaPdfStatus === 'loading'}
+                        className={`tp-pdf-period-option${pusulaPdfPeriodPreset === option ? ' is-selected' : ''}`}
+                        aria-pressed={pusulaPdfPeriodPreset === option}
+                        onClick={() => setPusulaPdfPeriodPreset(option)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {pusulaPdfPeriodPreset === 'custom' ? (
+                    <div className="tp-pdf-custom-dates">
+                      <label>
+                        Başlangıç tarihi
+                        <input type="date" value={pusulaPdfCustomStart}
+                          max={todayLocalIso()}
+                          disabled={pusulaPdfStatus === 'loading'}
+                          onChange={(event) => setPusulaPdfCustomStart(event.target.value)} />
+                      </label>
+                      <label>
+                        Bitiş tarihi
+                        <input type="date" value={pusulaPdfCustomEnd}
+                          max={todayLocalIso()}
+                          disabled={pusulaPdfStatus === 'loading'}
+                          onChange={(event) => setPusulaPdfCustomEnd(event.target.value)} />
+                      </label>
+                    </div>
+                  ) : null}
+                  <small className="tp-pdf-selected-range">
+                    {pusulaPdfSelectedPeriod.start && pusulaPdfSelectedPeriod.end
+                      ? `${formatPusulaPdfDate(pusulaPdfSelectedPeriod.start)} – ${formatPusulaPdfDate(pusulaPdfSelectedPeriod.end)}`
+                      : 'Başlangıç ve bitiş tarihini seç.'}
+                    {' · '}En az 7 gün, en fazla 180 gün.
+                  </small>
+                  {pusulaPdfPeriodError ? <small className="tp-pdf-period-error" role="alert">{pusulaPdfPeriodError}</small> : null}
+                </div>
+
                 <button
                   type="button"
-                  className="tp-ai-tool-primary"
+                  className="tp-ai-tool-primary tp-pdf-request-button"
                   onClick={() => void queuePusulaPdf()}
-                  disabled={synthesisLoading || !synthesisField || pusulaPdfStatus === 'loading'}
+                  disabled={synthesisLoading || !synthesisField || pusulaPdfStatus === 'loading' || Boolean(pusulaPdfPeriodError)}
                   aria-disabled={pusulaPdfStatus === 'loading'}
                 >
                   <span>✦</span>
                   <span className="tp-ai-tool-primary-copy">
-                    <strong>
-                      {pusulaPdfStatus === 'loading'
-                        ? (pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : '7 günlük rapor hazırlanıyor')
-                        : pusulaPdfStatus === 'ready'
-                          ? '7 günlük raporun hazır'
-                          : '7 günlük raporu hazırla'}
-                    </strong>
+                    <strong>{pusulaPdfStatus === 'loading' ? 'Rapor hazırlanıyor' : 'Rapor Al'}</strong>
                     <small>
                       {pusulaPdfStatus === 'loading'
-                        ? 'Hazırlama arka planda sürüyor.'
-                        : pusulaPdfStatus === 'ready'
-                          ? (pusulaPdfNextAt
-                              ? `Yeni rapor ${new Date(pusulaPdfNextAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} tarihinden sonra hazırlanabilir.`
-                              : 'Bu rapor son 7 günlük dönemi kapsıyor.')
-                          : 'Uydu, hava, toprak, sulama, risk ve tarla kayıtlarını birleştirir.'}
+                        ? 'Veri kontrolü sürüyor. Bu ekrandan çıkabilirsin.'
+                        : 'Eksik veya hatalı ölçüm uydurulmaz; işlem gerekirse daha uzun sürer.'}
                     </small>
                   </span>
                 </button>
 
-                {isPremiumPlan && synthesisField?.id && pusulaPdfStatus === 'ready' ? (
-                  <button
-                    type="button"
-                    className="tp-ai-tool-history"
-                    onClick={() => void queuePusulaPdf(true)}
-                    disabled={synthesisLoading}
-                    title="Copernicus sayısal ölçümlerini yeniden analiz eder"
-                  >
-                    <span>↻</span>
-                    <strong>Gerçek verileri yeniden ölç</strong>
-                    <small>180 günlük uydu arşiviyle mevcut raporu günceller.</small>
-                    <b>Yenile</b>
-                  </button>
-                ) : null}
                 {isPremiumPlan ? (
                   <button
                     type="button"
@@ -1889,47 +1914,34 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     disabled={!synthesisField}
                   >
                     <span>◷</span>
-                    <strong>Geçmiş raporlar</strong>
+                    <strong>Geçmiş Raporlar</strong>
                     <small>{pusulaPdfHistory.length ? `${pusulaPdfHistory.length} rapor` : 'Henüz rapor yok'}</small>
                     <b>{pusulaPdfHistoryOpen ? 'Kapat' : 'Aç'}</b>
                   </button>
                 ) : null}
 
-                {isPremiumPlan && synthesisField?.id && pusulaPdfNextAt ? (
-                  <QuickCalendarButton
-                    className="tp-ai-pdf-calendar"
-                    fieldId={String(synthesisField.id)}
-                    reminderType="Diğer"
-                    title="Yeni PusulaPDF raporu"
-                    reminderDate={pusulaPdfNextAt}
-                    notes="7 günlük PusulaPDF raporu bu tarihten sonra yeniden hazırlanabilir."
-                    label="Rapor tarihini hatırlat"
-                  />
+                {pusulaPdfStatus === 'loading' ? (
+                  <div className="tp-pusula-pdf-progress" aria-live="polite">
+                    <div className="tp-pusula-pdf-progress-head">
+                      <strong>{pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : 'Rapor sıraya alınıyor'}</strong>
+                      <span>Veri doğrulanıyor</span>
+                    </div>
+                    <div className="tp-pusula-pdf-progress-track" role="progressbar"
+                      aria-label="Raporun işlenen aşamaları"
+                      aria-valuemin={0}
+                      aria-valuemax={7}
+                      aria-valuenow={Math.min(7, Math.max(0, currentJobStageIndex + 1))}
+                      aria-valuetext={pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : 'Sıraya alınıyor'}>
+                      <div className="tp-pusula-pdf-progress-fill"
+                        style={{ width: `${Math.max(4, Math.round((Math.max(0, currentJobStageIndex + 1) / pusulaPdfStages.length) * 100))}%` }}
+                      />
+                    </div>
+                    <small>
+                      {String(pusulaPdfJob?.progress_meta?.message || 'Rapor işi başlatılıyor. Bu ekrandan çıkabilirsin.')}
+                      {' '}Hazır olduğunda bildirim göndereceğiz.
+                    </small>
+                  </div>
                 ) : null}
-              {pusulaPdfStatus === 'loading' && (
-                <div className="tp-pusula-pdf-progress" aria-live="polite">
-                  <div className="tp-pusula-pdf-progress-head">
-                    <strong>{pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : 'Sıraya alınıyor'}</strong>
-                    <span>%{pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}</span>
-                  </div>
-                  <div
-                    className="tp-pusula-pdf-progress-track"
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}
-                  >
-                    <div
-                      className="tp-pusula-pdf-progress-fill"
-                      style={{ width: `${pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}%` }}
-                    />
-                  </div>
-                  <small>
-                    {(pusulaPdfJob?.progress_meta?.message as string) ||
-                      'Rapor işi başlatılıyor. Bu ekrandan çıkabilirsin.'}
-                  </small>
-                </div>
-              )}
 
             {isPremiumPlan && pusulaPdfHistoryOpen ? (
               <div className="tp-pusula-pdf-ready">
@@ -1947,9 +1959,9 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     style={{ marginTop: 8 }}
                     onClick={() => void openArchivedPusulaPdf(report).catch((error) => setPusulaPdfError(error instanceof Error ? error.message : 'Rapor açılamadı.'))}
                   >
-                    {formatPusulaPdfDate(report.period_end)} · Haftalık raporu aç
+                    {formatPusulaPdfDate(report.period_end)}  · Raporu aç
                   </button>
-                )) : <small>Henüz arşivlenmiş haftalık rapor yok.</small>}
+                )) : <small>Henüz kaydedilmiş rapor yok.</small>}
               </div>
             ) : null}
 
@@ -1958,7 +1970,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 <div className="tp-pusula-pdf-premium-head">
                   <div className="tp-pusula-pdf-premium-copy">
                     <span className="tp-pusula-pdf-premium-kicker">PUSULAPDF</span>
-                    <strong>Haftalık rapor hazır</strong>
+                    <strong>Rapor hazır</strong>
                     <small>
                       {formatPusulaPdfDate(pusulaPdfReport.period_start)} – {formatPusulaPdfDate(pusulaPdfReport.period_end)}
                     </small>
