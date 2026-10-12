@@ -668,7 +668,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const guidance = buildPusulaPdfGuidance(snapshot);
   const sat = [...snapshot.satellite.points].sort((a, b) => a.date.localeCompare(b.date));
   const latest = sat.at(-1);
-  const allWeather = weatherRows(snapshot).filter((row) => wd(row) && wd(row) <= snapshot.period.end).sort((a,b) => wd(a).localeCompare(wd(b)));
+  const historicalWeather: any[] = Array.isArray((snapshot.weather as any)?.history) ? (snapshot.weather as any).history : [];
+  const allWeather = historicalWeather.filter((row) => wd(row) && wd(row) <= snapshot.period.end).sort((a,b) => wd(a).localeCompare(wd(b)));
   // Weather history is NOT a future forecast. Report the most recent recorded days.
   const weather = allWeather.filter((row) => wd(row) >= snapshot.period.start);
   const photos = [...(snapshot.fieldPhotos ?? [])].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
@@ -882,38 +883,49 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     midX + 272, 831, 9.5, 650, MUTED, 90, 1.25, 7);
 
   rr(ctx, midX, 946, midW, 250, 15, WHITE, LINE);
-  sectionHeader(ctx, midX + 10, 954, 4, 'Hava ve İklim Analizi', BLUE, '☀');
-  const weather5 = weather.slice(0, 5);
+  sectionHeader(ctx, midX + 10, 954, 4, 'Hava ve İklim Analizi', BLUE, '●');
+  text(ctx, 'Son 5 gün · geçmiş gözlemler (tahmin değil)', midX + 17, 992, 9.5, 800, MUTED);
+  const weather5 = weather.slice(-5);
   if (weather5.length) {
     weather5.forEach((row, index) => {
       const x = midX + 13 + index * 74;
-      rr(ctx, x, 998, 66, 100, 9, index === 0 ? '#f8fbff' : WHITE, LINE);
+      rr(ctx, x, 998, 66, 100, 9, index % 2 === 0 ? '#f8fbff' : WHITE, LINE);
       ctx.textAlign = 'center';
-      text(ctx, index === 0 ? 'Bugün' : fmt(wd(row), false), x + 33, 1017, 8.5, 750, MUTED);
-      const temp = wv(row, 'tempMax', 'maxTemp', 'temperature', 'temp', 'tempAvg', 'avgTemp');
+      text(ctx, fmt(wd(row), false), x + 33, 1018, 8.5, 750, MUTED);
+      const maximum = wv(row, 'tempMax', 'maxTemp', 'maxTemperature');
+      const minimum = wv(row, 'tempMin', 'minTemp', 'minTemperature');
       const rain = wv(row, 'precipitation', 'rain', 'precipitationMm');
-      text(ctx, rain !== null && rain > 2 ? '☂' : '☀', x + 33, 1054, 19, 900, rain !== null && rain > 2 ? BLUE : ORANGE);
-      text(ctx, temp === null ? '—' : `${Math.round(temp)}°`, x + 33, 1082, 17, 900, INK);
+      text(ctx, maximum === null ? '—' : `${maximum.toLocaleString('tr-TR', {maximumFractionDigits:1})}°`,
+        x + 33, 1048, 14, 900, INK);
+      text(ctx, minimum === null ? 'Min —' : `Min ${Math.round(minimum)}°`,
+        x + 33, 1068, 8.5, 800, BLUE);
+      text(ctx, rain === null ? 'Yağış —' : `${rain.toLocaleString('tr-TR', {maximumFractionDigits:1})} mm`,
+        x + 33, 1089, 8.5, 800, rain !== null && rain > 0 ? BLUE : MUTED);
       ctx.textAlign = 'left';
     });
   } else {
-    wrap(ctx, 'Hava tahmini bu rapor için hazır değil.', midX + 18, 1016, 11, 650, MUTED, midW - 36, 1.25, 2);
+    wrap(ctx, 'Bu dönem için doğrulanmış geçmiş hava ölçümü bulunmuyor; geleceğe dönük hava durumu üretilmedi.',
+      midX + 18, 1042, 11, 650, MUTED, midW - 36, 1.25, 3);
   }
-  const temps = weather.map((row) => wv(row, 'tempMax', 'maxTemp', 'temperature', 'temp', 'tempAvg', 'avgTemp')).filter(valid);
-  const rainTotal = weather.map((row) => wv(row, 'precipitation', 'rain', 'precipitationMm')).filter(valid).reduce((sum, value) => sum + value, 0);
-  const weatherBadges = [
-    ['Sıcaklık Trendi', temps.length >= 2 && temps.at(-1)! > temps[0] + 2 ? 'Artıyor' : 'Dengeli', ORANGE, ORANGE_SOFT],
-    ['Yağış Olasılığı', rainTotal > 10 ? 'Yüksek' : rainTotal > 2 ? 'Orta' : 'Düşük', BLUE, BLUE_SOFT],
-    ['Rüzgâr', 'Takip', GREEN, GREEN_SOFT],
+  const measuredTemps = weather5.map((row) => wv(row, 'tempMax','maxTemp','maxTemperature')).filter(valid);
+  const precip = weather5.map((row) => wv(row,'precipitation','rain','precipitationMm')).filter(valid);
+  const wind = weather5.map((row) => wv(row,'windSpeed','windSpeedKmh','windKmh')).filter(valid);
+  const measuredBadges = [
+    ['En yüksek sıcaklık', measuredTemps.length ? `${Math.max(...measuredTemps).toLocaleString('tr-TR',{maximumFractionDigits:1})}°C` : '—', ORANGE, ORANGE_SOFT],
+    ['Toplam yağış', precip.length ? `${precip.reduce((a,b)=>a+b,0).toLocaleString('tr-TR',{maximumFractionDigits:1})} mm` : '—', BLUE, BLUE_SOFT],
+    ['En yüksek rüzgâr', wind.length ? `${Math.max(...wind).toLocaleString('tr-TR',{maximumFractionDigits:1})} km/sa` : '—', GREEN, GREEN_SOFT],
   ];
-  weatherBadges.forEach(([label, value, accent, soft], index) => {
+  measuredBadges.forEach(([label,value,accent,soft],index) => {
     const x = midX + 14 + index * 122;
     rr(ctx, x, 1110, 114, 66, 9, soft, soft);
     ctx.textAlign = 'center';
     text(ctx, label, x + 57, 1132, 8, 800, MUTED);
-    text(ctx, value, x + 57, 1157, 11, 900, accent);
+    text(ctx, value, x + 57, 1157, 10, 900, accent);
     ctx.textAlign = 'left';
   });
+  const weatherSource = String((snapshot.weather as any)?.source ?? weather5.at(-1)?.source ?? 'Kaynak kaydı yok').trim();
+  wrap(ctx, `Kaynak: ${weatherSource} · ${weather5.length} kayıtlı gün · geleceğe dönük tahmin değildir.`,
+    midX + 16, 1187, 9, 700, MUTED, midW - 28, 1.1, 2);
 
   rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 1214, 5, 'Saha Gözlemleri', PURPLE, '▣');
@@ -932,32 +944,33 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   rr(ctx, rightX, top, rightW, 476, 15, WHITE, LINE);
   sectionHeader(ctx, rightX + 10, top + 8, 6, 'Risk ve Öneri Analizi', RED, '!');
   riskRows.forEach((row, index) => {
-    const yy = top + 65 + index * 78;
-    circleIcon(ctx, rightX + 34, yy + 18, 15, row.accent === GREEN ? '#eaf8ed' : row.accent === BLUE ? '#edf5ff' : row.accent === TEAL ? '#ebf9f7' : '#fff0e9', '●', row.accent, 8);
-    text(ctx, row.label, rightX + 58, yy + 11, 11.5, 850, INK);
-    wrap(ctx, row.detail, rightX + 58, yy + 33, 8.7, 600, MUTED, 235, 1.2, 2);
-    progressBar(ctx, rightX + 283, yy + 4, 70, row.status === 'Yüksek' ? 92 : row.status === 'Orta' ? 58 : row.status === 'Düşük' ? 24 : 42, row.statusAccent);
-    rr(ctx, rightX + 305, yy + 25, 62, 23, 11, row.statusSoft, row.statusSoft);
+    const yy = top + 64 + index * 78;
+    circleIcon(ctx, rightX + 34, yy + 15, 12, row.statusSoft, '●', row.statusAccent, 8);
+    text(ctx, row.label, rightX + 56, yy + 18, 12, 900, INK);
+    const pillW = 95;
+    rr(ctx, rightX + rightW - pillW - 13, yy - 3, pillW, 26, 12, row.statusSoft, row.statusSoft);
     ctx.textAlign = 'center';
-    text(ctx, row.status, rightX + 336, yy + 41, 8.7, 900, row.statusAccent);
+    text(ctx, row.status, rightX + rightW - pillW / 2 - 13, yy + 14, 9, 850, row.statusAccent);
     ctx.textAlign = 'left';
+    // A risk without validated risk score never gets a fabricated 24/58/92% bar.
+    wrap(ctx, englishFree(row.detail), rightX + 20, yy + 39, 10, 650, MUTED, rightW - 39, 1.17, 3);
   });
 
   rr(ctx, rightX, 604, rightW, 216, 15, WHITE, LINE);
   sectionHeader(ctx, rightX + 10, 612, 7, 'Verim, Hasat ve Kalite', ORANGE, '↑');
   const yieldCards = [
-    ['Tahmini Verim', yieldInfo.yieldKgDa === null ? '—' : `${Math.round(yieldInfo.yieldKgDa)}`, yieldInfo.yieldKgDa === null ? 'kg/da bekleniyor' : 'kg/da', ORANGE],
-    ['Kalite Skoru', yieldInfo.quality.length <= 6 ? yieldInfo.quality : 'Takip', yieldInfo.quality.length <= 6 ? 'Kalite' : yieldInfo.quality.slice(0, 20), GREEN],
-    ['Hasat Zamanı', yieldInfo.harvest, 'Tahmini', PURPLE],
+    ['Tahmini Verim', yieldInfo.yieldKgDa === null ? '—' : `${Math.round(yieldInfo.yieldKgDa)}`, yieldInfo.yieldKgDa === null ? 'Ölçüm/model yok' : 'kg/da', ORANGE],
+    ['Kalite', yieldInfo.quality === 'Ölçüm bekleniyor' ? '—' : yieldInfo.quality, 'Ölçüm gerek', GREEN],
+    ['Hasat Zamanı', yieldInfo.harvest, yieldInfo.harvestNote, PURPLE],
   ];
-  yieldCards.forEach(([titleValue, value, sub, accent], index) => {
+  yieldCards.forEach(([titleValue,value,sub,accent],index) => {
     const x = rightX + 14 + index * 124;
     rr(ctx, x, 655, 116, 145, 10, GRAY_SOFT, LINE);
     ctx.textAlign = 'center';
-    text(ctx, titleValue, x + 58, 680, 8.5, 800, MUTED);
-    text(ctx, value, x + 58, 726, index === 2 ? 16 : 25, 900, accent);
-    text(ctx, sub, x + 58, 754, 9.5, 850, INK);
-    if (index === 0 && valid(ndviCmp.pct)) text(ctx, `${ndviCmp.pct >= 0 ? '↑' : '↓'} %${Math.abs(ndviCmp.pct).toFixed(0)} bitki trendi`, x + 58, 782, 8.5, 750, ndviCmp.pct >= 0 ? GREEN : RED);
+    text(ctx, titleValue, x + 58, 680, 9.5, 800, MUTED);
+    const large = String(value).length <= 11;
+    text(ctx, value, x + 58, 727, large ? 17 : 11, 900, accent);
+    wrap(ctx, sub, x + 10, 758, 9, 750, MUTED, 95, 1.2, 3);
     ctx.textAlign = 'left';
   });
 
