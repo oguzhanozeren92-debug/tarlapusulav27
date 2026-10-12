@@ -1081,6 +1081,52 @@ html body #root .tp-ai-page .tp-pusula-pdf-progress>small{
   html body #root .tp-ai-page .tp-pdf-custom-dates{grid-template-columns:minmax(0,1fr)!important}
 }
 
+
+/* Single-card AI and PDF hierarchy, compact field control, high-contrast actions */
+html body #root .tp-ai-page .tp-pusula-hub-intro{
+ padding:10px 12px!important;margin:0 0 12px!important;
+ border-radius:13px!important;background:#fff!important;box-shadow:none!important
+}
+html body #root .tp-ai-page .tp-pusula-hub-field{
+ padding:0!important;margin:0!important;border:0!important;background:transparent!important
+}
+html body #root .tp-ai-page .tp-pusula-hub-field>span{
+ display:block!important;margin:0 0 5px!important;font-size:10px!important;
+ color:#151b20!important;-webkit-text-fill-color:#151b20!important
+}
+html body #root .tp-ai-page .tp-ai-tool-sections{
+ display:grid!important;gap:14px!important;min-width:0!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card--photo,
+html body #root .tp-ai-page .tp-ai-tool-card--report{
+ box-sizing:border-box!important;min-width:0!important;width:100%!important;
+ background:#fff!important;border:1px solid #d5dfe6!important;border-radius:17px!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head small,
+html body #root .tp-ai-page .tp-pdf-selected-range,
+html body #root .tp-ai-page .tp-ai-tool-history small{
+ color:#202932!important;-webkit-text-fill-color:#202932!important;opacity:1!important;
+ font-size:11px!important;line-height:1.45!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head strong{
+ font-size:16px!important;line-height:1.3!important;overflow-wrap:anywhere!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-history{
+ opacity:1!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-history :is(strong,small,b){
+ color:#17212a!important;-webkit-text-fill-color:#17212a!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled,
+html body #root .tp-ai-page .tp-ai-tool-card .tp-pdf-request-button:disabled {
+ opacity:1!important;color:#202932!important;-webkit-text-fill-color:#202932!important;
+ background:#e5eaee!important;border-color:#cbd4db!important
+}
+html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary:disabled
+ :is(strong,small){
+ color:#202932!important;-webkit-text-fill-color:#202932!important;opacity:1!important
+}
+
 /* QUICK CALENDAR ACTION — PUSULAPDF */
 html body #root .tp-ai-page .tp-ai-pdf-calendar{
   box-sizing:border-box!important;
@@ -1873,12 +1919,8 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
         <main className="tp-ai-page-content">
         <style>{PUSULA_HUB_FINAL_STYLES}</style>
           <section className="tp-pusula-hub-intro">
-            <span className="tp-pusula-hub-kicker">PUSULA AI MERKEZİ</span>
-            <h1>{synthesisField ? synthesisField.name : 'Tarlanı seç'}</h1>
-            <p>Uydu, hava ve tarla kayıtlarını tek yerde değerlendir.</p>
-
             <div className="tp-pusula-hub-field">
-              <span>ANALİZ EDİLECEK TARLA</span>
+              <span>Tarla Seç</span>
               {safeRealFields.length > 0 ? (
                 <MobileWheelPicker
                   className="tp-ai-field-select"
@@ -1922,8 +1964,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     <span className="tp-ai-tool-kicker">PUSULAPDF</span>
                     <strong>Tarla Analiz Raporu</strong>
                     <small>
-                      Uydu, hava, toprak, risk ve saha kayıtlarını seçtiğin dönemde
-                      birleştirir. Veriler doğrulanır; rapor hazır olduğunda Pusula sana haber verir.
+                      Seçtiğin tarihlerdeki uydu, bitki, toprak, hava ve saha kayıtlarını yorumlayan PDF raporunu hazırla. Hazır olduğunda Pusula sana haber verir; dosyayı açıp paylaşabilirsin.
                     </small>
                   </div>
                   {!isPremiumPlan ? <b className="tp-premium-badge">PREMIUM</b> : null}
@@ -1986,7 +2027,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 >
                   <span>✦</span>
                   <span className="tp-ai-tool-primary-copy">
-                    <strong>{pusulaPdfStatus === 'loading' ? 'Rapor hazırlanıyor' : 'Rapor Al'}</strong>
+                    <strong>{pusulaPdfStatus === 'loading' ? 'Rapor Hazırlanıyor' : 'Seçilen Tarihler İçin Rapor Al'}</strong>
                     <small>
                       {pusulaPdfStatus === 'loading'
                         ? 'Veri kontrolü sürüyor. Bu ekrandan çıkabilirsin.'
@@ -2003,7 +2044,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     disabled={!synthesisField}
                   >
                     <span>◷</span>
-                    <strong>Geçmiş Raporlar</strong>
+                    <strong>Rapor Geçmişimi Gör</strong>
                     <small>{pusulaPdfHistory.length ? `${pusulaPdfHistory.length} rapor` : 'Henüz rapor yok'}</small>
                     <b>{pusulaPdfHistoryOpen ? 'Kapat' : 'Aç'}</b>
                   </button>
@@ -2117,22 +2158,13 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
 
               </section>
 
-              <section className="tp-ai-photo-intro" aria-label="AI Tarla Asistanı tanıtımı">
-                <span className="tp-ai-photo-intro-symbol" aria-hidden="true">✦</span>
-                <div className="tp-ai-photo-intro-copy">
-                  <span>AI TARLA ASİSTANI</span>
-                  <h2>Fotoğrafı çek, tarladaki belirtiyi birlikte inceleyelim.</h2>
-                  <p>Yaprak, meyve veya sorunlu bölgenin net bir fotoğrafını yükle. Fotoğraf sonucu tek başına kesin teşhis değildir; Pusula bunu saha kanıtı olarak değerlendirir.</p>
-                </div>
-              </section>
-
               <section className="tp-ai-tool-card tp-ai-tool-card--photo">
                 <div className="tp-ai-tool-card-head">
                   <div>
-                    <span className="tp-ai-tool-kicker">PUSULA AI</span>
-                    <strong>Fotoğraf Analizi</strong>
+                    <span className="tp-ai-tool-kicker">PUSULA AI · TARLA ASİSTANI</span>
+                    <strong>Fotoğrafı çek, belirtileri birlikte inceleyelim</strong>
                     <small>
-                      Yaprak, meyve veya sorunlu bölgenin fotoğrafını yükle; Pusula tarla bilgilerinle birlikte incelesin.
+                      Yaprak, meyve veya sorunlu bölgenin net fotoğrafını gönder. Pusula AI, görseli seçilen tarlanın kayıtlarıyla değerlendirir; sonuç kesin teşhis değildir.
                     </small>
                   </div>
                 </div>
