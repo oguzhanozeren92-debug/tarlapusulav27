@@ -397,6 +397,44 @@ async function readFusionNdvi(userId:string,fieldId:string,period:{start:string;
   return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
 }
 
+// Reuse only date-stamped, actual numbers from the SAME field/user's
+// previously generated reports. Historic NDMI/NDRE/GNDVI/SAVI often exist in
+// these snapshots even when the newer NDVI-only fusion has no such columns.
+async function readHistoricalReportIndices(userId:string,fieldId:string,period:{start:string;end:string}){
+  const {data,error}=await admin.from('weekly_field_reports')
+    .select('period_start,period_end,report_data,created_at')
+    .eq('user_id',userId).eq('field_id',fieldId).eq('status','ready')
+    .lte('period_start',period.end).gte('period_end',period.start)
+    .order('created_at',{ascending:false}).limit(12);
+  if(error){
+    console.warn('[PUSULAPDF] Geçmiş raporların tarihli indeksleri okunamadı:',error.message);
+    return [] as any[];
+  }
+  const byDate=new Map<string,any>();
+  for(const saved of data??[]){
+    for(const row of saved?.report_data?.satellite?.points??[]){
+      const date=dateOnly(row?.date);
+      if(!date||date<period.start||date>period.end)continue;
+      const metrics:Record<string,number|null>={};
+      for(const key of ['ndvi','ndmi','ndre','gndvi','savi']){
+        const n=numberOrNull(row?.[key]);
+        metrics[key]=n!==null&&n>=-1&&n<=1?n:null;
+      }
+      if(Object.values(metrics).every((n)=>n===null))continue;
+      const previous=byDate.get(date);
+      if(!previous){
+        byDate.set(date,{
+          date,...metrics,source:'TarlaPusula · tarihli Sentinel-2 rapor arşivi',
+          dataQuality:row?.dataQuality??'archive',fromArchive:true,
+        });
+      }else for(const key of Object.keys(metrics)){
+        if(previous[key]===null&&metrics[key]!==null)previous[key]=metrics[key];
+      }
+    }
+  }
+  return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
+}
+
 async function readFieldBiophysics(userId:string,fieldId:string,period:{start:string;end:string}){
   const {data,error}=await admin.from('field_biophysical_snapshots')
     .select('acquired_at,algorithm,collection,metrics,qc,source')
@@ -755,8 +793,9 @@ async function processJob(jobId:string,userId:string){
       console.error('[PUSULAPDF] satellite collection failed:',error);const fallback=cloudSatellitePoints(layerArchive).filter((p:any)=>p.date>=period.start&&p.date<=period.end).slice(0,10);
       return {points:fallback.sort((a:any,b:any)=>a.date.localeCompare(b.date)),availableDates:fallback.map((p:any)=>p.date),archiveUsed:fallback.length,liveUsed:0};
     });
-    const [fusionNdvi,biophysical] = await Promise.all([
+    const [fusionNdvi,oldReportIndices,biophysical] = await Promise.all([
       readFusionNdvi(userId,fieldId,period),
+      readHistoricalReportIndices(userId,fieldId,period),
       readFieldBiophysics(userId,fieldId,period),
     ]);
     // Match by actual observation date. Preserve higher-quality satellite
@@ -772,6 +811,16 @@ async function processJob(jobId:string,userId:string){
           existing.dataQuality=row.dataQuality;
         }
       }else satelliteByDate.set(row.date,row);
+    }
+    for(const archiveRow of oldReportIndices){
+      const existing=satelliteByDate.get(archiveRow.date);
+      if(existing){
+        for(const key of ['ndvi','ndmi','ndre','gndvi','savi']){
+          if(numberOrNull(existing[key])===null&&numberOrNull(archiveRow[key])!==null){
+            existing[key]=archiveRow[key];
+          }
+        }
+      }else satelliteByDate.set(archiveRow.date,archiveRow);
     }
     satellite.points=[...satelliteByDate.values()].sort((a:any,b:any)=>a.date.localeCompare(b.date));
     const numericSatellitePoints=satellite.points.filter((p:any)=>[p.ndvi,p.ndmi,p.ndre,p.savi,p.gndvi].some((v)=>typeof v==='number'&&Number.isFinite(v))).length;

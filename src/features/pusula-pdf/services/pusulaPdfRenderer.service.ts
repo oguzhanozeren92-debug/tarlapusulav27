@@ -404,26 +404,52 @@ function progressBar(
 }
 
 function fieldHealthScore(snapshot: PusulaPdfSnapshot) {
-  const candidates = [
-    latestLayer(snapshot, 'field-health-score'),
-    latestLayer(snapshot, 'plant-health-synthesis'),
-    latestLayer(snapshot, 'satellite-fusion'),
-  ].map(layerPayload).filter(Boolean);
-
-  for (const candidate of candidates) {
-    const value = metricNumber(candidate, 'healthScore', 'fieldHealthScore', 'score');
-    if (value !== null) return clamp(value, 0, 100);
-  }
-  return null;
+  // A risk score is not a field-health score. Only accept a separately
+  // calculated, dated and named health metric from the actual reporting period.
+  const health = layerPayload(latestPeriodLayer(snapshot, 'field-health-score'));
+  const value = metricNumber(health, 'healthScore', 'fieldHealthScore');
+  return value !== null && value >= 0 && value <= 100 ? value : null;
 }
 
-function phenologyLabel(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
-  const pcse = layerPayload(latestLayer(snapshot, 'phenology-pcse-wofost'));
-  const fromLayer = detailText(pcse, 'stageLabel', 'phenologyStage', 'stage');
-  if (fromLayer) return fromLayer;
-  const insight = guidance.insights.find((item) => item.id === 'pcse-wofost-phenology-evidence');
-  const fromEvidence = evidenceValue(insight, ['Evre', 'Fenoloji']);
-  return fromEvidence || 'Takipte';
+function latestPeriodLayer(snapshot: PusulaPdfSnapshot, name: string) {
+  return [...(snapshot.layerArchive ?? [])]
+    .filter((row) => row.layer === name
+      && typeof row.observedAt === 'string'
+      && row.observedAt.slice(0, 10) >= snapshot.period.start
+      && row.observedAt.slice(0, 10) <= snapshot.period.end)
+    .sort((a, b) => String(a.observedAt).localeCompare(String(b.observedAt)))
+    .at(-1) ?? null;
+}
+
+// Never assign a present-day phenological stage to a previous season.
+function phenologyLabel(snapshot: PusulaPdfSnapshot) {
+  const pcse = layerPayload(latestPeriodLayer(snapshot, 'phenology-pcse-wofost'));
+  const pcseStage = detailText(pcse, 'stageLabel', 'phenologyStage', 'stage');
+  if (pcseStage) return {value:pcseStage, sub:'Dönem fenolojisi'};
+  const irrigation = layerPayload(latestPeriodLayer(snapshot, 'irrigation-synthesis'));
+  const stageFromIrrigation = String(irrigation?.metrics?.stageLabel ?? irrigation?.details?.stageLabel ?? '').trim();
+  if (stageFromIrrigation) return {value:stageFromIrrigation, sub:'Kayıtlı ürün evresi'};
+  return {value:'Kayıt yok', sub:'Dönem evresi eksik'};
+}
+
+function summaryRisk(snapshot: PusulaPdfSnapshot) {
+  const layer = latestPeriodLayer(snapshot, 'plant-health-synthesis');
+  const payload = layerPayload(layer);
+  if (!payload) return {value:'Veri yok',sub:'Dönem riski eksik'};
+  const level = String(payload.metrics?.riskLevel ?? '').trim().toLowerCase();
+  const title = String(payload.details?.title ?? '').toLocaleLowerCase('tr-TR');
+  const riskLabel:Record<string,string> = {
+    low:'Düşük',medium:'Orta',moderate:'Orta',high:'Yüksek',
+    critical:'Kritik',düşük:'Düşük',orta:'Orta',yüksek:'Yüksek',kritik:'Kritik',
+  };
+  const translated = riskLabel[level] ?? null;
+  const conflict = (['low','düşük'].includes(level) && /risk.*yüksek|yüksek.*risk|kritik/i.test(title))
+    || (['high','critical','yüksek','kritik'].includes(level) && /risk.*düşük|düşük.*risk/i.test(title));
+  // Contradictory headline and machine level is insufficient for a firm risk label.
+  if (conflict) return {value:'Ön sinyal',sub:'Model uyuşmazlığı'};
+  if (!translated) return {value:'Ön risk',sub:'Dönem kaydı'};
+  const confidence=String(payload.details?.confidence ?? '').toLowerCase();
+  return {value:translated,sub:confidence==='preliminary'?'Ön model riski':'Model risk kaydı'};
 }
 
 function irrigationNeed(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
@@ -666,7 +692,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const riskRows = riskItems(guidance);
   const soilRows = latestSoilValues(snapshot);
   const soilGrids = soilGridsProfile(snapshot);
-  const stage = phenologyLabel(snapshot, guidance);
+  const stage = phenologyLabel(snapshot);
+  const primaryRisk = summaryRisk(snapshot);
   const location = [snapshot.field.city, snapshot.field.district].filter(Boolean).join(' / ') || 'Konum kaydı yok';
 
   // Print-safe header: a fixed, subtle topographic motif, with protected
@@ -746,16 +773,17 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const lastMeasured = knownSeries(sat, 'ndvi').at(-1);
   const lastNdmi = [...sat].filter((p) => valid(p.ndmi)).at(-1);
   const ndmiValue = lastNdmi?.ndmi ?? null;
-  summaryCard(ctx, leftX + 8, statY, statW, 'Tarla Sağlığı',
-    health === null ? '—' : `${Math.round(health)}`,
-    health === null ? 'Skor eksik' : 'Model skoru', GREEN, GREEN_SOFT, '✓');
-  const primaryRisk = riskRows.find((r) => r.status !== 'Doğrulanmadı');
+  summaryCard(ctx, leftX + 8, statY, statW, health === null ? 'Bitki Canlılığı':'Tarla Sağlığı',
+    health === null ? numericIndexText(lastMeasured?.ndvi) : `${Math.round(health)}/100`,
+    health === null ? (lastMeasured ? 'NDVI · uydu' : 'Dönem ölçümü yok') : 'Gerçek sağlık skoru',
+    GREEN, GREEN_SOFT, '✓');
   summaryCard(ctx, leftX + 8 + statW + statGap, statY, statW, 'Ana Risk',
-    primaryRisk?.status ?? 'Belirsiz', 'Kanıt kontrolü', RED, RED_SOFT, '!');
+    primaryRisk.value, primaryRisk.sub, RED, RED_SOFT, '!');
   summaryCard(ctx, leftX + 8 + (statW + statGap) * 2, statY, statW, 'Bitki Nem İndeksi',
-    numericIndexText(ndmiValue), 'NDMI · uydu', BLUE, BLUE_SOFT, '●');
+    ndmiValue === null ? 'Veri yok' : numericIndexText(ndmiValue),
+    lastNdmi ? 'NDMI · uydu' : 'Dönemde kayıt yok', BLUE, BLUE_SOFT, '●');
   summaryCard(ctx, leftX + 8 + (statW + statGap) * 3, statY, statW, 'Gelişim Evresi',
-    stage.length > 10 ? 'Takipte' : stage, 'Fenoloji kaydı', GREEN, GREEN_SOFT, '↑');
+    stage.value, stage.sub, GREEN, GREEN_SOFT, '↑');
 
   rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
   text(ctx, 'Uydu Geçmişi ve Karşılaştırma', leftX + 16, 691, 17, 900, INK);
