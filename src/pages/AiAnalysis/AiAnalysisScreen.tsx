@@ -900,6 +900,44 @@ html body #root .tp-ai-page .tp-ai-tool-card--photo{
 }
 
 
+/* PUSULA AI / PDF visual separation — top-level independent cards */
+html body #root .tp-ai-page .tp-pusula-hub-intro{
+  margin-bottom:14px!important;
+  border:1px solid #d9e0e6!important;
+  border-radius:18px!important;
+  box-shadow:0 5px 18px rgba(17,24,32,.04)!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-sections{
+  margin:0 0 15px!important;
+  gap:14px!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card--report{
+  border:2px solid #1a1d21!important;
+  border-radius:18px!important;
+  padding:16px!important;
+  background:#fff!important;
+  box-shadow:0 6px 22px rgba(17,24,32,.055)!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card--photo{
+  border:1px solid #ccd5de!important;
+  border-radius:18px!important;
+  padding:16px!important;
+  background:#fff!important;
+  box-shadow:0 5px 16px rgba(17,24,32,.035)!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card--report .tp-ai-tool-kicker{
+  color:#161b22!important;
+  -webkit-text-fill-color:#161b22!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card--report .tp-pusula-pdf-progress{
+  margin-top:12px!important;
+}
+html body #root .tp-ai-page .tp-ai-tool-card--report .tp-ai-page-error{
+  margin-top:12px!important;
+  font-size:11px!important;
+  overflow-wrap:anywhere!important;
+}
+
 /* QUICK CALENDAR ACTION — PUSULAPDF */
 html body #root .tp-ai-page .tp-ai-pdf-calendar{
   box-sizing:border-box!important;
@@ -1744,8 +1782,9 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 </div>
               )}
             </div>
+          </section>
 
-            <div className="tp-ai-tool-sections">
+          <div className="tp-ai-tool-sections">
               <section className="tp-ai-tool-card tp-ai-tool-card--report">
                 <div className="tp-ai-tool-card-head">
                   <div>
@@ -1811,37 +1850,31 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     label="Rapor tarihini hatırlat"
                   />
                 ) : null}
-              </section>
-
-              <section className="tp-ai-tool-card tp-ai-tool-card--photo">
-                <div className="tp-ai-tool-card-head">
-                  <div>
-                    <span className="tp-ai-tool-kicker">PUSULA AI</span>
-                    <strong>Fotoğraf Analizi</strong>
-                    <small>
-                      Yaprak, meyve veya sorunlu bölgenin fotoğrafını yükle; Pusula tarla bilgilerinle birlikte incelesin.
-                    </small>
+              {pusulaPdfStatus === 'loading' && (
+                <div className="tp-pusula-pdf-progress" aria-live="polite">
+                  <div className="tp-pusula-pdf-progress-head">
+                    <strong>{pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : 'Sıraya alınıyor'}</strong>
+                    <span>%{pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}</span>
                   </div>
+                  <div
+                    className="tp-pusula-pdf-progress-track"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}
+                  >
+                    <div
+                      className="tp-pusula-pdf-progress-fill"
+                      style={{ width: `${pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}%` }}
+                    />
+                  </div>
+                  <small>
+                    {(pusulaPdfJob?.progress_meta?.message as string) ||
+                      'Rapor işi başlatılıyor. Bu ekrandan çıkabilirsin.'}
+                  </small>
                 </div>
+              )}
 
-                <button
-                  type="button"
-                  className="tp-ai-tool-primary"
-                  onClick={() => {
-                    setTpAiMode('photo');
-                    requestAnimationFrame(() => {
-                      document.querySelector('.tp-ai-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    });
-                  }}
-                >
-                  <span>⌁</span>
-                  <span className="tp-ai-tool-primary-copy">
-                    <strong>Fotoğrafla İncele</strong>
-                    <small>Galeriden seç veya yeni fotoğraf çek.</small>
-                  </span>
-                </button>
-              </section>
-            </div>
             {isPremiumPlan && pusulaPdfHistoryOpen ? (
               <div className="tp-pusula-pdf-ready">
                 <div className="tp-pusula-pdf-ready-head">
@@ -1917,37 +1950,44 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
               </div>
             ) : null}
             {pusulaPdfStatus === 'error' && pusulaPdfError ? <div className="tp-ai-page-error" style={{ marginTop: 10, padding: 11 }}>PUSULAPDF: {pusulaPdfError}</div> : null}
-          </section>
+
+              </section>
+
+              <section className="tp-ai-tool-card tp-ai-tool-card--photo">
+                <div className="tp-ai-tool-card-head">
+                  <div>
+                    <span className="tp-ai-tool-kicker">PUSULA AI</span>
+                    <strong>Fotoğraf Analizi</strong>
+                    <small>
+                      Yaprak, meyve veya sorunlu bölgenin fotoğrafını yükle; Pusula tarla bilgilerinle birlikte incelesin.
+                    </small>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="tp-ai-tool-primary"
+                  onClick={() => {
+                    setTpAiMode('photo');
+                    requestAnimationFrame(() => {
+                      document.querySelector('.tp-ai-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                  }}
+                >
+                  <span>⌁</span>
+                  <span className="tp-ai-tool-primary-copy">
+                    <strong>Fotoğrafla İncele</strong>
+                    <small>Galeriden seç veya yeni fotoğraf çek.</small>
+                  </span>
+                </button>
+              </section>
+            </div>
           {premiumInfoOpen ? (
             <section className="tp-premium-info" aria-live="polite">
               <div>
                 <span>PREMIUM ÖZELLİK</span>
                 <strong>Toplu Tarla Değerlendirmesi</strong>
                 <p>Premium PusulaPDF; uydu, NDVI, hava, iklim ve tarla kayıtlarını kapsamlı bir raporda birleştirir. Hazırlama arka planda sürer; rapor tamamlandığında bildirim gönderilir.</p>
-              {pusulaPdfStatus === 'loading' && (
-                <div className="tp-pusula-pdf-progress" aria-live="polite">
-                  <div className="tp-pusula-pdf-progress-head">
-                    <strong>{pusulaPdfJob ? PUSULAPDF_STAGE_LABEL[pusulaPdfJob.stage] : 'Sıraya alınıyor'}</strong>
-                    <span>%{pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}</span>
-                  </div>
-                  <div
-                    className="tp-pusula-pdf-progress-track"
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}
-                  >
-                    <div
-                      className="tp-pusula-pdf-progress-fill"
-                      style={{ width: `${pusulaPdfJob ? pusulaPdfProgress[pusulaPdfJob.stage] : 3}%` }}
-                    />
-                  </div>
-                  <small>
-                    {(pusulaPdfJob?.progress_meta?.message as string) ||
-                      'Rapor işi başlatılıyor. Bu ekrandan çıkabilirsin.'}
-                  </small>
-                </div>
-              )}
               </div>
               <button type="button" onClick={() => setPremiumInfoOpen(false)}>Kapat</button>
             </section>
