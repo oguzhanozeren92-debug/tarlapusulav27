@@ -1149,38 +1149,74 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   wrap(ctx, englishFree(observationText), midX + 28, 1535, 10, 650, INK, 333, 1.22, 3);
 
   // RIGHT COLUMN
-  rr(ctx, rightX, top, rightW, 476, 15, '#f9fbfe', LINE);
-  sectionHeader(ctx, rightX + 10, top + 8, 6, 'Risk ve Öneri Analizi', RED, '!');
-  riskRows.forEach((row, index) => {
-    const yy = top + 64 + index * 78;
-    rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?'#ffffff':'#f1f5f9',LINE);
-    circleIcon(ctx, rightX + 34, yy + 15, 12, row.statusSoft, '●', row.statusAccent, 8);
-    text(ctx, row.label, rightX + 56, yy + 18, 12, 900, INK);
-    const pillW = 95;
-    rr(ctx, rightX + rightW - pillW - 13, yy - 3, pillW, 26, 12, row.statusSoft, row.statusSoft);
-    ctx.textAlign = 'center';
-    text(ctx, row.status, rightX + rightW - pillW / 2 - 13, yy + 14, 9, 850, row.statusAccent);
-    ctx.textAlign = 'left';
-    // A risk without validated risk score never gets a fabricated 24/58/92% bar.
-    wrap(ctx, englishFree(row.detail), rightX + 20, yy + 39, 10, 650, MUTED, rightW - 39, 1.17, 3);
-  });
+  const hasPeriodRiskEvidence=!!latestPeriodLayer(snapshot,'plant-health-synthesis');
+  rr(ctx,rightX,top,rightW,476,15,hasPeriodRiskEvidence?'#fffafa':'#f6fbff',LINE);
+  sectionHeader(ctx,rightX+10,top+8,6,
+    hasPeriodRiskEvidence?'Risk ve Öneri Analizi':'İklim Koşulları ve Kanıt Sınırları',
+    hasPeriodRiskEvidence?RED:BLUE,'!');
+  if(hasPeriodRiskEvidence){
+    riskRows.forEach((row,index)=>{
+      const yy=top+64+index*78;
+      rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?WHITE:'#f1f5f9',LINE);
+      circleIcon(ctx,rightX+34,yy+15,12,row.statusSoft,'●',row.statusAccent,8);
+      fittedText(ctx,row.label,rightX+56,yy+18,180,12,900,INK);
+      const pillW=95;
+      rr(ctx,rightX+rightW-pillW-13,yy-3,pillW,26,12,row.statusSoft,row.statusSoft);
+      ctx.textAlign='center';
+      fittedText(ctx,row.status,rightX+rightW-pillW/2-13,yy+14,pillW-8,9,850,row.statusAccent);
+      ctx.textAlign='left';
+      wrap(ctx,englishFree(row.detail),rightX+20,yy+39,10,650,MUTED,rightW-39,1.17,2);
+    });
+  }else{
+    const climateEvidence=[
+      {title:'Yağış',value:climate.totalRain===null?'Eksik':numTr(climate.totalRain)+' mm',
+        detail:'Seçilen dönemin toplam geçmiş yağışı. Bitki hastalığı kanıtı değildir.',accent:BLUE,soft:BLUE_SOFT},
+      {title:'Referans ET₀',value:climate.totalEt0===null?'Eksik':numTr(climate.totalEt0)+' mm',
+        detail:'Atmosferik buharlaşma talebi; sulama miktarı veya gerçek su açığı değildir.',accent:TEAL,soft:GREEN_SOFT},
+      {title:'Sıcak günler',value:climate.hotDays===null?'Eksik':String(climate.hotDays)+' gün',
+        detail:'Günlük en yüksek sıcaklık 30°C veya üzerinde. Ürün evresi bilinmeden zarar belirlenmez.',accent:ORANGE,soft:ORANGE_SOFT},
+      {title:'En yüksek rüzgâr',value:climate.maximumWind===null?'Eksik':numTr(climate.maximumWind)+' km/sa',
+        detail:'Dönemdeki en yüksek kayıtlı rüzgâr. Hasar kanıtı olarak kullanılmaz.',accent:BLUE,soft:BLUE_SOFT},
+      {title:'Hastalık / zararlı',value:'Tanı yok',
+        detail:'Bu dönemde kayıtlı doğrulanmış saha teşhisi yok. Bu, hiç risk olmadığı anlamına gelmez.',accent:PURPLE,soft:PURPLE_SOFT},
+    ];
+    climateEvidence.forEach((row,index)=>{
+      const yy=top+64+index*78;
+      rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?WHITE:'#edf4f8',LINE);
+      circleIcon(ctx,rightX+34,yy+15,12,row.soft,'●',row.accent,8);
+      fittedText(ctx,row.title,rightX+56,yy+18,174,11,900,INK);
+      rr(ctx,rightX+rightW-122,yy-3,109,26,12,row.soft,row.soft);
+      ctx.textAlign='center';
+      fittedText(ctx,row.value,rightX+rightW-67,yy+14,100,9.4,850,row.accent);
+      ctx.textAlign='left';
+      wrap(ctx,row.detail,rightX+20,yy+39,9.5,650,INK,rightW-39,1.13,2);
+    });
+  }
 
-  rr(ctx, rightX, 604, rightW, 216, 15, WHITE, LINE);
-  sectionHeader(ctx, rightX + 10, 612, 7, 'Verim, Hasat ve Kalite', ORANGE, '↑');
-  const yieldCards = [
-    ['Tahmini Verim', yieldInfo.yieldKgDa === null ? '—' : `${Math.round(yieldInfo.yieldKgDa)}`, yieldInfo.yieldKgDa === null ? 'Ölçüm/model yok' : 'kg/da', ORANGE],
-    ['Kalite', yieldInfo.quality === 'Ölçüm bekleniyor' ? '—' : yieldInfo.quality, 'Ölçüm gerek', GREEN],
-    ['Hasat Zamanı', yieldInfo.harvest, yieldInfo.harvestNote, PURPLE],
+  const hasYieldEstimate=yieldInfo.yieldKgDa!==null||
+    (yieldInfo.quality!=='Ölçüm bekleniyor'&&yieldInfo.quality!=='')||
+    yieldInfo.harvest!=='Doğrulanmadı';
+  rr(ctx,rightX,604,rightW,216,15,hasYieldEstimate?WHITE:'#fffaf4',LINE);
+  sectionHeader(ctx,rightX+10,612,7,
+    hasYieldEstimate?'Verim, Hasat ve Kalite':'Verim ve Hasat · Kanıt Durumu',ORANGE,'↑');
+  const yieldCards=hasYieldEstimate?[
+    ['Tahmini Verim',yieldInfo.yieldKgDa===null?'—':String(Math.round(yieldInfo.yieldKgDa)),
+      yieldInfo.yieldKgDa===null?'Model hesabı yok':'kg/da',ORANGE],
+    ['Kalite',yieldInfo.quality==='Ölçüm bekleniyor'?'—':yieldInfo.quality,'Kayıtlı değerlendirme',GREEN],
+    ['Hasat Zamanı',yieldInfo.harvest,yieldInfo.harvestNote,PURPLE],
+  ]:[
+    ['Saha İşlemleri',String(snapshot.activities?.length??0),'Bu dönemde kayıtlı',ORANGE],
+    ['Toprak Testi',String(snapshot.soilAnalyses?.length??0),'Laboratuvar kayıtları',GREEN],
+    ['Verim / Hasat','Hesaplanmadı','Güvenilir model ve kayıt gerekli',PURPLE],
   ];
-  yieldCards.forEach(([titleValue,value,sub,accent],index) => {
-    const x = rightX + 14 + index * 124;
-    rr(ctx, x, 655, 116, 145, 10, GRAY_SOFT, LINE);
-    ctx.textAlign = 'center';
-    fittedText(ctx, titleValue, x + 58, 680, 103, 9.5, 800, MUTED);
-    const large = String(value).length <= 11;
-    fittedText(ctx, value, x + 58, 727, 102, large ? 17 : 11, 900, accent);
-    ctx.textAlign = 'left';
-    wrap(ctx, sub, x + 10, 758, 9, 750, MUTED, 95, 1.2, 3);
+  yieldCards.forEach(([titleValue,value,sub,accent],index)=>{
+    const x=rightX+14+index*124;
+    rr(ctx,x,655,116,145,10,index===0?ORANGE_SOFT:index===1?GREEN_SOFT:PURPLE_SOFT,LINE);
+    ctx.textAlign='center';
+    fittedText(ctx,titleValue,x+58,680,103,9.5,800,MUTED);
+    fittedText(ctx,value,x+58,727,102,String(value).length<=11?17:11,900,accent);
+    ctx.textAlign='left';
+    wrap(ctx,sub,x+10,758,9,750,MUTED,95,1.2,3);
   });
 
   rr(ctx, rightX, 830, rightW, 330, 15, '#fbf8ff', LINE);
