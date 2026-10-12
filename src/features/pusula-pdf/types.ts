@@ -127,6 +127,15 @@ export type PusulaPdfSnapshot = {
     qc: { quality: string; validPixelFraction: number | null };
     metrics: Record<string, number | null>;
   }>;
+  // A static model reference captured on a potentially later date.
+  // Never interpreted as an in-period laboratory or satellite measurement.
+  soilReference?: {
+    kind: 'SoilGrids250m-model-context';
+    recordedAt: string | null;
+    source: string;
+    historicalMeasurement: false;
+    metrics: Record<string, number | null>;
+  } | null;
   layerArchive?: PusulaPdfLayerArchiveSnapshot[];
   irrigation: { kcSnapshots: unknown[] };
   activities: unknown[];
