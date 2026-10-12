@@ -121,6 +121,7 @@ export type PusulaPdfSnapshot = {
 
 export type WeeklyPusulaReport = {
   id: string;
+  user_id: string;
   field_id: string;
   period_start: string;
   period_end: string;
