@@ -27,15 +27,33 @@ export type StorePurchaseResult = {
   productIdentifier: string | null;
 };
 
-const OFFERING_IDS: Record<StorePaidPlan, string> = {
-  plus: 'plus',
-  premium: 'premium',
+const OFFERING_ID = 'tarlapusula_plans';
+
+const PACKAGE_IDS: Record<StorePaidPlan, Record<StoreBillingPeriod, string>> = {
+  plus: { monthly: '$rc_monthly', annual: '$rc_annual' },
+  premium: { monthly: 'premium_monthly', annual: 'premium_annual' },
 };
 
 const ENTITLEMENT_IDS: Record<StorePaidPlan, string> = {
-  plus: 'plus',
-  premium: 'premium',
+  plus: 'tarlapusula_plus',
+  premium: 'tarlapusula_premium',
 };
+
+function findPlanPackage(
+  offering: PurchasesOffering | null | undefined,
+  plan: StorePaidPlan,
+  period: StoreBillingPeriod,
+): PurchasesPackage | null {
+  const packageId = PACKAGE_IDS[plan][period];
+  const productId = `com.tarlapusula.${plan}.${period === 'monthly' ? 'monthly' : 'annual'}`;
+  return (
+    offering?.availablePackages?.find(
+      (item) =>
+        item.identifier === packageId ||
+        item.product.identifier === productId,
+    ) ?? null
+  );
+}
 
 let configuredUserId = '';
 let configurePromise: Promise<void> | null = null;
@@ -74,8 +92,8 @@ function activePlanFromCustomerInfo(
 ): TarlaPusulaPlan {
   const active = customerInfo?.entitlements?.active ?? {};
 
-  if (active[ENTITLEMENT_IDS.premium]) return 'premium';
-  if (active[ENTITLEMENT_IDS.plus]) return 'plus';
+  if (active[ENTITLEMENT_IDS.premium] || active.premium) return 'premium';
+  if (active[ENTITLEMENT_IDS.plus] || active.plus) return 'plus';
   return 'free';
 }
 
@@ -86,6 +104,7 @@ function activeProductIdentifier(
   if (plan !== 'plus' && plan !== 'premium') return null;
 
   return (
+    customerInfo?.entitlements?.active?.[ENTITLEMENT_IDS[plan]]?.productIdentifier ??
     customerInfo?.entitlements?.active?.[plan]?.productIdentifier ??
     null
   );
@@ -167,14 +186,14 @@ async function offeringForPlan(plan: StorePaidPlan) {
 
   const offerings = await Purchases.getOfferings();
   const offering =
-    offerings.all?.[OFFERING_IDS[plan]] ??
-    (offerings.current?.identifier === OFFERING_IDS[plan]
+    offerings.all?.[OFFERING_ID] ??
+    (offerings.current?.identifier === OFFERING_ID
       ? offerings.current
       : null);
 
   if (!offering) {
     throw new Error(
-      `${plan === 'plus' ? 'Plus' : 'Premium'} mağaza paketi RevenueCat'te bulunamadı.`,
+      `RevenueCat mağaza grubu (${OFFERING_ID}) bulunamadı. Satın alma ayarlarını kontrol edin.`,
     );
   }
 
@@ -183,10 +202,10 @@ async function offeringForPlan(plan: StorePaidPlan) {
 
 function packageForPeriod(
   offering: PurchasesOffering,
+  plan: StorePaidPlan,
   period: StoreBillingPeriod,
 ): PurchasesPackage {
-  const aPackage =
-    period === 'annual' ? offering.annual : offering.monthly;
+  const aPackage = findPlanPackage(offering, plan, period);
 
   if (!aPackage) {
     throw new Error(
@@ -217,18 +236,18 @@ export async function getNativeStorePrices(): Promise<StorePlanPrice[]> {
   await ensureNativePurchasesConfigured();
   const offerings = await Purchases.getOfferings();
 
-  return (['plus', 'premium'] as const).map((plan) => {
-    const offering =
-      offerings.all?.[OFFERING_IDS[plan]] ??
-      (offerings.current?.identifier === OFFERING_IDS[plan]
-        ? offerings.current
-        : null);
+  const offering =
+    offerings.all?.[OFFERING_ID] ??
+    (offerings.current?.identifier === OFFERING_ID ? offerings.current : null);
 
+  return (['plus', 'premium'] as const).map((plan) => {
+    const monthly = findPlanPackage(offering, plan, 'monthly');
+    const annual = findPlanPackage(offering, plan, 'annual');
     return {
       plan,
-      monthly: priceString(offering?.monthly),
-      annual: priceString(offering?.annual),
-      annualMonthlyEquivalent: monthlyEquivalent(offering?.annual),
+      monthly: priceString(monthly),
+      annual: priceString(annual),
+      annualMonthlyEquivalent: monthlyEquivalent(annual),
     };
   });
 }
@@ -283,7 +302,7 @@ export async function purchaseStorePlan(
 ): Promise<StorePurchaseResult> {
   try {
     const offering = await offeringForPlan(plan);
-    const aPackage = packageForPeriod(offering, period);
+    const aPackage = packageForPeriod(offering, plan, period);
 
     await Purchases.trackCustomPaywallImpression({
       offering,
