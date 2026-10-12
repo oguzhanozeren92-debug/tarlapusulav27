@@ -649,6 +649,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
   const { canvas, ctx } = makeCanvas();
   const guidance = buildPusulaPdfGuidance(snapshot);
+  const narrative=snapshot.aiNarrative;
   const sat = [...snapshot.satellite.points].sort((a, b) => a.date.localeCompare(b.date));
   const latest = sat.at(-1);
   const historicalWeather: any[] = Array.isArray((snapshot.weather as any)?.history) ? (snapshot.weather as any).history : [];
@@ -757,8 +758,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const ndviNote=knownSeries(sat,'ndvi').length>=2
     ? 'Geçmiş NDVI ölçümleri var; ölçüm yönü grafik üzerinden karşılaştırılabilir.'
     : 'Tek geçerli sayısal NDVI varsa değişim kesinleştirilemez.';
-  const summary = guidance.weeklySummary;
-  wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 11.7, 650, INK, leftW - 40, 1.32, 6);
+  const summary = narrative?.summary || guidance.weeklySummary;
+  wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 11.3, 650, INK, leftW - 40, 1.27, 6);
   const action = guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
   rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
   text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
@@ -785,11 +786,13 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   });
   rr(ctx,leftX+15,1458,leftW-30,111,11,WHITE,LINE);
   text(ctx,'Pusula’nın Bitki Yorumu',leftX+27,1480,12,900,GREEN_DARK);
-  const bioNote=bio
-    ? ('Yaprak alanı ve bitki örtüsü SL2P uydu tahminidir; '+(bioQuality==='low'
-      ? 'piksel kalitesi düşük olduğu için kesin bir tarla teşhisi sayılmaz.'
-      : 'saha gözlemi ve çok tarihli ölçümlerle birlikte değerlendirilmelidir.'))
-    : 'Seçilen dönemde uygun SL2P sayısal ölçümü bulunmuyor. Görüntü olması tek başına güvenilir klorofil veya su ölçümü anlamına gelmez.';
+  const bioNote=(narrative?.plant && narrative.plant.length<=240)
+    ? narrative.plant
+    : bio
+      ? ('Yaprak alanı ve bitki örtüsü SL2P uydu tahminidir; '+(bioQuality==='low'
+        ? 'piksel kalitesi düşük olduğu için kesin bir tarla teşhisi sayılmaz.'
+        : 'saha gözlemi ve çok tarihli ölçümlerle birlikte değerlendirilmelidir.'))
+      : 'Seçilen dönemde uygun SL2P sayısal ölçümü bulunmuyor. Görüntü olması tek başına güvenilir klorofil veya su ölçümü anlamına gelmez.';
   wrap(ctx,bioNote,leftX+27,1503,11,650,INK,leftW-55,1.33,4);
   text(ctx,'Kaynak: Sentinel-2 · SL2P / arşiv · tarla özelinde',leftX+27,1552,9.2,750,MUTED);
 
@@ -992,17 +995,18 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     rightX + 75, 926, 16, 900, INK);
   const criticalText = latestPhoto
     ? (diagnosis.headline || diagnosis.summary || 'Fotoğraftaki belirtiler saha gözlemiyle birlikte değerlendirilmelidir.')
-    : 'Fotoğraf, güncel tarla notu veya yerinde doğrulama olmadan kesin hastalık ve zararlı teşhisi üretilmez.';
+    : (narrative?.risk || 'Fotoğraf, güncel tarla notu veya yerinde doğrulama olmadan kesin hastalık ve zararlı teşhisi üretilmez.');
   wrap(ctx, englishFree(criticalText), rightX + 29, 975, 13, 650, MUTED, rightW - 61, 1.35, 5);
   text(ctx, latestPhoto ? 'Kanıt: Kullanıcı saha fotoğrafı' : 'İstenen kanıt: Güncel saha fotoğrafı',
     rightX + 29, 1081, 11, 850, BLUE);
 
   rr(ctx, rightX, 1170, rightW, 250, 15, '#f7fbf8', LINE);
   sectionHeader(ctx, rightX + 10, 1178, 9, "Pusula'nın Kısa Aksiyonları", GREEN, '✓');
+  const narrativeActions=(narrative?.actions??[]).filter(Boolean);
   const actions = [
-    ['Bugün', guidance.next7Days[0] ?? 'Tarlanın güncel durumunu kontrol et.', GREEN, GREEN_SOFT],
-    ['Önümüzdeki 7 Gün', guidance.next7Days[1] ?? 'Uydu ve hava trendini takip et.', BLUE, BLUE_SOFT],
-    ['İzle ve Planla', guidance.next7Days[2] ?? guidance.dataQualityNote, PURPLE, PURPLE_SOFT],
+    ['Bugün', narrativeActions[0] ?? guidance.next7Days[0] ?? 'Tarlanın güncel durumunu kontrol et.', GREEN, GREEN_SOFT],
+    ['Önümüzdeki 7 Gün', narrativeActions[1] ?? guidance.next7Days[1] ?? 'Uydu ve hava trendini takip et.', BLUE, BLUE_SOFT],
+    ['İzle ve Planla', narrativeActions[2] ?? guidance.next7Days[2] ?? guidance.dataQualityNote, PURPLE, PURPLE_SOFT],
   ];
   actions.forEach(([titleValue, value, accent, soft], index) => {
     const x = rightX + 14 + index * 124;
