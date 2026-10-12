@@ -1,5 +1,10 @@
 .tp-drawer-support-footer{
-  margin-top:auto; padding:14px 0 4px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-top:auto;
+  padding:14px 0 4px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(118px,138px);
+  align-items:center;
+  gap:10px;
 }
 .tp-drawer-social-stack{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0;flex:1}
 .tp-drawer-socials{display:flex;gap:8px;align-items:center}
@@ -67,10 +72,108 @@
   stroke-linejoin:round!important;
   flex:0 0 auto!important;
 }
+
+/* Social links stay on the left; compact membership card fills the marked space on the right. */
+.tp-premium-drawer .tp-drawer-membership{
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:center;
+  gap:8px;
+  min-width:0;
+  min-height:104px;
+  padding:10px 9px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.34);
+  border-radius:16px;
+  background:linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.055) 72%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.11),0 8px 20px rgba(0,0,0,.16);
+  color:#fff;
+  -webkit-text-fill-color:#fff;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+.tp-premium-drawer .tp-drawer-membership-title{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  color:rgba(255,255,255,.74);
+  -webkit-text-fill-color:rgba(255,255,255,.74);
+  font-size:8px;
+  font-weight:850;
+  letter-spacing:.10em;
+}
+.tp-premium-drawer .tp-drawer-membership-title svg{
+  width:14px;
+  height:14px;
+  flex:0 0 14px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.65;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.tp-premium-drawer .tp-drawer-membership-plan{
+  display:block;
+  min-width:0;
+  color:#fff;
+  -webkit-text-fill-color:#fff;
+  font-size:13px;
+  font-weight:850;
+  letter-spacing:-.025em;
+  line-height:1.2;
+}
+.tp-premium-drawer .tp-drawer-membership-cta{
+  box-sizing:border-box;
+  width:100%;
+  min-height:31px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  margin:0;
+  padding:6px 5px;
+  border:1px solid #fff;
+  border-radius:9px;
+  background:#fff;
+  color:#11151a;
+  -webkit-text-fill-color:#11151a;
+  font-size:9px;
+  line-height:1.15;
+  font-weight:850;
+  text-align:center;
+  cursor:pointer;
+  transition:background .16s ease,transform .16s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.tp-premium-drawer .tp-drawer-membership-cta:hover{background:#e8eaed}
+.tp-premium-drawer .tp-drawer-membership-cta:active{transform:scale(.98)}
+.tp-premium-drawer .tp-drawer-membership-cta:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.tp-premium-drawer .tp-drawer-membership-cta span{font-size:17px;font-weight:450;line-height:.8}
+.tp-premium-drawer .tp-drawer-membership-confirmed,
+.tp-premium-drawer .tp-drawer-membership-pending{
+  min-height:31px;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  color:rgba(255,255,255,.78);
+  -webkit-text-fill-color:rgba(255,255,255,.78);
+  font-size:9px;
+  line-height:1.2;
+  font-weight:750;
+}
+.tp-premium-drawer .tp-drawer-membership-confirmed svg{
+  width:14px;height:14px;fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+}
+
 @media(max-width:520px){
   .tp-drawer-support-footer{
     padding-top:12px;
-    align-items:flex-start;
+    grid-template-columns:minmax(0,1fr) minmax(118px,132px);
+    align-items:center;
+    gap:8px;
   }
   .tp-drawer-footer-links{
     gap:5px;
