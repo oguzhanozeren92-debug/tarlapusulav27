@@ -818,6 +818,12 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     text(ctx, item.meaning, x + 52, yy + 2, 8.5, 650, INK);
   });
 
+  const unmeasuredIndices=VEGETATION_INDICES.filter(item=>knownSeries(sat,item.key).length===0);
+  if(unmeasuredIndices.length){
+    fittedText(ctx,`Sayısal veri yok: ${unmeasuredIndices.map(item=>item.label).join(', ')} · uygun parsel ölçümü gerekli.`,
+      midX+17,top+375,midW-34,9,750,MUTED);
+  }
+
   rr(ctx, midX, 512, midW, 204, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 520, 2, 'Su ve Sulama Analizi', BLUE, '●');
   const waterCards = [
