@@ -26,7 +26,11 @@ function safeName(value: string) {
 function makePath(report: WeeklyPusulaReport, userId: string) {
   const fileName = `TarlaPusula-${safeName(report.report_data?.field?.name || 'Tarla')}-${safeName(report.period_end || report.id)}.pdf`;
   const safeId = String(report.id).replace(/[^a-zA-Z0-9_-]/g, '');
-  return { fileName, path: `${REPORT_FOLDER}/${userId}/${safeId}-rev4.pdf` };
+  // Same report ID can be updated with fresh measurements by the PDF worker.
+  // Use the immutable snapshot creation timestamp as part of the local file key,
+  // so a re-analysis never opens a stale previously downloaded PDF.
+  const snapshotVersion = safeName(report.report_data?.period?.createdAt || report.generated_at || report.period_end);
+  return { fileName, path: `${REPORT_FOLDER}/${userId}/${safeId}-rev4-${snapshotVersion}.pdf` };
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
