@@ -322,9 +322,15 @@ async function collectSatellite(userId:string,fieldId:string,geometry:any,archiv
       // More scene cloud cover does not imply every pixel in this parcel is cloudy.
       // Sentinel SCL still masks all invalid/cloud pixels; no values are fabricated.
       if(!['ndvi','ndre','savi','gndvi'].some((key)=>readIndex(r,key)!==null)){
-        r=await withRetry(`uydu açık piksel tekrar ${date}`,()=>invokeFunction('satellite-field-analysis',{
+        const firstPass=r;
+        const numericRetry=await withRetry(`uydu açık piksel tekrar ${date}`,()=>invokeFunction('satellite-field-analysis',{
           geometry:g,imageDate:date,maxCloudCoverage:75,statisticsOnly:true
         }),2);
+        // Preserve the valid first-pass parcel images; only replace the
+        // numerical statistics when a clearer-pixel retry succeeds.
+        r={...firstPass,...numericRetry,
+          ndviImage:numericRetry?.ndviImage??firstPass?.ndviImage??null,
+          trueColorImage:numericRetry?.trueColorImage??firstPass?.trueColorImage??null};
       }
       const point={date,ndvi:readIndex(r,'ndvi'),ndmi:readIndex(r,'ndmi'),ndre:readIndex(r,'ndre'),savi:readIndex(r,'savi'),gndvi:readIndex(r,'gndvi'),
         ndviImage:typeof r?.ndviImage==='string'?r.ndviImage:null,trueColorImage:typeof r?.trueColorImage==='string'?r.trueColorImage:null,source:'live',fromArchive:false};
