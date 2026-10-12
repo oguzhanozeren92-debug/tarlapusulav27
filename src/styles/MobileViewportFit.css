@@ -201,3 +201,110 @@
     line-height: 1.45;
   }
 }
+
+
+/* v67: shared mobile viewport containment (2026-10-13).
+   Correct intrinsic width at the source. A map carousel may scroll INSIDE
+   its own rail; it must not turn the entire page into a horizontal canvas.
+   Root clipping is a final safety net, not a substitute for fitting cards. */
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important; /* WKWebView: reliable document-edge guard */
+    overscroll-behavior-x: none;
+  }
+
+  body #root {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: clip !important;
+  }
+
+  /* Do not let a screen or its first content wrapper set the page width. */
+  body #root :is(
+    .tp-v1,
+    .tp-app-shell-content,
+    .tp-field-detail-page,
+    .tp-calendar-page,
+    .tp-ai-page,
+    .tp-wxr-page,
+    .tp-wxv2-page,
+    .soil-page,
+    .tp-peststore-page,
+    .tp-market-ref-page,
+    .tp-hub-page
+  ) {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  body #root .tp-v1 {
+    width: 100% !important;
+    overflow-x: clip !important; /* Does not create an extra vertical scroller */
+  }
+
+  body #root .tp-v1 .tp-main {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-inline: auto !important;
+  }
+
+  body #root .tp-v1 .tp-main > *,
+  body #root .tp-v1 :is(
+    .tp-home-top-split,
+    .tp-home-map-pusula-shell,
+    .tp-map-first-shell,
+    .tp-home-field,
+    .tp-field-head,
+    .tp-field-toolbar,
+    .tp-field-select-wrap,
+    .tp-map-shortcut-stack,
+    .tp-home-today-reference,
+    .tp-home-notifications-reference
+  ) {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Map stage was declared width:100% alongside horizontal 9px margins.
+     The margins must not make the normal portrait viewport 18px too wide.
+     Fullscreen map remains free to use the entire screen. */
+  body:not(.tp-map-body-fullscreen) #root .tp-v1
+    .tp-map-stage:not(.tp-map-portrait-fullscreen) {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Explicit local horizontal scroll for satellite tools, not for the page. */
+  body #root .tp-v1 .tp-map-shortcut-stack {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Child columns must shrink to the actual device before wrapping text. */
+  body #root .tp-v1 :is(
+    .tp-home-top-split,
+    .tp-field-head,
+    .tp-field-toolbar
+  ) > * {
+    min-width: 0 !important;
+  }
+}
