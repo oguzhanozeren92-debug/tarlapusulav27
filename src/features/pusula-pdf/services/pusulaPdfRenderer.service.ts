@@ -768,11 +768,23 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   rr(ctx, leftX, 914, leftW, 230, 15, PURPLE_SOFT, '#e4d6fb');
   circleIcon(ctx, leftX + 34, 945, 18, PURPLE, '✦', WHITE, 14);
   text(ctx, "Pusula'nın Yorumu", leftX + 62, 951, 18, 900, PURPLE);
-  const ndviNote=knownSeries(sat,'ndvi').length>=2
-    ? 'Geçmiş NDVI ölçümleri var; ölçüm yönü grafik üzerinden karşılaştırılabilir.'
-    : 'Tek geçerli sayısal NDVI varsa değişim kesinleştirilemez.';
-  const summary = narrative?.summary || guidance.weeklySummary;
-  wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 11.3, 650, INK, leftW - 40, 1.27, 6);
+  // Data-grounded narrative fallback if the AI provider has no response.
+  // Numeric change in NDVI alone does not prove disease, yield or irrigation.
+  const ndviSeries=knownSeries(sat,'ndvi');
+  let ndviNote='Bu dönemde tarihli NDVI ölçümü yok; güvenilir değişim yorumu yapılamaz.';
+  if(ndviSeries.length===1){
+    const one=ndviSeries[0];
+    ndviNote=`Tek NDVI ölçümü ${fmt(one.date,false)} tarihinde ${numericIndexText(one.ndvi)}. Eğilim için ikinci gerçek ölçüm gerekir.`;
+  }else if(ndviSeries.length>=2){
+    const last=ndviSeries.at(-1)!;
+    const prev=ndviSeries.at(-2)!;
+    const delta=Number(last.ndvi)-Number(prev.ndvi);
+    const signal=Math.abs(delta)<.015?'belirgin bir farklılık göstermiyor'
+      :delta>0?'artış gösteriyor':'azalış gösteriyor';
+    ndviNote=`NDVI ${fmt(prev.date,false)} tarihinde ${numericIndexText(prev.ndvi)}, ${fmt(last.date,false)} tarihinde ${numericIndexText(last.ndvi)}: ${signal}. Tek başına hastalık, su stresi veya verim kanıtı değildir.`;
+  }
+  const summary=narrative?.summary || guidance.weeklySummary;
+  wrap(ctx, summary+' '+ndviNote, leftX + 20, 985, 10.8, 650, INK, leftW - 40, 1.27, 6);
   const action = guidance.next7Days[0] ?? 'Yeni veri geldikçe tarlanın durumunu tekrar değerlendir.';
   rr(ctx, leftX + 18, 1080, leftW - 36, 48, 9, WHITE, '#e6dcf7');
   text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
