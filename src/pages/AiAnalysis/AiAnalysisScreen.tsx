@@ -992,6 +992,95 @@ html body #root .tp-ai-page .tp-pdf-local-status {
   font-size:11px!important;font-weight:700!important;line-height:1.4!important;
 }
 
+
+/* PusulaPDF — period selector and truthful stage progress */
+html body #root .tp-ai-page .tp-pdf-period-picker {
+  box-sizing:border-box!important;display:grid!important;gap:9px!important;
+  margin:12px 0 12px!important;padding:13px!important;
+  background:#f6f8f9!important;border:1px solid #e1e5e8!important;
+  border-radius:14px!important;min-width:0!important;max-width:100%!important;
+}
+html body #root .tp-ai-page .tp-pdf-period-label{
+  display:block!important;font-size:11px!important;font-weight:900!important;
+  color:#182029!important;-webkit-text-fill-color:#182029!important
+}
+html body #root .tp-ai-page .tp-pdf-period-options{
+  width:100%!important;min-width:0!important;display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important
+}
+html body #root .tp-ai-page .tp-pdf-period-option{
+  appearance:none!important;min-width:0!important;min-height:38px!important;
+  padding:6px 3px!important;background:#fff!important;color:#27323b!important;
+  border:1px solid #d7dfe5!important;border-radius:10px!important;
+  font-size:10px!important;line-height:1.1!important;font-weight:800!important;
+  -webkit-text-fill-color:#27323b!important;cursor:pointer!important;
+}
+html body #root .tp-ai-page .tp-pdf-period-option.is-selected{
+  background:#101820!important;border-color:#101820!important;
+  color:#fff!important;-webkit-text-fill-color:#fff!important
+}
+html body #root .tp-ai-page .tp-pdf-period-option:disabled{cursor:wait!important}
+html body #root .tp-ai-page .tp-pdf-custom-dates{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:8px!important;width:100%!important;min-width:0!important
+}
+html body #root .tp-ai-page .tp-pdf-custom-dates label{
+  display:grid!important;gap:5px!important;min-width:0!important;
+  font-size:10px!important;font-weight:800!important;color:#34414c!important
+}
+html body #root .tp-ai-page .tp-pdf-custom-dates input{
+  color-scheme:light!important;display:block!important;
+  width:100%!important;min-width:0!important;box-sizing:border-box!important;
+  border:1px solid #d4dce3!important;border-radius:9px!important;background:#fff!important;
+  color:#1c2831!important;padding:9px 6px!important;font-size:12px!important;
+}
+html body #root .tp-ai-page .tp-pdf-selected-range{
+  display:block!important;color:#586673!important;-webkit-text-fill-color:#586673!important;
+  font-size:10px!important;font-weight:700!important;line-height:1.45!important;
+  overflow-wrap:anywhere!important
+}
+html body #root .tp-ai-page .tp-pdf-period-error{
+  color:#b42318!important;-webkit-text-fill-color:#b42318!important;
+  font-size:10px!important;font-weight:800!important
+}
+html body #root .tp-ai-page .tp-pdf-request-button{
+  background:#101820!important;border-color:#101820!important;
+}
+html body #root .tp-ai-page .tp-pusula-pdf-progress{
+  min-width:0!important;padding:14px 13px!important;margin:12px 0!important;
+  border:1px solid #dce2e7!important;border-radius:14px!important;
+  background:#f6f8fa!important;
+}
+html body #root .tp-ai-page .tp-pusula-pdf-progress-head{
+  display:flex!important;align-items:center!important;gap:10px!important;
+  justify-content:space-between!important;flex-wrap:wrap!important
+}
+html body #root .tp-ai-page .tp-pusula-pdf-progress-head strong{
+  font-size:12px!important;color:#19232b!important;-webkit-text-fill-color:#19232b!important
+}
+html body #root .tp-ai-page .tp-pusula-pdf-progress-head span{
+  font-size:10px!important;color:#465460!important;-webkit-text-fill-color:#465460!important
+}
+html body #root .tp-ai-page .tp-pusula-pdf-progress-track{
+  height:10px!important;margin:11px 0!important;width:100%!important;max-width:100%!important;
+  overflow:hidden!important;border-radius:999px!important;background:#dce3e8!important;
+  border:0!important
+}
+html body #root .tp-ai-page .tp-pusula-pdf-progress-fill{
+  display:block!important;height:100%!important;min-width:4px!important;max-width:100%!important;
+  border-radius:999px!important;background:linear-gradient(90deg,#222d35,#050607)!important;
+  transition:width 600ms ease!important;
+}
+html body #root .tp-ai-page .tp-pusula-pdf-progress>small{
+  display:block!important;font-size:10px!important;line-height:1.55!important;
+  font-weight:700!important;color:#4d5b68!important;-webkit-text-fill-color:#4d5b68!important
+}
+@media (max-width:340px){
+  html body #root .tp-ai-page .tp-pdf-period-options{gap:4px!important}
+  html body #root .tp-ai-page .tp-pdf-period-option{font-size:9px!important}
+  html body #root .tp-ai-page .tp-pdf-custom-dates{grid-template-columns:minmax(0,1fr)!important}
+}
+
 /* QUICK CALENDAR ACTION — PUSULAPDF */
 html body #root .tp-ai-page .tp-ai-pdf-calendar{
   box-sizing:border-box!important;
