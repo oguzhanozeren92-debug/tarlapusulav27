@@ -602,7 +602,8 @@ async function processJob(jobId:string,userId:string){
     const {data:field,error:fieldError}=await admin.from('fields').select(FIELD_COLUMNS).eq('id',job.field_id).eq('user_id',userId).single();
     if(fieldError||!field) throw fieldError??new Error('Tarla bulunamadı');
     const fieldId=String(field.id);const geometry=field.parcel_geometry??null;const lat=numberOrNull(field.parcel_centroid_lat??field.latitude);const lng=numberOrNull(field.parcel_centroid_lng??field.longitude);const period=requestedPeriod(job);
-    let layerArchive=await collectCloudLayerArchive(userId,fieldId);
+    let layerArchive=(await collectCloudLayerArchive(userId,fieldId))
+      .filter((row:any)=>!dateOnly(row.observedAt??row.archivedAt)||dateOnly(row.observedAt??row.archivedAt)!<=period.end);
 
     await setJob(jobId,{stage:'satellite',progress_meta:{message:'Seçilen dönemin uydu sahneleri doğrulanıyor',cloudArchiveCount:layerArchive.length}});
     const satellite=await collectSatellite(userId,fieldId,geometry,layerArchive,period).catch((error)=>{
@@ -614,16 +615,31 @@ async function processJob(jobId:string,userId:string){
     await setJob(jobId,{stage:'weather',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),message:'Seçilen dönemin gerçek hava kayıtları toplanıyor'}});
     const weather=await collectWeather(userId,fieldId,lat,lng,layerArchive,period);
 
-    layerArchive=await collectCloudLayerArchive(userId,fieldId);
+    layerArchive=(await collectCloudLayerArchive(userId,fieldId))
+      .filter((row:any)=>!dateOnly(row.observedAt??row.archivedAt)||dateOnly(row.observedAt??row.archivedAt)!<=period.end);
     await setJob(jobId,{stage:'field_memory',progress_meta:{weatherDays:weather.history.length,weatherArchiveUsed:Number(weather.archiveUsed??0),weatherLiveUsed:Number(weather.liveUsed??0),message:'Sentinel-1 VV, VH ve su adayı geçmişi birleştiriliyor'}});
     const radar=await collectRadar(userId,fieldId,lat,lng,geometry,layerArchive,period);
     // Bu raporda canlı kaynaktan çekilip yeni yazılan kayıtları da snapshot'a dahil et.
-    layerArchive=await collectCloudLayerArchive(userId,fieldId);
+    layerArchive=(await collectCloudLayerArchive(userId,fieldId))
+      .filter((row:any)=>!dateOnly(row.observedAt??row.archivedAt)||dateOnly(row.observedAt??row.archivedAt)!<=period.end);
 
     await setJob(jobId,{stage:'field_memory',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,message:'Tarla geçmişi birleştiriliyor'}});
-    const [activities,soilAnalyses,diagnoses,kcSnapshots]=await Promise.all([
+    const [allActivities,allSoilAnalyses,allDiagnoses,allKcSnapshots]=await Promise.all([
       optionalRows('activities',fieldId,'activity_date'),optionalRows('soil_analyses',fieldId),optionalRows('ai_diagnosis_sessions',fieldId,'updated_at'),optionalRows('field_irrigation_kc_snapshots',fieldId,'snapshot_date'),
     ]);
+    const inRange=(value:unknown)=>{
+      const d=dateOnly(value);return !!d&&d>=period.start&&d<=period.end;
+    };
+    const beforeEnd=(value:unknown)=>{
+      const d=dateOnly(value);return !d||d<=period.end;
+    };
+    const activities=allActivities.filter((row:any)=>inRange(row.activity_date??row.created_at));
+    const diagnoses=allDiagnoses.filter((row:any)=>inRange(row.updated_at??row.created_at));
+    const soilAnalyses=allSoilAnalyses.filter((row:any)=>beforeEnd(row.sample_date??row.analysis_date??row.created_at));
+    const kcSnapshots=allKcSnapshots.filter((row:any)=>inRange(row.snapshot_date??row.created_at));
+    if(numericSatellitePoints===0&&weather.history.length<2){
+      throw new Error('Seçilen dönemde güvenilir sayısal uydu veya yeterli hava ölçümü bulunamadı. Daha geniş ya da başka bir dönem seç.');
+    }
 
     const missing:string[]=[];if(!geometry)missing.push('parcel_geometry');if(!satellite.points.length)missing.push('satellite_period');if(weather.history.length<2)missing.push('weather_history_period');if(!radar.points.length)missing.push('radar_history');if(!activities.length)missing.push('activities');if(!soilAnalyses.length)missing.push('soil_analysis');
     const resolved=diagnoses.filter((d:any)=>d.status==='resolved');if(!resolved.length)missing.push('resolved_diagnosis');if(!kcSnapshots.length)missing.push('irrigation_kc');
