@@ -404,17 +404,11 @@ function progressBar(
 }
 
 function fieldHealthScore(snapshot: PusulaPdfSnapshot) {
-  const candidates = [
-    latestLayer(snapshot, 'field-health-score'),
-    latestLayer(snapshot, 'plant-health-synthesis'),
-    latestLayer(snapshot, 'satellite-fusion'),
-  ].map(layerPayload).filter(Boolean);
-
-  for (const candidate of candidates) {
-    const value = metricNumber(candidate, 'healthScore', 'fieldHealthScore', 'score');
-    if (value !== null) return clamp(value, 0, 100);
-  }
-  return null;
+  // A risk score is not a field-health score. Only accept a separately
+  // calculated, dated and named health metric from the actual reporting period.
+  const health = layerPayload(latestPeriodLayer(snapshot, 'field-health-score'));
+  const value = metricNumber(health, 'healthScore', 'fieldHealthScore');
+  return value !== null && value >= 0 && value <= 100 ? value : null;
 }
 
 function latestPeriodLayer(snapshot: PusulaPdfSnapshot, name: string) {
