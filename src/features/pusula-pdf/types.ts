@@ -112,6 +112,15 @@ export type PusulaPdfSnapshot = {
     error?: string;
   };
   weather: PusulaPdfWeatherHistory | unknown | null;
+  aiNarrative?: {
+    source: string;
+    summary: string;
+    plant: string;
+    water: string;
+    soil: string;
+    risk: string;
+    actions: string[];
+  };
   biophysical?: Array<{
     date: string | null;
     source: string;
