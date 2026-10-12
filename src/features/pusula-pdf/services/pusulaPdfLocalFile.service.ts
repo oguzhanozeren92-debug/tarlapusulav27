@@ -26,7 +26,7 @@ function safeName(value: string) {
 function makePath(report: WeeklyPusulaReport, userId: string) {
   const fileName = `TarlaPusula-${safeName(report.report_data?.field?.name || 'Tarla')}-${safeName(report.period_end || report.id)}.pdf`;
   const safeId = String(report.id).replace(/[^a-zA-Z0-9_-]/g, '');
-  return { fileName, path: `${REPORT_FOLDER}/${userId}/${safeId}.pdf` };
+  return { fileName, path: `${REPORT_FOLDER}/${userId}/${safeId}-rev4.pdf` };
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
