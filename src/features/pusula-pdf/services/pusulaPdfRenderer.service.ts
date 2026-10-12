@@ -43,7 +43,6 @@ const fmt = (value?: string | null, year = true) => {
 
 const valid = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-const num = (value: unknown, digits = 2) => valid(value) ? value.toFixed(digits) : '—';
 
 function makeCanvas() {
   const canvas = document.createElement('canvas');
@@ -187,18 +186,6 @@ function sectionHeader(
   text(ctx, `${number}. ${titleValue}`, x + 42, y + 24, 17, 900, accent);
 }
 
-function weatherRows(snapshot: PusulaPdfSnapshot) {
-  const w: any = snapshot.weather;
-  const candidates = [w?.history, w?.daily, w?.forecast];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate) && candidate.length) return candidate;
-  }
-  if (Array.isArray(w?.providers)) {
-    return w.providers.flatMap((provider: any) => provider?.forecast ?? provider?.daily ?? provider?.history ?? []);
-  }
-  return [];
-}
-
 function wv(row: any, ...keys: string[]) {
   for (const key of keys) {
     const value = row?.[key];
@@ -272,14 +259,6 @@ function statusColor(value: string) {
   if (/orta|dikkat|takip|kısmi|sinir|sınır|izle/.test(normalized)) return { accent: ORANGE, soft: ORANGE_SOFT };
   if (/iyi|düşük|dusuk|normal|sağlıklı|yeterli|dengeli|hazır/.test(normalized)) return { accent: GREEN, soft: GREEN_SOFT };
   return { accent: BLUE, soft: BLUE_SOFT };
-}
-
-function shortStatus(value: string, fallback = 'Takip') {
-  const normalized = String(value ?? '').toLocaleLowerCase('tr-TR');
-  if (/yüksek|kritik|severe|high/.test(normalized)) return 'Yüksek';
-  if (/orta|medium|moderate|attention|partial/.test(normalized)) return 'Orta';
-  if (/düşük|dusuk|low|normal|ready|healthy|good|aligned/.test(normalized)) return 'Düşük';
-  return value ? String(value).slice(0, 16) : fallback;
 }
 
 function imageBitmapFrom(src: string | null | undefined) {
@@ -398,36 +377,6 @@ function chart(
 }
 
 
-function donut(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-  value: number | null,
-  accent: string,
-  suffix = '',
-) {
-  ctx.strokeStyle = '#e4eaed';
-  ctx.lineWidth = 11;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.stroke();
-
-  if (value !== null) {
-    const pct = clamp(value, 0, 100) / 100;
-    ctx.strokeStyle = accent;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
-    ctx.stroke();
-    ctx.lineCap = 'butt';
-  }
-
-  ctx.textAlign = 'center';
-  text(ctx, value === null ? '—' : `${Math.round(value)}${suffix}`, x, y + 9, 23, 900, INK);
-  ctx.textAlign = 'left';
-}
-
 function progressBar(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -509,7 +458,7 @@ function photoDiagnosis(photo: PusulaPdfFieldPhoto | undefined) {
   return { headline, summary, severity };
 }
 
-function riskItems(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
+function riskItems(guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
   const find = (id: string) => guidance.insights.find((item) => item.id === id);
   const entries = [
     ['Kuraklık Stresi', find('water-scarcity-plan-evidence') ?? find('irrigation-synthesis-evidence')],
@@ -524,7 +473,8 @@ function riskItems(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buil
     const riskLevel = /^(yüksek|orta|düşük|kritik)$/i.test(observed.trim()) ? observed.trim() : null;
     const status = riskLevel ?? 'Doğrulanmadı';
     const description = String(insight?.meaning ?? '').trim();
-    const firstSentence = description.match(/^[^.!?]+[.!?]/)?.[0] ?? '';
+    // Split at an actual sentence boundary, not at decimal dots such as 0.3.
+    const firstSentence = description.split(/(?<=[.!?])\\s+(?=[A-ZÇĞİÖŞÜ])/u)[0] ?? '';
     const detail = firstSentence || 'Bu risk için doğrulanmış bir saha ölçümü veya yeterli model kanıtı henüz bulunmuyor.';
     const action = String(insight?.action ?? '').trim();
     const style = riskLevel ? statusColor(riskLevel) : { accent: MUTED, soft: GRAY_SOFT };
@@ -674,14 +624,12 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const weather = allWeather.filter((row) => wd(row) >= snapshot.period.start);
   const photos = [...(snapshot.fieldPhotos ?? [])].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
   const latestPhoto = photos[0];
-  const secondPhoto = photos[1];
   const diagnosis = photoDiagnosis(latestPhoto);
   const health = fieldHealthScore(snapshot);
-  const ndviCmp = periodCompare(sat, 'ndvi');
   const ndmiCmp = periodCompare(sat, 'ndmi');
   const need = irrigationNeed(snapshot, guidance);
   const yieldInfo = yieldSummary(snapshot);
-  const riskRows = riskItems(snapshot, guidance);
+  const riskRows = riskItems(guidance);
   const soilRows = latestSoilValues(snapshot);
   const soilGrids = soilGridsProfile(snapshot);
   const stage = phenologyLabel(snapshot, guidance);
