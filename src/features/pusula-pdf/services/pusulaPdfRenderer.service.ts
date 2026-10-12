@@ -572,10 +572,72 @@ function knownSeries(points: PusulaPdfSatellitePoint[], key: VegetationKey) {
   return points.filter((point) => valid(point[key])).sort((a,b) => a.date.localeCompare(b.date));
 }
 
+type PeriodClimateBucket = {
+  start:string;end:string;days:number;rainMm:number|null;et0Mm:number|null;
+  meanMaxC:number|null;
+};
+function periodWeatherSummary(rows:any[],from:string,to:string){
+  const start=Date.parse(from+'T00:00:00Z'),end=Date.parse(to+'T00:00:00Z');
+  const days=Math.max(0,Math.round((end-start)/86400000)+1);
+  const inPeriod=rows.filter(r=>wd(r)&&wd(r)>=from&&wd(r)<=to);
+  const observedDays=new Set(inPeriod.map(r=>wd(r))).size;
+  const vals=(key:string[])=>inPeriod.map(r=>wv(r,...key)).filter(valid);
+  const rainy=vals(['precipitation','rain','precipitationMm']);
+  const et0=vals(['et0','referenceEt0']);
+  const maxTemps=vals(['tempMax','maxTemp','maxTemperature']);
+  const minTemps=vals(['tempMin','minTemp','minTemperature']);
+  const winds=vals(['windSpeed','windSpeedKmh','windKmh']);
+  const total=(v:number[])=>v.length===days&&observedDays===days
+    ? v.reduce((a,b)=>a+b,0):null;
+  const totalRain=total(rainy),totalEt0=total(et0);
+  const hotDays=maxTemps.length===days&&observedDays===days
+    ? maxTemps.filter(v=>v>=30).length:null;
+  const bucketDays=Math.max(7,Math.ceil(days/5));
+  const buckets:PeriodClimateBucket[]=[];
+  for(let ix=0;ix<days;ix+=bucketDays){
+    const fromDate=new Date(start+ix*86400000).toISOString().slice(0,10);
+    const toDate=new Date(Math.min(end,start+(ix+bucketDays-1)*86400000)).toISOString().slice(0,10);
+    const period=inPeriod.filter(r=>wd(r)>=fromDate&&wd(r)<=toDate);
+    const count=Math.min(bucketDays,days-ix);
+    const validTotal=(keys:string[])=>{
+      const v=period.map(r=>wv(r,...keys)).filter(valid);
+      return v.length===count?v.reduce((a,b)=>a+b,0):null;
+    };
+    const temperatures=period.map(r=>wv(r,'tempMax','maxTemp','maxTemperature')).filter(valid);
+    buckets.push({start:fromDate,end:toDate,days:count,
+      rainMm:validTotal(['precipitation','rain','precipitationMm']),
+      et0Mm:validTotal(['et0','referenceEt0']),
+      meanMaxC:temperatures.length===count?temperatures.reduce((a,b)=>a+b,0)/count:null,
+    });
+  }
+  return {days,observedDays,totalRain,totalEt0,hotDays,
+    maximum:maxTemps.length?Math.max(...maxTemps):null,
+    minimum:minTemps.length?Math.min(...minTemps):null,
+    maximumWind:winds.length?Math.max(...winds):null,
+    averageMax:maxTemps.length?maxTemps.reduce((a,b)=>a+b,0)/maxTemps.length:null,
+    rainyDays:rainy.length===days?rainy.filter(v=>v>0).length:null,
+    buckets};
+}
+const numTr=(n:number|null,decimals=1)=>n===null?'—':n.toLocaleString('tr-TR',{maximumFractionDigits:decimals});
+function climateInterpretation(c:ReturnType<typeof periodWeatherSummary>){
+  if(c.totalRain===null||c.totalEt0===null) return 'Seçilen dönemin hava kayıtlarında eksik günler var. Eksik yağış ve buharlaşma değerleri tamamlanmadan kesin dönem yorumu yapılmaz.';
+  const rainText='Dönem yağışı '+numTr(c.totalRain)+' mm, referans ET₀ toplamı '+numTr(c.totalEt0)+' mm.';
+  const caution='ET₀ yağışla çıkarılarak sulama ihtiyacı hesaplanamaz; ürün katsayısı, sulama ve toprak su deposu ayrıca gerekir.';
+  return rainText+' '+(c.totalRain<5?'Yağış oldukça sınırlı; ':'')+caution;
+}
+
 function soilGridsProfile(snapshot: PusulaPdfSnapshot) {
   const layers = [...(snapshot.layerArchive ?? [])]
-    .filter((v) => v.layer === 'soil-intelligence')
+    .filter((v) => v.layer === 'soil-intelligence'
+      && String(v.observedAt??v.archivedAt??'').slice(0,10)<=snapshot.period.end)
     .sort((a,b) => String(b.observedAt ?? b.archivedAt ?? '').localeCompare(String(a.observedAt ?? a.archivedAt ?? '')));
+  const isHistoricalRecord=layers.length>0;
+  // This later-query static model is context, NOT an observation from the
+  // historical reporting period.
+  if(!isHistoricalRecord && snapshot.soilReference?.metrics){
+    layers.push({layer:'soil-intelligence',source:snapshot.soilReference.source,
+      observedAt:snapshot.soilReference.recordedAt,metrics:snapshot.soilReference.metrics});
+  }
   const read = (key: string, min: number, max: number) => {
     for (const row of layers) {
       const value = row.metrics?.[key];
@@ -590,7 +652,9 @@ function soilGridsProfile(snapshot: PusulaPdfSnapshot) {
   const clay = read('clayPercent', 0, 100);
   const silt = read('siltPercent', 0, 100);
   const sand = read('sandPercent', 0, 100);
-  return { ph, carbon, clay, silt, sand, available: [ph, carbon, clay, silt, sand].some((n) => n !== null) };
+  return { ph, carbon, clay, silt, sand, isHistoricalRecord,
+    referenceDate:snapshot.soilReference?.recordedAt??layers[0]?.observedAt??null,
+    available: [ph, carbon, clay, silt, sand].some((n) => n !== null) };
 }
 
 function numericIndexText(value: number | null | undefined) {
@@ -682,6 +746,11 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const allWeather = historicalWeather.filter((row) => wd(row) && wd(row) <= snapshot.period.end).sort((a,b) => wd(a).localeCompare(wd(b)));
   // Weather history is NOT a future forecast. Report the most recent recorded days.
   const weather = allWeather.filter((row) => wd(row) >= snapshot.period.start);
+  const climate=periodWeatherSummary(weather,snapshot.period.start,snapshot.period.end);
+  const hasSatelliteMeasurements=sat.some(p=>VEGETATION_INDICES.some(i=>valid(p[i.key])));
+  const hasBiophysics=(snapshot.biophysical??[]).some(p=>
+    p.date&&p.date>=snapshot.period.start&&p.date<=snapshot.period.end
+    &&Object.values(p.metrics??{}).some(valid));
   const photos = [...(snapshot.fieldPhotos ?? [])].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
   const latestPhoto = photos[0];
   const diagnosis = photoDiagnosis(latestPhoto);
