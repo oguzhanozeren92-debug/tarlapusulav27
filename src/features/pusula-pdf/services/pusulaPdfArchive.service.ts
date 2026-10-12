@@ -2,6 +2,7 @@ import { supabase } from '../../../supabaseClient';
 import { getPrivateFileUrl, uploadPrivateFile } from '../../../services/r2Storage';
 import type { WeeklyPusulaReport } from '../types';
 import { generatePusulaPdf } from './pusulaPdfRenderer.service';
+import { shareSavedPusulaPdf } from './pusulaPdfLocalFile.service';
 import {
   openRemoteFileInWeb,
   shareBlobFileOnDevice,
@@ -74,6 +75,8 @@ async function saveLocalPusulaPdf(
 }
 
 export async function openArchivedPusulaPdf(report: WeeklyPusulaReport) {
+  // No network or re-render is needed when the app has cached the PDF.
+  if (await shareSavedPusulaPdf(report)) return report.pdf_path || '';
   const fieldName = safePart(report.report_data?.field?.name || 'tarla');
   const periodEnd = safePart(report.period_end || report.generated_at || report.id);
   const fileName = `TarlaPusula-${fieldName}-${periodEnd}.pdf`;
