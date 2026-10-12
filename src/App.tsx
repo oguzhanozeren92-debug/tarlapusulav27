@@ -714,7 +714,27 @@ export default function App() {
 
       if (target === 'pusulapdf' || source === 'pusulapdf') {
         const reportId = String(detail.reportId ?? detail.report_id ?? '').trim();
-        void openPusulaPdfReport(reportId);
+        const notificationId = String(detail.notificationId ?? detail.notification_id ?? '').trim();
+        void (async () => {
+          if (reportId) {
+            await openPusulaPdfReport(reportId);
+            return;
+          }
+          if (notificationId) {
+            const { data: auth } = await supabase.auth.getUser();
+            if (auth.user) {
+              const { data: notice } = await supabase.from('app_notifications')
+                .select('data').eq('id', notificationId).eq('user_id', auth.user.id)
+                .maybeSingle();
+              const resolvedId = String((notice?.data as Record<string, unknown> | null)?.reportId ?? '').trim();
+              if (resolvedId) {
+                await openPusulaPdfReport(resolvedId);
+                return;
+              }
+            }
+          }
+          setScreen('notificationsHub');
+        })();
         return;
       }
 
