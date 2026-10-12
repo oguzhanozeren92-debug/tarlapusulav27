@@ -436,7 +436,7 @@ function yieldSummary(snapshot: PusulaPdfSnapshot) {
     && !['low', 'limited', 'unknown'].includes(String(details.harvestTiming?.confidence ?? '').toLowerCase())
     && details.harvestTiming?.status !== 'phenology_only';
   const reportDay = String(snapshot.period.end ?? '').slice(0, 10);
-  const currentHarvest = /^\\d{4}-\\d{2}-\\d{2}$/.test(rawHarvest)
+  const currentHarvest = /^\d{4}-\d{2}-\d{2}$/.test(rawHarvest)
     && (isObserved || (validatedModel && rawHarvest >= reportDay));
   // A phenology-only placeholder (e.g. cherry on 12 October) is not a harvest forecast.
   return {
@@ -474,7 +474,7 @@ function riskItems(guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
     const status = riskLevel ?? 'Doğrulanmadı';
     const description = String(insight?.meaning ?? '').trim();
     // Split at an actual sentence boundary, not at decimal dots such as 0.3.
-    const firstSentence = description.split(/(?<=[.!?])\\s+(?=[A-ZÇĞİÖŞÜ])/u)[0] ?? '';
+    const firstSentence = description.split(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ])/u)[0] ?? '';
     const detail = firstSentence || 'Bu risk için doğrulanmış bir saha ölçümü veya yeterli model kanıtı henüz bulunmuyor.';
     const action = String(insight?.action ?? '').trim();
     const style = riskLevel ? statusColor(riskLevel) : { accent: MUTED, soft: GRAY_SOFT };
@@ -554,11 +554,11 @@ function numericIndexText(value: number | null | undefined) {
 
 function englishFree(value: string) {
   return String(value)
-    .replace(/\\blimited\\b/gi, 'Sınırlı kanıt')
-    .replace(/\\bunknown\\b/gi, 'Bilinmiyor')
-    .replace(/\\bready\\b/gi, 'Hazır')
-    .replace(/\\bblocked\\b/gi, 'Engellendi')
-    .replace(/\\bcontext-only\\b/gi, 'Ön değerlendirme');
+    .replace(/\blimited\b/gi, 'Sınırlı kanıt')
+    .replace(/\bunknown\b/gi, 'Bilinmiyor')
+    .replace(/\bready\b/gi, 'Hazır')
+    .replace(/\bblocked\b/gi, 'Engellendi')
+    .replace(/\bcontext-only\b/gi, 'Ön değerlendirme');
 }
 
 function qrImageUrl(target: string) {
