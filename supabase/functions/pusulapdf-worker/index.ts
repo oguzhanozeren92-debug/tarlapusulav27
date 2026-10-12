@@ -367,6 +367,137 @@ async function collectSatellite(userId:string,fieldId:string,geometry:any,archiv
     examinedDates:points.length,historyDays:SATELLITE_HISTORY_DAYS};
 }
 
+// A verified archived optical series already used by Tarla Durumu is a valid
+// source of historical NDVI values. It is not a substitute for missing NDRE,
+// SAVI, GNDVI or SL2P outputs; preserve those as null.
+async function readFusionNdvi(userId:string,fieldId:string,period:{start:string;end:string}){
+  const {data,error}=await admin.from('field_satellite_fusion_snapshots')
+    .select('optical,analysis_day,qc,source,status')
+    .eq('user_id',userId).eq('field_id',fieldId)
+    .order('analysis_day',{ascending:false}).limit(3);
+  if(error){console.warn('[PUSULAPDF] fusion geçmişi alınamadı:',error.message);return [] as any[];}
+  const byDate=new Map<string,any>();
+  for(const snapshot of data??[]){
+    const series=snapshot?.optical?.ndvi?.series;
+    if(!Array.isArray(series))continue;
+    for(const row of series){
+      const date=dateOnly(row?.date);
+      const value=numberOrNull(row?.mean);
+      if(!date||date<period.start||date>period.end||value===null||value< -1||value>1)continue;
+      if(!byDate.has(date)){
+        byDate.set(date,{
+          date,ndvi:value,ndmi:null,ndre:null,gndvi:null,savi:null,
+          source:'Tarla Durumu · tarihli Sentinel-2 NDVI arşivi',
+          dataQuality:String(snapshot?.qc?.overall_quality??'unknown'),
+          fromArchive:true,
+        });
+      }
+    }
+  }
+  return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+async function readFieldBiophysics(userId:string,fieldId:string,period:{start:string;end:string}){
+  const {data,error}=await admin.from('field_biophysical_snapshots')
+    .select('acquired_at,algorithm,collection,metrics,qc,source')
+    .eq('user_id',userId).eq('field_id',fieldId)
+    .gte('acquired_at',period.start+'T00:00:00Z')
+    .lt('acquired_at',new Date(Date.parse(period.end+'T00:00:00Z')+86400000).toISOString())
+    .order('acquired_at',{ascending:false}).limit(12);
+  if(error){console.warn('[PUSULAPDF] SL2P arşivi alınamadı:',error.message);return [] as any[];}
+  return (data??[]).filter((row:any)=>
+    row?.metrics&&typeof row.metrics==='object'
+    &&['sl2p','rscm'].includes(String(row.algorithm??'').toLowerCase())
+    &&Object.values(row.metrics).some((metric:any)=>numberOrNull(metric?.mean??metric?.value)!==null)
+  ).map((row:any)=>({
+    date:dateOnly(row.acquired_at),
+    source:String(row.algorithm??'SL2P').toUpperCase()+' · '+String(row.collection??'Sentinel-2'),
+    qc:{quality:row.qc?.quality??'unknown',validPixelFraction:numberOrNull(row.qc?.valid_pixel_fraction)},
+    metrics:Object.fromEntries(['LAI','CCC','CWC','fCOVER','fAPAR','Albedo'].map(key=>{
+      const metric=row.metrics[key]??row.metrics[key.toLowerCase()];
+      return [key,numberOrNull(metric?.mean??metric?.value)];
+    })),
+  }));
+}
+
+// Supplement deterministic risk and crop engines with a guarded narrative.
+// The model has no authority to calculate water, yield, disease or treatment.
+async function buildGroundedNarrative(snapshot:any){
+  const key=Deno.env.get('NVIDIA_API_KEY');
+  if(!key)return null;
+  const satellite=(snapshot.satellite?.points??[]).slice(-12).map((p:any)=>({
+    date:p.date,ndvi:numberOrNull(p.ndvi),ndre:numberOrNull(p.ndre),
+    gndvi:numberOrNull(p.gndvi),savi:numberOrNull(p.savi),ndmi:numberOrNull(p.ndmi),
+  }));
+  const bio=(snapshot.biophysical??[]).slice(0,2).map((p:any)=>({
+    date:p.date,quality:p.qc?.quality,metrics:p.metrics,
+  }));
+  const weather=(snapshot.weather?.history??[]).slice(-12).map((row:any)=>({
+    date:row.date,tempMin:numberOrNull(row.tempMin),tempMax:numberOrNull(row.tempMax),
+    precipitation:numberOrNull(row.precipitation),et0:numberOrNull(row.et0),
+  }));
+  const soil=(snapshot.layerArchive??[]).findLast((r:any)=>r.layer==='soil-intelligence');
+  const irrigation=(snapshot.layerArchive??[]).findLast((r:any)=>r.layer==='irrigation-synthesis');
+  const input={
+    crop:snapshot.field?.crop??null,period:snapshot.period,
+    satellite,biophysical:bio,weather,
+    soil:{
+      labCount:snapshot.soilAnalyses?.length??0,
+      soilGridsIsModel:true,
+      ph:numberOrNull(soil?.metrics?.phTopsoil0To30),
+      clayPercent:numberOrNull(soil?.metrics?.clayPercent),
+      organicCarbon:numberOrNull(soil?.metrics?.organicCarbonTopsoil0To30),
+    },
+    irrigation:{
+      status:irrigation?.metrics?.synthesisStatus??null,
+      decision:irrigation?.metrics?.decision??null,
+      decisionConfidence:irrigation?.metrics?.decisionConfidence??null,
+    },
+    recordedActivities:snapshot.activities?.length??0,
+    evidenceGaps:snapshot.missing,
+  };
+  const system=[
+    'Sen TarlaPusula Pusula AI rapor yorumcususun.',
+    'Yalnız iletilen tarihli kaynakların desteklediği çıkarımları doğal Türkçe ile açıkla.',
+    'Verilmeyen sayısal değer, değişim, eşik, neden, sulama/gübre/ilaç dozu, hastalık teşhisi veya hasat tarihi ASLA uydurma.',
+    'Sadece NDVI değişimi hastalık, su stresi, azot eksikliği, hasat veya sulama ihtiyacı kanıtı değildir.',
+    'SL2P düşük kalite ise teşhis/karar için kullanma; SoilGrids laboratuvar sonucu değildir.',
+    'İki gerçek tarih yoksa artış veya düşüş iddiasında bulunma. Eksik alanların neden kesinleştirilemediğini kısa belirt.',
+    'Rapor yalnızca açıklama ve saha doğrulama önerileri içerir; üretim kararı mevcut yetkili motorlardan gelir.',
+    'Sadece JSON nesnesi döndür: {"summary":"","plant":"","water":"","soil":"","risk":"","actions":[]}.',
+    'Her metin tam cümle ve 1-2 cümle uzunluğunda, actions tam 3 kısa güvenli adım olmalı.',
+  ].join(' ');
+  try{
+    const response=await fetch('https://integrate.api.nvidia.com/v1/chat/completions',{
+      method:'POST',signal:AbortSignal.timeout(35000),
+      headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'deepseek-ai/deepseek-v4-flash-0731',temperature:0.1,max_tokens:700,
+        messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(input)}],
+        stream:false,
+      }),
+    });
+    if(!response.ok){console.warn('[PUSULAPDF] AI yorum sağlayıcısı yanıtı:',response.status);return null;}
+    const payload=await response.json();
+    const raw=String(payload?.choices?.[0]?.message?.content??'').trim();
+    const jsonText=raw.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+    const parsed=JSON.parse(jsonText);
+    if(!parsed||typeof parsed!=='object')return null;
+    const clean=(v:unknown)=>typeof v==='string'
+      ? v.trim().slice(0,480) : '';
+    const summary=clean(parsed.summary);
+    if(!summary||summary.length<20)return null;
+    const actions=(Array.isArray(parsed.actions)?parsed.actions:[])
+      .map(clean).filter(Boolean).slice(0,3);
+    return {source:'Pusula AI · açıklayıcı model',summary,
+      plant:clean(parsed.plant),water:clean(parsed.water),
+      soil:clean(parsed.soil),risk:clean(parsed.risk),actions};
+  }catch(error){
+    console.warn('[PUSULAPDF] AI değerlendirmesi yapılamadı, kanıt rehberi kullanılacak:',error);
+    return null;
+  }
+}
+
 type WeatherDay={date:string;tempMin:number|null;tempMax:number|null;tempAvg:number|null;precipitation:number|null;windSpeed:number|null;et0:number|null;source:string};
 
 function cloudWeatherHistory(archive:CloudLayerSnapshot[],period:{start:string;end:string}){
@@ -611,7 +742,26 @@ async function processJob(jobId:string,userId:string){
       console.error('[PUSULAPDF] satellite collection failed:',error);const fallback=cloudSatellitePoints(layerArchive).filter((p:any)=>p.date>=period.start&&p.date<=period.end).slice(0,10);
       return {points:fallback.sort((a:any,b:any)=>a.date.localeCompare(b.date)),availableDates:fallback.map((p:any)=>p.date),archiveUsed:fallback.length,liveUsed:0};
     });
-    const numericSatellitePoints=satellite.points.filter((p:any)=>[p.ndvi,p.ndmi,p.ndre,p.savi,p.gndvi].some((v)=>typeof v==='number')).length;
+    const [fusionNdvi,biophysical] = await Promise.all([
+      readFusionNdvi(userId,fieldId,period),
+      readFieldBiophysics(userId,fieldId,period),
+    ]);
+    // Match by actual observation date. Preserve higher-quality satellite
+    // measurements and images, enrich only an otherwise missing NDVI.
+    const satelliteByDate=new Map<string,any>();
+    for(const row of satellite.points) satelliteByDate.set(row.date,row);
+    for(const row of fusionNdvi){
+      const existing=satelliteByDate.get(row.date);
+      if(existing){
+        if(numberOrNull(existing.ndvi)===null){
+          existing.ndvi=row.ndvi;
+          existing.ndviSource=row.source;
+          existing.dataQuality=row.dataQuality;
+        }
+      }else satelliteByDate.set(row.date,row);
+    }
+    satellite.points=[...satelliteByDate.values()].sort((a:any,b:any)=>a.date.localeCompare(b.date));
+    const numericSatellitePoints=satellite.points.filter((p:any)=>[p.ndvi,p.ndmi,p.ndre,p.savi,p.gndvi].some((v)=>typeof v==='number'&&Number.isFinite(v))).length;
 
     await setJob(jobId,{stage:'weather',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),message:'Seçilen dönemin gerçek hava kayıtları toplanıyor'}});
     const weather=await collectWeather(userId,fieldId,lat,lng,layerArchive,period);
@@ -648,10 +798,13 @@ async function processJob(jobId:string,userId:string){
     const snapshot={
       schemaVersion:2,
       field:{id:fieldId,name:field.name??'Tarla',city:field.city??null,district:field.district??null,village:field.village??null,areaDecare:numberOrNull(field.area_decare),crop:field.crop??null,cropSubtype:field.crop_subtype??null,season:numberOrNull(field.season),irrigationStatus:field.irrigation_status??null,irrigationMethod:field.irrigation_method??null,geometry,latitude:lat,longitude:lng},
-      period:{start:period.start,end:period.end,createdAt:new Date().toISOString()},satellite,radar,weather,layerArchive:layerArchive.slice(0,220),irrigation:{kcSnapshots},activities,soilAnalyses,diagnoses:resolved,missing,
+      period:{start:period.start,end:period.end,createdAt:new Date().toISOString()},satellite,radar,weather,biophysical,layerArchive:layerArchive.slice(0,220),irrigation:{kcSnapshots},activities,soilAnalyses,diagnoses:resolved,missing,
     };
 
-    await setJob(jobId,{stage:'interpreting',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Pusula değerlendirmesi hazırlanıyor'}});
+    await setJob(jobId,{stage:'interpreting',progress_meta:{satelliteScenes:satellite.points.length,numericSatellitePoints,satelliteArchiveUsed:Number(satellite.archiveUsed??0),satelliteLiveUsed:Number(satellite.liveUsed??0),weatherDays:weather.history.length,radarPoints:radar.points.length,radarImages:radar.images.length,cloudArchiveCount:layerArchive.length,activities:activities.length,soilAnalyses:soilAnalyses.length,diagnoses:resolved.length,kcSnapshots:kcSnapshots.length,message:'Pusula AI gerçek ölçüm ve kanıtları yorumluyor'}});
+    const aiNarrative=await buildGroundedNarrative(snapshot);
+    if(aiNarrative)Object.assign(snapshot,{aiNarrative});
+    await setJob(jobId,{stage:'rendering',progress_meta:{message:'Rapor içerik bütünlüğü son kez kontrol ediliyor',aiNarrativeReady:Boolean(aiNarrative)}});
 
     const {data:existing,error:findError}=await admin.from('weekly_field_reports')
       .select('*').eq('user_id',userId).eq('field_id',field.id)

@@ -30,7 +30,7 @@ function makePath(report: WeeklyPusulaReport, userId: string) {
   // Use the immutable snapshot creation timestamp as part of the local file key,
   // so a re-analysis never opens a stale previously downloaded PDF.
   const snapshotVersion = safeName(report.report_data?.period?.createdAt || report.generated_at || report.period_end);
-  return { fileName, path: `${REPORT_FOLDER}/${userId}/${safeId}-rev4-${snapshotVersion}.pdf` };
+  return { fileName, path: `${REPORT_FOLDER}/${userId}/${safeId}-rev5-${snapshotVersion}.pdf` };
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {

@@ -13,6 +13,8 @@ export type PusulaPdfSatellitePoint = {
   ndviImage: string | null;
   trueColorImage: string | null;
   source?: string | null;
+  ndviSource?: string | null;
+  dataQuality?: string | null;
   fromArchive?: boolean;
 };
 
@@ -110,6 +112,21 @@ export type PusulaPdfSnapshot = {
     error?: string;
   };
   weather: PusulaPdfWeatherHistory | unknown | null;
+  aiNarrative?: {
+    source: string;
+    summary: string;
+    plant: string;
+    water: string;
+    soil: string;
+    risk: string;
+    actions: string[];
+  };
+  biophysical?: Array<{
+    date: string | null;
+    source: string;
+    qc: { quality: string; validPixelFraction: number | null };
+    metrics: Record<string, number | null>;
+  }>;
   layerArchive?: PusulaPdfLayerArchiveSnapshot[];
   irrigation: { kcSnapshots: unknown[] };
   activities: unknown[];
