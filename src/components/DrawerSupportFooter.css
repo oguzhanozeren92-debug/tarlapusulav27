@@ -2,16 +2,19 @@
   margin-top:auto;
   padding:14px 0 4px;
   display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(118px,138px);
+  grid-template-columns:minmax(124px,138px) minmax(0,1fr);
   align-items:center;
   gap:10px;
 }
-.tp-drawer-social-stack{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0;flex:1}
+.tp-drawer-social-stack{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:7px;min-width:0;max-width:100%;flex:1}
 .tp-drawer-socials{display:flex;gap:8px;align-items:center}
 .tp-drawer-footer-links{
   display:flex;
   align-items:center;
   flex-wrap:wrap;
+  justify-content:flex-end;
+  width:100%;
+  min-width:0;
   gap:6px;
 }
 .tp-premium-drawer .tp-drawer-support-footer .tp-drawer-privacy-link{
@@ -73,7 +76,7 @@
   flex:0 0 auto!important;
 }
 
-/* Social links stay on the left; compact membership card fills the marked space on the right. */
+/* Membership left, social links and support actions right. Keep both within the drawer. */
 .tp-premium-drawer .tp-drawer-membership{
   box-sizing:border-box;
   display:flex;
@@ -171,11 +174,19 @@
 @media(max-width:520px){
   .tp-drawer-support-footer{
     padding-top:12px;
-    grid-template-columns:minmax(0,1fr) minmax(118px,132px);
+    grid-template-columns:minmax(124px,132px) minmax(0,1fr);
     align-items:center;
     gap:8px;
   }
   .tp-drawer-footer-links{
     gap:5px;
   }
+  .tp-drawer-socials{max-width:100%;gap:7px}
+  .tp-drawer-socials a,.tp-drawer-socials button{width:34px;height:34px;flex:0 0 34px}
+  .tp-premium-drawer .tp-drawer-support-footer .tp-drawer-privacy-link{
+    white-space:normal!important;
+    text-align:center!important;
+    line-height:1.15!important;
+  }
 }
+
