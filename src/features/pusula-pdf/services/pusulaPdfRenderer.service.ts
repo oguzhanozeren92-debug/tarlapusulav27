@@ -189,7 +189,7 @@ function sectionHeader(
 
 function weatherRows(snapshot: PusulaPdfSnapshot) {
   const w: any = snapshot.weather;
-  const candidates = [w?.forecast, w?.daily, w?.history];
+  const candidates = [w?.history, w?.daily, w?.forecast];
   for (const candidate of candidates) {
     if (Array.isArray(candidate) && candidate.length) return candidate;
   }
@@ -534,50 +534,27 @@ function photoDiagnosis(photo: PusulaPdfFieldPhoto | undefined) {
 
 function riskItems(snapshot: PusulaPdfSnapshot, guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
   const find = (id: string) => guidance.insights.find((item) => item.id === id);
-  const drought = find('water-scarcity-plan-evidence') ?? find('irrigation-synthesis-evidence');
-  const disease = find('plant-health-synthesis-evidence');
-  const frost = find('frost-pocket-evidence');
-  const disaster = find('disaster-recovery-evidence');
-  const multi = find('multi-stress-synthesis-evidence');
-
-  const rows = [
-    {
-      label: 'Kuraklık Stresi',
-      detail: drought?.meaning ?? 'Su baskısı için yeterli kanıt yok.',
-      status: shortStatus(evidenceValue(drought, ['Risk seviyesi', 'Durum']) || drought?.confidence || ''),
-      accent: ORANGE,
-    },
-    {
-      label: 'Hastalık Riski',
-      detail: disease?.meaning ?? 'Belirti temelli risk sinyali yok.',
-      status: shortStatus(evidenceValue(disease, ['Risk seviyesi']) || disease?.confidence || ''),
-      accent: GREEN,
-    },
-    {
-      label: 'Zararlı Riski',
-      detail: multi?.meaning ?? 'Zararlı saha gözlemiyle doğrulanmalı.',
-      status: shortStatus(multi?.confidence || '', 'Takip'),
-      accent: ORANGE,
-    },
-    {
-      label: 'Don Riski',
-      detail: frost?.meaning ?? disaster?.meaning ?? 'Güncel don riski kanıtı yok.',
-      status: shortStatus(evidenceValue(frost, ['Risk', 'Durum']) || frost?.confidence || ''),
-      accent: BLUE,
-    },
-    {
-      label: 'Su Baskını Riski',
-      detail: disaster?.meaning ?? 'Aşırı yağış sonrası olay sinyali yok.',
-      status: shortStatus(evidenceValue(disaster, ['Olay', 'Durum']) || disaster?.confidence || ''),
-      accent: TEAL,
-    },
-  ];
-
-  return rows.map((row) => {
-    const style = statusColor(row.status);
-    return { ...row, statusAccent: style.accent, statusSoft: style.soft };
+  const entries = [
+    ['Kuraklık Stresi', find('water-scarcity-plan-evidence') ?? find('irrigation-synthesis-evidence')],
+    ['Hastalık Riski', find('plant-health-synthesis-evidence')],
+    ['Zararlı Riski', find('multi-stress-synthesis-evidence')],
+    ['Don Riski', find('frost-pocket-evidence')],
+    ['Su Baskını Riski', find('disaster-recovery-evidence')],
+  ] as const;
+  return entries.map(([label, insight]) => {
+    // Confidence is about evidence quality, NOT risk severity.
+    const observed = evidenceValue(insight, ['Risk seviyesi', 'Risk düzeyi', 'Risk']);
+    const riskLevel = /^(yüksek|orta|düşük|kritik)$/i.test(observed.trim()) ? observed.trim() : null;
+    const status = riskLevel ?? 'Doğrulanmadı';
+    const description = String(insight?.meaning ?? '').trim();
+    const firstSentence = description.match(/^[^.!?]+[.!?]/)?.[0] ?? '';
+    const detail = firstSentence || 'Bu risk için doğrulanmış bir saha ölçümü veya yeterli model kanıtı henüz bulunmuyor.';
+    const action = String(insight?.action ?? '').trim();
+    const style = riskLevel ? statusColor(riskLevel) : { accent: MUTED, soft: GRAY_SOFT };
+    return { label, detail, action, status, statusAccent: style.accent, statusSoft: style.soft };
   });
 }
+
 
 function latestSoilValues(snapshot: PusulaPdfSnapshot) {
   const latest: any = snapshot.soilAnalyses?.[0] ?? null;
@@ -609,6 +586,52 @@ function latestSoilValues(snapshot: PusulaPdfSnapshot) {
       accent: candidate.accent,
     };
   });
+}
+
+type VegetationKey = 'ndvi' | 'ndre' | 'gndvi' | 'savi';
+const VEGETATION_INDICES: Array<{ key: VegetationKey; label: string; meaning: string; color: string }> = [
+  { key: 'ndvi', label: 'NDVI', meaning: 'Genel bitki canlılığı', color: GREEN },
+  { key: 'ndre', label: 'NDRE', meaning: 'Klorofil duyarlılığı', color: BLUE },
+  { key: 'gndvi', label: 'GNDVI', meaning: 'Yeşil doku sinyali', color: TEAL },
+  { key: 'savi', label: 'SAVI', meaning: 'Toprak etkisi azaltılmış', color: ORANGE },
+];
+
+function knownSeries(points: PusulaPdfSatellitePoint[], key: VegetationKey) {
+  return points.filter((point) => valid(point[key])).sort((a,b) => a.date.localeCompare(b.date));
+}
+
+function soilGridsProfile(snapshot: PusulaPdfSnapshot) {
+  const layers = [...(snapshot.layerArchive ?? [])]
+    .filter((v) => v.layer === 'soil-intelligence')
+    .sort((a,b) => String(b.observedAt ?? b.archivedAt ?? '').localeCompare(String(a.observedAt ?? a.archivedAt ?? '')));
+  const read = (key: string, min: number, max: number) => {
+    for (const row of layers) {
+      const value = row.metrics?.[key];
+      if (value == null || value === '') continue;
+      const number = Number(value);
+      if (Number.isFinite(number) && number >= min && number <= max) return number;
+    }
+    return null;
+  };
+  const ph = read('phTopsoil0To30', 3, 11);
+  const carbon = read('organicCarbonTopsoil0To30', 0.1, 300);
+  const clay = read('clayPercent', 0, 100);
+  const silt = read('siltPercent', 0, 100);
+  const sand = read('sandPercent', 0, 100);
+  return { ph, carbon, clay, silt, sand, available: [ph, carbon, clay, silt, sand].some((n) => n !== null) };
+}
+
+function numericIndexText(value: number | null | undefined) {
+  return valid(value) ? value.toLocaleString('tr-TR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : 'Ölçülmedi';
+}
+
+function englishFree(value: string) {
+  return String(value)
+    .replace(/\\blimited\\b/gi, 'Sınırlı kanıt')
+    .replace(/\\bunknown\\b/gi, 'Bilinmiyor')
+    .replace(/\\bready\\b/gi, 'Hazır')
+    .replace(/\\bblocked\\b/gi, 'Engellendi')
+    .replace(/\\bcontext-only\\b/gi, 'Ön değerlendirme');
 }
 
 function qrImageUrl(target: string) {
@@ -668,7 +691,9 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const guidance = buildPusulaPdfGuidance(snapshot);
   const sat = [...snapshot.satellite.points].sort((a, b) => a.date.localeCompare(b.date));
   const latest = sat.at(-1);
-  const weather = weatherRows(snapshot).sort((a, b) => wd(a).localeCompare(wd(b)));
+  const allWeather = weatherRows(snapshot).filter((row) => wd(row) && wd(row) <= snapshot.period.end).sort((a,b) => wd(a).localeCompare(wd(b)));
+  // Weather history is NOT a future forecast. Report the most recent recorded days.
+  const weather = allWeather.filter((row) => wd(row) >= snapshot.period.start);
   const photos = [...(snapshot.fieldPhotos ?? [])].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
   const latestPhoto = photos[0];
   const secondPhoto = photos[1];
@@ -680,6 +705,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const yieldInfo = yieldSummary(snapshot);
   const riskRows = riskItems(snapshot, guidance);
   const soilRows = latestSoilValues(snapshot);
+  const soilGrids = soilGridsProfile(snapshot);
   const stage = phenologyLabel(snapshot, guidance);
   const location = [snapshot.field.city, snapshot.field.district].filter(Boolean).join(' / ') || 'Konum kaydı yok';
 
