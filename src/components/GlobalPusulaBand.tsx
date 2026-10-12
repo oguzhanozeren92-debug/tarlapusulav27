@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, CloudSun, MapPin, Menu, Star } from 'lucide-react';
 import PusulaGuide, { type PusulaInsight } from '../assets/pusula/PusulaGuide';
+import { PUSULAPDF_ALERT_KEY } from '../features/pusula-pdf/PusulaPdfReadyBridge';
 import { supabase } from '../supabaseClient';
 import { useGamificationStore } from '../gamification/useGamificationStore';
 
@@ -602,6 +603,22 @@ export default function GlobalPusulaBand({
   const [hasUnreadInsight, setHasUnreadInsight] = useState(false);
   const [hasInteractiveSignal, setHasInteractiveSignal] = useState(false);
   const [hasDepotSignal, setHasDepotSignal] = useState(false);
+  const [readyPdf, setReadyPdf] = useState<{ reportId: string; fieldName: string } | null>(null);
+  useEffect(() => {
+    const update = (event?: Event) => {
+      try {
+        const raw = event
+          ? (event as CustomEvent<{ reportId?: string; fieldName?: string }>).detail
+          : JSON.parse(sessionStorage.getItem(PUSULAPDF_ALERT_KEY) || 'null');
+        if (!raw?.reportId) return;
+        setReadyPdf({ reportId: String(raw.reportId), fieldName: String(raw.fieldName || 'Tarlan') });
+      } catch { /* no pending report */ }
+    };
+    update();
+    window.addEventListener('tp:pusulapdf-ready', update as EventListener);
+    return () => window.removeEventListener('tp:pusulapdf-ready', update as EventListener);
+  }, []);
+
   const latestPageInsightRef = useRef<PusulaInsight | null>(null);
   const latestWeatherInsightRef = useRef<PusulaInsight | null>(null);
   const guideDelayRef = useRef<number | null>(null);
@@ -650,7 +667,7 @@ export default function GlobalPusulaBand({
 
   const pageTitle = String(title ?? 'TarlaPusula').trim() || 'TarlaPusula';
   const hasPusulaSignal =
-    hasUnreadInsight || hasInteractiveSignal || hasDepotSignal;
+    hasUnreadInsight || hasInteractiveSignal || hasDepotSignal || Boolean(readyPdf);
 
   const fieldSuffix = useMemo(() => {
     const name = String(fieldName ?? '').trim();
@@ -1420,6 +1437,13 @@ export default function GlobalPusulaBand({
   }, [screen]);
 
   const handlePusulaClick = () => {
+    if (readyPdf) {
+      const reportId = readyPdf.reportId;
+      setReadyPdf(null);
+      try { sessionStorage.removeItem(PUSULAPDF_ALERT_KEY); } catch { /* noop */ }
+      window.dispatchEvent(new CustomEvent('tp:open-pusulapdf', { detail: { reportId } }));
+      return;
+    }
     if (screen === 'inventoryHub') {
       setHasDepotSignal(false);
 
@@ -2347,8 +2371,8 @@ export default function GlobalPusulaBand({
               : ''
           }${hasPusulaSignal ? ' tp-pusula-has-message' : ''}`}
           onClick={handlePusulaClick}
-          aria-label="Pusula"
-          title="Pusula"
+          aria-label={readyPdf ? `${readyPdf.fieldName} için PDF raporun hazır. Açmak için dokun.` : 'Pusula'}
+          title={readyPdf ? 'PusulaPDF raporun hazır · Aç' : 'Pusula'}
         >
           <span className="tp-global-pusula-stage" aria-hidden="true">
             <img
