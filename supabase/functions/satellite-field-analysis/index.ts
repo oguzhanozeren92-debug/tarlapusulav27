@@ -19,6 +19,7 @@ type SatelliteRequest = {
   maxCloudCoverage?: number;
   imageDate?: string;
   listScenes?: boolean;
+  statisticsOnly?: boolean;
 };
 
 type TimeRange = { from: string; to: string };
