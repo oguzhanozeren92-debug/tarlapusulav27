@@ -548,7 +548,14 @@ async function fetchHistoricalWeather(latitude:number,longitude:number,period:{s
   }catch(error){console.warn('[PUSULAPDF] recent weather fallback kullanılamadı:',error)}
 
   // Operasyonel arşiv boş kalırsa tutarlı reanalysis son fallback olur.
-  if(byDate.size<Math.min(20,REPORT_DAYS-5)){
+  // Compare the actual user-selected period instead of the removed fixed
+  // REPORT_DAYS constant (which crashed every historical custom report).
+  const selectedDays=Math.round((
+    Date.parse(`${period.end}T00:00:00Z`)-
+    Date.parse(`${period.start}T00:00:00Z`)
+  )/86_400_000)+1;
+  const minimumWeatherCoverage=Math.min(20,Math.max(2,selectedDays-5));
+  if(byDate.size<minimumWeatherCoverage){
     try{
       merge(await fetchOpenMeteoDaily('https://archive-api.open-meteo.com/v1/archive',latitude,longitude,{start_date:period.start,end_date:period.end}),'Open-Meteo Historical / ERA5');
     }catch(error){console.warn('[PUSULAPDF] ERA5 fallback kullanılamadı:',error)}
