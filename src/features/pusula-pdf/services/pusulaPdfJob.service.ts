@@ -22,7 +22,7 @@ import { mirrorLatestMultiStressEvidenceForPdf } from './pusulaPdfMultiStressEvi
 import { runAquaCropPilotEvidence } from '../../irrigation/services/aquaCropPilotEvidence.service';
 import { runDualKcShadowEvidence } from '../../irrigation/services/dualKcShadow.service';
 
-export async function requestPusulaPdf(fieldId: string) {
+export async function requestPusulaPdf(fieldId: string, period: { start: string; end: string }) {
   // PDF worker sunucuda çalıştığı için cihazdaki gerçek geçmiş kayıtları ve
   // bağımsız model kanıtlarını önce ortak bulut arşivine aynala. Bu adımlar
   // best-effort'tür; başarısız olmaları rapor işini engellemez.
@@ -73,6 +73,8 @@ export async function requestPusulaPdf(fieldId: string) {
 
   const { data, error } = await supabase.rpc('request_pusulapdf', {
     p_field_id: fieldId,
+    p_start_date: period.start,
+    p_end_date: period.end,
   });
   if (error) {
     const detail = String(error.message ?? '').trim();
@@ -81,6 +83,12 @@ export async function requestPusulaPdf(fieldId: string) {
     }
     if (detail.includes('AUTH_REQUIRED')) {
       throw new Error('Rapor hazırlamak için tekrar giriş yapmalısın.');
+    }
+    if (detail.includes('INVALID_REPORT_PERIOD')) {
+      throw new Error('Rapor dönemi 7–180 gün arasında olmalı; bitiş tarihi gelecekte olamaz.');
+    }
+    if (detail.includes('REPORT_ALREADY_RUNNING')) {
+      throw new Error('Bu tarla için başka bir rapor hazırlanıyor. Bittiğinde yeni dönem seçebilirsin.');
     }
     if (detail.includes('FIELD_NOT_FOUND_OR_FORBIDDEN')) {
       throw new Error('Bu tarla rapor talebi için bulunamadı veya erişim yetkin yok.');
@@ -95,6 +103,7 @@ export async function requestPusulaPdf(fieldId: string) {
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error('PUSULAPDF için oturum bulunamadı.');
 
+  if (result.reused) return result; // A running job must never be started twice.
   const { error: workerError } = await supabase.functions.invoke('pusulapdf-worker', {
     body: { jobId: result.job_id },
     headers: { Authorization: `Bearer ${accessToken}` },
