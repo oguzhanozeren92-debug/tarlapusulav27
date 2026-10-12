@@ -63,13 +63,13 @@ export function planAllows(current: TarlaPusulaPlan, required: PaidPlan) {
 
 export const PLAN_LAUNCH_PRICES = {
   plus: {
-    monthly: '₺200 / ay',
-    yearly: '₺1.920 / yıl',
-    yearlyMonthlyEquivalent: '₺160 / ay eşdeğer',
+    monthly: '₺199,99 / ay',
+    yearly: '₺1.939,99 / yıl',
+    yearlyMonthlyEquivalent: '₺161,67 / ay eşdeğer',
   },
   premium: {
-    monthly: '₺250 / ay',
-    yearly: '₺2.400 / yıl',
+    monthly: '₺249,99 / ay',
+    yearly: '₺2.399,99 / yıl',
     yearlyMonthlyEquivalent: '₺200 / ay eşdeğer',
   },
 } as const;
