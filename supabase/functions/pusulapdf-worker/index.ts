@@ -425,6 +425,9 @@ async function readFieldBiophysics(userId:string,fieldId:string,period:{start:st
 async function buildGroundedNarrative(snapshot:any){
   const key=Deno.env.get('NVIDIA_API_KEY');
   if(!key)return null;
+  // The previous deepseek-v4-flash-0731 free endpoint responds with HTTP 410.
+  // Keep the model configurable without exposing provider credentials.
+  const model=Deno.env.get('PUSULAPDF_AI_MODEL')?.trim()||'deepseek-ai/deepseek-v4-pro';
   const satellite=(snapshot.satellite?.points??[]).slice(-12).map((p:any)=>({
     date:p.date,ndvi:numberOrNull(p.ndvi),ndre:numberOrNull(p.ndre),
     gndvi:numberOrNull(p.gndvi),savi:numberOrNull(p.savi),ndmi:numberOrNull(p.ndmi),
@@ -472,12 +475,15 @@ async function buildGroundedNarrative(snapshot:any){
       method:'POST',signal:AbortSignal.timeout(35000),
       headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'deepseek-ai/deepseek-v4-flash-0731',temperature:0.1,max_tokens:700,
+        model,temperature:0.1,max_tokens:700,
         messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(input)}],
         stream:false,
       }),
     });
-    if(!response.ok){console.warn('[PUSULAPDF] AI yorum sağlayıcısı yanıtı:',response.status);return null;}
+    if(!response.ok){
+      console.warn('[PUSULAPDF] AI yorum sağlayıcısı yanıtı:',response.status,'model:',model);
+      return null;
+    }
     const payload=await response.json();
     const raw=String(payload?.choices?.[0]?.message?.content??'').trim();
     const jsonText=raw.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
