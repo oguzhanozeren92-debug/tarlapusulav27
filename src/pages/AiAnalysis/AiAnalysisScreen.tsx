@@ -1198,14 +1198,14 @@ export default function AiAnalysisScreen({
     }
   };
 
-  const queuePusulaPdf = async () => {
+  const queuePusulaPdf = async (refreshMeasurements = false) => {
     if (!isPremiumPlan) { setPremiumInfoOpen(true); return; }
     if (!synthesisField?.id || pusulaPdfStatus === 'loading') return;
 
     try {
       const cycle = await getPusulaPdfCycleState(String(synthesisField.id));
       setPusulaPdfNextAt(cycle.nextReportAt);
-      if (!cycle.canCreateNew && cycle.latest) {
+      if (!refreshMeasurements && !cycle.canCreateNew && cycle.latest) {
         setPusulaPdfReport(cycle.latest);
         setPusulaPdfStatus('ready');
         setPusulaPdfHistory(await listPusulaPdfReports(String(synthesisField.id)));
@@ -1851,7 +1851,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 <button
                   type="button"
                   className="tp-ai-tool-primary"
-                  onClick={queuePusulaPdf}
+                  onClick={() => void queuePusulaPdf()}
                   disabled={synthesisLoading || !synthesisField || pusulaPdfStatus === 'loading'}
                   aria-disabled={pusulaPdfStatus === 'loading'}
                 >
@@ -1876,6 +1876,20 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   </span>
                 </button>
 
+                {isPremiumPlan && synthesisField?.id && pusulaPdfStatus === 'ready' ? (
+                  <button
+                    type="button"
+                    className="tp-ai-tool-history"
+                    onClick={() => void queuePusulaPdf(true)}
+                    disabled={synthesisLoading}
+                    title="Copernicus sayısal ölçümlerini yeniden analiz eder"
+                  >
+                    <span>↻</span>
+                    <strong>Gerçek verileri yeniden ölç</strong>
+                    <small>180 günlük uydu arşiviyle mevcut raporu günceller.</small>
+                    <b>Yenile</b>
+                  </button>
+                ) : null}
                 {isPremiumPlan ? (
                   <button
                     type="button"
