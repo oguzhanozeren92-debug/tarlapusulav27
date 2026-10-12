@@ -887,6 +887,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   text(ctx, '7 GÜN', leftX + 30, 1102, 8.5, 900, PURPLE);
   wrap(ctx, action, leftX + 76, 1098, 10, 750, INK, leftW - 112, 1.15, 2);
 
+  if(hasBiophysics){
   // Plant measurements from the actual field SL2P archive (never mock values).
   rr(ctx, leftX, 1154, leftW, 436, 15, '#f9fbfa', LINE);
   text(ctx, 'Uydu Bitki Ölçümleri', leftX + 18, 1190, 18, 900, INK);
@@ -917,6 +918,32 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       : 'Seçilen dönemde uygun SL2P sayısal ölçümü bulunmuyor. Görüntü olması tek başına güvenilir klorofil veya su ölçümü anlamına gelmez.';
   wrap(ctx,bioNote,leftX+27,1503,11,650,INK,leftW-55,1.33,4);
   text(ctx,'Kaynak: Sentinel-2 · SL2P / arşiv · tarla özelinde',leftX+27,1552,9.2,750,MUTED);
+
+
+  }else{
+    // A period without SL2P should NOT waste six cells on "Ölçüm yok".
+    // Show meaningful recorded climate variation without pretending to have
+    // LAI / chlorophyll / water content measurements.
+    rr(ctx,leftX,1154,leftW,436,15,'#f7fbff',LINE);
+    text(ctx,'Dönemsel İklim Seyri',leftX+18,1190,19,900,INK);
+    fittedText(ctx,`${fmt(snapshot.period.start,false)} – ${fmt(snapshot.period.end,false)} · ${climate.observedDays}/${climate.days} kayıtlı gün`,
+      leftX+18,1213,leftW-36,10,750,MUTED);
+    rr(ctx,leftX+15,1223,leftW-30,27,7,'#e7f1fa','');
+    text(ctx,'TARİH',leftX+23,1241,9,850,MUTED);
+    text(ctx,'YAĞIŞ',leftX+147,1241,9,850,BLUE);
+    text(ctx,'REFERANS ET₀',leftX+239,1241,9,850,TEAL);
+    climate.buckets.slice(0,5).forEach((bucket,index)=>{
+      const yy=1255+index*40;
+      rr(ctx,leftX+15,yy,leftW-30,35,8,index%2===0?WHITE:'#edf5fc',LINE);
+      fittedText(ctx,`${fmt(bucket.start,false)}–${fmt(bucket.end,false)}`,leftX+23,yy+22,120,9.7,800,INK);
+      fittedText(ctx,bucket.rainMm===null?'Eksik':numTr(bucket.rainMm)+' mm',leftX+147,yy+22,87,10,900,BLUE);
+      fittedText(ctx,bucket.et0Mm===null?'Eksik':numTr(bucket.et0Mm)+' mm',leftX+240,yy+22,144,10,900,TEAL);
+    });
+    rr(ctx,leftX+15,1463,leftW-30,108,10,WHITE,LINE);
+    text(ctx,'Pusula’nın Dönem Yorumu',leftX+27,1486,12,900,GREEN_DARK);
+    wrap(ctx,climateInterpretation(climate),leftX+27,1510,10.5,650,INK,leftW-55,1.25,4);
+    fittedText(ctx,'Kaynak: kayıtlı geçmiş hava · SL2P ölçümü yok',leftX+27,1559,leftW-54,8.5,750,MUTED);
+  }
 
   // MIDDLE COLUMN
   rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
