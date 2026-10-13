@@ -6,6 +6,7 @@ import { useGamificationStore } from '../gamification/useGamificationStore';
 import DrawerSupportFooter from './DrawerSupportFooter';
 import PusulaPointsModal from './PusulaPointsModal';
 import drawerFieldBg from '../assets/login-bg.webp';
+import approvedOrbitHeader from '../assets/drawer-orbit-approved.jpg';
 
 type AppDrawerProps = {
   open: boolean;
@@ -999,8 +1000,8 @@ export default function AppDrawer({
            compass in the point card. Keep navigation rows and scrolling. */
         html body .tp-premium-drawer{
           background:
-            linear-gradient(180deg,rgba(2,8,12,.30) 0%,rgba(2,7,10,.50) 26%,rgba(2,6,8,.72) 64%,rgba(2,5,7,.80) 100%),
-            url('https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/ui-icons/backgrounds/global-header-satellite-v2.webp') center top / auto 250px no-repeat,
+            linear-gradient(180deg,rgba(2,6,10,.06) 0%,rgba(2,6,10,.15) 16%,rgba(2,6,10,.65) 42%,rgba(2,5,7,.82) 100%),
+            url("${approvedOrbitHeader}") center top / 100% auto no-repeat,
             url("${DRAWER_BG_SRC}") center center / cover no-repeat,
             #05090b!important;
         }
@@ -1020,12 +1021,14 @@ export default function AppDrawer({
         }
         html body .tp-premium-drawer .tp-premium-drawer-brand-name{
           color:#fff!important;
+          -webkit-text-fill-color:#fff!important;
           font-size:22px!important;
           letter-spacing:-.025em!important;
           text-shadow:0 1px 7px rgba(0,0,0,.58)!important;
         }
         html body .tp-premium-drawer .tp-premium-drawer-brand-name em{
           color:#fff!important;
+          -webkit-text-fill-color:#fff!important;
         }
         html body .tp-premium-drawer .tp-premium-drawer-welcome strong{
           color:#fff!important;
@@ -1035,25 +1038,25 @@ export default function AppDrawer({
           color:rgba(255,255,255,.89)!important;
         }
         html body .tp-premium-drawer .tp-premium-points-opd{
-          min-height:62px!important;
-          grid-template-columns:54px minmax(0,1fr) auto 15px!important;
+          min-height:56px!important;
+          grid-template-columns:34px minmax(0,1fr) auto 15px!important;
           margin:10px 0 12px!important;
           background:#f4f6f8!important;
           border-radius:22px!important;
           box-shadow:0 8px 22px rgba(0,0,0,.24)!important;
         }
         html body .tp-premium-drawer .tp-premium-points-badge{
-          width:54px!important;
-          height:54px!important;
+          width:34px!important;
+          height:34px!important;
           overflow:visible!important;
-          border-radius:0!important;
+          border-radius:50%!important;
           box-shadow:none!important;
         }
         html body .tp-premium-drawer .tp-premium-points-badge svg{
           display:block!important;
-          width:51px!important;
-          height:57px!important;
-          margin-top:-2px!important;
+          width:34px!important;
+          height:34px!important;
+          margin-top:0!important;
           overflow:visible!important;
           filter:drop-shadow(0 3px 3px rgba(0,0,0,.22));
         }
@@ -1207,11 +1210,10 @@ export default function AppDrawer({
           aria-label="Pusula puanı, seviyeler ve puan geçmişini aç"
         >
           <span className="tp-premium-points-opd-emblem tp-premium-points-badge" aria-hidden="true">
-            <svg viewBox="0 0 64 72" role="presentation" focusable="false">
-              <path d="M17 48 11 69l17-8 4-13M47 48l6 21-17-8-4-13" fill="#111820" stroke="#c4ab78" strokeWidth="2.5" strokeLinejoin="round"/>
-              <circle cx="32" cy="32" r="26" fill="#0a1117" stroke="#c3a773" strokeWidth="3"/>
-              <circle cx="32" cy="32" r="20.5" fill="#111b24" stroke="#39434a" strokeWidth="1.5"/>
-              <path d="m32 16 5.1 10.8 12 1.7-8.7 8.5 2 12-10.4-5.6-10.5 5.6 2-12-8.7-8.5 12-1.7Z" fill="#e4d1a5" stroke="#fff4cf" strokeWidth="1" strokeLinejoin="round"/>
+            <svg viewBox="0 0 40 40" role="presentation" focusable="false">
+              <circle cx="20" cy="20" r="18" fill="#0a1219" stroke="#bb9858" strokeWidth="2.5"/>
+              <circle cx="20" cy="20" r="14.4" fill="#15212b" stroke="#293846" strokeWidth="1.2"/>
+              <path d="m20 8.7 3.45 7.05 7.8 1.15-5.6 5.45 1.35 7.75L20 26.4l-7 3.7 1.35-7.75-5.6-5.45 7.8-1.15Z" fill="#e4c88c" stroke="#f9e9be" strokeWidth=".9" strokeLinejoin="round"/>
             </svg>
           </span>
 
