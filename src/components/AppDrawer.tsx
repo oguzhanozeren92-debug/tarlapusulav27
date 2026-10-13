@@ -925,6 +925,33 @@ export default function AppDrawer({
           white-space:normal!important;
         }
 
+        /* Restore the original photo-backed dark drawer. WhiteAppTheme's
+           neutral #30363d canvas must not replace this menu's artwork. */
+        html body .tp-premium-drawer{
+          background:
+            linear-gradient(180deg,rgba(0,0,0,.38) 0%,rgba(0,0,0,.52) 58%,rgba(0,0,0,.65) 100%),
+            url("${DRAWER_BG_SRC}") center center / cover no-repeat,
+            url("${DRAWER_BG_FALLBACK_SRC}") center center / cover no-repeat,
+            #07090b!important;
+          border-color:rgba(255,255,255,.3)!important;
+        }
+
+        /* Photo is drawn on the drawer itself; avoid a second washed-out
+           photograph from the theme's decorative pseudo-element. */
+        html body .tp-premium-drawer .tp-premium-drawer-atmosphere{
+          display:none!important;
+        }
+
+        /* Logout: light button with high-contrast black label on iOS,
+           Android and web (WebKit also needs text-fill-color). */
+        html body .tp-premium-drawer .tp-premium-drawer-logout{
+          background:#f3f5f7!important;
+          background-image:none!important;
+          border-color:#d0d7de!important;
+          color:#11151a!important;
+          -webkit-text-fill-color:#11151a!important;
+        }
+
         @media(max-width:520px){
           .tp-premium-drawer{
             /* Native iPhone: keep the whole drawer below the status-bar /
