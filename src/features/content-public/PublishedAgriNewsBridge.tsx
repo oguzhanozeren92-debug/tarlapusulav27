@@ -362,6 +362,7 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
   const [detailLoading, setDetailLoading] = useState(false);
   const [ratingBusyId, setRatingBusyId] = useState('');
   const railRef = useRef<HTMLDivElement | null>(null);
+  const detailRequestRef = useRef(0);
 
   const loadPublished = async () => {
     setLoading(true);
@@ -441,21 +442,42 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
   );
   const visibleNews = activeTab === 'world' ? filteredWorldNews : turkeyNews;
 
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetail(null);
+    setDetailPayload(null);
+    setDetailLoading(false);
+  };
+
   const openDetail = async (item: LiveContentRow) => {
-    await maybeShowFreeInterstitial('agenda_deep_read');
+    const requestId = ++detailRequestRef.current;
+
+    // Haberi/makaleyi ilk dokunuşta aç. Reklam kontrolü veya ağ isteği
+    // modalın görünmesini asla engellememeli (özellikle iOS native).
     setDetail(item);
     setDetailPayload(null);
-    setDetailLoading(true);
+    const hasPayload = Boolean(item.payload_public_url && item.payload_status === 'ready');
+    setDetailLoading(hasPayload);
+
+    // Reklam başarısız/yanıtsız kalsa bile okuma ekranı erişilebilir olsun.
+    void maybeShowFreeInterstitial('agenda_deep_read').catch((cause) => {
+      console.warn('[TarlaPusula Gündem] Reklam gösterilemedi:', cause);
+    });
+
+    if (authUserId) void supabase.rpc('content_record_view', { p_content_id: item.id });
+
+    if (!hasPayload) return;
     try {
-      if (item.payload_public_url && item.payload_status === 'ready') {
-        const response = await fetch(item.payload_public_url, { headers: { Accept: 'application/json' } });
-        if (response.ok) setDetailPayload(await response.json());
+      const response = await fetch(item.payload_public_url!, { headers: { Accept: 'application/json' } });
+      if (response.ok) {
+        const nextPayload = (await response.json()) as R2Payload;
+        // Kullanıcı başka içeriğe geçtiyse önceki yanıt yeni detaya karışmasın.
+        if (requestId === detailRequestRef.current) setDetailPayload(nextPayload);
       }
-      if (authUserId) void supabase.rpc('content_record_view', { p_content_id: item.id });
     } catch {
-      // R2 paketi açılamazsa Supabase önizleme alanlarıyla devam edilir.
+      // R2 paketi açılamazsa Supabase içeriği gösterilmeye devam eder.
     } finally {
-      setDetailLoading(false);
+      if (requestId === detailRequestRef.current) setDetailLoading(false);
     }
   };
 
@@ -596,14 +618,14 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
   const chart = payload?.chart_data ?? detailStructured?.chart_data ?? null;
   const table = payload?.table_data ?? detailStructured?.table_data ?? null;
   const fullBodyText = detail?.body?.trim() || '';
-  const leadText = payload?.summary || detail?.excerpt || '';
+  const leadText = payload?.summary || detail?.excerpt || detailBlock?.lead || '';
 
   const modal = detail ? createPortal(
-    <div className="tp-content-modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setDetail(null); }}>
+    <div className="tp-content-modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeDetail(); }}>
       <article className="tp-content-modal" role="dialog" aria-modal="true">
         <header className="tp-content-modal__head">
           <div><span>{detail.content_subtype === 'article' ? 'AR-GE MAKALESİ' : detail.coverage_scope === 'world' ? 'DÜNYADA TARIM' : 'ÜLKEMİZDE TARIM'}</span><small>{detail.content_subtype === 'article' ? 'Makale tarihi: ' : ''}{fmtDate(payload?.coverage?.event_date || detail.event_date || detail.published_at)} · {detail.location_text || payload?.coverage?.location || 'Konum belirtilmedi'}</small></div>
-          <button type="button" onClick={() => setDetail(null)} aria-label="Kapat"><X size={20} /></button>
+          <button type="button" onClick={closeDetail} aria-label="Kapat"><X size={20} /></button>
         </header>
         <div className="tp-content-modal__body">
           <figure className="tp-content-modal__cover"><ContentImage image={images[detail.id]} alt={detail.title} /></figure>
