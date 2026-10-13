@@ -17,15 +17,6 @@ export {
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-const fallbackAvailability: SocialAuthAvailability = {
-  google: true,
-  facebook: true,
-  apple:
-    String(import.meta.env.VITE_APPLE_SIGN_IN_ENABLED || '')
-      .trim()
-      .toLowerCase() === 'true',
-};
-
 let cached:
   | { value: SocialAuthAvailability; expiresAt: number }
   | null = null;
@@ -79,7 +70,11 @@ export async function fetchSocialAuthAvailability(
       error,
     );
 
-    return fallbackAvailability;
+    // A provider must be enabled in Supabase Auth, not inferred from a
+    // frontend environment flag. Do not show inactive providers as working.
+    throw error instanceof Error
+      ? error
+      : new Error('Sosyal giriş durumu kontrol edilemedi.');
   } finally {
     window.clearTimeout(timer);
     options.signal?.removeEventListener('abort', abortFromCaller);
