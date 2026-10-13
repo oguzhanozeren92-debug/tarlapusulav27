@@ -218,23 +218,60 @@ export default function AuthScreens({
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<SocialAuthProvider | null>(null);
   const [socialAvailability, setSocialAvailability] = useState<SocialAuthAvailability | null>(null);
+  const [socialStatusError, setSocialStatusError] = useState(false);
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const [recoveryComplete, setRecoveryComplete] = useState(false);
+
   useEffect(() => {
-    const controller = new AbortController();
+    let alive = true;
+    let activeRequest: AbortController | null = null;
 
-    void fetchSocialAuthAvailability({ signal: controller.signal })
-      .then((availability) => {
-        if (!controller.signal.aborted) {
+    const checkProviders = () => {
+      activeRequest?.abort();
+      const controller = new AbortController();
+      activeRequest = controller;
+      void fetchSocialAuthAvailability({ force: true, signal: controller.signal })
+        .then((availability) => {
+          if (!alive || controller.signal.aborted) return;
           setSocialAvailability(availability);
-        }
-      })
-      .catch(() => {
-        // Unmount/abort sırasında sessiz kal. Gerçek ağ hatasında servis fallback döndürür.
-      });
+          setSocialStatusError(false);
+        })
+        .catch(() => {
+          if (!alive || controller.signal.aborted) return;
+          setSocialAvailability(null);
+          setSocialStatusError(true);
+        });
+    };
 
-    return () => controller.abort();
+    // Refresh on return from browser/Settings. A provider only becomes
+    // selectable after Supabase confirms that it is really enabled.
+    const checkOnFocus = () => {
+      if (!document.hidden) checkProviders();
+    };
+
+    checkProviders();
+    window.addEventListener('focus', checkOnFocus);
+    document.addEventListener('visibilitychange', checkOnFocus);
+
+    return () => {
+      alive = false;
+      activeRequest?.abort();
+      window.removeEventListener('focus', checkOnFocus);
+      document.removeEventListener('visibilitychange', checkOnFocus);
+    };
   }, []);
+
+  useEffect(() => {
+    // Surface failures received after Safari / the native OAuth browser
+    // returns to the app instead of silently dropping the error.
+    const onNativeAuthError = (event: Event) => {
+      const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+      setSocialLoading(null);
+      setAuthMessage(message || 'Sosyal giriş tamamlanamadı. Tekrar deneyebilirsin.');
+    };
+    window.addEventListener('tp:native-auth-error', onNativeAuthError);
+    return () => window.removeEventListener('tp:native-auth-error', onNativeAuthError);
+  }, [setAuthMessage]);
 
   const [rememberSession, setRememberSession] = useState(() => {
     try {
@@ -377,7 +414,7 @@ export default function AuthScreens({
     setAuthMessage('');
 
     if (!socialAvailability) {
-      setAuthMessage('Giriş seçenekleri kontrol ediliyor. Birkaç saniye sonra tekrar dene.');
+      setAuthMessage(socialStatusError ? 'Sosyal giriş seçenekleri kontrol edilemedi. Bağlantını kontrol edip tekrar dene.' : 'Giriş seçenekleri kontrol ediliyor. Birkaç saniye sonra tekrar dene.');
       return;
     }
 
@@ -555,7 +592,7 @@ export default function AuthScreens({
                     const available = socialAvailability?.[provider] === true;
                     const statusKnown = socialAvailability !== null;
                     const statusText = !statusKnown
-                      ? 'Giriş yöntemi kontrol ediliyor'
+                      ? (socialStatusError ? 'Giriş sağlayıcısı doğrulanamadı' : 'Giriş yöntemi kontrol ediliyor')
                       : available
                         ? `${socialAuthProviderLabel(provider)} ile devam et`
                         : `${socialAuthProviderLabel(provider)} girişi henüz etkinleştirilmedi`;
@@ -575,6 +612,11 @@ export default function AuthScreens({
                     );
                   })}
                 </div>
+                {socialStatusError && (
+                  <small className="tp-authv2-social-unavailable-note">
+                    Sosyal giriş durumu alınamadı. Bağlantını kontrol et.
+                  </small>
+                )}
                 {socialAvailability &&
                   (!socialAvailability.facebook || !socialAvailability.apple) && (
                     <small className="tp-authv2-social-unavailable-note">
