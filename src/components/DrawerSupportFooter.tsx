@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import IssueReportModal from './IssueReportModal';
@@ -8,9 +8,9 @@ import './DrawerSupportFooter.css';
 
 type Props = { screen?: string; onCloseDrawer?: () => void };
 
-const facebookUrl = String(import.meta.env.VITE_TARLAPUSULA_FACEBOOK_URL || '').trim();
-const instagramUrl = String(import.meta.env.VITE_TARLAPUSULA_INSTAGRAM_URL || '').trim();
-const supportEmail = String(import.meta.env.VITE_TARLAPUSULA_SUPPORT_EMAIL || '').trim();
+const facebookUrl = String(import.meta.env.VITE_TARLAPUSULA_FACEBOOK_URL || 'https://www.facebook.com/tarlapusula').trim();
+const instagramUrl = String(import.meta.env.VITE_TARLAPUSULA_INSTAGRAM_URL || 'https://www.instagram.com/tarlapusula/').trim();
+const supportEmail = String(import.meta.env.VITE_TARLAPUSULA_SUPPORT_EMAIL || 'tarlapusula@gmail.com').trim();
 const publicAppUrl = String(
   import.meta.env.VITE_PUBLIC_APP_URL ||
     import.meta.env.VITE_APP_URL ||
@@ -24,13 +24,35 @@ function SocialButton({
   children,
 }: {
   label: string;
-  href?: string;
+  href: string;
   children: ReactNode;
 }) {
-  if (href) {
-    return <a href={href} target="_blank" rel="noreferrer" aria-label={label} title={label}>{children}</a>;
-  }
-  return <button type="button" aria-label={label} title={`${label} · hesap açıldığında aktif olacak`}>{children}</button>;
+  const isEmail = href.startsWith('mailto:');
+
+  const handleOpen = (event: MouseEvent<HTMLAnchorElement>) => {
+    // Mailto varsayılan e-posta uygulamasına devredilir.
+    // iOS/Android WebView'larında target="_blank" sosyal bağlantıları
+    // sessizce engelleyebilir; Capacitor Browser ile güvenilir biçimde aç.
+    if (isEmail || !Capacitor.isNativePlatform()) return;
+    event.preventDefault();
+    void Browser.open({ url: href }).catch((error) => {
+      console.warn('[TarlaPusula] Sosyal medya bağlantısı açılamadı:', error);
+      window.location.assign(href);
+    });
+  };
+
+  return (
+    <a
+      href={href}
+      target={isEmail ? undefined : '_blank'}
+      rel={isEmail ? undefined : 'noopener noreferrer'}
+      aria-label={label}
+      title={label}
+      onClick={handleOpen}
+    >
+      {children}
+    </a>
+  );
 }
 
 export default function DrawerSupportFooter({ screen, onCloseDrawer }: Props) {
@@ -93,13 +115,13 @@ export default function DrawerSupportFooter({ screen, onCloseDrawer }: Props) {
 
         <div className="tp-drawer-social-stack">
           <div className="tp-drawer-socials" aria-label="TarlaPusula iletişim">
-            <SocialButton label="Facebook" href={facebookUrl || undefined}>
+            <SocialButton label="Facebook" href={facebookUrl}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4.4c-.5-.1-2.2-.2-4.2-.2-4.1 0-6.8 2.5-6.8 7.1V15H2v4h4v9h5v-9h4.1l.7-4H11v-3.3C11 9.5 11.6 8 14 8Z"/></svg>
             </SocialButton>
-            <SocialButton label="Instagram" href={instagramUrl || undefined}>
+            <SocialButton label="Instagram" href={instagramUrl}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
             </SocialButton>
-            <SocialButton label="Kurumsal e-posta" href={supportEmail ? `mailto:${supportEmail}` : undefined}>
+            <SocialButton label="Kurumsal e-posta" href={`mailto:${supportEmail}`}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
             </SocialButton>
           </div>
