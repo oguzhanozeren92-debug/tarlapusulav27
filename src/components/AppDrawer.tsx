@@ -945,11 +945,30 @@ export default function AppDrawer({
         /* Satellite + Earth artwork belongs INSIDE the formerly plain white
            navigation rows, not only in the dark area around the menu. Render
            one continuous low-contrast monochrome photo behind all rows. */
+        html body .tp-premium-drawer{
+          overflow-y:auto!important;
+          overflow-x:hidden!important;
+          -webkit-overflow-scrolling:touch;
+          overscroll-behavior-y:contain;
+        }
         html body .tp-premium-drawer .tp-premium-drawer-nav{
+          /* A flex column may otherwise shrink this grid down to ~2 rows
+             because overflow:hidden removes its automatic minimum size.
+             Keep ALL menu items in document flow; scroll the whole drawer. */
+          flex:0 0 auto!important;
+          min-height:max-content!important;
           position:relative!important;
           isolation:isolate!important;
           overflow:hidden!important;
           background:#f8f9fa!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-nav > button{
+          flex-shrink:0!important;
+        }
+        html body .tp-premium-drawer .tp-drawer-support-footer,
+        html body .tp-premium-drawer .tp-premium-drawer-logout,
+        html body .tp-premium-drawer .tp-premium-drawer-foot-art{
+          flex-shrink:0!important;
         }
         html body .tp-premium-drawer .tp-premium-drawer-nav::before{
           content:''!important;
