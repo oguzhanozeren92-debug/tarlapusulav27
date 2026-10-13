@@ -2972,14 +2972,14 @@ export default function UnifiedMapScreen({
            tiles, map gestures, overlays, network requests or coordinates. */
         @keyframes tpSatelliteScanSweep{
           0%{transform:translate3d(0,0,0);opacity:0}
-          12%{opacity:.82}
-          70%{opacity:.8}
+          12%{opacity:1}
+          70%{opacity:1}
           100%{transform:translate3d(620%,0,0);opacity:0}
         }
         @keyframes tpSatelliteScanGrid{
           0%{opacity:0}
-          25%{opacity:.5}
-          72%{opacity:.3}
+          25%{opacity:.72}
+          72%{opacity:.48}
           100%{opacity:0}
         }
         @keyframes tpSatelliteScanFrame{
@@ -3022,9 +3022,9 @@ export default function UnifiedMapScreen({
           background:linear-gradient(
             90deg,
             transparent 0%,
-            rgba(170,251,244,.02) 24%,
-            rgba(147,250,238,.12) 78%,
-            rgba(213,255,250,.50) 98%,
+            rgba(170,251,244,.08) 24%,
+            rgba(147,250,238,.3) 78%,
+            rgba(213,255,250,.85) 98%,
             transparent 100%
           );
           mix-blend-mode:screen;
@@ -3040,14 +3040,17 @@ export default function UnifiedMapScreen({
         }
         .tp-unified-satellite-scan-caption{
           position:absolute;
-          bottom:13px;
-          right:13px;
-          padding:6px 9px;
+          top:45%;
+          left:50%;
+          transform:translateX(-50%);
+          min-width:152px;
+          text-align:center;
+          padding:12px 14px;
           border-radius:8px;
           border:1px solid rgba(194,255,245,.5);
           background:rgba(4,20,20,.82);
           color:#d9fff9;
-          font:800 9px/1.1 Inter,system-ui,sans-serif;
+          font:850 11px/1.3 Inter,system-ui,sans-serif;
           letter-spacing:.1em;
           box-shadow:0 0 17px rgba(118,242,228,.17);
           animation:tpSatelliteScanLabel var(--tp-scan-duration) ease-out both;
@@ -3465,10 +3468,10 @@ export default function UnifiedMapScreen({
               aria-hidden="true"
               style={{
                 '--tp-scan-duration': scanPulse.mode === 'entry'
-                  ? '600ms'
+                  ? '1200ms'
                   : scanPulse.mode === 'field'
-                    ? '480ms'
-                    : '360ms',
+                    ? '1100ms'
+                    : '950ms',
               } as CSSProperties}
             >
               <span className="tp-unified-satellite-scan-frame" />
