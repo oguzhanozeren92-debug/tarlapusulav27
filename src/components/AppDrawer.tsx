@@ -942,6 +942,39 @@ export default function AppDrawer({
           display:none!important;
         }
 
+        /* Satellite + Earth artwork belongs INSIDE the formerly plain white
+           navigation rows, not only in the dark area around the menu. Render
+           one continuous low-contrast monochrome photo behind all rows. */
+        html body .tp-premium-drawer .tp-premium-drawer-nav{
+          position:relative!important;
+          isolation:isolate!important;
+          overflow:hidden!important;
+          background:#f8f9fa!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-nav::before{
+          content:''!important;
+          position:absolute!important;
+          inset:0!important;
+          z-index:0!important;
+          pointer-events:none!important;
+          background:
+            linear-gradient(90deg,rgba(255,255,255,.15),rgba(255,255,255,.46)),
+            url("${DRAWER_BG_SRC}") center 42% / cover no-repeat,
+            url("https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/ui-icons/backgrounds/tarlapusula-bg-monokrom-parseller.webp") center / cover no-repeat!important;
+          filter:grayscale(1) contrast(1.14)!important;
+          opacity:.20!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-nav > button{
+          position:relative!important;
+          z-index:1!important;
+          background:transparent!important;
+          background-image:none!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-nav > button:hover,
+        html body .tp-premium-drawer .tp-premium-drawer-nav > button.active{
+          background:rgba(228,233,237,.70)!important;
+        }
+
         /* Logout: light button with high-contrast black label on iOS,
            Android and web (WebKit also needs text-fill-color). */
         html body .tp-premium-drawer .tp-premium-drawer-logout{
