@@ -249,6 +249,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>TarlaPusula, tarla ve bitki fotoğraflarını analiz etmek için kamerayı kullanır.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>TarlaPusula, tarla konumunu belirlemek ve konuma özel hava durumu ile uydu verilerini göstermek için konum bilgisine erişir. Uygulama arka planda konum takibi yapmaz.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>TarlaPusula, tarla konumunu bulmak ve hava ile uydu verilerini eşlemek için konumunu kullanır.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
