@@ -981,7 +981,8 @@ export default function App() {
           onOpenAi={() => setScreen('aiAnalysis')}
         />
 
-        <AiAnalysisScreen
+        <div className="tp-app-shell-content tp-app-shell-content--with-global-band">
+          <AiAnalysisScreen
           cmsRuntimeCss={cmsRuntimeCss}
           cmsPageFor={cmsPageFor}
           cmsBlockFor={cmsBlockFor}
@@ -1017,7 +1018,8 @@ export default function App() {
           handleSaveAiAnalysisToHistory={handleSaveAiAnalysisToHistory}
           openAddField={openAddField}
           openCalendarScreen={openCalendarScreen}
-        />
+          />
+        </div>
       </>
     );
   }
