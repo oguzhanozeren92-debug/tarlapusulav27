@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, ClipboardList, Gauge } from 'lucide-react';
 import HomeMapSection from './HomeMapSection';
@@ -3485,6 +3485,56 @@ body.tp-map-body-fullscreen .tp-map-stage .tp-map-portrait-close{
   }
 }
 
+
+/* PUSULA // SATELLITE SCAN. A non-interactive overlay attached to the real map. */
+@keyframes tpOrbitalSweep{
+  0%{transform:translate3d(0,0,0);opacity:0}
+  12%,70%{opacity:1}
+  100%{transform:translate3d(415%,0,0);opacity:0}
+}
+@keyframes tpOrbitalGrid{0%,100%{opacity:0}18%,66%{opacity:.7}}
+@keyframes tpOrbitalHalo{0%,100%{opacity:0}25%,60%{opacity:1}}
+@keyframes tpOrbitalHud{0%,100%{opacity:0}18%,74%{opacity:1}}
+.tp-map-first-shell .tp-map-stage > .tp-home-satellite-scan{
+  position:absolute!important;inset:0!important;z-index:160!important;
+  isolation:isolate;pointer-events:none!important;user-select:none!important;
+  overflow:hidden!important;--tp-scan-speed:1050ms;
+}
+.tp-map-first-shell .tp-home-satellite-scan::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,rgba(112,255,231,.25) 0 1px,transparent 1px 25px),
+    repeating-linear-gradient(90deg,rgba(112,255,231,.20) 0 1px,transparent 1px 25px);
+  animation:tpOrbitalGrid var(--tp-scan-speed) ease-out both;
+}
+.tp-map-first-shell .tp-home-satellite-scan::after{
+  content:'';position:absolute;top:-3%;bottom:-3%;left:-37%;width:32%;
+  background:linear-gradient(90deg,transparent,rgba(57,249,218,.07) 24%,
+    rgba(73,243,223,.25) 76%,rgba(227,255,251,.9) 97%,transparent);
+  box-shadow:10px 0 32px rgba(76,245,223,.19);
+  animation:tpOrbitalSweep var(--tp-scan-speed) cubic-bezier(.24,.66,.3,1) both;
+}
+.tp-map-first-shell .tp-home-satellite-scan-frame{
+  position:absolute;inset:12px;border:1px solid rgba(158,255,243,.78);
+  border-radius:8px;box-shadow:inset 0 0 24px rgba(81,255,235,.12),0 0 17px rgba(81,255,235,.20);
+  animation:tpOrbitalHalo var(--tp-scan-speed) ease-out both;
+}
+.tp-map-first-shell .tp-home-satellite-scan-hud{
+  position:absolute;top:43%;left:50%;transform:translateX(-50%);
+  display:grid;gap:4px;min-width:168px;padding:12px 18px;
+  border:1px solid rgba(138,255,237,.75);border-radius:10px;
+  background:rgba(2,19,19,.90);color:#ebfffb;
+  box-shadow:0 0 33px rgba(75,245,220,.25);text-align:center;
+  animation:tpOrbitalHud var(--tp-scan-speed) ease-out both;
+}
+.tp-map-first-shell .tp-home-satellite-scan-hud b{
+  font:850 11px/1.3 Inter,system-ui,sans-serif;letter-spacing:.14em;
+}
+.tp-map-first-shell .tp-home-satellite-scan-hud small{
+  font:650 8px/1.3 Inter,system-ui,sans-serif;letter-spacing:.09em;color:#8befe2;
+}
+@media(prefers-reduced-motion:reduce){
+  .tp-map-first-shell .tp-home-satellite-scan{display:none!important}
+}
 `
 
 function LayerIcon() {
@@ -3505,10 +3555,26 @@ export default function HomeMapSectionMapFirst(
   const [layerMenuOpen, setLayerMenuOpen] = useState(false);
   const [subLayerMenuOpen, setSubLayerMenuOpen] = useState(false);
   const [portraitExpanded, setPortraitExpanded] = useState(false);
+  const [satelliteScan, setSatelliteScan] = useState({
+    sequence: 0, kind: 'initial' as 'initial' | 'field' | 'layer',
+  });
+  const lastScanRef = useRef<{ signature: string; fieldId: string } | null>(null);
 
 
   const activeLayer = props.activeHomeLayer as HomeLayer;
   const satelliteData = props.satelliteData ?? null;
+
+  const scanFieldId = String(props.homeField?.id ?? '');
+  useEffect(() => {
+    const signature = scanFieldId + '|' + String(activeLayer);
+    const previous = lastScanRef.current;
+    lastScanRef.current = { signature, fieldId: scanFieldId };
+    if (!previous || previous.signature === signature) return;
+    setSatelliteScan((current) => ({
+      sequence: current.sequence + 1,
+      kind: previous.fieldId !== scanFieldId ? 'field' : 'layer',
+    }));
+  }, [scanFieldId, activeLayer]);
 
   const homeSoilProperty =
     (props.homeSoilProperty ?? 'phh2o') as HomeSoilProperty;
@@ -4292,6 +4358,30 @@ export default function HomeMapSectionMapFirst(
         )
       : null;
 
+  const satelliteScanOverlay = mapStage
+    ? createPortal(
+        <div
+          key={satelliteScan.sequence}
+          className="tp-home-satellite-scan"
+          aria-hidden="true"
+          style={{
+            '--tp-scan-speed': satelliteScan.kind === 'initial'
+              ? '1200ms'
+              : satelliteScan.kind === 'field' ? '1100ms' : '950ms',
+          } as CSSProperties}
+        >
+          <span className="tp-home-satellite-scan-frame" />
+          <span className="tp-home-satellite-scan-hud">
+            <b>{satelliteScan.kind === 'initial'
+              ? 'UYDU TARAMASI'
+              : satelliteScan.kind === 'field' ? 'PARSEL TARAMASI' : 'KATMAN GEÇİŞİ'}</b>
+            <small>TARLAPUSULA / SATELLITE</small>
+          </span>
+        </div>,
+        mapStage,
+      )
+    : null;
+
   const portraitClose = portraitExpanded && mapStage
     ? createPortal(
         <button
@@ -4328,6 +4418,7 @@ export default function HomeMapSectionMapFirst(
       {operationToolbarButton}
       {quickToolbarButtons}
       {mapOverlay}
+      {satelliteScanOverlay}
       {portraitClose}
     </div>
   );
