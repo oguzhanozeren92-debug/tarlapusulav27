@@ -994,6 +994,81 @@ export default function AppDrawer({
           background:rgba(228,233,237,.70)!important;
         }
 
+        /* Approved C option: one small brand compass, a separate star
+           achievement medal, and an orbital satellite photograph. No second
+           compass in the point card. Keep navigation rows and scrolling. */
+        html body .tp-premium-drawer{
+          background:
+            linear-gradient(180deg,rgba(2,8,12,.30) 0%,rgba(2,7,10,.50) 26%,rgba(2,6,8,.72) 64%,rgba(2,5,7,.80) 100%),
+            url('https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/ui-icons/backgrounds/global-header-satellite-v2.webp') center top / auto 250px no-repeat,
+            url("${DRAWER_BG_SRC}") center center / cover no-repeat,
+            #05090b!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-top{
+          grid-template-columns:46px minmax(0,1fr) 38px!important;
+          gap:10px!important;
+          min-height:138px;
+          align-items:center!important;
+          padding:13px 2px 17px!important;
+          border-bottom:1px solid rgba(255,255,255,.26)!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-brand-mark{
+          width:46px!important;
+          height:46px!important;
+          max-width:46px!important;
+          filter:drop-shadow(0 3px 7px rgba(0,0,0,.6))!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-brand-name{
+          color:#fff!important;
+          font-size:22px!important;
+          letter-spacing:-.025em!important;
+          text-shadow:0 1px 7px rgba(0,0,0,.58)!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-brand-name em{
+          color:#fff!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-welcome strong{
+          color:#fff!important;
+          font-size:17px!important;
+        }
+        html body .tp-premium-drawer .tp-premium-drawer-welcome :is(small,p){
+          color:rgba(255,255,255,.89)!important;
+        }
+        html body .tp-premium-drawer .tp-premium-points-opd{
+          min-height:62px!important;
+          grid-template-columns:54px minmax(0,1fr) auto 15px!important;
+          margin:10px 0 12px!important;
+          background:#f4f6f8!important;
+          border-radius:22px!important;
+          box-shadow:0 8px 22px rgba(0,0,0,.24)!important;
+        }
+        html body .tp-premium-drawer .tp-premium-points-badge{
+          width:54px!important;
+          height:54px!important;
+          overflow:visible!important;
+          border-radius:0!important;
+          box-shadow:none!important;
+        }
+        html body .tp-premium-drawer .tp-premium-points-badge svg{
+          display:block!important;
+          width:51px!important;
+          height:57px!important;
+          margin-top:-2px!important;
+          overflow:visible!important;
+          filter:drop-shadow(0 3px 3px rgba(0,0,0,.22));
+        }
+        html body .tp-premium-drawer .tp-premium-points-opd > span:not(.tp-premium-points-opd-emblem){
+          font-size:12px!important;
+          font-weight:800!important;
+          color:#17202a!important;
+          -webkit-text-fill-color:#17202a!important;
+        }
+        html body .tp-premium-drawer .tp-premium-points-opd > strong{
+          font-size:14px!important;
+          color:#17202a!important;
+          -webkit-text-fill-color:#17202a!important;
+        }
+
         /* Logout: light button with high-contrast black label on iOS,
            Android and web (WebKit also needs text-fill-color). */
         html body .tp-premium-drawer .tp-premium-drawer-logout{
@@ -1023,10 +1098,18 @@ export default function AppDrawer({
           }
 
           .tp-premium-drawer-top{
-            grid-template-columns:57px minmax(0,1fr) 44px;
-            gap:10px;
-            align-items:start;
-            padding-top:8px;
+            grid-template-columns:42px minmax(0,1fr) 44px!important;
+            gap:8px!important;
+            align-items:center!important;
+            min-height:126px!important;
+            padding-top:8px!important;
+          }
+          html body .tp-premium-drawer .tp-premium-drawer-brand-mark{
+            width:42px!important;
+            height:42px!important;
+          }
+          html body .tp-premium-drawer .tp-premium-drawer-brand-name{
+            font-size:20px!important;
           }
 
           .tp-premium-drawer-x{
@@ -1123,21 +1206,13 @@ export default function AppDrawer({
           }}
           aria-label="Pusula puanı, seviyeler ve puan geçmişini aç"
         >
-          <span className="tp-premium-points-opd-emblem" aria-hidden="true">
-            <img
-              src={premiumIconUrl('pusula-puani-opD.webp')}
-              alt=""
-              crossOrigin="anonymous"
-              draggable={false}
-              onError={(event) => {
-                const image = event.currentTarget;
-
-                if (image.dataset.tpFallback !== '1') {
-                  image.dataset.tpFallback = '1';
-                  image.src = PUSULA_BODY_SRC;
-                }
-              }}
-            />
+          <span className="tp-premium-points-opd-emblem tp-premium-points-badge" aria-hidden="true">
+            <svg viewBox="0 0 64 72" role="presentation" focusable="false">
+              <path d="M17 48 11 69l17-8 4-13M47 48l6 21-17-8-4-13" fill="#111820" stroke="#c4ab78" strokeWidth="2.5" strokeLinejoin="round"/>
+              <circle cx="32" cy="32" r="26" fill="#0a1117" stroke="#c3a773" strokeWidth="3"/>
+              <circle cx="32" cy="32" r="20.5" fill="#111b24" stroke="#39434a" strokeWidth="1.5"/>
+              <path d="m32 16 5.1 10.8 12 1.7-8.7 8.5 2 12-10.4-5.6-10.5 5.6 2-12-8.7-8.5 12-1.7Z" fill="#e4d1a5" stroke="#fff4cf" strokeWidth="1" strokeLinejoin="round"/>
+            </svg>
           </span>
 
           <span>Pusula Puanı</span>
