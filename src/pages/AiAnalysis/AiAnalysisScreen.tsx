@@ -1938,17 +1938,8 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
       <style>{cmsRuntimeCss + onboardingStyles + PUSULA_AI_EXTRA_STYLES}</style>
 
       <div className="tp-ai-page">
-        <div
-          aria-hidden="true"
-          style={{
-            display: 'block',
-            width: '100%',
-            height: '64px',
-            minHeight: '64px',
-            flex: '0 0 64px',
-            pointerEvents: 'none',
-          }}
-        />
+        {/* Global header spacing comes from the shared AppShell contract,
+            not a hard-coded spacer that can sit below the iPhone safe area. */}
         <main className="tp-ai-page-content">
         <style>{PUSULA_HUB_FINAL_STYLES}</style>
           <section className="tp-pusula-hub-intro">
