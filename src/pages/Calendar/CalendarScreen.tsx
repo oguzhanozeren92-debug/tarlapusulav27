@@ -239,6 +239,125 @@ const CALENDAR_COMPACT_STYLES = String.raw`
 }
 `;
 
+const CALENDAR_MODE_STYLES = String.raw`
+/* Takvim / Tarla Defteri — independent, resilient segmented selector.
+   Two adjacent choices even when CMS overrides app button typography. */
+html body #root .tp-calendar-page .tp-calendar-mode-switch{
+  box-sizing:border-box!important;
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  width:100%!important;
+  min-width:0!important;
+  align-items:stretch!important;
+  gap:8px!important;
+  margin:0 0 12px!important;
+  padding:6px!important;
+  border:1px solid #dce2e7!important;
+  border-radius:18px!important;
+  background:#fff!important;
+  box-shadow:0 4px 14px rgba(20,29,39,.045)!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch > button{
+  box-sizing:border-box!important;
+  display:grid!important;
+  grid-template-columns:28px minmax(0,1fr)!important;
+  align-items:center!important;
+  justify-items:stretch!important;
+  column-gap:9px!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  min-height:62px!important;
+  margin:0!important;
+  padding:9px!important;
+  border:1px solid transparent!important;
+  border-radius:13px!important;
+  background:#f2f4f6!important;
+  color:#26313c!important;
+  -webkit-text-fill-color:#26313c!important;
+  text-align:left!important;
+  white-space:normal!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch > button.active{
+  background:#151c24!important;
+  border-color:#151c24!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch .tp-calendar-mode-icon{
+  box-sizing:border-box!important;
+  display:grid!important;
+  place-items:center!important;
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  border:1px solid #d4dce3!important;
+  border-radius:9px!important;
+  background:#fff!important;
+  color:#26313c!important;
+  -webkit-text-fill-color:#26313c!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch > button.active .tp-calendar-mode-icon{
+  border-color:rgba(255,255,255,.28)!important;
+  background:rgba(255,255,255,.12)!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch .tp-calendar-mode-copy{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  gap:3px!important;
+  width:100%!important;
+  min-width:0!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch .tp-calendar-mode-copy strong{
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+  max-width:100%!important;
+  color:#19232e!important;
+  -webkit-text-fill-color:#19232e!important;
+  font-size:clamp(11px,3vw,15px)!important;
+  font-weight:850!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch .tp-calendar-mode-copy small{
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:2!important;
+  overflow:hidden!important;
+  max-width:100%!important;
+  margin:0!important;
+  color:#6c7781!important;
+  -webkit-text-fill-color:#6c7781!important;
+  font-size:clamp(8px,2.05vw,10px)!important;
+  font-weight:600!important;
+  line-height:1.23!important;
+  white-space:normal!important;
+  overflow-wrap:normal!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch > button.active .tp-calendar-mode-copy strong{
+  color:#fff!important;-webkit-text-fill-color:#fff!important;
+}
+html body #root .tp-calendar-page .tp-calendar-mode-switch > button.active .tp-calendar-mode-copy small{
+  color:#d5dce2!important;-webkit-text-fill-color:#d5dce2!important;
+}
+@media(max-width:380px){
+  html body #root .tp-calendar-page .tp-calendar-mode-switch{gap:5px!important;padding:5px!important}
+  html body #root .tp-calendar-page .tp-calendar-mode-switch > button{
+    grid-template-columns:25px minmax(0,1fr)!important;
+    column-gap:6px!important;
+    padding:7px 6px!important;
+  }
+  html body #root .tp-calendar-page .tp-calendar-mode-switch .tp-calendar-mode-icon{
+    width:25px!important;height:25px!important;min-width:25px!important;
+  }
+}
+`;
+
 type CalendarScreenProps = {
   cmsRuntimeCss: string;
   cmsPageFor: (pageKey: string) => CmsPageRow | undefined;
@@ -406,7 +525,10 @@ export default function CalendarScreen({
 
   return (
     <>
-      <style>{cmsRuntimeCss + onboardingStyles + CALENDAR_COMPACT_STYLES}</style>
+      <style>{cmsRuntimeCss}</style>
+      <style>{onboardingStyles}</style>
+      <style>{CALENDAR_COMPACT_STYLES}</style>
+      <style>{CALENDAR_MODE_STYLES}</style>
 
       <AppDrawer
         open={drawerOpen}
