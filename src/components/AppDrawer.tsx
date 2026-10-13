@@ -204,6 +204,26 @@ export default function AppDrawer({
     String(profileName || '').trim() || 'Üretici',
   );
   const drawerRef = useRef<HTMLElement | null>(null);
+  // Keep the drawer mounted briefly after close so the neural exit effect
+  // can finish. Reopening cancels any pending removal.
+  const [rendered, setRendered] = useState(open);
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      setClosing(false);
+      return;
+    }
+
+    if (!rendered) return;
+    setClosing(true);
+    const timeout = window.setTimeout(() => {
+      setRendered(false);
+      setClosing(false);
+    }, 260);
+    return () => window.clearTimeout(timeout);
+  }, [open, rendered]);
 
   useEffect(() => {
     const explicitName = String(profileName || '').trim();
@@ -289,7 +309,7 @@ export default function AppDrawer({
       window.removeEventListener('resize', applyNativeMobileOffset);
       window.removeEventListener('orientationchange', applyNativeMobileOffset);
     };
-  }, [open]);
+  }, [open, rendered]);
 
   const shownPoints = useMemo(() => {
     const explicit = Number(points);
@@ -299,7 +319,7 @@ export default function AppDrawer({
     return Number.isFinite(storePoints) ? storePoints : null;
   }, [points, gamification]);
 
-  if (!open) return null;
+  if (!rendered) return null;
 
   const handleLogout = async () => {
     onClose();
@@ -314,9 +334,44 @@ export default function AppDrawer({
   return (
     <>
       <style>{`
-        @keyframes tpPremiumDrawerIn{
-          from{transform:translateX(-28px);opacity:.55}
-          to{transform:translateX(0);opacity:1}
+        /* PUSULA // NEURAL SCAN — motion only; preserve drawer geometry. */
+        @keyframes tpNeuralDrawerIn{
+          0%{transform:translate3d(-40px,0,0) scaleX(.97);opacity:.15}
+          100%{transform:translate3d(0,0,0) scaleX(1);opacity:1}
+        }
+        @keyframes tpNeuralDrawerOut{
+          from{transform:translate3d(0,0,0);opacity:1}
+          to{transform:translate3d(-32px,0,0);opacity:0}
+        }
+        @keyframes tpNeuralBackdropIn{
+          from{opacity:0}
+          to{opacity:1}
+        }
+        @keyframes tpNeuralBackdropOut{
+          from{opacity:1}
+          to{opacity:0}
+        }
+        @keyframes tpNeuralSweep{
+          0%{transform:translate3d(0,0,0);opacity:0}
+          12%{opacity:.92}
+          78%{opacity:.78}
+          100%{transform:translate3d(440%,0,0);opacity:0}
+        }
+        @keyframes tpNeuralRaster{
+          0%{opacity:0}
+          16%{opacity:.45}
+          35%{opacity:.22}
+          55%{opacity:.35}
+          100%{opacity:0}
+        }
+        @keyframes tpNeuralItemIn{
+          from{opacity:0;transform:translate3d(-11px,0,0)}
+          to{opacity:1;transform:translate3d(0,0,0)}
+        }
+        @keyframes tpNeuralCompass{
+          0%{transform:rotate(-13deg) scale(.9);opacity:.7}
+          65%{transform:rotate(4deg) scale(1.04);opacity:1}
+          100%{transform:rotate(0) scale(1);opacity:1}
         }
 
         .tp-premium-drawer-backdrop{
@@ -328,6 +383,11 @@ export default function AppDrawer({
           background:rgba(0,5,2,.66);
           backdrop-filter:blur(9px) saturate(.82);
           -webkit-backdrop-filter:blur(9px) saturate(.82);
+          animation:tpNeuralBackdropIn .28s ease-out both;
+        }
+
+        .tp-premium-drawer-backdrop.tp-neural-exit{
+          animation:tpNeuralBackdropOut .26s ease-in both;
         }
 
         .tp-premium-drawer{
@@ -342,7 +402,7 @@ export default function AppDrawer({
           overflow-x:hidden;
           color:#f2ead9;
           isolation:isolate;
-          animation:tpPremiumDrawerIn .22s cubic-bezier(.2,.8,.2,1);
+          animation:tpNeuralDrawerIn .34s cubic-bezier(.16,1,.3,1) both;
 
           background:
             linear-gradient(180deg,rgba(1,12,6,.48) 0%,rgba(2,11,6,.60) 48%,rgba(1,7,4,.74) 100%),
@@ -361,6 +421,80 @@ export default function AppDrawer({
             0 0 0 1px rgba(111,237,146,.07),
             0 0 32px rgba(64,219,109,.20),
             inset -1px 0 0 rgba(202,255,214,.13);
+        }
+
+        .tp-premium-drawer.tp-neural-exit{
+          animation:tpNeuralDrawerOut .26s cubic-bezier(.55,0,.9,.45) both;
+          pointer-events:none;
+        }
+
+        /* Transient scan overlay: never changes sizing, scrolling or hit areas. */
+        .tp-premium-drawer > .tp-neural-scan-wrap{
+          position:absolute;
+          inset:0;
+          z-index:5;
+          overflow:hidden;
+          border-radius:inherit;
+          pointer-events:none;
+        }
+        .tp-neural-scan-wrap::before{
+          content:'';
+          position:absolute;
+          top:0;
+          bottom:0;
+          left:-35%;
+          width:36%;
+          background:linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(170,255,245,.035) 35%,
+            rgba(169,254,242,.24) 94%,
+            rgba(215,255,250,.52) 99%,
+            transparent 100%
+          );
+          mix-blend-mode:screen;
+          animation:tpNeuralSweep .44s cubic-bezier(.22,.8,.2,1) .045s both;
+        }
+        .tp-neural-scan-wrap::after{
+          content:'';
+          position:absolute;
+          inset:0;
+          background:repeating-linear-gradient(
+            0deg,
+            rgba(181,255,246,.10) 0 1px,
+            transparent 1px 7px
+          );
+          animation:tpNeuralRaster .37s steps(6,end) both;
+        }
+        .tp-premium-drawer.tp-neural-exit .tp-neural-scan-wrap::before{
+          animation:tpNeuralSweep .26s ease-in reverse both;
+        }
+        .tp-premium-drawer.tp-neural-exit .tp-neural-scan-wrap::after{
+          animation:tpNeuralRaster .26s linear reverse both;
+        }
+        .tp-premium-drawer:not(.tp-neural-exit) .tp-premium-drawer-brand-mark{
+          animation:tpNeuralCompass .36s ease-out .065s both;
+        }
+        .tp-premium-drawer:not(.tp-neural-exit) .tp-premium-drawer-nav > button{
+          animation:tpNeuralItemIn .27s cubic-bezier(.22,.8,.22,1) both;
+        }
+        .tp-premium-drawer-nav > button:nth-child(1){animation-delay:60ms!important;}
+        .tp-premium-drawer-nav > button:nth-child(2){animation-delay:82ms!important;}
+        .tp-premium-drawer-nav > button:nth-child(3){animation-delay:104ms!important;}
+        .tp-premium-drawer-nav > button:nth-child(4){animation-delay:126ms!important;}
+        .tp-premium-drawer-nav > button:nth-child(5){animation-delay:148ms!important;}
+        .tp-premium-drawer-nav > button:nth-child(6){animation-delay:170ms!important;}
+        .tp-premium-drawer-nav > button:nth-child(7){animation-delay:192ms!important;}
+
+        @media(prefers-reduced-motion:reduce){
+          .tp-premium-drawer,
+          .tp-premium-drawer-backdrop,
+          .tp-premium-drawer-brand-mark,
+          .tp-premium-drawer-nav > button,
+          .tp-neural-scan-wrap::before,
+          .tp-neural-scan-wrap::after{
+            animation:none!important;
+          }
         }
 
         .tp-premium-drawer::before{
@@ -1162,13 +1296,14 @@ export default function AppDrawer({
 
       <button
         type="button"
-        className="tp-premium-drawer-backdrop"
+        className={`tp-premium-drawer-backdrop${closing ? ' tp-neural-exit' : ''}`}
         aria-label="Menüyü kapat"
         onClick={onClose}
       />
 
-      <aside ref={drawerRef} className="tp-premium-drawer">
+      <aside ref={drawerRef} className={`tp-premium-drawer${closing ? ' tp-neural-exit' : ''}`}>
         <div className="tp-premium-drawer-atmosphere" aria-hidden="true" />
+        <div className="tp-neural-scan-wrap" aria-hidden="true" />
 
         <div className="tp-premium-drawer-top">
           <img
