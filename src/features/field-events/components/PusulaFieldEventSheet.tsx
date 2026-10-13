@@ -153,7 +153,7 @@ export default function PusulaFieldEventSheet({
       >
         <div className="tp-field-event-handle" aria-hidden="true" />
 
-        <header className="tp-field-event-head">
+        <header className={`tp-field-event-head${selected ? ' is-confirming' : ''}`}>
           {selected ? (
             <button
               type="button"
