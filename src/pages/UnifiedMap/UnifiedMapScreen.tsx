@@ -2358,6 +2358,42 @@ export default function UnifiedMapScreen({
 
   const orchardPilot = isOrchardTreePilotCrop(selectedField?.crop);
 
+  // Visual-only satellite scan: rerun only when the selected field or map
+  // layer changes. Map panning, zooming and scrolling never retrigger it.
+  const scanSignature = [
+    String(selectedField?.id ?? ''),
+    section,
+    section === 'vegetation' ? ndviView : '',
+    section === 'vegetation' ? String(showOrchardTrees) : '',
+    section === 'radar' ? radarMode : '',
+    section === 'soil' ? soilProperty : '',
+    section === 'soil' ? soilDepth : '',
+    section === 'climate' ? climateVariable : '',
+    periodDays,
+  ].join('|');
+  const scanContextRef = useRef<{ signature: string; fieldId: string } | null>(null);
+  const [scanPulse, setScanPulse] = useState<{
+    revision: number;
+    mode: 'entry' | 'field' | 'layer';
+  }>({ revision: 0, mode: 'entry' });
+
+  useEffect(() => {
+    const nextContext = {
+      signature: scanSignature,
+      fieldId: String(selectedField?.id ?? ''),
+    };
+    const previous = scanContextRef.current;
+    scanContextRef.current = nextContext;
+
+    // The first scan plays on mount; avoid a redundant replay.
+    if (!previous || previous.signature === scanSignature) return;
+
+    setScanPulse((current) => ({
+      revision: current.revision + 1,
+      mode: previous.fieldId !== nextContext.fieldId ? 'field' : 'layer',
+    }));
+  }, [scanSignature, selectedField?.id]);
+
   useEffect(() => {
     let cancelled = false;
     setOrchardTreePoints([]);
@@ -2932,6 +2968,94 @@ export default function UnifiedMapScreen({
         }
         .tp-unified-map-page .maplibregl-canvas{outline:none;}
 
+        /* PUSULA SATELLITE SCAN — visual layer only, never touches MapLibre,
+           tiles, map gestures, overlays, network requests or coordinates. */
+        @keyframes tpSatelliteScanSweep{
+          0%{transform:translate3d(0,0,0);opacity:0}
+          12%{opacity:.82}
+          70%{opacity:.8}
+          100%{transform:translate3d(620%,0,0);opacity:0}
+        }
+        @keyframes tpSatelliteScanGrid{
+          0%{opacity:0}
+          25%{opacity:.5}
+          72%{opacity:.3}
+          100%{opacity:0}
+        }
+        @keyframes tpSatelliteScanFrame{
+          0%{opacity:0;transform:scale(1.018)}
+          44%{opacity:.55}
+          100%{opacity:0;transform:scale(1)}
+        }
+        @keyframes tpSatelliteScanLabel{
+          0%{opacity:0;transform:translate3d(0,5px,0)}
+          25%{opacity:1;transform:translate3d(0,0,0)}
+          70%{opacity:1}
+          100%{opacity:0}
+        }
+        .tp-unified-satellite-scan{
+          --tp-scan-duration:380ms;
+          position:absolute;
+          inset:0;
+          z-index:89;
+          overflow:hidden;
+          isolation:isolate;
+          pointer-events:none!important;
+          user-select:none;
+        }
+        .tp-unified-satellite-scan::before{
+          content:'';
+          position:absolute;
+          inset:0;
+          background:
+            repeating-linear-gradient(0deg,rgba(208,252,245,.095) 0 1px,transparent 1px 18px),
+            repeating-linear-gradient(90deg,rgba(208,252,245,.075) 0 1px,transparent 1px 22px);
+          animation:tpSatelliteScanGrid var(--tp-scan-duration) ease-out both;
+        }
+        .tp-unified-satellite-scan::after{
+          content:'';
+          position:absolute;
+          left:-31%;
+          top:-5%;
+          bottom:-5%;
+          width:24%;
+          background:linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(170,251,244,.02) 24%,
+            rgba(147,250,238,.12) 78%,
+            rgba(213,255,250,.50) 98%,
+            transparent 100%
+          );
+          mix-blend-mode:screen;
+          animation:tpSatelliteScanSweep var(--tp-scan-duration) cubic-bezier(.2,.75,.22,1) both;
+        }
+        .tp-unified-satellite-scan-frame{
+          position:absolute;
+          inset:10px;
+          border:1px solid rgba(179,255,244,.48);
+          border-radius:6px;
+          box-shadow:inset 0 0 18px rgba(173,255,244,.09),0 0 20px rgba(173,255,244,.08);
+          animation:tpSatelliteScanFrame var(--tp-scan-duration) ease-out both;
+        }
+        .tp-unified-satellite-scan-caption{
+          position:absolute;
+          bottom:13px;
+          right:13px;
+          padding:6px 9px;
+          border-radius:8px;
+          border:1px solid rgba(194,255,245,.5);
+          background:rgba(4,20,20,.82);
+          color:#d9fff9;
+          font:800 9px/1.1 Inter,system-ui,sans-serif;
+          letter-spacing:.1em;
+          box-shadow:0 0 17px rgba(118,242,228,.17);
+          animation:tpSatelliteScanLabel var(--tp-scan-duration) ease-out both;
+        }
+        @media(prefers-reduced-motion:reduce){
+          .tp-unified-satellite-scan{display:none!important}
+        }
+
         .tp-unified-map-stage.is-fullscreen{
           position:fixed!important;
           inset:0!important;
@@ -3334,6 +3458,28 @@ export default function UnifiedMapScreen({
             style={styles.stage}
           >
             {renderVisual()}
+
+            <div
+              key={scanPulse.revision}
+              className="tp-unified-satellite-scan"
+              aria-hidden="true"
+              style={{
+                '--tp-scan-duration': scanPulse.mode === 'entry'
+                  ? '600ms'
+                  : scanPulse.mode === 'field'
+                    ? '480ms'
+                    : '360ms',
+              } as CSSProperties}
+            >
+              <span className="tp-unified-satellite-scan-frame" />
+              <span className="tp-unified-satellite-scan-caption">
+                {scanPulse.mode === 'entry'
+                  ? 'UYDU GÖRÜNÜMÜ'
+                  : scanPulse.mode === 'field'
+                    ? 'PARSEL TARAMASI'
+                    : 'KATMAN GEÇİŞİ'}
+              </span>
+            </div>
 
             <button
               type="button"
