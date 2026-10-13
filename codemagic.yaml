@@ -8,6 +8,8 @@ workflows:
       app_store_connect: TarlaPusula CI 2
 
     environment:
+      groups:
+        - revenuecat_keys
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.tarlapusula.app
@@ -74,6 +76,8 @@ workflows:
     # Team settings > Code signing identities > Android keystores.
     # Use the reference name "tarlapusula_upload". Never commit the keystore.
     environment:
+      groups:
+        - revenuecat_keys
       android_signing:
         - tarlapusula_upload
       node: 22
