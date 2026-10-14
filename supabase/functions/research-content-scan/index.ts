@@ -14,7 +14,21 @@ type Found = { title:string; url:string; doi:string|null; summary:string; langua
 
 const TR = ["buğday hastalıkları","sarı pas buğday","bitki hastalıkları","tarımsal zararlılar","azot noksanlığı bitki","bitki besleme gübreleme","toprak verimliliği","sulama yönetimi","kuraklık stresi bitki","don zararı tarım","verim tahmini tarım","hasat zamanı","mısır verimi","pamuk yetiştiriciliği","ayçiçeği yetiştiriciliği","fındık hastalıkları","zeytin hastalıkları","üzüm hastalıkları","incir yetiştiriciliği","tarımsal üretim tekniği"];
 const EN = ["wheat disease","wheat yellow rust","plant disease crop","crop pest management","nitrogen deficiency crop","plant nutrition fertilization","soil fertility crop","irrigation management crop","crop drought stress","frost damage crop","crop yield prediction","harvest timing crop","maize yield","cotton production","sunflower production","hazelnut disease","olive disease","grape disease","fig production","agricultural production technique"];
-const QUERY_POOL = [...TR, ...EN];
+// Visit different areas of research rather than the same first queries.
+const TOPIC_ORDER = [6,12,17,3,9,14,4,10,19,7,16,1,13,8,18,5,11,15,2,0];
+const QUERY_POOL = TOPIC_ORDER.flatMap((i) => [TR[i],EN[(i+9)%EN.length]]);
+const doiKey = (v:unknown) => clean(v,400).replace(/^https?:\/\/(dx\.)?doi\.org\//i,"").toLowerCase().trim();
+const topicTokens = (t:string) => new Set(norm(t).split(" ").filter(w=>w.length>=4));
+function nearSameTitle(a:string,b:string) {
+  if(a===b) return true;
+  const x=topicTokens(a),y=topicTokens(b);
+  if(x.size<4||y.size<4) return false;
+  return [...x].filter(w=>y.has(w)).length/Math.max(x.size,y.size)>=.84;
+}
+function evidenceKey(row:any) {
+  const refs=Array.isArray(row.source_refs)?row.source_refs:[];
+  return doiKey(row.doi_number||row.structured_body?.doi||refs[0]?.doi);
+}
 
 async function authorize(req: Request, admin: SupabaseClient, url: string, anon: string) {
   const cronToken = clean(req.headers.get("x-cron-token"), 500);
@@ -80,15 +94,51 @@ Deno.serve(async (req:Request)=>{
     const providerText=norm(`${source?.name||""} ${source?.base_url||""} ${source?.metadata?.provider||""} ${source?.metadata?.api_provider||""}`);
     if(/researchgate/.test(providerText)) return json({ok:true,engine:"research-v5.2",source:source?.name,skipped:true,reason:"ResearchGate otomatik taramaya uygun kaynak olarak kullanılmıyor; yayın keşfi indeks API'lerinden yapılır.",candidatesCreated:0});
     const providers = /semantic/.test(providerText) ? ["semantic"] : /crossref/.test(providerText) ? ["crossref"] : /openalex/.test(providerText) ? ["openalex"] : ["openalex","crossref","semantic"];
-    const requested=Array.isArray(body?.queries)?body.queries.map((x:any)=>clean(x,240)).filter((x:string)=>x.length>2):[]; const metadataQuery=clean(source?.metadata?.query,240); const allQueries=requested.length?requested:(metadataQuery?[metadataQuery,...QUERY_POOL]:QUERY_POOL); const cursor=Math.min(requestedCursor,allQueries.length); const queries=allQueries.slice(cursor,cursor+batchSize); const nextCursor=cursor+queries.length<allQueries.length?cursor+queries.length:null;
+    const requested=Array.isArray(body?.queries)?body.queries.map((x:any)=>clean(x,240)).filter((x:string)=>x.length>2):[];
+    const metadataQuery=clean(source?.metadata?.query,240);
+    const allQueries=requested.length?requested:[...new Set([...QUERY_POOL,...(metadataQuery?[metadataQuery]:[])])];
+    const explicitCursor=Object.prototype.hasOwnProperty.call(body,"cursor");
+    const cursor=requested.length||explicitCursor
+      ?Math.min(requestedCursor,Math.max(0,allQueries.length-1))
+      :Math.max(0,Number(source?.metadata?.article_scan_cursor||0))%allQueries.length;
+    const queries=[...allQueries.slice(cursor,cursor+batchSize)];
+    if(queries.length<batchSize&&!explicitCursor&&!requested.length) {
+      queries.push(...allQueries.slice(0,batchSize-queries.length));
+    }
+    const nextCursor=explicitCursor||requested.length
+      ?(cursor+queries.length<allQueries.length?cursor+queries.length:null)
+      :(cursor+queries.length)%allQueries.length;
     const found:Found[]=[]; const errors:string[]=[]; const providerStats:Record<string,{found:number;errors:number}>={}; for(const provider of providers) providerStats[provider]={found:0,errors:0};
     for(const q of queries){ for(const provider of providers){ try{ const rows=provider==="crossref"?await crossref(q,perQuery):provider==="semantic"?await semantic(q,perQuery):await openAlex(q,perQuery); found.push(...rows); providerStats[provider].found+=rows.length; }catch(e){ providerStats[provider].errors+=1; errors.push(`${provider} · ${q}: ${e instanceof Error?e.message:String(e)}`); } } }
-    const unique=new Map<string,Found>(); for(const x of found){ const key=x.doi?`doi:${x.doi.toLowerCase()}`:`title:${norm(x.title)}`; if(!unique.has(key)) unique.set(key,x); }
+    const unique=new Map<string,Found>();
+    for(const x of found){
+      const key=x.doi?`doi:${doiKey(x.doi)}`:`title:${norm(x.title)}`;
+      if(!unique.has(key)) unique.set(key,x);
+    }
+    // Same work from another provider, a previous rejected candidate or a
+    // published article must not be added a second time.
+    const [candidates,published]=await Promise.all([
+      admin.from("content_candidates").select("title_suggested,doi_number,source_refs,structured_body").eq("candidate_type","knowledge_new").limit(1500),
+      admin.from("content_items").select("title,doi_number,source_refs").eq("content_type","knowledge").limit(1000),
+    ]);
+    if(candidates.error) throw candidates.error;
+    if(published.error) throw published.error;
+    const knownDois=new Set<string>(),knownTitles:string[]=[];
+    for(const row of [...(candidates.data||[]),...(published.data||[])]){
+      const title=norm(row.title_suggested??row.title??"");
+      if(title) knownTitles.push(title);
+      const doi=evidenceKey(row);if(doi) knownDois.add(doi);
+    }
     let created=0,duplicates=0,lowQuality=0,translated=0,translationFailed=0; const examples:string[]=[];
     for(const item of unique.values()){
       const publicationYear=articleYear(item);
       if(!publicationYear || publicationYear < 2010){ lowQuality++; continue; }
-      const score=articleScore(item); if(score<45){lowQuality++;continue;} const fingerprint=await hash(`${item.doi||""}|${norm(item.title)}`);
+      const score=articleScore(item); if(score<45){lowQuality++;continue;}
+      const titleKey=norm(item.title), paperDoi=doiKey(item.doi);
+      if((paperDoi&&knownDois.has(paperDoi))||knownTitles.some(known=>nearSameTitle(known,titleKey))){
+        duplicates++;continue;
+      }
+      const fingerprint=await hash(`${paperDoi}|${titleKey}`);
       const saved=await admin.from("content_source_items").upsert({source_id:sourceId,external_id:item.doi||item.url,url:item.url,title:item.title,published_at:item.publishedAt,detected_language:item.language,raw_summary:item.summary||null,fingerprint,raw_metadata:{provider:item.provider,doi:item.doi,search_query:item.query,discovery_mode:discoveryMode},last_seen_at:new Date().toISOString()},{onConflict:"source_id,fingerprint"}).select("id").single();
       if(saved.error||!saved.data){errors.push(`${item.title}: ${saved.error?.message||"source item kaydedilemedi"}`);continue;}
       const ex=await admin.from("content_candidates").select("id,workflow_status,structured_body").eq("source_item_id",saved.data.id).maybeSingle(); if(ex.data){duplicates++;continue;}
@@ -110,7 +160,7 @@ Deno.serve(async (req:Request)=>{
         body_draft:clean(sourceSummary,5000),
         source_refs:[{
           source_id:sourceId,
-          source_name:source?.name||item.provider,
+          source_name:item.provider==="openalex"?"OpenAlex":item.provider==="crossref"?"Crossref":"Semantic Scholar",
           title:item.title,
           url:item.url,
           published_at:item.publishedAt,
@@ -118,7 +168,17 @@ Deno.serve(async (req:Request)=>{
           doi:item.doi,
           search_query:item.query
         }],
-        suggested_category:"Bilimsel Makale",
+        suggested_category:(()=>{
+          const t=norm(item.title+" "+item.summary);
+          if(/pas|mildew|fung|disease|hastalik|zararli|pest|virus/.test(t))return "Hastalık ve Zararlılar";
+          if(/sulama|irrig|water use|su stresi/.test(t))return "Sulama ve Su Yönetimi";
+          if(/kurak|drought|don|frost|iklim|climate/.test(t))return "İklim ve Risk";
+          if(/soil|toprak|mikrob|microb|fertili|gubre|azot|nutrient/.test(t))return "Toprak ve Bitki Besleme";
+          if(/verim|yield|harvest|hasat|quality|kalite|storage|depolama/.test(t))return "Verim, Hasat ve Depolama";
+          if(/uydu|satellite|ndvi|sensor|remote sensing/.test(t))return "Hassas Tarım ve Teknoloji";
+          if(/tohum|seed|islah|breeding|variety|cesit/.test(t))return "Tohum ve Islah";
+          return "Yetiştiricilik ve Tarımsal Araştırmalar";
+        })(),
         suggested_tags:[
           "makale",
           item.provider,
@@ -148,7 +208,8 @@ Deno.serve(async (req:Request)=>{
           channel:"article"
         }
       }).select("id").single();
-      if(ins.error||!ins.data){errors.push(`${item.title}: ${ins.error?.message||"candidate"}`);continue;} created++; if(examples.length<6) examples.push(item.title);
+      if(ins.error||!ins.data){errors.push(`${item.title}: ${ins.error?.message||"candidate"}`);continue;} created++;knownTitles.push(titleKey);if(paperDoi)knownDois.add(paperDoi);
+      if(examples.length<6) examples.push(item.title);
       if(!tr){
         try{
           const headers:Record<string,string>={"Content-Type":"application/json"}; const auth=req.headers.get("Authorization"); const cron=req.headers.get("x-cron-token"); if(auth) headers.Authorization=auth; if(cron) headers["x-cron-token"]=cron;
@@ -158,7 +219,14 @@ Deno.serve(async (req:Request)=>{
         }catch(e){ translationFailed++; const msg=e instanceof Error?e.message:String(e); await markTranslation(admin, ins.data.id, "failed_auto", msg); errors.push(`translation ${item.title}: ${msg}`); continue; }
       }
     }
-    await admin.from("content_sources").update({last_scanned_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",sourceId);
-    return json({ok:true,engine:"research-v5.3-background-translation-gate",authorization:access.mode,discoveryMode,providers,providerStats,source:source?.name||null,batch:{cursor,nextCursor,batchSize:queries.length,totalQueries:allQueries.length,hasMore:nextCursor!==null},queriesUsed:queries.length,found:found.length,unique:unique.size,candidatesCreated:created,translated,translationFailed,duplicates,lowQualityRejected:lowQuality,errors:errors.slice(0,10),examples});
+    await admin.from("content_sources").update({
+      last_scanned_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+      metadata:{
+        ...(source.metadata||{}),
+        ...(!requested.length&&!explicitCursor?{article_scan_cursor:nextCursor}:{}),
+        article_scan_engine:"research-v6-diverse-topics-global-dedupe",
+      },
+    }).eq("id",sourceId);
+    return json({ok:true,engine:"research-v6-diverse-topics-global-dedupe",authorization:access.mode,discoveryMode,providers,providerStats,source:source?.name||null,batch:{cursor,nextCursor,batchSize:queries.length,totalQueries:allQueries.length,hasMore:nextCursor!==null},queriesUsed:queries.length,found:found.length,unique:unique.size,candidatesCreated:created,translated,translationFailed,duplicates,lowQualityRejected:lowQuality,errors:errors.slice(0,10),examples});
   }catch(e){console.error("[RESEARCH_V5_2]",e);return json({error:e instanceof Error?e.message:"Makale taraması başarısız."},500);}
 });
