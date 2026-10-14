@@ -590,6 +590,23 @@ async function callNewsAi(messages: Array<{ role: string; content: string }>, ap
   }
 }
 
+function storyTitleKey(v: unknown) {
+  return norm(v).split(" ").filter(Boolean).join(" ");
+}
+function storyUrlKey(v: unknown) {
+  try {
+    const u = new URL(clean(v,1800));
+    const path = u.pathname.endsWith("/") ? u.pathname.slice(0,-1) : u.pathname;
+    return u.hostname.toLowerCase().replace("www.","") + path;
+  } catch { return ""; }
+}
+function sameNewsStory(a: string, b: string) {
+  if(a === b) return true;
+  const x = new Set(a.split(" ").filter(w => w.length >= 4));
+  const y = new Set(b.split(" ").filter(w => w.length >= 4));
+  if(x.size < 5 || y.size < 5) return false;
+  return [...x].filter(w => y.has(w)).length / Math.max(x.size,y.size) >= .82;
+}
 function inferNewsCategory(text: string) {
   const t = norm(text);
   if (/\b(fiyat|piyasa|ithalat|ihracat|arz|talep|stok|rekolte|alım|alim|satış|satis|price|market|import|export)\b/i.test(t)) return "piyasa";
@@ -803,7 +820,7 @@ Deno.serve(async (req: Request) => {
       .eq("active", true)
       .neq("source_type", "image_library")
       .contains("metadata", { channel: "news" })
-      .limit(20);
+      .limit(100);
 
     if (request.sourceId) q = q.eq("id", clean(request.sourceId, 100));
 
@@ -819,7 +836,11 @@ Deno.serve(async (req: Request) => {
         Number(source.trust_score || 0)
       );
     };
-    const allSources = (src.data as Source[]).sort((a, b) => sourcePriority(b) - sourcePriority(a));
+    const allSources=(src.data as Source[]).sort((a,b)=>{
+      const ta=a.last_scanned_at?Date.parse(a.last_scanned_at):0;
+      const tb=b.last_scanned_at?Date.parse(b.last_scanned_at):0;
+      return ta===tb?sourcePriority(b)-sourcePriority(a):ta-tb;
+    });
     const sources = request.sourceId
       ? allSources.slice(0, maxSources)
       : (() => {
@@ -858,6 +879,22 @@ Deno.serve(async (req: Request) => {
         .limit(40)
     ).data ?? [];
 
+    const archives=await Promise.all([
+      admin.from("content_candidates").select("title_suggested,source_refs").eq("candidate_type","news").order("generated_at",{ascending:false}).limit(700),
+      admin.from("content_items").select("title,source_refs").eq("content_type","news").limit(300),
+    ]);
+    if(archives[0].error)throw archives[0].error;
+    if(archives[1].error)throw archives[1].error;
+    const seenTitles:string[]=[],seenUrls=new Set<string>();
+    for(const row of [...(archives[0].data||[]),...(archives[1].data||[])]){
+      const title=storyTitleKey(row.title_suggested??row.title??"");
+      if(title)seenTitles.push(title);
+      for(const ref of Array.isArray(row.source_refs)?row.source_refs:[]){
+        const url=storyUrlKey(ref?.url);if(url)seenUrls.add(url);
+      }
+    }
+    const scanTopics=new Map<string,number>();
+    let diversitySkipped=0;
     let created = 0;
     let found = 0;
     let fresh = 0;
@@ -875,6 +912,7 @@ Deno.serve(async (req: Request) => {
         new: 0,
         candidates: 0,
         duplicates: 0,
+        diversitySkipped: 0,
         gateRejected: 0,
         aiRejected: 0,
         translationRejected: 0,
@@ -890,8 +928,13 @@ Deno.serve(async (req: Request) => {
         r.found = items.length;
         found += items.length;
 
-        for (const item of items) {
-          const gate = scientificNewsGate(item, source);
+        for(const item of items){
+          const storyKey=storyTitleKey(item.title), linkKey=storyUrlKey(item.url);
+          if((linkKey&&seenUrls.has(linkKey))||
+             (storyKey&&seenTitles.some(old=>sameNewsStory(old,storyKey)))){
+            duplicates++;r.duplicates++;continue;
+          }
+          const gate=scientificNewsGate(item,source);
           if (!gate.pass) {
             gateRejected++;
             r.gateRejected++;
@@ -993,6 +1036,14 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
+          const categoryContext=norm(draft.title+" "+draft.summary);
+          const topic = ["borç","borc","protesto"].some(term=>categoryContext.includes(term))
+            ? "tarım-ekonomisi"
+            : inferNewsCategory(draft.title+" "+draft.summary)||draft.category||"yetistiricilik";
+          const used=scanTopics.get(topic)||0;
+          if(!request.sourceId&&used>=2){
+            diversitySkipped++;r.diversitySkipped++;continue;
+          }
           // Kaynak fotoğrafı yalnız lisans bilgisi güvenliyse otomatik hazır sayılır.
           const sourceImageLicense = license(item.imageLicense);
           const sourceImageSafe = Boolean(item.imageUrl && SAFE_LICENSES.has(sourceImageLicense));
@@ -1031,7 +1082,7 @@ Deno.serve(async (req: Request) => {
               published_at: item.publishedAt,
               language: item.language,
             }],
-            suggested_category: draft.category,
+            suggested_category: topic,
             suggested_tags: draft.tags,
             suggested_crops: draft.crops,
             original_language: item.language,
@@ -1065,8 +1116,12 @@ Deno.serve(async (req: Request) => {
             });
           }
 
-          created++;
-          r.candidates++;
+          created++;r.candidates++;
+          scanTopics.set(topic,used+1);
+          if(storyKey)seenTitles.push(storyKey);
+          if(linkKey)seenUrls.add(linkKey);
+          const translatedKey=storyTitleKey(draft.title);
+          if(translatedKey)seenTitles.push(translatedKey);
         }
 
         await admin.from("content_sources").update({
@@ -1083,19 +1138,22 @@ Deno.serve(async (req: Request) => {
             last_news_ai_rejected: r.aiRejected,
             last_news_translation_rejected: r.translationRejected,
             last_news_ai_errors: r.aiErrors,
-            news_engine: "news-v19-field-value-tr",
+            news_engine: "news-v20-rotating-source-diversity",
           },
         }).eq("id", source.id);
-      } catch (error) {
-        r.error = error instanceof Error ? error.message : String(error);
+      } catch(error){
+        r.error=error instanceof Error?error.message:String(error);
+        await admin.from("content_sources").update({
+          last_scanned_at:new Date().toISOString(),
+          metadata:{...(source.metadata||{}),last_scan_error:r.error.slice(0,300)},
+        }).eq("id",source.id);
       }
-
       report.push(r);
     }
 
     return json({
       ok: true,
-      engine: "news-v19-field-value-tr",
+      engine: "news-v20-rotating-source-diversity",
       editorialMode: "producer_first_agriculture",
       mode,
       sourcesChecked: sources.length,
@@ -1103,6 +1161,7 @@ Deno.serve(async (req: Request) => {
       newItems: fresh,
       candidatesCreated: created,
       duplicates,
+      diversitySkipped,
       gateRejected,
       aiRejected,
       translationRejected,
