@@ -1041,7 +1041,7 @@ Deno.serve(async (req: Request) => {
             ? "tarım-ekonomisi"
             : inferNewsCategory(draft.title+" "+draft.summary)||draft.category||"yetistiricilik";
           const used=scanTopics.get(topic)||0;
-          if(!request.sourceId&&used>=2){
+          if(used>=2){
             diversitySkipped++;r.diversitySkipped++;continue;
           }
           // Kaynak fotoğrafı yalnız lisans bilgisi güvenliyse otomatik hazır sayılır.
