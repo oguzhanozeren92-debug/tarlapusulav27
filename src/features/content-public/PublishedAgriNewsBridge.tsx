@@ -217,9 +217,39 @@ function worldBucket(item: LiveContentRow): Exclude<WorldFilter, 'all'> {
   return 'policy';
 }
 
+function contentTopic(item: LiveContentRow) {
+  const category = item.category?.trim() || '';
+  if (item.content_subtype !== 'article' || (category && category.toLocaleLowerCase('tr-TR') !== 'bilimsel makale')) {
+    return category || 'Tarım Gündemi';
+  }
+  // Older articles all used the generic "Bilimsel Makale" label. Display a
+  // more informative subject without changing stored editorial metadata.
+  const text = [item.title,item.excerpt,...(item.tags??[])].filter(Boolean).join(' ').toLocaleLowerCase('tr-TR');
+  if (['hastalık','zararlı','böcek','mantar','pas hastal','fungal','pest','disease','virüs'].some(x=>text.includes(x))) return 'Bitki Sağlığı';
+  if (['sulama','su yönetimi','su stresi','irrigation','water use'].some(x=>text.includes(x))) return 'Sulama ve Su';
+  if (['kurak','don','iklim','drought','frost','climate'].some(x=>text.includes(x))) return 'İklim ve Risk';
+  if (['toprak','gübre','besin','azot','mikrob','soil','nutrient','fertiliz'].some(x=>text.includes(x))) return 'Toprak ve Besleme';
+  if (['uydu','ndvi','drone','hassas tarım','sensör','remote sensing','satellite'].some(x=>text.includes(x))) return 'Tarım Teknolojisi';
+  if (['ıslah','tohum','genotip','çeşit','breeding','variety'].some(x=>text.includes(x))) return 'Çeşit ve Islah';
+  if (['hasat','verim','kalite','depolama','yield','harvest','storage'].some(x=>text.includes(x))) return 'Verim ve Hasat';
+  return 'Tarımsal Araştırma';
+}
+
 function categoryLabel(item: LiveContentRow) {
-  if (item.category?.trim()) return item.category;
-  return item.content_subtype === 'article' ? 'Araştırma' : 'Tarım Gündemi';
+  return contentTopic(item);
+}
+
+// Stay close to publication order, but don't present three identical subjects
+// in sequence when a different recent subject is available nearby.
+function diversifyPublished(rows: LiveContentRow[]) {
+  const remaining = [...rows];
+  const result: LiveContentRow[] = [];
+  while (remaining.length) {
+    const lastTwo = result.slice(-2).map(contentTopic);
+    const index = remaining.slice(0,8).findIndex(item=>!lastTwo.includes(contentTopic(item)));
+    result.push(remaining.splice(index<0?0:index,1)[0]);
+  }
+  return result;
 }
 
 function readTime(item: LiveContentRow) {
@@ -428,8 +458,9 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
 
   useEffect(() => { void loadPublished(); }, []);
 
-  const turkeyNews = useMemo(() => news.filter((item) => item.coverage_scope !== 'world'), [news]);
-  const worldNews = useMemo(() => news.filter((item) => item.coverage_scope === 'world'), [news]);
+  const turkeyNews = useMemo(() => diversifyPublished(news.filter((item) => item.coverage_scope !== 'world')), [news]);
+  const worldNews = useMemo(() => diversifyPublished(news.filter((item) => item.coverage_scope === 'world')), [news]);
+  const variedArticles = useMemo(() => diversifyPublished(articles), [articles]);
   const worldCounts = useMemo(() => ({
     all: worldNews.length,
     markets: worldNews.filter((item) => worldBucket(item) === 'markets').length,
@@ -582,7 +613,7 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
         ) : <div className="tp-content-state">Bu başlıkta henüz admin onaylı içerik yok.</div>
       ) : articles.length ? (
         <div className="tp-research-list tp-research-list--compact">
-          {articles.map((item) => (
+          {variedArticles.map((item) => (
             <article key={item.id} className="tp-research-card tp-research-card--compact" onClick={() => void openDetail(item)}>
               <div className="tp-research-card__compact-copy">
                 <div className="tp-research-card__meta">
