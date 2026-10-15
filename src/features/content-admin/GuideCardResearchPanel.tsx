@@ -181,9 +181,11 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
         </div>
       ) : null}
       {failures.length ? (
-        <details className="tp-guide-research__failures">
-          <summary>Üretilemeyen kaynaklar ({failures.length})</summary>
-          {failures.map((item, index) => <p key={item.url + index}>{item.reason} — {item.url}</p>)}
+        <details className="tp-guide-research__failures" open={!created.length}>
+          <summary>Üretilemeyen kaynaklar ({failures.length}) — nedenini göster</summary>
+          {failures.map((item, index) => (
+            <p key={item.url + index}><strong>{item.reason}</strong><span>{item.url}</span></p>
+          ))}
         </details>
       ) : null}
     </section>
