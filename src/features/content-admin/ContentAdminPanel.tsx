@@ -18,13 +18,14 @@ import {
 import { supabase } from '../../supabaseClient';
 import KnowledgeUpdateSuggestions from './KnowledgeUpdateSuggestions';
 import KnowledgeAdminPanel from '../knowledge/components/KnowledgeAdminPanel';
+import GuideCardResearchPanel from './GuideCardResearchPanel';
 import ContentCoveragePanel from './ContentCoveragePanel.tsx';
 import { suggestKnowledgeUpdates, validateUpdateTarget } from './services/knowledgeUpdateSuggestions.service';
 import './ContentAdminPanel.css';
 
 type CandidateStatus = 'pending' | 'approved' | 'rejected' | 'held';
 type CandidateType = 'news' | 'knowledge_new' | 'knowledge_update';
-type AdminTab = 'queue' | 'published' | 'manual' | 'pdf' | 'sources' | 'coverage';
+type AdminTab = 'queue' | 'published' | 'manual' | 'pdf' | 'sources' | 'coverage' | 'guideengine';
 type QueueFilter = 'all' | 'news' | 'article' | 'guide';
 type SourceChannel = 'news' | 'article' | 'guide';
 
@@ -1373,6 +1374,7 @@ export default function ContentAdminPanel() {
         <button className={activeTab === 'published' ? 'active' : ''} type="button" onClick={() => setActiveTab('published')}>Yayınlananlar</button>
         <button className={activeTab === 'manual' ? 'active' : ''} type="button" onClick={() => setActiveTab('manual')}>Yeni Haber / Makale</button>
         <button className={activeTab === 'pdf' ? 'active' : ''} type="button" onClick={() => setActiveTab('pdf')}><Upload size={14} /> PDF'den İçerik</button>
+        <button className={activeTab === 'guideengine' ? 'active' : ''} type="button" onClick={() => setActiveTab('guideengine')}><BookOpen size={14} /> Rehber Motoru</button>
         <button className={activeTab === 'sources' ? 'active' : ''} type="button" onClick={() => setActiveTab('sources')}>Kaynaklar</button>
         <button className={activeTab === 'coverage' ? 'active' : ''} type="button" onClick={() => setActiveTab('coverage')}>İçerik Boşlukları</button>
       </nav>
@@ -1389,6 +1391,10 @@ export default function ContentAdminPanel() {
 
       {activeTab === 'pdf' ? (
         <KnowledgeAdminPanel />
+      ) : null}
+
+      {activeTab === 'guideengine' ? (
+        <GuideCardResearchPanel onCreated={loadAll} />
       ) : null}
 
       {activeTab === 'coverage' ? (
