@@ -1,3 +1,4 @@
+import { handleGuideCardRequest } from "./guideCards.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as cheerio from "npm:cheerio@1.0.0";
 
@@ -328,6 +329,15 @@ async function reprocess(baseUrl: string, id: string, req: Request) {
 }
 
 Deno.serve(async (req: Request) => {
+  // New reviewed guide-card mode uses the same deployed function (no new function quota).
+  if (req.method === "POST") {
+    let intent: any = {};
+    try { intent = await req.clone().json(); } catch { /* legacy scan validates its own payload */ }
+    if (intent?.action === "search" || intent?.action === "generate") {
+      return handleGuideCardRequest(req);
+    }
+  }
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST gerekli" }, 405);
   try {
