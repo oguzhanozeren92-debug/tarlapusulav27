@@ -25,7 +25,18 @@ type GuideData = {
   producer_value_score?: number | null;
 };
 
+type GuideCardData = {
+  title?: string | null;
+  summary?: string | null;
+  points?: string[] | null;
+  practice?: string | null;
+  caution?: string | null;
+  word_count?: number | null;
+  region?: string | null;
+};
+
 type KnowledgeStructuredBody = {
+  guide_card?: GuideCardData | null;
   crop_matches?: string[] | null;
   topic?: string | null;
   guide?: GuideData | null;
@@ -57,6 +68,9 @@ type KnowledgeCard = {
   sourceUrl: string;
   quality: number;
   publishedAt: string | null;
+  guideCard: GuideCardData | null;
+  sourceDetail: string;
+  sourceReason: string;
 };
 
 type KnowledgeLibraryProps = {
@@ -136,6 +150,9 @@ const toCard = (row: KnowledgeRow): KnowledgeCard => {
     sourceUrl: sourceUrl(row),
     quality: Number(guide?.producer_value_score ?? 0),
     publishedAt: row.published_at ?? null,
+    guideCard: row.structured_body?.guide_card ?? null,
+    sourceDetail: [row.source_refs?.[0]?.publication_type, row.source_refs?.[0]?.language].filter((x): x is string => typeof x === 'string').join(' · '),
+    sourceReason: typeof row.source_refs?.[0]?.reason === 'string' ? row.source_refs[0].reason : '',
   };
 };
 
@@ -408,13 +425,39 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
               <p className="tp-knowledge-detail-sheet__summary">{selectedCard.summary}</p>
             ) : null}
 
-            {selectedCard.fullBody && selectedCard.fullBody !== selectedCard.summary ? (
+            {!selectedCard.guideCard && selectedCard.fullBody && selectedCard.fullBody !== selectedCard.summary ? (
               <div className="tp-knowledge-detail-sheet__full-body">
                 {selectedCard.fullBody}
               </div>
             ) : null}
 
-            {selectedCard.highlights.length ? (
+            {selectedCard.guideCard ? (
+              <>
+                <section>
+                  <strong>Bilmen gerekenler</strong>
+                  <ul>
+                    {(selectedCard.guideCard.points ?? []).map((point, index) => (
+                      <li key={selectedCard.id + ':point:' + index}>{point}</li>
+                    ))}
+                  </ul>
+                </section>
+                <section className="tp-knowledge-detail-practical">
+                  <strong>Çiftçi için pratik öneri</strong>
+                  <p>{selectedCard.guideCard.practice}</p>
+                </section>
+                <section className="tp-knowledge-detail-warning">
+                  <strong>Dikkat</strong>
+                  <p>{selectedCard.guideCard.caution}</p>
+                </section>
+                <section className="tp-knowledge-detail-source">
+                  <strong>Kaynak önerisi</strong>
+                  <p>{selectedCard.sourceName}{selectedCard.sourceDetail ? ' · ' + selectedCard.sourceDetail : ''}</p>
+                  {selectedCard.sourceReason ? <p>{selectedCard.sourceReason}</p> : null}
+                </section>
+              </>
+            ) : null}
+
+            {!selectedCard.guideCard && selectedCard.highlights.length ? (
               <section>
                 <strong>Önemli noktalar</strong>
                 <ul>
@@ -425,7 +468,7 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
               </section>
             ) : null}
 
-            {selectedCard.details.length ? (
+            {!selectedCard.guideCard && selectedCard.details.length ? (
               <section>
                 <strong>Biraz daha detay</strong>
                 <ul>
