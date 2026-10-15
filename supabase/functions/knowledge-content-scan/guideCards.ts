@@ -109,25 +109,67 @@ async function discover(db:any,topic:string){
  }
  return [...map.values()].sort((a,b)=>b.score-a.score).slice(0,30);
 }
-async function read(url:string){
- const r=await fetch(url,{redirect:"follow",signal:AbortSignal.timeout(13000),headers:{Accept:"text/html,application/pdf,text/plain","User-Agent":"TarlaPusulaGuide/1.0"}});
- if(!r.ok||!trusted(r.url)||Number(r.headers.get("content-length")||0)>6000000)return "";
+async function readPdfBytes(bytes: Uint8Array) {
+ // A PDF is not HTML. First extract actual text with PDF.js, not an unreliable URL preview.
+ // If pages are scans, no text will be invented.
+ try {
+   const pdfjs = await import("npm:pdfjs-dist@4.10.38/legacy/build/pdf.mjs");
+   const task = pdfjs.getDocument({
+     data: bytes, useSystemFonts: true, disableFontFace: true, isEvalSupported: false,
+     stopAtErrors: true,
+   });
+   const document = await task.promise;
+   const pieces: string[] = [];
+   try {
+     const count = Math.min(document.numPages, 10);
+     for(let n=1;n<=count;n++){
+       const page = await document.getPage(n);
+       const content = await page.getTextContent();
+       const text = content.items.map((item:any)=>typeof item.str==="string"?item.str:"").filter(Boolean).join(" ");
+       if(text.trim())pieces.push(text);
+       page.cleanup();
+       if(pieces.join(" ").length>20000)break;
+     }
+   } finally { await document.destroy(); }
+   return clean(pieces.join("\n\n"),22000);
+ } catch(error){
+   console.warn("[GUIDE_PDF_EXTRACT]",String(error).slice(0,240));
+   return "";
+ }
+}
+type ReadEvidence = { text: string; method: string; note?: string };
+async function read(url:string):Promise<ReadEvidence>{
+ const r=await fetch(url,{redirect:"follow",signal:AbortSignal.timeout(18000),
+   headers:{Accept:"text/html,application/pdf,text/plain","User-Agent":"Mozilla/5.0 (compatible; TarlaPusulaGuide/2.0)"}});
+ if(!r.ok) return {text:"",method:"none",note:"Kaynak HTTP "+r.status+" durumuyla yanıt verdi."};
+ if(!trusted(r.url)) return {text:"",method:"none",note:"Kaynak izin verilen alan adının dışına yönlendirildi."};
+ if(Number(r.headers.get("content-length")||0)>6500000)return {text:"",method:"none",note:"Kaynak 6,5 MB sınırını aşıyor."};
  const type=r.headers.get("content-type")||"";
  if(/text\/html|application\/xhtml/i.test(type)){
    const $=cheerio.load((await r.text()).slice(0,650000));
    $("script,style,nav,header,footer,aside,button,form,noscript,svg,.cookie,.breadcrumb").remove();
    const root=$("article").first().length?$("article").first():$("main").first().length?$("main").first():$("body").first();
    const paragraphs=[...new Set(root.find("h1,h2,h3,p,li,table tr").toArray().map(el=>clean($(el).text(),1200)).filter(x=>x.length>30))].join("\n");
-   return (countWords(paragraphs)>=110?paragraphs:clean(root.text(),17000)).slice(0,17000);
+   return {text:(countWords(paragraphs)>=110?paragraphs:clean(root.text(),18000)).slice(0,18000),method:"html"};
  }
- if(/text\/plain/i.test(type))return clean(await r.text(),17000);
+ if(/text\/plain/i.test(type))return {text:clean(await r.text(),17000),method:"text"};
  if(/pdf/i.test(type)||/\.pdf(?:\?|$)/i.test(url)){
+   const bytes=new Uint8Array(await r.arrayBuffer());
+   if(bytes.length>6500000)return {text:"",method:"pdf",note:"PDF 6,5 MB sınırını aşıyor."};
+   const direct=await readPdfBytes(bytes);
+   if(countWords(direct)>=110)return {text:direct,method:"pdf-direct"};
+   // Public URL-to-text endpoints may provide text for PDFs with custom embedded fonts.
    try{
-     const extracted=await fetch("https://r.jina.ai/"+url,{signal:AbortSignal.timeout(18000),headers:{"X-Return-Format":"text"}});
-     return extracted.ok?clean(await extracted.text(),17000):"";
-   }catch{return "";}
+     const extracted=await fetch("https://r.jina.ai/"+url,{signal:AbortSignal.timeout(16000),headers:{"X-Return-Format":"text"}});
+     if(extracted.ok){
+       const markdown=clean(await extracted.text(),18000);
+       if(countWords(markdown)>=110 && !/access denied|cloudflare|verification required|404 not found/i.test(markdown.slice(0,300)))
+         return {text:markdown,method:"pdf-readable"};
+     }
+   }catch{/* no usable secondary extractor */ }
+   return {text:"",method:"pdf",note:"PDF indirildi ancak metin çıkarılamadı (taranmış görüntü ya da uyumsuz PDF)."};
  }
- return "";
+ return {text:"",method:"unsupported",note:"Kaynak okunabilir HTML veya PDF döndürmedi."};
 }
 async function generate(key:string,system:string,evidence:string){
  for(const model of ["z-ai/glm-5.3-flash","nvidia/nemotron-3-super-120b-a12b"]){
@@ -217,15 +259,21 @@ export async function handleGuideCardRequest(req: Request) {
    for(const source of selected){
      if(created.length>=requested)break;
      if(used.has(source.url)){failures.push({url:source.url,reason:"Bu kaynakla kart zaten var."});continue;}
-     let text="";try{text=await read(source.url)}catch{/* unavailable source */ }
-     if(countWords(text)<110){failures.push({url:source.url,reason:"Kaynak içeriği doğrulanamadı veya okunamadı."});continue;}
+     let evidenceResult:ReadEvidence={text:"",method:"none"};
+     try{evidenceResult=await read(source.url)}
+     catch(error){evidenceResult={text:"",method:"error",note:error instanceof Error?error.message:"Kaynağa erişilemedi."};}
+     const text=evidenceResult.text;
+     if(countWords(text)<110){
+       failures.push({url:source.url,reason:evidenceResult.note||"Kaynak metni üretim için yeterli değil ("+countWords(text)+" kelime)."});
+       continue;
+     }
      const evidence="KAYNAK BAŞLIĞI: "+source.title+"\nKURUM: "+source.institution+"\nBAĞLANTI: "+source.url+"\nKAYNAK METNİ:\n"+text.slice(0,15000);
      let card:any=null;
      for(let i=0;i<2&&!card;i++){
        const raw=await generate(key,prompt(area,topic,region,audience)+(i?"\nÖnceki cevap kelime ve biçim doğrulamasından geçemedi; sınırları yeniden kontrol et.":""),evidence);
        card=validate(raw,risky);
      }
-     if(!card){failures.push({url:source.url,reason:"100-180 kelime ve güvenlik denetimi geçilemedi."});continue;}
+     if(!card){failures.push({url:source.url,reason:"Yapay zekâ, güvenli 100-180 kelimelik Türkçe kart üretemedi. Kaynak metni okunabildi ("+evidenceResult.method+")."});continue;}
      if(older.some((row:any)=>norm(row.title||row.title_suggested)===norm(card.title))){
        failures.push({url:source.url,reason:"Benzer başlık zaten var."});continue;
      }
