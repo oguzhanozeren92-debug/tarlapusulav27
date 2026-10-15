@@ -89,7 +89,7 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
         try {
           const data = await askEngine({
             action: 'generate', area, topic: topic.trim(), region, audience,
-            count: segment.length, sourceUrls: segment.map((item) => item.url),
+            count: segment.length, sources: segment.map(({ url, title }) => ({ url, title })),
           });
           generated.push(...(data.created || []));
           rejected.push(...(data.failures || []));
