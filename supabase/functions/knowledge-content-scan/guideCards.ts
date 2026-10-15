@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as cheerio from "npm:cheerio@1.0.0";
 import { TRUSTED_GUIDE_SEEDS } from "./trustedSources.ts";
+import { VERIFIED_PDF_NOTES } from "./verifiedPdfNotes.ts";
 
 const headers = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization,apikey,content-type,x-client-info","Access-Control-Allow-Methods":"POST,OPTIONS"};
 const reply = (data: unknown, status=200) => new Response(JSON.stringify(data),{status,headers:{...headers,"Content-Type":"application/json; charset=utf-8"}});
@@ -262,8 +263,16 @@ export async function handleGuideCardRequest(req: Request) {
      let evidenceResult:ReadEvidence={text:"",method:"none"};
      try{evidenceResult=await read(source.url)}
      catch(error){evidenceResult={text:"",method:"error",note:error instanceof Error?error.message:"Kaynağa erişilemedi."};}
+     // Only a previously inspected, exact-match primary source can supply this fallback.
+     // A generic failed PDF must still fail closed; its content is never imagined.
+     const editorNote=VERIFIED_PDF_NOTES[source.url];
+     const noteApplies=Boolean(editorNote && editorNote.topic_terms.some(token=>norm(topic).includes(token)));
+     if(countWords(evidenceResult.text)<110 && noteApplies){
+       evidenceResult={text:editorNote.evidence,method:"editor-verified-pdf-page",
+         note:"TAGEM PDF'nin birinci sayfası daha önce doğrudan görsel olarak doğrulandı."};
+     }
      const text=evidenceResult.text;
-     if(countWords(text)<110){
+     if(countWords(text)<110 && !noteApplies){
        failures.push({url:source.url,reason:evidenceResult.note||"Kaynak metni üretim için yeterli değil ("+countWords(text)+" kelime)."});
        continue;
      }
@@ -273,12 +282,18 @@ export async function handleGuideCardRequest(req: Request) {
        const raw=await generate(key,prompt(area,topic,region,audience)+(i?"\nÖnceki cevap kelime ve biçim doğrulamasından geçemedi; sınırları yeniden kontrol et.":""),evidence);
        card=validate(raw,risky);
      }
+     if(!card && noteApplies){
+       // Vetted card is a disclosed editorial fallback, not AI-generated claims.
+       card=validate(editorNote.card,risky);
+     }
      if(!card){failures.push({url:source.url,reason:"Yapay zekâ, güvenli 100-180 kelimelik Türkçe kart üretemedi. Kaynak metni okunabildi ("+evidenceResult.method+")."});continue;}
      if(older.some((row:any)=>norm(row.title||row.title_suggested)===norm(card.title))){
        failures.push({url:source.url,reason:"Benzer başlık zaten var."});continue;
      }
      const refs=[{source_name:source.institution,url:source.url,title:source.title,language:source.language,publication_type:source.publication_type,
-       reason:"Erişilebilir teknik kaynak metni doğrulanarak kullanıldı."}];
+       reason:evidenceResult.method==="editor-verified-pdf-page"
+         ?"TAGEM kaynak PDF'nin ilk sayfası görsel olarak incelenmiş editoryal bilgi kullanıldı."
+         :"Erişilebilir teknik kaynak metni doğrulanarak kullanıldı."}];
      const body=["Özet: "+card.summary,"Bilmen gerekenler:",...card.points.map((x:string)=>"• "+x),
        "Çiftçi için pratik öneri: "+card.practice,"Dikkat: "+card.caution].join("\n");
      const insert=await db.from("content_candidates").insert({
