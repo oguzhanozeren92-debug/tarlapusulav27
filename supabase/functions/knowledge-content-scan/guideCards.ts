@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as cheerio from "npm:cheerio@1.0.0";
+import { TRUSTED_GUIDE_SEEDS } from "./trustedSources.ts";
 
 const headers = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization,apikey,content-type,x-client-info","Access-Control-Allow-Methods":"POST,OPTIONS"};
 const reply = (data: unknown, status=200) => new Response(JSON.stringify(data),{status,headers:{...headers,"Content-Type":"application/json; charset=utf-8"}});
@@ -30,7 +31,44 @@ function patterns(topic:string){return [
  "site:extension.okstate.edu "+topic+" pdf",
  'site:dergipark.org.tr "derleme" '+topic+" pdf"
 ];}
-type Source={url:string;title:string;institution:string;language:string;publication_type:string;score:number};
+type Source={url:string;title:string;institution:string;language:string;publication_type:string;score:number;keywords?:string;origin?:"catalog"|"indexed"|"web"};
+const ignored=new Set(["ve","veya","ile","icin","bir","bu","gibi","nasil","nedir","hangi","yontemi","yontem","hakkinda","bilgi","rehber","tarim","tarimi","bitki","bitkisel","uretim","harita","haritasi","konu","sorun","onlem","onlemi"]);
+const stem=(s:string)=>s.slice(0,s.length>=8?6:s.length>=6?5:s.length);
+const synonyms:Record<string,string[]>={
+ "azot":["nitrojen","nitrogen","ndre","nitrat"],
+ "nitrojen":["azot","nitrogen"],
+ "gubre":["gubreleme","fertility","fertilizer","fertilization","besin"],
+ "sulama":["su","irrigation","nem","damla"],
+ "ndvi":["uydu","uzaktan algilama","hassas","ndre"],
+ "ndre":["azot","uydu","uzaktan algilama"],
+ "uydu":["ndvi","ndre","uzaktan algilama","hassas"],
+ "toprak":["soil"],
+ "tohum":["tohumluk","seed"],
+ "don":["soguk","frost"],
+ "hastalik":["mantar","fungus","disease"],
+ "zararli":["bocek","pest"],
+ "cokerten":["fide","kok","hastalik"],
+ "bugday":["hububat","wheat"],
+ "yabanci":["ot","weed"],
+ "hasat":["derim","postharvest"],
+ "depolama":["depo","hasat","storage"],
+ "kuraklik":["su","sulama","drought"]
+};
+function terms(value:string){
+ const all=norm(value).split(" ").filter(x=>x.length>=3&&!ignored.has(x));
+ return [...new Set(all)];
+}
+function relevance(search:string,matchAgainst:string){
+ const needle=terms(search),hay=norm(matchAgainst);
+ if(!needle.length)return 0;
+ return needle.reduce((sum,token)=>{
+   const prefix=stem(token),hit=hay.includes(token)||hay.split(" ").some(word=>stem(word)===prefix);
+   if(hit)return sum+4;
+   const synonymsHit=Object.entries(synonyms).some(([key,values])=>
+     (token===key||token.startsWith(key)||key.startsWith(token))&&values.some(alias=>hay.includes(alias)));
+   return sum+(synonymsHit?2:0);
+ },0);
+}
 async function indexed(db:any,topic:string){
  const sources=await db.from("content_sources").select("id,base_url,metadata").eq("active",true).limit(150);
  if(sources.error)throw sources.error;
@@ -50,18 +88,24 @@ async function bing(q:string){
  }catch{return [];}
 }
 async function discover(db:any,topic:string){
- const terms=norm(topic).split(" ").filter(x=>x.length>2);
- const [known,...found]=await Promise.all([indexed(db,topic),...patterns(topic).map(bing)]);
  const map=new Map<string,Source>();
- for(const result of [...known,...found.flat()]){
-   const t=trusted(result.url);if(!t)continue;
-   const hay=norm(result.title+" "+new URL(t.url).pathname.replace(/[-_]/g," "));
-   const matches=terms.filter(x=>hay.includes(x)).length;
-   if(!matches||result.title.length<8)continue;
-   const score=t.weight+matches*15;
-   if(!map.has(t.url)||score>map.get(t.url)!.score)map.set(t.url,{...t,title:result.title,score});
+ function add(row:{title:string;url:string;keywords?:string},origin:"catalog"|"indexed"|"web"){
+   const t=trusted(row.url);if(!t)return;
+   const score=relevance(topic,row.title+" "+(row.keywords||"")+" "+new URL(t.url).pathname.replace(/[-_]/g," "));
+   if(score<=0||row.title.length<8)return;
+   const value:Source={...t,title:row.title,keywords:row.keywords||"",score:t.weight+score*15+(origin==="catalog"?6:0),origin};
+   if(!map.has(t.url)||value.score>map.get(t.url)!.score)map.set(t.url,value);
  }
- return [...map.values()].sort((a,b)=>b.score-a.score).slice(0,25);
+ for(const row of TRUSTED_GUIDE_SEEDS)add(row,"catalog");
+ const known=await indexed(db,topic);
+ for(const row of known)add(row,"indexed");
+ // Curated primary sources are a dependable offline index; external RSS is optional.
+ // A blocked search provider can no longer zero out known credible topic matches.
+ if(map.size<8){
+   const results=await Promise.all(patterns(topic).map(bing));
+   for(const row of results.flat())add(row,"web");
+ }
+ return [...map.values()].sort((a,b)=>b.score-a.score).slice(0,30);
 }
 async function read(url:string){
  const r=await fetch(url,{redirect:"follow",signal:AbortSignal.timeout(13000),headers:{Accept:"text/html,application/pdf,text/plain","User-Agent":"TarlaPusulaGuide/1.0"}});
@@ -71,7 +115,8 @@ async function read(url:string){
    const $=cheerio.load((await r.text()).slice(0,650000));
    $("script,style,nav,header,footer,aside,button,form,noscript,svg,.cookie,.breadcrumb").remove();
    const root=$("article").first().length?$("article").first():$("main").first().length?$("main").first():$("body").first();
-   return [...new Set(root.find("h1,h2,h3,p,li,table tr").toArray().map(el=>clean($(el).text(),1200)).filter(x=>x.length>30))].join("\n").slice(0,17000);
+   const paragraphs=[...new Set(root.find("h1,h2,h3,p,li,table tr").toArray().map(el=>clean($(el).text(),1200)).filter(x=>x.length>30))].join("\n");
+   return (countWords(paragraphs)>=110?paragraphs:clean(root.text(),17000)).slice(0,17000);
  }
  if(/text\/plain/i.test(type))return clean(await r.text(),17000);
  if(/pdf/i.test(type)||/\.pdf(?:\?|$)/i.test(url)){
@@ -145,8 +190,18 @@ export async function handleGuideCardRequest(req: Request) {
    const key=Deno.env.get("NVIDIA_API_KEY")||"";
    if(!key)return reply({error:"NVIDIA_API_KEY sunucuda yapılandırılmamış."},503);
    const requested=Math.max(1,Math.min(2,Number(b.count)||1));
-   const all=await discover(db,topic);
-   const selected=Array.isArray(b.sourceUrls)&&b.sourceUrls.length?all.filter(s=>b.sourceUrls.includes(s.url)):all;
+   // Respect the exact source candidates selected by the editor. Never re-run
+   // remote discovery for those URLs: RSS results can change or disappear.
+   const selectedFromClient:Source[]=Array.isArray(b.sources)?b.sources.slice(0,20).flatMap((input:any)=>{
+     const t=trusted(input?.url);if(!t)return [];
+     const seed=TRUSTED_GUIDE_SEEDS.find(x=>x.url===t.url);
+     const title=clean(seed?.title||input?.title,250);
+     if(!title)return [];
+     return [{...t,title,score:t.weight+relevance(topic,title+" "+(seed?.keywords||""))*15,origin:seed?"catalog" as const:"web" as const}];
+   }):[];
+   const all=selectedFromClient.length?[]:await discover(db,topic);
+   const selected=selectedFromClient.length?selectedFromClient
+     :Array.isArray(b.sourceUrls)&&b.sourceUrls.length?all.filter(s=>b.sourceUrls.includes(s.url)):all;
    if(!selected.length)return reply({ok:true,created:[],failures:[],message:"Güvenilir birincil kaynak bulunamadı."});
    const [drafts,published]=await Promise.all([
      db.from("content_candidates").select("title_suggested,source_refs").eq("content_subtype","guide").in("workflow_status",["pending","approved"]).limit(500),
