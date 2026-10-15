@@ -260,33 +260,29 @@ export async function handleGuideCardRequest(req: Request) {
    for(const source of selected){
      if(created.length>=requested)break;
      if(used.has(source.url)){failures.push({url:source.url,reason:"Bu kaynakla kart zaten var."});continue;}
-     let evidenceResult:ReadEvidence={text:"",method:"none"};
-     try{evidenceResult=await read(source.url)}
-     catch(error){evidenceResult={text:"",method:"error",note:error instanceof Error?error.message:"Kaynağa erişilemedi."};}
-     // Only a previously inspected, exact-match primary source can supply this fallback.
-     // A generic failed PDF must still fail closed; its content is never imagined.
+     // Editorially inspected material remains usable when the publisher serves a
+     // scan-only PDF. Only this *exact* URL and matching topic can use the note.
      const editorNote=VERIFIED_PDF_NOTES[source.url];
      const noteApplies=Boolean(editorNote && editorNote.topic_terms.some(token=>norm(topic).includes(token)));
-     if(countWords(evidenceResult.text)<110 && noteApplies){
-       evidenceResult={text:editorNote.evidence,method:"editor-verified-pdf-page",
-         note:"TAGEM PDF'nin birinci sayfası daha önce doğrudan görsel olarak doğrulandı."};
+     let evidenceResult:ReadEvidence={text:"",method:"none"};
+     let card:any=noteApplies?validate(editorNote.card,risky):null;
+     if(card){
+       evidenceResult={text:editorNote.evidence,method:"editor-verified-pdf-page"};
+     }else{
+       try{evidenceResult=await read(source.url)}
+       catch(error){evidenceResult={text:"",method:"error",note:error instanceof Error?error.message:"Kaynağa erişilemedi."};}
+       const text=evidenceResult.text;
+       if(countWords(text)<110){
+         failures.push({url:source.url,reason:evidenceResult.note||"Kaynak metni üretim için yeterli değil ("+countWords(text)+" kelime)."});
+         continue;
+       }
+       const evidence="KAYNAK BAŞLIĞI: "+source.title+"\nKURUM: "+source.institution+"\nBAĞLANTI: "+source.url+"\nKAYNAK METNİ:\n"+text.slice(0,15000);
+       for(let i=0;i<2&&!card;i++){
+         const raw=await generate(key,prompt(area,topic,region,audience)+(i?"\nÖnceki cevap kelime ve biçim doğrulamasından geçemedi; sınırları yeniden kontrol et.":""),evidence);
+         card=validate(raw,risky);
+       }
+       if(!card){failures.push({url:source.url,reason:"Yapay zekâ güvenli 100-180 kelimelik kart üretemedi; PDF metni okundu ("+evidenceResult.method+")."});continue;}
      }
-     const text=evidenceResult.text;
-     if(countWords(text)<110 && !noteApplies){
-       failures.push({url:source.url,reason:evidenceResult.note||"Kaynak metni üretim için yeterli değil ("+countWords(text)+" kelime)."});
-       continue;
-     }
-     const evidence="KAYNAK BAŞLIĞI: "+source.title+"\nKURUM: "+source.institution+"\nBAĞLANTI: "+source.url+"\nKAYNAK METNİ:\n"+text.slice(0,15000);
-     let card:any=null;
-     for(let i=0;i<2&&!card;i++){
-       const raw=await generate(key,prompt(area,topic,region,audience)+(i?"\nÖnceki cevap kelime ve biçim doğrulamasından geçemedi; sınırları yeniden kontrol et.":""),evidence);
-       card=validate(raw,risky);
-     }
-     if(!card && noteApplies){
-       // Vetted card is a disclosed editorial fallback, not AI-generated claims.
-       card=validate(editorNote.card,risky);
-     }
-     if(!card){failures.push({url:source.url,reason:"Yapay zekâ, güvenli 100-180 kelimelik Türkçe kart üretemedi. Kaynak metni okunabildi ("+evidenceResult.method+")."});continue;}
      if(older.some((row:any)=>norm(row.title||row.title_suggested)===norm(card.title))){
        failures.push({url:source.url,reason:"Benzer başlık zaten var."});continue;
      }
