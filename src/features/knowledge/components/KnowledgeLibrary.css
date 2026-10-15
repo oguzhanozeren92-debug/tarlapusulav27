@@ -484,3 +484,16 @@
     border-radius:15px!important;
   }
 }
+
+.tp-knowledge-detail-practical,
+.tp-knowledge-detail-warning,
+.tp-knowledge-detail-source{
+  border:1px solid #e3e6e9;
+  background:#f7f8f9;
+  padding:12px 14px;
+  border-radius:12px;
+}
+.tp-knowledge-detail-practical p,
+.tp-knowledge-detail-warning p,
+.tp-knowledge-detail-source p{margin:7px 0 0;font-size:12px;line-height:1.65;white-space:pre-wrap}
+.tp-knowledge-detail-warning{border-left:3px solid #30343a}
