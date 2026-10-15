@@ -32,10 +32,11 @@ function patterns(topic:string){return [
  'site:dergipark.org.tr "derleme" '+topic+" pdf"
 ];}
 type Source={url:string;title:string;institution:string;language:string;publication_type:string;score:number;keywords?:string;origin?:"catalog"|"indexed"|"web"};
-const ignored=new Set(["ve","veya","ile","icin","bir","bu","gibi","nasil","nedir","hangi","yontemi","yontem","hakkinda","bilgi","rehber","tarim","tarimi","bitki","bitkisel","uretim","harita","haritasi","konu","sorun","onlem","onlemi"]);
+const ignored=new Set(["ve","veya","ile","icin","bir","bu","gibi","nasil","nedir","hangi","yontemi","yontem","hakkinda","bilgi","rehber","tarim","tarimi","bitki","bitkisel","uretim","harita","haritasi","konu","sorun","onlem","onlemi","zamani","zaman","zarari","zarar","oncesi","sonrasi","durumu","seviyesi","belirtileri","uygulamasi"]);
 const stem=(s:string)=>s.slice(0,s.length>=8?6:s.length>=6?5:s.length);
 const synonyms:Record<string,string[]>={
  "azot":["nitrojen","nitrogen","ndre","nitrat"],
+ "besleme":["besin","gubre","fertility","nutrition"],
  "nitrojen":["azot","nitrogen"],
  "gubre":["gubreleme","fertility","fertilizer","fertilization","besin"],
  "sulama":["su","irrigation","nem","damla"],
@@ -47,7 +48,7 @@ const synonyms:Record<string,string[]>={
  "don":["soguk","frost"],
  "hastalik":["mantar","fungus","disease"],
  "zararli":["bocek","pest"],
- "cokerten":["fide","kok","hastalik"],
+ "cokerten":["damping off"],
  "bugday":["hububat","wheat"],
  "yabanci":["ot","weed"],
  "hasat":["derim","postharvest"],
@@ -61,7 +62,8 @@ function terms(value:string){
 function relevance(search:string,matchAgainst:string){
  const needle=terms(search),hay=norm(matchAgainst);
  if(!needle.length)return 0;
- return needle.reduce((sum,token)=>{
+ const directPhrase=hay.includes(norm(search))?6:0;
+ return directPhrase+needle.reduce((sum,token)=>{
    const prefix=stem(token),hit=hay.includes(token)||hay.split(" ").some(word=>stem(word)===prefix);
    if(hit)return sum+4;
    const synonymsHit=Object.entries(synonyms).some(([key,values])=>
@@ -92,7 +94,7 @@ async function discover(db:any,topic:string){
  function add(row:{title:string;url:string;keywords?:string},origin:"catalog"|"indexed"|"web"){
    const t=trusted(row.url);if(!t)return;
    const score=relevance(topic,row.title+" "+(row.keywords||"")+" "+new URL(t.url).pathname.replace(/[-_]/g," "));
-   if(score<=0||row.title.length<8)return;
+   if(score<(terms(topic).length>=2?6:3)||row.title.length<8)return;
    const value:Source={...t,title:row.title,keywords:row.keywords||"",score:t.weight+score*15+(origin==="catalog"?6:0),origin};
    if(!map.has(t.url)||value.score>map.get(t.url)!.score)map.set(t.url,value);
  }
