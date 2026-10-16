@@ -110,6 +110,69 @@ async function discover(db:any,topic:string){
  }
  return [...map.values()].sort((a,b)=>b.score-a.score).slice(0,30);
 }
+
+type ExistingGuide={url:string;title:string;status:string;id:string};
+type CheckedUrl={ok:boolean;reason:string};
+const sourceCheckCache=new Map<string,{result:CheckedUrl;expires:number}>();
+function sameGuideTopic(asked:string,existing:string){
+ const a=norm(asked),b=norm(existing);
+ if(!a||!b)return false;
+ if(a===b||a.startsWith(b+" ")||b.startsWith(a+" "))return true;
+ const tokensA=terms(a),tokensB=terms(b);
+ return tokensA.length>0&&tokensB.length>0 &&
+  tokensA.every(x=>tokensB.some(y=>y===x||stem(y)===stem(x))) &&
+  tokensA.length>=Math.max(1,tokensB.length-1);
+}
+async function existingGuides(db:any,topic:string):Promise<ExistingGuide[]>{
+ const [c,p]=await Promise.all([
+  db.from("content_candidates").select("id,title_suggested,source_refs,structured_body,workflow_status")
+    .eq("content_subtype","guide").in("workflow_status",["pending","approved"]).limit(600),
+  db.from("content_items").select("id,title,source_refs,structured_body,status")
+    .eq("content_subtype","guide").eq("status","published").limit(600)
+ ]);
+ if(c.error)throw c.error;if(p.error)throw p.error;
+ return [...(c.data||[]),...(p.data||[])].flatMap((row:any)=>{
+   const current=clean(row.structured_body?.guide_card?.topic||row.structured_body?.topic||"",160);
+   // An old guide without a topic can be matched conservatively by its title.
+   if(!sameGuideTopic(topic,current||row.title_suggested||row.title||""))return [];
+   const urls=Array.isArray(row.source_refs)?row.source_refs.map((r:any)=>trusted(r?.url)?.url).filter(Boolean):[];
+   return urls.map((url:string)=>({url,title:clean(row.title_suggested||row.title,180),
+      status:String(row.workflow_status||row.status||"pending"),id:String(row.id)}));
+ });
+}
+async function isSourceReachable(url:string):Promise<CheckedUrl>{
+ const cached=sourceCheckCache.get(url);
+ if(cached&&cached.expires>Date.now())return cached.result;
+ let result:CheckedUrl={ok:false,reason:"Kaynağın erişimi doğrulanamadı."};
+ for(const method of ["HEAD","GET"] as const){
+   try{
+     const response=await fetch(url,{method,redirect:"follow",
+       headers:method==="GET"?{"Range":"bytes=0-1023","Accept":"text/html,application/pdf,text/plain"}:{},
+       signal:AbortSignal.timeout(7000)});
+     const safe=trusted(response.url);
+     const code=response.status;
+     await response.body?.cancel().catch(()=>{});
+     if(!safe){result={ok:false,reason:"Bağlantı güvenilir alan adının dışına yönleniyor."};break;}
+     if(response.ok){
+       const ct=response.headers.get("content-type")||"";
+       if(/application\/pdf|text\/html|application\/xhtml|text\/plain/i.test(ct)
+          ||/\.pdf(?:[?#]|$)/i.test(response.url)){
+         result={ok:true,reason:""};break;
+       }
+       result={ok:false,reason:"Bağlantı desteklenen bir teknik belge döndürmüyor."};
+       if(method==="HEAD")continue;
+       break;
+     }
+     if(code===404||code===410){result={ok:false,reason:"Kaynak bulunamadı (HTTP "+code+")."};break;}
+     result={ok:false,reason:"Kaynağa ulaşılamadı (HTTP "+code+")."};
+   }catch{
+     result={ok:false,reason:"Kaynak bağlantısı zaman aşımına uğradı veya erişim engellendi."};
+   }
+ }
+ sourceCheckCache.set(url,{result,expires:Date.now()+(result.ok?30:8)*60_000});
+ if(sourceCheckCache.size>350)sourceCheckCache.clear();
+ return result;
+}
 async function readPdfBytes(bytes: Uint8Array) {
  // A PDF is not HTML. First extract actual text with PDF.js, not an unreliable URL preview.
  // If pages are scans, no text will be invented.
@@ -227,9 +290,25 @@ export async function handleGuideCardRequest(req: Request) {
    const region=clean(b.region||"Türkiye geneli",80),audience=clean(b.audience||"Küçük ve orta ölçekli çiftçiler",90);
    if(topic.length<3||norm(topic).split(" ").length>12)return reply({error:"3-110 karakterlik konu yaz."},400);
    if(action==="search"){
-     const sources=await discover(db,topic);
-     return reply({ok:true,sources,queries:patterns(topic),found:sources.length,
-       message:sources.length?"":"Güvenilir birincil kaynak bulunamadı."});
+     const [discovered,previous]=await Promise.all([discover(db,topic),existingGuides(db,topic)]);
+     const recorded=new Map(previous.map(x=>[x.url,x]));
+     const existing:ExistingGuide[]=[];
+     const pending:Source[]=[];
+     for(const source of discovered){
+       const entry=recorded.get(source.url);
+       if(entry)existing.push(entry);
+       else pending.push(source);
+     }
+     const inspections=await Promise.all(pending.slice(0,18).map(async source=>({
+       source,check:await isSourceReachable(source.url)
+     })));
+     const sources=inspections.filter(x=>x.check.ok).map(x=>x.source);
+     const unavailable=inspections.filter(x=>!x.check.ok)
+       .map(x=>({title:x.source.title,url:x.source.url,reason:x.check.reason}));
+     return reply({ok:true,sources,existing,unavailable,queries:patterns(topic),
+       found:sources.length,message:sources.length?"":
+       existing.length?"Bu konuda kart zaten hazır veya onay bekliyor. Yeni ve erişilebilir kaynak bulunamadı.":
+       "Bu konuda erişilebilir birincil kaynak bulunamadı. Bozuk bağlantılar ayıklandı."});
    }
    if(action!=="generate")return reply({error:"Geçersiz işlem."},400);
    const key=Deno.env.get("NVIDIA_API_KEY")||"";
@@ -249,17 +328,27 @@ export async function handleGuideCardRequest(req: Request) {
      :Array.isArray(b.sourceUrls)&&b.sourceUrls.length?all.filter(s=>b.sourceUrls.includes(s.url)):all;
    if(!selected.length)return reply({ok:true,created:[],failures:[],message:"Güvenilir birincil kaynak bulunamadı."});
    const [drafts,published]=await Promise.all([
-     db.from("content_candidates").select("title_suggested,source_refs").eq("content_subtype","guide").in("workflow_status",["pending","approved"]).limit(500),
-     db.from("content_items").select("title,source_refs").eq("content_subtype","guide").eq("status","published").limit(500)
+     db.from("content_candidates").select("id,title_suggested,source_refs,structured_body,workflow_status").eq("content_subtype","guide").in("workflow_status",["pending","approved"]).limit(600),
+     db.from("content_items").select("id,title,source_refs,structured_body,status").eq("content_subtype","guide").eq("status","published").limit(600)
    ]);
    if(drafts.error)throw drafts.error;if(published.error)throw published.error;
    const older=[...(drafts.data||[]),...(published.data||[])];
-   const used=new Set(older.flatMap((row:any)=>(Array.isArray(row.source_refs)?row.source_refs:[]).map((ref:any)=>String(ref?.url||"")).filter(Boolean)));
+   const duplicateFor=(sourceUrl:string)=>older.find((row:any)=>{
+     const exact=Array.isArray(row.source_refs)&&row.source_refs.some((ref:any)=>trusted(ref?.url)?.url===sourceUrl);
+     if(!exact)return false;
+     const pastTopic=String(row.structured_body?.guide_card?.topic||row.structured_body?.topic||"");
+     return sameGuideTopic(topic,pastTopic||row.title_suggested||row.title||"");
+   });
    const risky=/ilaç|gübre|hastalık|zararlı|mücadele|hayvan|veteriner|tedavi|teşhis|doz|fungus|pest/i.test(area+" "+topic);
-   const created:any[]=[],failures:any[]=[];
+   const created:any[]=[],failures:any[]=[],alreadyExists:any[]=[];
    for(const source of selected){
      if(created.length>=requested)break;
-     if(used.has(source.url)){failures.push({url:source.url,reason:"Bu kaynakla kart zaten var."});continue;}
+     const prior=duplicateFor(source.url);
+     if(prior){
+       alreadyExists.push({url:source.url,title:prior.title_suggested||prior.title,
+         id:prior.id,status:prior.workflow_status||prior.status||"pending"});
+       continue;
+     }
      // Editorially inspected material remains usable when the publisher serves a
      // scan-only PDF. Only this *exact* URL and matching topic can use the note.
      const editorNote=VERIFIED_PDF_NOTES[source.url];
@@ -305,9 +394,15 @@ export async function handleGuideCardRequest(req: Request) {
        }
      }).select("id").single();
      if(insert.error||!insert.data){failures.push({url:source.url,reason:"Kayıt hatası: "+clean(insert.error?.message,170)});continue;}
-     created.push({id:insert.data.id,title:card.title,words:card.word_count,source:source.url});used.add(source.url);
+     created.push({id:insert.data.id,title:card.title,words:card.word_count,source:source.url});
+     older.push({id:insert.data.id,title_suggested:card.title,source_refs:refs,
+       structured_body:{guide_card:{topic}},workflow_status:"pending"});
    }
-   return reply({ok:true,created,failures,message:created.length?created.length+" kart admin onay kuyruğuna eklendi.":"Uygun kart hazırlanamadı."});
+   return reply({ok:true,created,failures,alreadyExists,message:created.length
+     ?created.length+" yeni kart admin onay kuyruğuna eklendi."
+     :alreadyExists.length&&!failures.length
+       ?"Seçilen konuda kart zaten hazır veya onay bekliyor; yeni bir kopya oluşturulmadı."
+       :"Yeni bir kart hazırlanamadı. Erişilemeyen veya uygun olmayan kaynaklar aşağıda gösteriliyor."});
  }catch(error){
    console.error("[GUIDE_CARD_ENGINE]",error);
    return reply({error:error instanceof Error?error.message:"Rehber araması başarısız."},500);
