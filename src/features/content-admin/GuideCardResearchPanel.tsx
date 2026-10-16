@@ -110,7 +110,7 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
           rejected.push(...(data.failures || []));
           duplicates.push(...(data.alreadyExists || []));
           setCreated([...generated]);
-          setExisting((before) => [...new Map([...before, ...duplicates].map((item) => [item.id, item])).values()]);
+          setExisting((before) => [...before, ...duplicates].filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index));
           setFailures([...rejected]);
         } catch (cause) {
           rejected.push(...segment.map((item) => ({
