@@ -74,9 +74,9 @@ export const TRUSTED_GUIDE_SEEDS: Array<{title:string;url:string;keywords:string
     "keywords": "nohut tohum tohumluk sertifikalı kalite ekim çıkış hastalık"
   },
   {
-    "title": "Kirazda Entegre Mücadele",
-    "url": "https://arastirma.tarimorman.gov.tr/bzmai/Belgeler/Yay%C4%B1nlar/kiraz.pdf",
-    "keywords": "kiraz meyve sineği böcek zararlı hastalık ilaç entegre mücadele tuzak izleme"
+    "title": "Kiraz Sineği: Tanıma, Zarar ve Mücadele — TAGEM",
+    "url": "https://arastirma.tarimorman.gov.tr/zmmae/Belgeler/Kutu%20Men%C3%BC/%C3%A7ift%C3%A7i%20b%C3%BClteni/kiraz_sine%C4%9Fi.pdf",
+    "keywords": "kiraz sineği kiraz zararlı entegre biyoteknik mücadele sarı yapışkan tuzak Rhagoletis cerasi meyve hasar"
   },
   {
     "title": "Sulama Suyunda Tuzluluk",
@@ -122,5 +122,10 @@ export const TRUSTED_GUIDE_SEEDS: Array<{title:string;url:string;keywords:string
     "title": "Bitki Mineral Beslenmesi ve Gübreleme",
     "url": "https://dergipark.org.tr/tr/pub/ajfr/article/1945633",
     "keywords": "azot fosfor potasyum besin gübre gübreleme beslenme eksiklik yaprak mineral"
+  },
+  {
+    "title": "Kiraz Yetiştiriciliği ve Zararlı Yönetimi — MAREM",
+    "url": "https://arastirma.tarimorman.gov.tr/marem/Belgeler/2022/Yeti%C5%9Ftiricilik%20Bilgileri/Kiraz%20Yeti%C5%9Ftiricili%C4%9Fi.pdf",
+    "keywords": "kiraz yetiştiricilik kiraz sineği monilya entegre mücadele zararlı hastalık meyve tozlaşma bahçe"
   }
 ];
