@@ -53,6 +53,7 @@ type StructuredBody = {
   channel?: 'news' | 'article' | 'guide' | string | null;
   crop_matches?: string[] | null;
   topic?: string | null;
+  guide_card?: { topic?: string | null } | null;
   user_crop_match_count?: number | null;
   crop_priority?: number | null;
   producer_practicality_score?: number | null;
