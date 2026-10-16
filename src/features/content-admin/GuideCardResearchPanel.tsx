@@ -12,11 +12,19 @@ type VerifiedSource = {
   score: number;
 };
 type GeneratedCard = { id: string; title: string; words: number; source: string };
+type ExistingCard = { url: string; title: string; id: string; status: string };
+type UnavailableSource = { url: string; title: string; reason: string };
+const statusText = (status: string) =>
+  status === 'published' ? 'Yayında' :
+  status === 'approved' ? 'Onaylandı' : 'Onay bekliyor';
 type EngineResult = {
   error?: string;
   message?: string;
   sources?: VerifiedSource[];
   created?: GeneratedCard[];
+  existing?: ExistingCard[];
+  alreadyExists?: ExistingCard[];
+  unavailable?: UnavailableSource[];
   failures?: Array<{ url: string; reason: string }>;
 };
 
@@ -35,6 +43,8 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
   const [audience, setAudience] = useState('Küçük ve orta ölçekli çiftçiler');
   const [limit, setLimit] = useState(5);
   const [sources, setSources] = useState<VerifiedSource[]>([]);
+  const [existing, setExisting] = useState<ExistingCard[]>([]);
+  const [unavailable, setUnavailable] = useState<UnavailableSource[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [created, setCreated] = useState<GeneratedCard[]>([]);
   const [failures, setFailures] = useState<Array<{ url: string; reason: string }>>([]);
@@ -49,6 +59,8 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
     setCreated([]);
     setFailures([]);
     setSources([]);
+    setExisting([]);
+    setUnavailable([]);
     setSelected([]);
     setSearched(false);
     setBusy('search');
@@ -57,9 +69,11 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
       const data = await askEngine({ action: 'search', area, topic: topic.trim(), region, audience });
       const items = data.sources || [];
       setSources(items);
+      setExisting(data.existing || []);
+      setUnavailable(data.unavailable || []);
       setSelected(items.slice(0, limit).map((item) => item.url));
       setSearched(true);
-      setProgress(data.message || (items.length + ' konuya uygun kaynak bulundu. İçerik okunabilirliği üretim sırasında doğrulanır.'));
+      setProgress(data.message || (items.length + ' erişilebilir yeni kaynak bulundu. Belge metni kart hazırlanırken ayrıca doğrulanacak.'));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Kaynak araştırması tamamlanamadı.');
       setProgress('');
@@ -81,6 +95,7 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
     const chosen = sources.filter((source) => selected.includes(source.url)).slice(0, limit);
     const generated: GeneratedCard[] = [];
     const rejected: Array<{ url: string; reason: string }> = [];
+    const duplicates: ExistingCard[] = [];
     try {
       // Small batches prevent an Edge Function timeout. Failed source checks are never published.
       for (let index = 0; index < chosen.length; index += 2) {
@@ -93,7 +108,9 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
           });
           generated.push(...(data.created || []));
           rejected.push(...(data.failures || []));
+          duplicates.push(...(data.alreadyExists || []));
           setCreated([...generated]);
+          setExisting((before) => [...new Map([...before, ...duplicates].map((item) => [item.id, item])).values()]);
           setFailures([...rejected]);
         } catch (cause) {
           rejected.push(...segment.map((item) => ({
@@ -103,8 +120,10 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
         }
       }
       setProgress(generated.length
-        ? (generated.length + ' doğrulanmış taslak onay kuyruğuna eklendi. Fotoğraflar ve metinler onaydan önce incelenmeli.')
-        : 'Hiçbir kaynak doğrulanmış bir karta dönüşmedi. Kaynak bağlantılarını ve konu seçimini kontrol et.');
+        ? (generated.length + ' yeni taslak onay kuyruğuna eklendi. Kaynağı ve fotoğrafları yayın öncesi kontrol et.')
+        : rejected.length
+          ? 'Yeni taslak oluşturulamadı. Aşağıda hangi kaynağın neden işlenemediği yazıyor.'
+          : 'Bu konudaki kart zaten hazırlanmış; gereksiz bir kopya oluşturulmadı.');
       if (generated.length) await onCreated();
     } finally {
       setBusy('');
@@ -151,8 +170,8 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
       {searched ? (
         <div className="tp-guide-research__results">
           <div className="tp-guide-research__results-head">
-            <strong>Kaynak adayları ({sources.length})</strong>
-            <span>En fazla {limit} tanesi kart üretiminde kullanılır.</span>
+            <strong>Yeni ve erişilebilir kaynaklar ({sources.length})</strong>
+            <span>En fazla {limit} kaynak seçilebilir.</span>
           </div>
           {sources.length ? (
             <div className="tp-guide-research__sources">
@@ -167,11 +186,35 @@ export default function GuideCardResearchPanel({ onCreated }: { onCreated: () =>
                 </label>
               ))}
             </div>
-          ) : <p className="tp-guide-research__empty">Güvenilir birincil kaynak bulunamadı. Bilgi kartı oluşturulmayacak.</p>}
+          ) : <p className="tp-guide-research__empty">
+            {existing.length
+              ? 'Bu konuda zaten hazırlanmış kart var. Yeni kaynak bulunamadı.'
+              : 'Yeni kart oluşturmak için erişilebilir ve güvenilir kaynak bulunamadı.'}
+          </p>}
           <button className="tp-guide-research__action" type="button" onClick={() => void generate()} disabled={Boolean(busy) || selected.length === 0}>
             <Sparkles size={16} /> {busy === 'generate' ? 'Kartlar hazırlanıyor…' : 'Seçilen Kaynaklardan Taslak Oluştur'}
           </button>
         </div>
+      ) : null}
+      {existing.length ? (
+        <div className="tp-guide-research__already">
+          <strong>Mevcut kartlar ({existing.length})</strong>
+          <p>Bu kaynaklardan aynı konuda tekrar kart oluşturulmaz; ilgili kartı İçerik Yönetimi’nde açabilirsin.</p>
+          {existing.map((item) => (
+            <div key={item.id} className="tp-guide-research__already-row">
+              <span>{item.title}</span>
+              <small>{statusText(item.status)}</small>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {unavailable.length ? (
+        <details className="tp-guide-research__failures">
+          <summary>Erişilemeyen kaynaklar ayıklandı ({unavailable.length})</summary>
+          {unavailable.map((item) => (
+            <p key={item.url}><strong>{item.title}: {item.reason}</strong><span>{item.url}</span></p>
+          ))}
+        </details>
       ) : null}
       {created.length ? (
         <div className="tp-guide-research__drafts">
