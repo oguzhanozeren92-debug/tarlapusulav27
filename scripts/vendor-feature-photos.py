@@ -15,15 +15,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[1] / "public" / "feature-discove
 ROOT.mkdir(parents=True, exist_ok=True)
 # The short Unsplash photo IDs below were handpicked to match the actual feature.
 PHOTO = {
-    "satellite": ("photo-1500937386664-56d1dfef3854", "Aerial farmland / agricultural fields"),
+    "satellite": ("pexels-30842697", "Aerial field parcel patterns"),
     "irrigation": ("photo-1692369584496-3216a88f94c1", "Lumin Osity — Cornfield sprinkler irrigation"),
-    "ai": ("photo-1464226184884-fa280b87c399", "Growing crops in a field"),
-    "spray": ("photo-1625246333195-78d9c38ad449", "Farm machinery on cultivated land"),
-    "workability": ("photo-1592982537447-7440770cbfc9", "Tractor and farm work"),
-    "soil": ("photo-1518977676601-b53f82aba655", "Crops and ground-level soil"),
+    "ai": ("pexels-10403883", "Farmer photographing crops with smartphone"),
+    "spray": ("pexels-23247806", "Tractor spraying a crop field"),
+    "workability": ("pexels-8374427", "Tractor in muddy flooded farmland"),
+    "soil": ("pexels-11924683", "Exposed plant roots in layered soil profile"),
     "frost": ("photo-1700943131513-f2ddb656f5a5", "Seven Colors — Frost crystals on leaves"),
     "health": ("photo-1500382017468-9049fed747ef", "Cultivated healthy farmland"),
-    "pdf": ("photo-1495107334309-fcf20504a5ab", "Reports and documents"),
+    "pdf": ("pexels-4975377", "Agronomist recording notes in the field"),
     "agenda": ("photo-1504711434969-e33886168f5c", "News and journalism"),
     "market": ("pexels-18404065", "Timon Cornelissen — Commodity grains in sacks at a market"),
     "guide": ("photo-1456513080510-7bf3a84b82f8", "Study and knowledge resources"),
