@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '../../../supabaseClient';
+import { isRelevantGuideImage } from '../services/guideImageRelevance';
 import './KnowledgeLibrary.css';
 
 type GuideData = {
@@ -55,7 +56,18 @@ type KnowledgeRow = {
   published_at?: string | null;
 };
 
+type KnowledgeImage = {
+ id:string;
+ content_id:string|null;
+ public_url:string|null;
+ original_url:string|null;
+ caption:string|null;
+ is_cover:boolean;
+ license_type:string|null;
+ sort_order:number|null;
+};
 type KnowledgeCard = {
+ images:KnowledgeImage[];
   id: string;
   category: string;
   title: string;
@@ -135,10 +147,18 @@ const pickDetails = (guide: GuideData | null | undefined) => {
   ]).slice(0, 8);
 };
 
-const toCard = (row: KnowledgeRow): KnowledgeCard => {
+const toCard = (row: KnowledgeRow, allImages: KnowledgeImage[]): KnowledgeCard => {
   const guide = row.structured_body?.guide;
+  const relevantImages = allImages.filter(image => image.content_id === row.id
+    && isRelevantGuideImage(image, {
+      title: row.title,
+      summary: row.structured_body?.guide_card?.summary || row.excerpt,
+      topic: row.structured_body?.guide_card?.topic || row.structured_body?.topic,
+    })
+  ).sort((a, b) => Number(b.is_cover) - Number(a.is_cover) || (a.sort_order ?? 50) - (b.sort_order ?? 50));
   return {
     id: row.id,
+    images: relevantImages,
     category: row.category || row.structured_body?.topic || 'Genel Bilgi',
     title: row.title,
     summary: guide?.quick_answer || row.excerpt || row.body || 'Bilgi hazırlanıyor.',
@@ -170,6 +190,7 @@ const matchesFieldCrop = (card: KnowledgeCard, fieldCrops: string[]) => {
 
 export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryProps) {
   const [rows, setRows] = useState<KnowledgeRow[]>([]);
+  const [images, setImages] = useState<KnowledgeImage[]>([]);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<KnowledgeCard | null>(null);
@@ -197,7 +218,23 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
         .limit(300);
 
       if (fetchError) throw fetchError;
-      setRows((data ?? []) as KnowledgeRow[]);
+      const records = (data ?? []) as KnowledgeRow[];
+      setRows(records);
+      if (records.length) {
+        // Only published content images are visible through the database's public SELECT policy.
+        const { data: photoRows, error: photoError } = await supabase
+          .from('content_images')
+          .select('id,content_id,public_url,original_url,caption,is_cover,license_type,sort_order')
+          .eq('status', 'approved')
+          .in('content_id', records.map(row => row.id))
+          .order('sort_order', { ascending: true });
+        if (photoError) {
+          console.warn('[Bilgi Rehberi] Onaylı görseller alınamadı:', photoError.message);
+          setImages([]);
+        } else {
+          setImages((photoRows ?? []) as KnowledgeImage[]);
+        }
+      } else setImages([]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Bilgi kartları yüklenemedi.');
     } finally {
@@ -212,7 +249,7 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
 
   const cards = useMemo(() => {
     return rows
-      .map(toCard)
+      .map(row => toCard(row, images))
       .sort((a, b) => {
         const aMine = matchesFieldCrop(a, normalizedFieldCrops) ? 1 : 0;
         const bMine = matchesFieldCrop(b, normalizedFieldCrops) ? 1 : 0;
@@ -220,7 +257,7 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
         if (a.quality !== b.quality) return b.quality - a.quality;
         return a.title.localeCompare(b.title, 'tr');
       });
-  }, [rows, normalizedFieldCrops]);
+  }, [rows, images, normalizedFieldCrops]);
 
   const categoryGroups = useMemo(() => {
     const map = new Map<string, KnowledgeCard[]>();
@@ -373,6 +410,10 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
                     {mine ? <em>Senin ürünün</em> : null}
                   </div>
 
+                  {card.images[0]?.public_url ? (
+                    <img className="tp-knowledge-info-card__image" src={card.images[0].public_url}
+                      alt={card.images[0].caption || card.title} loading="lazy" />
+                  ) : null}
                   <strong>{card.title}</strong>
                   <p>{card.summary}</p>
 
@@ -425,6 +466,18 @@ export default function KnowledgeLibrary({ fieldCrops = [] }: KnowledgeLibraryPr
               <p className="tp-knowledge-detail-sheet__summary">{selectedCard.summary}</p>
             ) : null}
 
+            {selectedCard.images.length ? (
+              <div className="tp-knowledge-detail-gallery" aria-label="Konu ile ilgili onaylı görseller">
+                {selectedCard.images.slice(0, 4).map((image) => (
+                  image.public_url ? (
+                    <figure key={image.id}>
+                      <img src={image.public_url} alt={image.caption || selectedCard.title} loading="lazy"/>
+                      {image.caption ? <figcaption>{image.caption}</figcaption> : null}
+                    </figure>
+                  ) : null
+                ))}
+              </div>
+            ) : null}
             {!selectedCard.guideCard && selectedCard.fullBody && selectedCard.fullBody !== selectedCard.summary ? (
               <div className="tp-knowledge-detail-sheet__full-body">
                 {selectedCard.fullBody}
