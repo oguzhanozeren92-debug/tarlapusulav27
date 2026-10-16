@@ -163,7 +163,7 @@ async function isSourceReachable(url:string):Promise<CheckedUrl>{
        if(method==="HEAD")continue;
        break;
      }
-     if(code===404||code===410){result={ok:false,reason:"Kaynak bulunamadı (HTTP "+code+")."};break;}
+     if(code===404||code===410){result={ok:false,reason:"Kaynak bulunamadı (HTTP "+code+")."};if(method==="HEAD")continue;break;}
      result={ok:false,reason:"Kaynağa ulaşılamadı (HTTP "+code+")."};
    }catch{
      result={ok:false,reason:"Kaynak bağlantısı zaman aşımına uğradı veya erişim engellendi."};
