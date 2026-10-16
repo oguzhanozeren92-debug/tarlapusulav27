@@ -497,3 +497,11 @@
 .tp-knowledge-detail-warning p,
 .tp-knowledge-detail-source p{margin:7px 0 0;font-size:12px;line-height:1.65;white-space:pre-wrap}
 .tp-knowledge-detail-warning{border-left:3px solid #30343a}
+
+/* Topic-verified guide photographs (only approved & relevant images are rendered) */
+.tp-knowledge-info-card__image{display:block;width:100%;height:125px;object-fit:cover;object-position:center;border-radius:11px;margin:4px 0 9px;background:#f0f2f3}
+.tp-knowledge-detail-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:13px 0}
+.tp-knowledge-detail-gallery figure{margin:0;min-width:0;overflow:hidden;border-radius:12px;border:1px solid #e2e6e8;background:#f5f6f7}
+.tp-knowledge-detail-gallery img{display:block;width:100%;height:150px;object-fit:cover}
+.tp-knowledge-detail-gallery figcaption{font-size:9px;line-height:1.45;color:#606b72;padding:8px 9px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+@media(max-width:390px){.tp-knowledge-detail-gallery img{height:110px}.tp-knowledge-info-card__image{height:112px}}
