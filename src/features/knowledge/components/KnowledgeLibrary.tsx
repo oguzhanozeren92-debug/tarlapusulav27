@@ -34,6 +34,7 @@ type GuideCardData = {
   caution?: string | null;
   word_count?: number | null;
   region?: string | null;
+  topic?: string | null;
 };
 
 type KnowledgeStructuredBody = {
