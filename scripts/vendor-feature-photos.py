@@ -25,12 +25,15 @@ PHOTO = {
     "health": ("photo-1500382017468-9049fed747ef", "Cultivated healthy farmland"),
     "pdf": ("photo-1495107334309-fcf20504a5ab", "Reports and documents"),
     "agenda": ("photo-1504711434969-e33886168f5c", "News and journalism"),
-    "market": ("photo-1501436513145-30f24e19fcc4", "Harvested agricultural products"),
+    "market": ("pexels-18404065", "Timon Cornelissen — Commodity grains in sacks at a market"),
     "guide": ("photo-1456513080510-7bf3a84b82f8", "Study and knowledge resources"),
 }
 
 def candidates(photo_id: str):
-    if photo_id.startswith("photo-"):
+    if photo_id.startswith("pexels-"):
+        n = photo_id.removeprefix("pexels-")
+        yield f"https://images.pexels.com/photos/{n}/pexels-photo-{n}.jpeg?auto=compress&cs=tinysrgb&w=1400"
+    elif photo_id.startswith("photo-"):
         yield f"https://images.unsplash.com/{photo_id}?fm=jpg&w=1450&q=78&fit=crop"
         yield f"https://images.unsplash.com/{photo_id}?w=1450&q=78"
     else:
@@ -62,7 +65,7 @@ def fetch_image(photo_id: str) -> Image.Image:
     raise RuntimeError(f"No usable photo for {photo_id}: " + " | ".join(errs))
 
 lines = ["# TarlaPusula feature photography", "",
-         "Images are distributed under the [Unsplash License](https://unsplash.com/license).",
+         "Sources: [Unsplash License](https://unsplash.com/license) and [Pexels License](https://www.pexels.com/license/).",
          "Photography is illustrative; it is not a current satellite view or a live farm measurement.", ""]
 for name, (identifier, credit) in PHOTO.items():
     print(f"Downloading {name}: {identifier}", flush=True)
@@ -74,7 +77,9 @@ for name, (identifier, credit) in PHOTO.items():
     image.save(output, "JPEG", quality=80, optimize=True, progressive=True, subsampling=0)
     if output.stat().st_size < 10_000 or output.stat().st_size > 1_500_000:
         raise ValueError(f"Invalid output size for {name}: {output.stat().st_size}")
-    source = (f"https://unsplash.com/photos/{identifier}" if not identifier.startswith("photo-")
+    source = (f"https://www.pexels.com/photo/{identifier.removeprefix('pexels-')}/"
+              if identifier.startswith("pexels-") else
+              f"https://unsplash.com/photos/{identifier}" if not identifier.startswith("photo-")
               else f"https://images.unsplash.com/{identifier}")
     lines.append(f"- **{name}**: {credit}. Source: {source}")
     print(f"  ready: {output.stat().st_size} bytes", flush=True)
