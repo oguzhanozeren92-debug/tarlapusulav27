@@ -18,6 +18,7 @@ import {
 import { supabase } from '../../supabaseClient';
 import KnowledgeUpdateSuggestions from './KnowledgeUpdateSuggestions';
 import KnowledgeAdminPanel from '../knowledge/components/KnowledgeAdminPanel';
+import { isRelevantGuideImage } from '../knowledge/services/guideImageRelevance';
 import GuideCardResearchPanel from './GuideCardResearchPanel';
 import ContentCoveragePanel from './ContentCoveragePanel.tsx';
 import { suggestKnowledgeUpdates, validateUpdateTarget } from './services/knowledgeUpdateSuggestions.service';
@@ -152,6 +153,7 @@ type ContentImage = {
   original_url: string | null;
   license_type: string | null;
   credit_text: string | null;
+  caption: string | null;
   status: string;
   is_cover: boolean;
 };
@@ -502,7 +504,12 @@ export default function ContentAdminPanel() {
       image.candidate_id === candidateId &&
       image.status !== 'rejected' &&
       Boolean(image.license_type) &&
-      SAFE_IMAGE_LICENSES.has(String(image.license_type).toLowerCase())
+      SAFE_IMAGE_LICENSES.has(String(image.license_type).toLowerCase()) &&
+      isRelevantGuideImage(image, {
+        title: candidates.find(item => item.id === candidateId)?.title_suggested || '',
+        summary: candidates.find(item => item.id === candidateId)?.short_summary || '',
+        topic: candidates.find(item => item.id === candidateId)?.structured_body?.guide_card?.topic || '',
+      })
     );
 
   const guideImageProgress = (candidate: Candidate) => {
@@ -893,7 +900,9 @@ export default function ContentAdminPanel() {
       if (data?.error) throw new Error(data.error);
       const count = Number(data?.imageCount ?? data?.images?.length ?? 0);
       setMessage(guide
-        ? `Rehber görselleri işlendi${count ? ` · ${count} güvenli görsel` : ''}. Kapak + en az 2 destek görseli yayın için zorunlu.`
+        ? count
+          ? `Rehber için ${count} görsel bulundu. Konu uyumu ve açık lisans kontrolünden sonra 1 kapak + 2 destek görseliyle yayına alınabilir.`
+          : 'Bu konuya uygun açık lisanslı fotoğraf bulunamadı. Alakasız tarla veya hasat fotoğrafı eklenmeyecek.'
         : 'Görsel hazırlandı.');
       await loadAll();
     } catch (error: any) {
