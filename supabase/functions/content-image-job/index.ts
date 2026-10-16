@@ -79,6 +79,16 @@ function subjectFor(row:any):Subject|null {
  if(/azot eksik|nitrogen deficien|nitrojen eksik/.test(t))return {kind:"nitrogen",search:["nitrogen deficiency wheat yellow leaves","nitrogen chlorosis cereal leaves"]};
  if(/kurak|drought stress|drought damage/.test(t))return {kind:"drought",search:["wheat drought stress damaged leaves","drought damaged crop plants"]};
  if(/zararlı|zararli|yaprak biti|aphid|insect pest/.test(t))return {kind:"pest",search:["crop plant insect pest infestation","wheat aphid infestation leaves"]};
+ if(/badem|almond/.test(t)&&/tozlaş|tozlas|döllen|dollen|pollinat/.test(t))
+  return {kind:"pollination",search:["almond blossom bee pollination","almond flower pollination orchard"]};
+ if(/toprak analiz|soil analy|soil sampl/.test(t))
+  return {kind:"soil_test",search:["agricultural soil sampling test","soil testing laboratory agriculture"]};
+ if(/herbisit|herbicide|yabancı ot|yabanci ot/.test(t))
+  return {kind:"herbicide",search:["weed herbicide crop spraying","weeds control agriculture plant"]};
+ if(/biyolojik mücadele|biyolojik mucadele|biological control/.test(t))
+  return {kind:"biocontrol",search:["beneficial insect natural enemies crop","biological control predatory insect"]};
+ if(/tuzak|trap/.test(t))
+  return {kind:"traps",search:["yellow sticky traps crop pests","pheromone trap field insects"]};
  return null;
 }
 function subjectMatch(image:Img,subject:Subject|null){
@@ -92,6 +102,11 @@ function subjectMatch(image:Img,subject:Subject|null){
  case "nitrogen":return /nitrogen|nitrojen|azot|chlorosis/.test(t)&&/deficien|yellow|chloros|leaf|leaves|wheat|plant/.test(t);
  case "drought":return /drought|wilting|water stress|kurak/.test(t)&&/wheat|cereal|crop|field|plant|leaves/.test(t);
  case "pest":return /aphid|insect|pest|beetle|mite|weevil|borer|larva/.test(t)&&/crop|plant|leaf|leaves|wheat|cereal|barley/.test(t);
+ case "pollination":return /pollinat|flower|blossom|bee|pollen/.test(t)&&/almond|orchard|flower|fruit tree/.test(t);
+ case "soil_test":return /soil sample|soil test|soil analy|soil laboratory|soil testing/.test(t);
+ case "herbicide":return /herbicide|weed|spray|sprayer|chemical control/.test(t)&&!/fertili[sz]er spread|fertili[sz]er spinner/.test(t);
+ case "biocontrol":return /biological control|predator|parasitoid|beneficial insect|ladybird|lacewing|natural enemy/.test(t);
+ case "traps":return /sticky trap|insect trap|pheromone trap|monitoring trap|yellow trap/.test(t);
  default:return false;
  }
 }
@@ -204,7 +219,7 @@ function visualPlantQuery(q:string){
   return biologicalQuery(q)||/pistachio|pistacia|cherry|prunus|apricot|wheat|triticum|maize|corn|cotton|tea|rice|potato|grape|vineyard|apple|almond|crop|plant/.test(q.toLowerCase());
 }
 
-async function search(queries:string[],subject:Subject|null){
+async function search(queries:string[],subject:Subject|null,isGuide=false){
   const all:Img[]=[],fallback:Img[]=[],failures:string[]=[];let okSources=0;
   const run=async(q:string,strict:boolean)=>{
     const calls=visualPlantQuery(q)?[commons(q),inat(q)]:[commons(q)];
@@ -222,13 +237,13 @@ async function search(queries:string[],subject:Subject|null){
     await run(q,true);
     if(all.length>=18)break;
   }
-  if(!all.length&&!subject){
+  if(!all.length&&!isGuide){
      for(const q of visualFallbackQueries(queries)){
       await run(q,true);
       if(all.length>=12)break;
     }
   }
-  if(!all.length&&!subject&&fallback.length){
+  if(!all.length&&!isGuide&&fallback.length){
     all.push(...fallback.filter((x:Img)=>!documentLike(x)).slice(0,12));
   }
   const seen=new Set<string>(),unique=all.filter(x=>{const k=(x.landing||x.url).toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true});
@@ -275,7 +290,7 @@ Deno.serve(async req=>{
     const initial=existing.length,slots=Math.max(0,target-initial+(body.replaceCover===true?1:0));
     if(slots===0&&hasCover){const status=initial>=required?"ready":"review_needed",structured=row.structured_body&&typeof row.structured_body==="object"?row.structured_body:{};await db.from(table).update({image_status:status,image_processing_at:new Date().toISOString(),structured_body:{...structured,visual_enrichment:{engine:"visual-enrichment-v6-subject-match",status,image_count:initial,cover_count:1,required_count:required,target_count:target,queries,updated_at:new Date().toISOString()}}}).eq("id",id);return reply({ok:true,id,status,imageCount:initial,requiredCount:required,targetCount:target,reused:true,queries})}
     await db.from(table).update({image_status:"processing",image_processing_at:new Date().toISOString()}).eq("id",id);
-    const found=await search(queries,subject);if(found.okSources===0)throw new Error(`Görsel kaynaklarına ulaşılamadı: ${found.failures.join(" | ")}`);
+    const found=await search(queries,subject,isGuide);if(found.okSources===0)throw new Error(`Görsel kaynaklarına ulaşılamadı: ${found.failures.join(" | ")}`);
     const s3=new S3Client({region:"auto",endpoint:`https://${rid}.r2.cloudflarestorage.com`,credentials:{accessKeyId:ra,secretAccessKey:rs}}),owner=candidateId?`candidate-${candidateId}`:`content-${contentId}`,inserted:any[]=[],errors:string=[];
     for(const c of found.images){if(inserted.length>=slots)break;const dk=clean(c.landing||c.url,1800).toLowerCase();if(!dk||keys.has(dk))continue;try{const im=await download(c.url),isCover=!hasCover&&inserted.every(x=>!x.is_cover),sortOrder=isCover?0:Math.max(1,initial+inserted.length),key=`content-images/library/${owner}/${crypto.randomUUID()}.${im.ext}`;await s3.send(new PutObjectCommand({Bucket:bucket,Key:key,Body:im.bytes,ContentType:im.type,CacheControl:"public, max-age=31536000, immutable"}));const ins=await db.from("content_images").insert({candidate_id:candidateId||null,content_id:contentId||null,r2_key:key,public_url:null,original_url:c.landing||c.url,source_domain:c.source,license_type:c.license,credit_text:[c.creator,c.license.toUpperCase(),c.source].filter(Boolean).join(" · ")||c.source,alt_text:clean(candidateId?row.title_suggested:row.title,500)||queries[0],caption:c.title||null,image_type:isCover?"cover":"gallery",status:contentId?"approved":"pending_review",is_cover:isCover,sort_order:sortOrder}).select("id").single();if(ins.error||!ins.data)throw ins.error||new Error("Görsel kaydı oluşturulamadı");const url=`${su}/functions/v1/content-image-public?id=${encodeURIComponent(ins.data.id)}`;await db.from("content_images").update({public_url:url}).eq("id",ins.data.id);if(isCover){await db.from("content_images").update({is_cover:false}).eq(ownerCol,id).neq("id",ins.data.id);hasCover=true}keys.add(dk);inserted.push({id:ins.data.id,url,source:c.source,license:c.license,is_cover:isCover,bytes:im.bytes.length})}catch(e){errors.push(clean(e instanceof Error?e.message:e,260))}}
     const fq=await db.from("content_images").select("id,is_cover,source_domain,license_type,status").eq(ownerCol,id);if(fq.error)throw fq.error;const imgs=Array.isArray(fq.data)?fq.data.filter((x:any)=>x.status!=="rejected"):[],count=imgs.length,covers=imgs.filter((x:any)=>x.is_cover).length,sources=[...new Set(imgs.map((x:any)=>clean(x.source_domain,120)).filter(Boolean))];let status="review_needed";if(covers>0&&count>=required)status="ready";else if(count===0&&errors.length&&found.images.length>0)status="error";
