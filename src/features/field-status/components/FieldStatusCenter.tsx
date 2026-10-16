@@ -1494,6 +1494,16 @@ export default function FieldStatusCenter({
     if (!target || consumedInitialActionRef.current === target) return;
     consumedInitialActionRef.current = target;
 
+    if (/workability|girilebilirlik/i.test(target)) {
+      setTab('summary');
+      setWorkabilityOpen(true);
+      window.setTimeout(() => {
+        document.querySelector('.tp-field-status-workability-detail')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 200);
+      return;
+    }
+
     if (/soil-analysis|soil/i.test(target)) {
       setTab('soil');
       return;

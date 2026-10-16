@@ -54,6 +54,7 @@ import { usePusulaFieldCompletion, type PusulaFieldQuestionTarget } from '../../
 import NdviObservationFollowUpPrompt from '../../features/field-observations/components/NdviObservationFollowUpPrompt';
 import { useNdviObservationFollowUp } from '../../features/field-observations/hooks/useNdviObservationFollowUp';
 import HomeMapSection from '../../features/home-map/components/HomeMapSectionMapFirst';
+import HomeDiscoveryCarousel, { type HomeDiscoveryFeatureId } from '../../features/home/components/HomeDiscoveryCarousel';
 import {
   type HomeClimateDepth,
   type HomeClimateLayer,
@@ -1653,6 +1654,63 @@ export default function HomeScreen(props: HomeScreenProps) {
               }}
             />
           </div>
+
+          <HomeDiscoveryCarousel
+            onOpenFeature={(feature: HomeDiscoveryFeatureId) => {
+              if (
+                ['irrigation', 'spray', 'workability', 'soil', 'frost', 'health', 'pdf'].includes(feature) &&
+                (!homeField || homeField.demo)
+              ) {
+                handleAddFieldClick();
+                return;
+              }
+
+              switch (feature) {
+                case 'satellite':
+                  openHomeInsightTarget('map_vegetation');
+                  break;
+                case 'irrigation':
+                  openHomeInsightTarget('irrigation_detail');
+                  break;
+                case 'ai':
+                  openHomeInsightTarget('ai');
+                  break;
+                case 'spray':
+                  openHomeInsightTarget('spray_weather');
+                  break;
+                case 'workability':
+                  setQuickSheet(null);
+                  setTasksOpen(false);
+                  setFieldStatusInitialTab('summary');
+                  setFieldStatusInitialActionTarget('workability');
+                  setFieldStatusOpen(true);
+                  break;
+                case 'soil':
+                  setFieldStatusInitialActionTarget(null);
+                  openHomeInsightTarget('soil');
+                  break;
+                case 'frost':
+                  openHomeInsightTarget('weather');
+                  break;
+                case 'health':
+                  setFieldStatusInitialActionTarget(null);
+                  openHomeInsightTarget('field_status');
+                  break;
+                case 'pdf':
+                  setScreen('notificationsHub');
+                  break;
+                case 'agenda':
+                  setScreen('agendaHub');
+                  break;
+                case 'market':
+                  setScreen('marketHub');
+                  break;
+                case 'guide':
+                  setScreen('pestGuideHub');
+                  break;
+              }
+            }}
+          />
 
           <FieldStatusCenter
             open={fieldStatusOpen}
