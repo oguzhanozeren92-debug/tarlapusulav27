@@ -16,17 +16,17 @@ ROOT.mkdir(parents=True, exist_ok=True)
 # The short Unsplash photo IDs below were handpicked to match the actual feature.
 PHOTO = {
     "satellite": ("photo-1500937386664-56d1dfef3854", "Aerial farmland / agricultural fields"),
-    "irrigation": ("6DMht7wYt6g", "Lumin Osity — Corn field sprinkler irrigation"),
-    "ai": ("7Hp6yu2P8wU", "Vitaly Gariev — Photographing plants with a phone"),
-    "spray": ("E-zxxavpZlw", "Annie Spratt — Tractor spraying crop field"),
-    "workability": ("Rem5sqFVYwE", "Adarsh PG — Tractor in muddy field"),
-    "soil": ("BcZZ_WqbkJM", "Elham Abdi — Exposed layered soil profile"),
-    "frost": ("LDQ_TTUedAc", "Andreas Fickl — Frost on leaves"),
+    "irrigation": ("photo-1692369584496-3216a88f94c1", "Lumin Osity — Cornfield sprinkler irrigation"),
+    "ai": ("photo-1464226184884-fa280b87c399", "Growing crops in a field"),
+    "spray": ("photo-1625246333195-78d9c38ad449", "Farm machinery on cultivated land"),
+    "workability": ("photo-1592982537447-7440770cbfc9", "Tractor and farm work"),
+    "soil": ("photo-1518977676601-b53f82aba655", "Crops and ground-level soil"),
+    "frost": ("photo-1700943131513-f2ddb656f5a5", "Seven Colors — Frost crystals on leaves"),
     "health": ("photo-1500382017468-9049fed747ef", "Cultivated healthy farmland"),
-    "pdf": ("lPG6XtwcKsY", "Farm data on smartphone"),
-    "agenda": ("YbXUymsk07E", "John Cardamone — Printed newspaper news"),
-    "market": ("7Ab1ewrV0e0", "Elif Basgıcılar — Grain sacks"),
-    "guide": ("Akf6BuBjJss", "Zoe Richardson — Farmer holding a plant"),
+    "pdf": ("photo-1495107334309-fcf20504a5ab", "Reports and documents"),
+    "agenda": ("photo-1504711434969-e33886168f5c", "News and journalism"),
+    "market": ("photo-1501436513145-30f24e19fcc4", "Harvested agricultural products"),
+    "guide": ("photo-1456513080510-7bf3a84b82f8", "Study and knowledge resources"),
 }
 
 def candidates(photo_id: str):
