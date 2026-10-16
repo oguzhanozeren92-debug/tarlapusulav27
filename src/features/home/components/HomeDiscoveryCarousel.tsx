@@ -24,84 +24,82 @@ type DiscoveryFeature = {
   plan?: PaidPlan;
 };
 
-// Fotoğraflar görsel arka plandır; bütün metinler, etiketler ve butonlar gerçek HTML'dir.
-// Kaynak görseller Unsplash CDN'inden optimize edilmiş boyutta alınır. Ağ hatasında
-// CSS'teki nötr görsel zemin korunur; karusel/kısayollar çalışmaya devam eder.
-const photo = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1200&q=78`;
+// Her konuya ait fotoğraf proje içinde tutulur ve mobil pakete dahildir.
+// Dış görsel servisleri / CDN erişimi gerektirmez.
+const photo = (id: HomeDiscoveryFeatureId) => `/feature-discovery/${id}.jpg`;
 
 const FEATURES: DiscoveryFeature[] = [
   {
     id: 'satellite', title: 'Tarlanı Uyduyla Takip Et',
     description: 'Bitki gelişimini ve geçmiş uydu görüntülerindeki değişimi harita üzerinden incele.',
     action: 'Uydu Haritasını Aç', icon: Map,
-    image: photo('photo-1500937386664-56d1dfef3854'),
+    image: photo('satellite'),
   },
   {
     id: 'irrigation', title: 'Sulama Zamanını Planla',
     description: 'Tarlanın su ihtiyacını değerlendir, sulama kararını ve programını tek ekranda gör.',
     action: 'Sulamayı Gör', icon: Droplets,
-    image: photo('photo-1523348837708-15d4a09cfac2'),
+    image: photo('irrigation'),
   },
   {
     id: 'ai', title: 'Pusula AI ile Sorunu İncele',
     description: 'Bitki fotoğrafını gönder; olası hastalık, zararlı ve stres belirtilerini değerlendir.',
     action: 'Pusula AI’ı Aç', icon: ScanSearch,
-    image: photo('photo-1464226184884-fa280b87c399'),
+    image: photo('ai'),
   },
   {
     id: 'spray', title: 'İlaçlama Zamanını Takip Et',
     description: 'Saatlik rüzgâr, yağış ve hava koşullarından ilaçlama için uygun zaman aralığını incele.',
     action: 'İlaçlama Saatlerine Bak', icon: CalendarClock, plan: 'plus',
-    image: photo('photo-1625246333195-78d9c38ad449'),
+    image: photo('spray'),
   },
   {
     id: 'workability', title: 'Tarlaya Girilebilirliğine Bak',
     description: 'Yağış ve zemin koşullarına göre traktörle çalışmaya uygunluk değerlendirmesini gör.',
     action: 'Girilebilirliği Gör', icon: Tractor, plan: 'plus',
-    image: photo('photo-1592982537447-7440770cbfc9'),
+    image: photo('workability'),
   },
   {
     id: 'soil', title: 'Tahmini Toprak Profilini Gör',
     description: 'SoilGrids modelindeki tahmini toprak yapısını ve katman bilgilerini incele.',
     action: 'Toprak Profilini Aç', icon: Sprout, plan: 'plus',
-    image: photo('photo-1518977676601-b53f82aba655'),
+    image: photo('soil'),
   },
   {
     id: 'frost', title: 'Don Riskini Önceden Gör',
     description: 'Sıcaklık tahminlerini ve olası don uyarılarını takip ederek önlem zamanını planla.',
     action: 'Hava Risklerini Gör', icon: CloudSun, plan: 'plus',
-    image: photo('photo-1470252649378-9c29740c9fa8'),
+    image: photo('frost'),
   },
   {
     id: 'health', title: 'Tarla Sağlığını Değerlendir',
     description: 'Tarlanın durumunu, dikkat isteyen noktaları ve mevcut sağlık özetlerini birlikte gör.',
     action: 'Tarla Durumunu Aç', icon: ShieldCheck, plan: 'plus',
-    image: photo('photo-1500382017468-9049fed747ef'),
+    image: photo('health'),
   },
   {
     id: 'pdf', title: 'PusulaPDF Raporlarını Aç',
     description: 'Hazırlanan tarla raporlarını bildirimlerinden aç, kaydet ve paylaş.',
     action: 'Raporlarıma Git', icon: FileText, plan: 'premium',
-    image: photo('photo-1495107334309-fcf20504a5ab'),
+    image: photo('pdf'),
   },
   {
     id: 'agenda', title: 'Gündemi Takip Et',
     description: 'Türkiye ve dünyadan tarım haberlerini, yeni gelişmeleri ve duyuruları takip et.',
     action: 'Gündemi Aç', icon: Newspaper,
-    image: photo('photo-1500382017468-9049fed747ef'),
+    image: photo('agenda'),
   },
   {
     id: 'market', title: 'Piyasa Fiyatlarını İncele',
     description: 'Ürün fiyatlarını tek yerden karşılaştır, tarım piyasasındaki gelişmeleri izle.',
     action: 'Fiyatları Gör', icon: TrendingUp,
-    image: photo('photo-1501436513145-30f24e19fcc4'),
+    image: photo('market'),
   },
   {
     id: 'guide', title: 'Bilgi Rehberinde Ara',
     description: 'Tarımsal konularda kısa ve anlaşılır bilgi kartlarına hızlıca ulaş.',
     action: 'Bilgi Rehberini Aç', icon: BookOpen,
-    image: photo('photo-1456513080510-7bf3a84b82f8'),
+    image: photo('guide'),
   },
 ];
 
@@ -194,7 +192,7 @@ export default function HomeDiscoveryCarousel({ onOpenFeature }: Props) {
                 inert={index !== position}
               >
                 <img className="tp-discovery__image" src={item.image} alt="" loading={position <= 1 ? 'eager' : 'lazy'} decoding="async"
-                  onError={(event) => { event.currentTarget.style.opacity = '0'; }} />
+                  onError={(event) => { event.currentTarget.classList.add('tp-discovery__image--unavailable'); }} />
                 <div className="tp-discovery__gradient" aria-hidden="true" />
                 <div className="tp-discovery__copy">
                   <span className="tp-discovery__icon" aria-hidden="true"><Icon size={23} strokeWidth={1.85} /></span>
