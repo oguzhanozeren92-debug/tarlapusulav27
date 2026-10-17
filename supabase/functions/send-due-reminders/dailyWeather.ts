@@ -194,7 +194,10 @@ export async function enqueueDailyWeatherNotifications(
   if (fields.error) throw fields.error;
 
   const byUser = new Map<string, FieldRow>();
-  for (const field of (fields.data ?? []) as FieldRow[]) {
+  const orderedFields = ([...(fields.data ?? [])] as FieldRow[]).sort((a, b) =>
+    Number(b.is_favorite === true) - Number(a.is_favorite === true) ||
+    String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
+  for (const field of orderedFields) {
     if (!byUser.has(String(field.user_id)) && coordinates(field)) {
       byUser.set(String(field.user_id), field);
     }
