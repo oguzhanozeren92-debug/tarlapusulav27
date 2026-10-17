@@ -768,6 +768,13 @@ export default function App() {
         return;
       }
 
+      if (target === 'weather' || target === 'weatherHub' || target === 'spray_weather') {
+        if (fieldId) setWeatherHubFieldId(fieldId);
+        setScreen('weatherHub');
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        return;
+      }
+
       if (fieldId) {
         const field = realFields.find(
           (item) => String(item.id) === fieldId,
