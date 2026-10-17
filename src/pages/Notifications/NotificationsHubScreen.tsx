@@ -195,7 +195,7 @@ export default function NotificationsHubScreen({
         }
         return;
       }
-      if (target === 'weather' || target === 'spray_weather') {
+      if (target === 'weather' || target === 'weatherHub' || target === 'spray_weather') {
         setScreen('weatherHub');
         return;
       }
