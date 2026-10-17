@@ -4,6 +4,7 @@ import {
   listNativePushUserIds,
   sendNativePushToUser,
 } from "../_shared/nativePush.ts";
+import { enqueueDailyWeatherNotifications } from "./dailyWeather.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1455,6 +1456,13 @@ Deno.serve(async (req) => {
     }
 
     const reengagement = await enqueueReengagementNotifications();
+    const dailyWeather = await enqueueDailyWeatherNotifications(supabaseAdmin)
+      .catch((error) => {
+        console.error("Günlük hava bildirimleri hazırlanamıyor:", error);
+        return { error: error instanceof Error ? error.message : "daily_weather_error" };
+      });
+    // Günlük özet, uzun uydu/faaliyet taramasını beklemeden gönderilsin.
+    const weatherPush = await processAppPushQueue(50);
     const fieldActivity = await processFieldActivityUpdates(cronSecret, body?.forceFieldActivity === true);
     const appPush = await processAppPushQueue(50);
     const ndvi = await processNdviMapUpdates(false);
@@ -1465,6 +1473,8 @@ Deno.serve(async (req) => {
         processedReminders: reminderResults.length,
         reminderResults,
         reengagement,
+        dailyWeather,
+        weatherPush,
         fieldActivity,
         appPush,
         ndvi,
