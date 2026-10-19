@@ -6,13 +6,22 @@ export default function NativeAuthBridge() {
     let disposed = false;
     let cleanup: (() => void) | null = null;
 
-    void installNativeAuthDeepLinkListener().then((remove) => {
-      if (disposed) {
-        remove();
-        return;
-      }
-      cleanup = remove;
-    });
+    void installNativeAuthDeepLinkListener()
+      .then((remove) => {
+        if (disposed) {
+          remove();
+          return;
+        }
+        cleanup = remove;
+      })
+      .catch((error) => {
+        console.error('[Auth] Native geri dönüş dinleyicisi başlatılamadı:', error);
+        window.dispatchEvent(
+          new CustomEvent('tp:native-auth-error', {
+            detail: { message: 'Apple ile giriş bağlantısı başlatılamadı. Uygulamayı yeniden açıp deneyin.' },
+          }),
+        );
+      });
 
     return () => {
       disposed = true;
