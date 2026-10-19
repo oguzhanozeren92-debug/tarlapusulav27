@@ -30,11 +30,6 @@ export type StorePurchaseResult = {
 // App Store / RevenueCat configuration can choose another offering name.
 const OFFERING_ID = String(import.meta.env.VITE_REVENUECAT_OFFERING_ID || 'tarlapusula_plans').trim();
 
-const PACKAGE_IDS: Record<StorePaidPlan, Record<StoreBillingPeriod, string>> = {
-  plus: { monthly: '$rc_monthly', annual: '$rc_annual' },
-  premium: { monthly: 'premium_monthly', annual: 'premium_annual' },
-};
-
 const ENTITLEMENT_IDS: Record<StorePaidPlan, string> = {
   plus: 'tarlapusula_plus',
   premium: 'tarlapusula_premium',
@@ -45,7 +40,6 @@ function findPlanPackage(
   plan: StorePaidPlan,
   period: StoreBillingPeriod,
 ): PurchasesPackage | null {
-  const packageId = PACKAGE_IDS[plan][period];
   const envProductId = plan === 'plus'
     ? period === 'monthly'
       ? import.meta.env.VITE_REVENUECAT_PLUS_MONTHLY_PRODUCT_ID
@@ -57,20 +51,11 @@ function findPlanPackage(
     envProductId || `com.tarlapusula.${plan}.${period === 'monthly' ? 'monthly' : 'annual'}`,
   ).trim();
 
-  // Never buy a different plan just because it uses the shared $rc_monthly
-  // or $rc_annual package name. Match the verified store product first.
-  const packages = offering?.availablePackages ?? [];
-  return (
-    packages.find((item) => item.product.identifier === productId) ??
-    packages.find(
-      (item) =>
-        item.identifier === packageId &&
-        (packageId.startsWith('$rc_')
-          ? item.product.identifier === productId
-          : item.product.identifier === productId),
-    ) ??
-    null
-  );
+  // Never buy a different plan just because two products share a monthly
+  // package label. The real App Store product identifier is authoritative.
+  return offering?.availablePackages?.find(
+    (item) => item.product.identifier === productId,
+  ) ?? null;
 }
 
 let configuredUserId = '';
@@ -102,7 +87,9 @@ export function nativeStorePurchasesSupported() {
 }
 
 export function nativeStorePurchasesConfigured() {
-  return nativeStorePurchasesSupported() && Boolean(publicApiKey());
+  if (!nativeStorePurchasesSupported()) return false;
+  const prefix = Capacitor.getPlatform() === 'ios' ? 'appl_' : 'goog_';
+  return publicApiKey().startsWith(prefix);
 }
 
 function activePlanFromCustomerInfo(
@@ -152,9 +139,10 @@ export async function ensureNativePurchasesConfigured() {
   }
 
   const apiKey = publicApiKey();
-  if (!apiKey) {
+  const expectedPrefix = Capacitor.getPlatform() === 'ios' ? 'appl_' : 'goog_';
+  if (!apiKey.startsWith(expectedPrefix)) {
     throw new Error(
-      'Mağaza bağlantısı henüz yapılandırılmadı. RevenueCat public API anahtarı eksik.',
+      'Mağaza bağlantısı yapılandırılmamış veya bu cihaz için yanlış RevenueCat public API anahtarı girilmiş.',
     );
   }
 
