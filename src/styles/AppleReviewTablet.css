@@ -130,6 +130,21 @@
     line-height: 1.45 !important;
   }
 
+  html.tp-native-app body .tp-plan-card h3 {
+    font-size: 21px !important;
+    line-height: 1.2 !important;
+  }
+
+  html.tp-native-app body .tp-plan-card-price strong {
+    font-size: 26px !important;
+  }
+
+  html.tp-native-app body .tp-plan-card :is(.tp-plan-card-price span, .tp-plan-card-badge),
+  html.tp-native-app body .tp-plan-gate-head small {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
   html.tp-native-app body .tp-plan-gate-compare-row {
     min-width: 0 !important;
   }
