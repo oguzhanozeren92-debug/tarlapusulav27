@@ -24,6 +24,14 @@ workflows:
         script: |
           npm install
 
+      - name: Validate App Store purchase configuration
+        script: |
+          set -eu
+          case "${VITE_REVENUECAT_IOS_PUBLIC_KEY:-}" in
+            appl_*) echo "RevenueCat iOS public key provided" ;;
+            *) echo "ERROR: iOS RevenueCat public SDK key (appl_*) is missing or invalid." >&2; exit 1 ;;
+          esac
+
       - name: Build web app and sync iOS
         script: |
           npm run build
@@ -87,6 +95,14 @@ workflows:
       - name: Install npm dependencies
         script: |
           npm install
+
+      - name: Validate Google Play purchase configuration
+        script: |
+          set -eu
+          case "${VITE_REVENUECAT_ANDROID_PUBLIC_KEY:-}" in
+            goog_*) echo "RevenueCat Android public key provided" ;;
+            *) echo "ERROR: Android RevenueCat public SDK key (goog_*) is missing or invalid." >&2; exit 1 ;;
+          esac
 
       - name: Build web app and sync Android
         script: |
