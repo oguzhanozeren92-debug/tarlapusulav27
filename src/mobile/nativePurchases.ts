@@ -25,6 +25,7 @@ export type StorePurchaseResult = {
   plan: TarlaPusulaPlan;
   cancelled: boolean;
   productIdentifier: string | null;
+  backendVerified: boolean;
 };
 
 // App Store / RevenueCat configuration can choose another offering name.
@@ -267,20 +268,23 @@ export async function getNativeStorePrices(): Promise<StorePlanPrice[]> {
   });
 }
 
-async function syncSubscriptionToBackend() {
-  if (!supabase) return;
+async function syncSubscriptionToBackend(): Promise<TarlaPusulaPlan | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-due-reminders', {
+      body: { mode: 'revenuecat_sync' },
+    });
 
-  const { error } = await supabase.functions.invoke('send-due-reminders', {
-    body: {
-      mode: 'revenuecat_sync',
-    },
-  });
+    if (error) throw error;
+    if (!data?.ok || !['free', 'plus', 'premium'].includes(String(data.plan))) {
+      throw new Error('Abonelik doğrulama sunucusu geçerli plan döndürmedi.');
+    }
 
-  if (error) {
-    console.warn(
-      '[RevenueCat] Supabase abonelik senkronu tamamlanamadı:',
-      error.message,
-    );
+    return data.plan as TarlaPusulaPlan;
+  } catch (error) {
+    // StoreKit purchase may have succeeded even if the server is temporarily
+    // unreachable. Do not report the transaction itself as failed.
+    console.warn('[RevenueCat] Sunucu abonelik doğrulaması başarısız:', error);
+    return null;
   }
 }
 
@@ -355,11 +359,12 @@ export async function purchaseStorePlan(
     );
 
     emitStorePlan(activePlan);
-    await syncSubscriptionToBackend();
+    const confirmedPlan = await syncSubscriptionToBackend();
 
     return {
       plan: activePlan,
       cancelled: false,
+      backendVerified: activePlan !== 'free' && confirmedPlan === activePlan,
       productIdentifier:
         result.productIdentifier ??
         aPackage.product.identifier ??
@@ -371,6 +376,7 @@ export async function purchaseStorePlan(
         plan: 'free',
         cancelled: true,
         productIdentifier: null,
+        backendVerified: false,
       };
     }
 
