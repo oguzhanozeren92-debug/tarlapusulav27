@@ -1,0 +1,31 @@
+name: Apple Review regression checks
+
+on:
+  push:
+    branches:
+      - 'fix/apple-review-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout review-fix branch
+        uses: actions/checkout@v4
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Audit native authentication wiring
+        run: npm run audit:auth
+      - name: Build web assets for Capacitor
+        run: npm run build
