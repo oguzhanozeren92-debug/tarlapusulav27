@@ -18,6 +18,7 @@ import './styles/MapReadabilityFix.css';
 import './styles/HomeFieldsSheetWhiteAccent.css';
 import './styles/FieldSelectChevron.css';
 import './styles/MobileViewportFit.css';
+import './styles/AppleReviewTablet.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
 import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 import PusulaPdfReadyBridge from './features/pusula-pdf/PusulaPdfReadyBridge';
