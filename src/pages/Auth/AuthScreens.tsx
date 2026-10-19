@@ -413,12 +413,10 @@ export default function AuthScreens({
   const handleSocialLogin = async (provider: SocialAuthProvider) => {
     setAuthMessage('');
 
-    if (!socialAvailability) {
-      setAuthMessage(socialStatusError ? 'Sosyal giriş seçenekleri kontrol edilemedi. Bağlantını kontrol edip tekrar dene.' : 'Giriş seçenekleri kontrol ediliyor. Birkaç saniye sonra tekrar dene.');
-      return;
-    }
-
-    if (!socialAvailability[provider]) {
+    // Do not block a user's first tap while the provider-status request is
+    // pending or temporarily unavailable. Supabase will reject a disabled
+    // provider explicitly, and that error is surfaced below.
+    if (socialAvailability && !socialAvailability[provider]) {
       setAuthMessage(
         `${socialAuthProviderLabel(provider)} ile giriş henüz etkin değil.`,
       );
