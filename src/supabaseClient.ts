@@ -58,7 +58,11 @@ function createTarlaPusulaSupabaseClient(): SupabaseClient {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: true,
+          // Native OAuth web bridge must forward the PKCE authorization code to
+          // the iOS app; the browser must not consume it first.
+          detectSessionInUrl:
+            typeof window === 'undefined' ||
+            new URLSearchParams(window.location.search).get('tp_native_oauth') !== '1',
           flowType: 'pkce',
           storageKey: 'tarlapusula-auth',
         },
