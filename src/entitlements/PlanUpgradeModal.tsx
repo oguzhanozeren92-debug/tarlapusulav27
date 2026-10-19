@@ -159,6 +159,7 @@ export default function PlanUpgradeModal() {
   const [message, setMessage] = useState('');
   const [messagePlan, setMessagePlan] = useState<PaidPlan | null>(null);
   const [storePrices, setStorePrices] = useState<StorePlanPrice[]>([]);
+  const [storePricesLoading, setStorePricesLoading] = useState(false);
   const [purchaseLoading, setPurchaseLoading] = useState<PaidPlan | null>(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
 
@@ -205,10 +206,13 @@ export default function PlanUpgradeModal() {
   useEffect(() => {
     if (!request || !nativeStorePurchasesConfigured()) {
       setStorePrices([]);
+      setStorePricesLoading(false);
       return;
     }
 
     let alive = true;
+    setStorePricesLoading(true);
+    setStorePrices([]);
 
     void getNativeStorePrices()
       .then((prices) => {
@@ -217,6 +221,9 @@ export default function PlanUpgradeModal() {
       .catch((error) => {
         console.info('[RevenueCat] Mağaza fiyatları henüz alınamadı:', error);
         if (alive) setStorePrices([]);
+      })
+      .finally(() => {
+        if (alive) setStorePricesLoading(false);
       });
 
     return () => {
@@ -279,18 +286,18 @@ export default function PlanUpgradeModal() {
       const equivalent = usableStoreLabel(row?.annualMonthlyEquivalent);
 
       return {
-        price: annual || planPriceLabel(plan, true),
-        detail: equivalent
-          ? `yaklaşık ${equivalent} / ay`
-          : planYearlyEquivalentLabel(plan),
+        price: annual || (storePricesLoading ? 'Yükleniyor…' : 'Mağazada bulunamadı'),
+        detail: annual
+          ? (equivalent ? `yaklaşık ${equivalent} / ay` : 'yıllık abonelik')
+          : 'App Store / Google Play ürünü doğrulanmalı',
       };
     }
 
     const monthly = usableStoreLabel(row?.monthly);
 
     return {
-      price: monthly || planPriceLabel(plan, false),
-      detail: 'aylık abonelik',
+      price: monthly || (storePricesLoading ? 'Yükleniyor…' : 'Mağazada bulunamadı'),
+      detail: monthly ? 'aylık abonelik' : 'App Store / Google Play ürünü doğrulanmalı',
     };
   };
 
@@ -318,6 +325,14 @@ export default function PlanUpgradeModal() {
       return;
     }
 
+    const selectedProduct = storePrices.find((item) => item.plan === plan);
+    if (!(yearly ? selectedProduct?.annual : selectedProduct?.monthly)) {
+      setMessage(
+        'Seçilen abonelik mağazada yüklenemedi. App Store / RevenueCat ürün eşleştirmesini kontrol edin.',
+      );
+      return;
+    }
+
     setPurchaseLoading(plan);
     setMessage('');
 
@@ -335,11 +350,11 @@ export default function PlanUpgradeModal() {
       await refreshEntitlements().catch(() => undefined);
 
       setMessage(
-        result.plan === 'premium'
-          ? 'Premium aktif. Tüm Premium özelliklerin açıldı.'
-          : result.plan === 'plus'
-            ? 'Plus aktif. Plus özelliklerin açıldı.'
-            : 'Satın alma mağazada tamamlandı; abonelik doğrulaması yenileniyor.',
+        !result.backendVerified
+          ? 'Satın alma mağaza tarafından işlendi ancak üyelik sunucuda henüz doğrulanamadı. Tekrar ödeme yapmayın; Satın alımları geri yükle seçeneğini kullanın.'
+          : result.plan === 'premium'
+            ? 'Premium aktif. Tüm Premium özelliklerin açıldı.'
+            : 'Plus aktif. Plus özelliklerin açıldı.',
       );
     } catch (error) {
       console.error('Mağaza satın alma hatası:', error);
@@ -476,7 +491,16 @@ export default function PlanUpgradeModal() {
                   <button
                     type="button"
                     className="tp-plan-card-action"
-                    disabled={!paid || current || lowerThanCurrent || purchaseLoading !== null}
+                    disabled={
+                      !paid || current || lowerThanCurrent || purchaseLoading !== null ||
+                      restoreLoading ||
+                      (nativeStorePurchasesSupported() && (
+                        !nativeStorePurchasesConfigured() ||
+                        !(yearly
+                          ? storePrices.find((item) => item.plan === plan)?.annual
+                          : storePrices.find((item) => item.plan === plan)?.monthly)
+                      ))
+                    }
                     onClick={() => paid && void selectPlan(plan)}
                   >
                     {purchaseLoading === plan
@@ -487,7 +511,15 @@ export default function PlanUpgradeModal() {
                           ? 'Ücretsiz'
                           : lowerThanCurrent
                             ? 'Mevcut planın kapsamında'
-                            : `${PLAN_LABELS[plan]} abone ol`}
+                            : nativeStorePurchasesSupported() && !nativeStorePurchasesConfigured()
+                              ? 'Mağaza yapılandırılamadı'
+                              : nativeStorePurchasesSupported() && storePricesLoading
+                                ? 'Mağaza yükleniyor…'
+                                : nativeStorePurchasesSupported() && !(yearly
+                                  ? storePrices.find((item) => item.plan === plan)?.annual
+                                  : storePrices.find((item) => item.plan === plan)?.monthly)
+                                  ? 'Ürün mağazada bulunamadı'
+                                  : `${PLAN_LABELS[plan]} abone ol`}
                   </button>
                   {message && messagePlan === plan ? (
                     <div className="tp-plan-gate-message" role="alert" aria-live="assertive">
