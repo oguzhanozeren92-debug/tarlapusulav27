@@ -58,7 +58,12 @@ function createTarlaPusulaSupabaseClient(): SupabaseClient {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: true,
+          // The web callback page only forwards the PKCE code to iOS. Do not
+          // consume it in the web Supabase client before the native app can
+          // exchange it with its own stored code verifier.
+          detectSessionInUrl:
+            typeof window === 'undefined' ||
+            new URLSearchParams(window.location.search).get('tp_native_oauth') !== '1',
           flowType: 'pkce',
           storageKey: 'tarlapusula-auth',
         },
