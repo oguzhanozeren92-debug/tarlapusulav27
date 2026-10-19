@@ -6,6 +6,7 @@ import { supabase } from '../supabaseClient';
 const NATIVE_CALLBACK = 'com.tarlapusula.app://auth-callback';
 const MOBILE_BRIDGE_PARAM = 'tp_native_oauth';
 const handledCallbacks = new Set<string>();
+const pendingCallbacks = new Set<string>();
 
 function publicWebUrl() {
   const configured = String(
@@ -137,7 +138,8 @@ export async function handleNativeAuthCallback(rawUrl: string) {
     return false;
   }
 
-  handledCallbacks.add(rawUrl);
+  if (pendingCallbacks.has(rawUrl)) return true;
+  pendingCallbacks.add(rawUrl);
   const params = callbackParams(url);
 
   try {
@@ -146,13 +148,14 @@ export async function handleNativeAuthCallback(rawUrl: string) {
     // Browser zaten kapanmış olabilir.
   }
 
-  const oauthError = params.get('error');
+  const oauthError = params.get('error') || params.get('error_code');
   if (oauthError) {
     window.dispatchEvent(
       new CustomEvent('tp:native-auth-error', {
         detail: { message: authErrorMessage(params) },
       }),
     );
+    pendingCallbacks.delete(rawUrl);
     return true;
   }
 
@@ -160,9 +163,10 @@ export async function handleNativeAuthCallback(rawUrl: string) {
   if (!code) {
     window.dispatchEvent(
       new CustomEvent('tp:native-auth-error', {
-        detail: { message: 'Giriş dönüş kodu bulunamadı.' },
+        detail: { message: 'Apple / sosyal giriş dönüş kodu bulunamadı. Yeniden giriş yapabilirsin.' },
       }),
     );
+    pendingCallbacks.delete(rawUrl);
     return true;
   }
 
@@ -178,6 +182,7 @@ export async function handleNativeAuthCallback(rawUrl: string) {
       throw new Error('Giriş oturumu oluşturulamadı.');
     }
 
+    handledCallbacks.add(rawUrl);
     window.dispatchEvent(
       new CustomEvent('tp:native-auth-complete'),
     );
@@ -192,6 +197,8 @@ export async function handleNativeAuthCallback(rawUrl: string) {
         },
       }),
     );
+  } finally {
+    pendingCallbacks.delete(rawUrl);
   }
 
   return true;
@@ -202,14 +209,20 @@ export async function installNativeAuthDeepLinkListener() {
     return () => undefined;
   }
 
-  const launch = await App.getLaunchUrl();
-  if (launch?.url) {
-    void handleNativeAuthCallback(launch.url);
-  }
-
+  // Register before checking cold-start URL: avoid missing a callback
+  // delivered while the Capacitor bridge is still initializing.
   const handle = await App.addListener('appUrlOpen', ({ url }) => {
     void handleNativeAuthCallback(url);
   });
+
+  try {
+    const launch = await App.getLaunchUrl();
+    if (launch?.url) {
+      void handleNativeAuthCallback(launch.url);
+    }
+  } catch (error) {
+    console.warn('[Auth] iOS launch URL okunamadı:', error);
+  }
 
   return () => {
     void handle.remove();
