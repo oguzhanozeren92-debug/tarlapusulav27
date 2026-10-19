@@ -27,12 +27,8 @@ export type StorePurchaseResult = {
   productIdentifier: string | null;
 };
 
-const OFFERING_ID = 'tarlapusula_plans';
-
-const PACKAGE_IDS: Record<StorePaidPlan, Record<StoreBillingPeriod, string>> = {
-  plus: { monthly: '$rc_monthly', annual: '$rc_annual' },
-  premium: { monthly: 'premium_monthly', annual: 'premium_annual' },
-};
+// App Store / RevenueCat configuration can choose another offering name.
+const OFFERING_ID = String(import.meta.env.VITE_REVENUECAT_OFFERING_ID || 'tarlapusula_plans').trim();
 
 const ENTITLEMENT_IDS: Record<StorePaidPlan, string> = {
   plus: 'tarlapusula_plus',
@@ -44,15 +40,22 @@ function findPlanPackage(
   plan: StorePaidPlan,
   period: StoreBillingPeriod,
 ): PurchasesPackage | null {
-  const packageId = PACKAGE_IDS[plan][period];
-  const productId = `com.tarlapusula.${plan}.${period === 'monthly' ? 'monthly' : 'annual'}`;
-  return (
-    offering?.availablePackages?.find(
-      (item) =>
-        item.identifier === packageId ||
-        item.product.identifier === productId,
-    ) ?? null
-  );
+  const envProductId = plan === 'plus'
+    ? period === 'monthly'
+      ? import.meta.env.VITE_REVENUECAT_PLUS_MONTHLY_PRODUCT_ID
+      : import.meta.env.VITE_REVENUECAT_PLUS_ANNUAL_PRODUCT_ID
+    : period === 'monthly'
+      ? import.meta.env.VITE_REVENUECAT_PREMIUM_MONTHLY_PRODUCT_ID
+      : import.meta.env.VITE_REVENUECAT_PREMIUM_ANNUAL_PRODUCT_ID;
+  const productId = String(
+    envProductId || `com.tarlapusula.${plan}.${period === 'monthly' ? 'monthly' : 'annual'}`,
+  ).trim();
+
+  // Never buy a different plan just because two products share a monthly
+  // package label. The real App Store product identifier is authoritative.
+  return offering?.availablePackages?.find(
+    (item) => item.product.identifier === productId,
+  ) ?? null;
 }
 
 let configuredUserId = '';
@@ -84,7 +87,9 @@ export function nativeStorePurchasesSupported() {
 }
 
 export function nativeStorePurchasesConfigured() {
-  return nativeStorePurchasesSupported() && Boolean(publicApiKey());
+  if (!nativeStorePurchasesSupported()) return false;
+  const prefix = Capacitor.getPlatform() === 'ios' ? 'appl_' : 'goog_';
+  return publicApiKey().startsWith(prefix);
 }
 
 function activePlanFromCustomerInfo(
@@ -134,9 +139,10 @@ export async function ensureNativePurchasesConfigured() {
   }
 
   const apiKey = publicApiKey();
-  if (!apiKey) {
+  const expectedPrefix = Capacitor.getPlatform() === 'ios' ? 'appl_' : 'goog_';
+  if (!apiKey.startsWith(expectedPrefix)) {
     throw new Error(
-      'Mağaza bağlantısı henüz yapılandırılmadı. RevenueCat public API anahtarı eksik.',
+      'Mağaza bağlantısı yapılandırılmamış veya bu cihaz için yanlış RevenueCat public API anahtarı girilmiş.',
     );
   }
 
@@ -181,19 +187,23 @@ export async function ensureNativePurchasesConfigured() {
   }
 }
 
-async function offeringForPlan(plan: StorePaidPlan) {
+async function offeringForPlan(plan: StorePaidPlan, period: StoreBillingPeriod) {
   await ensureNativePurchasesConfigured();
 
   const offerings = await Purchases.getOfferings();
-  const offering =
-    offerings.all?.[OFFERING_ID] ??
-    (offerings.current?.identifier === OFFERING_ID
-      ? offerings.current
-      : null);
+  const candidates = [
+    offerings.all?.[OFFERING_ID],
+    offerings.current,
+    ...Object.values(offerings.all ?? {}),
+  ].filter((offering): offering is PurchasesOffering => Boolean(offering));
+
+  const offering = candidates.find((entry) =>
+    Boolean(findPlanPackage(entry, plan, period)),
+  );
 
   if (!offering) {
     throw new Error(
-      `RevenueCat mağaza grubu (${OFFERING_ID}) bulunamadı. Satın alma ayarlarını kontrol edin.`,
+      `RevenueCat içinde ${plan.toUpperCase()} ${period === 'annual' ? 'yıllık' : 'aylık'} ürünü bulunamadı. App Store ürün kimliği ve RevenueCat offering eşleştirmesini kontrol edin.`,
     );
   }
 
@@ -235,14 +245,19 @@ export async function getNativeStorePrices(): Promise<StorePlanPrice[]> {
 
   await ensureNativePurchasesConfigured();
   const offerings = await Purchases.getOfferings();
-
-  const offering =
-    offerings.all?.[OFFERING_ID] ??
-    (offerings.current?.identifier === OFFERING_ID ? offerings.current : null);
+  const candidates = [
+    offerings.all?.[OFFERING_ID],
+    offerings.current,
+    ...Object.values(offerings.all ?? {}),
+  ].filter((offering): offering is PurchasesOffering => Boolean(offering));
 
   return (['plus', 'premium'] as const).map((plan) => {
-    const monthly = findPlanPackage(offering, plan, 'monthly');
-    const annual = findPlanPackage(offering, plan, 'annual');
+    const monthly = candidates
+      .map((offering) => findPlanPackage(offering, plan, 'monthly'))
+      .find(Boolean) ?? null;
+    const annual = candidates
+      .map((offering) => findPlanPackage(offering, plan, 'annual'))
+      .find(Boolean) ?? null;
     return {
       plan,
       monthly: priceString(monthly),
@@ -301,7 +316,7 @@ export async function purchaseStorePlan(
   period: StoreBillingPeriod,
 ): Promise<StorePurchaseResult> {
   try {
-    const offering = await offeringForPlan(plan);
+    const offering = await offeringForPlan(plan, period);
     const aPackage = packageForPeriod(offering, plan, period);
 
     await Purchases.trackCustomPaywallImpression({
