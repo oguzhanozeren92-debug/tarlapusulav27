@@ -7,10 +7,19 @@ TarlaPusula uygulama kodu Free / Plus / Premium planlarını RevenueCat üzerind
 - iOS Bundle ID: `com.tarlapusula.app`
 - Android Application ID: `com.tarlapusula.app`
 - RevenueCat App User ID: Supabase `auth.users.id` UUID
-- RevenueCat entitlement kimlikleri: `plus`, `premium`
-- RevenueCat offering kimlikleri: `plus`, `premium`
+- RevenueCat entitlement kimlikleri: `tarlapusula_plus` ve `tarlapusula_premium` (uyumluluk için `plus` ve `premium` adları da kod tarafından tanınır).
+- RevenueCat offering kimliği: `tarlapusula_plans` (varsayılan; uygulama mevcut diğer offering'lerde de eşleşen ürünleri arar).
 
-Her offering içinde RevenueCat standard **Monthly** ve **Annual** package tiplerini kullan. Uygulama mağaza product ID'lerini hard-code etmez; ürünleri RevenueCat dashboard'unda bu paketlere bağlar.
+**Önemli:** Uygulama, Monthly/Annual paket ismine tek başına güvenmez. Doğru aboneliği satın almak için RevenueCat paketinin gerçek App Store **Product ID**'sinin aşağıdaki dört kimlikten biriyle birebir uyuşmasını ister. Product ID gerekiyorsa yalnızca ilgili `VITE_REVENUECAT_*_PRODUCT_ID` build ayarıyla değiştirilebilir.
+
+| Plan | Periyot | App Store Product ID |
+| --- | --- | --- |
+| Plus | Aylık | `com.tarlapusula.plus.monthly` |
+| Plus | Yıllık | `com.tarlapusula.plus.annual` |
+| Premium | Aylık | `com.tarlapusula.premium.monthly` |
+| Premium | Yıllık | `com.tarlapusula.premium.annual` |
+
+Bu adlar daha önceki TarlaPusula App Store kurulumunun beklenen kimlikleridir. App Store Connect ve RevenueCat panellerindeki gerçek kayıtlarla karşılaştırılmalıdır.
 
 ## Plan kapsamı
 
@@ -60,12 +69,12 @@ Android Activity `singleTop` olarak ayarlı ve RevenueCat Capacitor SDK projeye 
 
 ## RevenueCat
 
-1. Apple ve Google uygulamalarını aynı RevenueCat projesine ekle.
-2. `plus` ve `premium` entitlement oluştur.
-3. Plus ürünlerini `plus`, Premium ürünlerini `premium` entitlement'a bağla.
-4. `plus` ve `premium` offering oluştur.
-5. Her offering'e Monthly ve Annual package bağla.
-6. Public SDK key'lerini build ortamına ekle:
+1. Apple ve Google uygulamalarını RevenueCat'e ekle; iOS Bundle ID `com.tarlapusula.app` olmalı.
+2. `tarlapusula_plus` ve `tarlapusula_premium` entitlement oluştur (var olan `plus` / `premium` entitlement'larını silmeden önce müşteri uyumluluğunu kontrol et).
+3. Plus ürünlerini Plus entitlement'ına, Premium ürünlerini Premium entitlement'ına bağla.
+4. `tarlapusula_plans` offering altında dört product ID'yi içeren dört ayrı paket tanımla. Aynı offering içinde aynı paket türünden birden fazla abonelik varsa benzersiz paket kimliği kullan.
+5. RevenueCat **Product Catalog**'da dört App Store ürünü de doğru durumla görünmeli; ürünlerin App Store Connect'te aktif / incelemeye hazır ve abonelik grubuna bağlı olduğunu kontrol et.
+6. Public SDK key'lerini **Codemagic `revenuecat_keys` environment group** içine ekle; iOS build'i `appl_` ile başlayan anahtarı gerektirir:
    - `VITE_REVENUECAT_IOS_PUBLIC_KEY=appl_...`
    - `VITE_REVENUECAT_ANDROID_PUBLIC_KEY=goog_...`
 
@@ -112,3 +121,16 @@ Plan ekranındaki **Satın alımları geri yükle** düğmesi RevenueCat `restor
 - Webhook Authorization header doğrulanmadan plan güncellenmez.
 - `subscription_webhook_events` anon/authenticated rollerine kapalıdır.
 - Store sonucunun istemcide görünmesi backend yetkisinin kaynağı değildir; backend RevenueCat'i tekrar sorgular.
+
+## App Store 2.1 satın alma ret kontrolü
+
+- [ ] Codemagic iOS build ortamında `VITE_REVENUECAT_IOS_PUBLIC_KEY` (`appl_` önekli) tanımlı, iOS build doğrulama adımı başarılı.
+- [ ] RevenueCat iOS App Bundle ID `com.tarlapusula.app`; dört Product ID yukarıdaki kimliklerle birebir eş.
+- [ ] Dört ürün RevenueCat'te doğru Plus/Premium entitlement'ına bağlanmış ve offering üzerinden sunuluyor.
+- [ ] App Store Connect'te bütün aboneliklerin lokalizasyonu, fiyatları, satış uygunluğu ve abonelik grubu tamam.
+- [ ] **Gerçek iPhone TestFlight** içinde Plus aylık, Plus yıllık, Premium aylık, Premium yıllık seçeneklerinde mağazadan gelen fiyat gösteriliyor.
+- [ ] StoreKit sandbox satın alma sayfası açılıyor; sandbox hesapla işlem tamamlanıyor.
+- [ ] İade/iptal/restore testlerinde istemci `CustomerInfo` ile sunucu `revenuecat_sync` sonucu tutarlı.
+- [ ] App Review'a inceleme için çalışan hesap ve gerekiyorsa abonelik ürünlerine erişim talimatı ekleniyor.
+
+**Uyarı:** Vercel build başarısı veya GitHub kodunun derlenmesi iOS sandbox satın alma testinin yerine geçmez. Build tamamlanıp TestFlight'ta dört ürün doğrulanmadan Apple ret maddesi çözülmüş sayılmamalıdır.
