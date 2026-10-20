@@ -1,4 +1,3 @@
-import { getEntitlementSnapshot } from '../entitlements/useEntitlementStore';
 import { supabase } from '../supabaseClient';
 
 export type AdPlacement =
@@ -45,8 +44,8 @@ export type RewardedAdClaimResult = {
   aiCreditGranted: boolean;
 };
 
-const INTERSTITIAL_MIN_GAP_MS = 25 * 60 * 1000;
-const INTERSTITIAL_DAILY_LIMIT = 3;
+const INTERSTITIAL_MIN_GAP_MS = 45 * 60 * 1000;
+const INTERSTITIAL_DAILY_LIMIT = 2;
 const INTERSTITIAL_STORAGE_KEY = 'tp_free_interstitial_policy_v1';
 
 function turkeyDayKey() {
@@ -85,9 +84,6 @@ function writeInterstitialState(next: { day: string; count: number; lastAt: numb
 
 function canShowInterstitialNow() {
   if (typeof window === 'undefined') return false;
-  const entitlement = getEntitlementSnapshot();
-  if (entitlement.effectivePlan !== 'free') return false;
-
   const state = readInterstitialState();
   if (state.count >= INTERSTITIAL_DAILY_LIMIT) return false;
   if (state.lastAt && Date.now() - state.lastAt < INTERSTITIAL_MIN_GAP_MS) return false;
@@ -341,15 +337,6 @@ async function claimAdReward(placement: AdPlacement, ad: BridgeAdResult) {
 }
 
 export async function showRewardedAdAndClaim(placement: AdPlacement) {
-  const entitlement = getEntitlementSnapshot();
-  if (entitlement.effectivePlan !== 'free') {
-    return {
-      completed: false,
-      claim: null,
-      reason: 'paid_plan_no_ads',
-    } as const;
-  }
-
   const ad = await runAd('rewarded', placement);
   if (!ad.completed) {
     return { completed: false, claim: null, reason: 'dismissed' } as const;
@@ -361,7 +348,7 @@ export async function showRewardedAdAndClaim(placement: AdPlacement) {
 
 /**
  * Ücretsiz kullanıcıda seyrek tam ekran reklam.
- * En fazla 3/gün, iki reklam arası en az 25 dakika.
+ * En fazla 2/gün, iki reklam arası en az 45 dakika.
  * Reklam kapatılırsa kullanıcının hedef ekranı yine açılır.
  */
 export async function maybeShowFreeInterstitial(placement: AdPlacement) {
