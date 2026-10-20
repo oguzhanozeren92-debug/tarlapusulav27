@@ -41,7 +41,7 @@
 	<!-- TarlaPusula production AdMob App ID. -->
 	<string>ca-app-pub-9321324588059191~6054909436</string>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>TarlaPusula, ücretsiz plandaki reklamları ölçmek ve gizlilik tercihlerine göre kişiselleştirmek için reklam tanımlayıcısını kullanabilir.</string>
+	<string>TarlaPusula, ücretsiz uygulamadaki reklamları ölçmek ve gizlilik tercihlerine göre kişiselleştirmek için reklam tanımlayıcısını kullanabilir.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
