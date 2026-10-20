@@ -16,9 +16,7 @@ export function openPlanUpgrade(request: PlanUpgradeRequest) {
   );
 }
 
-export function planRequirementProps(requiredPlan: PaidPlan, feature: string) {
-  return {
-    'data-required-plan': requiredPlan,
-    'data-plan-feature': feature,
-  };
+export function planRequirementProps(_requiredPlan: PaidPlan, _feature: string) {
+  // No paywall metadata: every feature is accessible without a purchase.
+  return {};
 }
