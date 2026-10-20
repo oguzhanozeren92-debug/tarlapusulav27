@@ -79,7 +79,7 @@ export async function requestPusulaPdf(fieldId: string, period: { start: string;
   if (error) {
     const detail = String(error.message ?? '').trim();
     if (detail.includes('PREMIUM_REQUIRED')) {
-      throw new Error('PusulaPDF için gerçek Premium aboneliği gerekiyor. TEST PREMIUM görünümü tek başına rapor yetkisi vermez.');
+      throw new Error('PusulaPDF erişimi sunucuda henüz ücretsiz sürüme açılmamış. Lütfen daha sonra tekrar deneyin.');
     }
     if (detail.includes('AUTH_REQUIRED')) {
       throw new Error('Rapor hazırlamak için tekrar giriş yapmalısın.');
