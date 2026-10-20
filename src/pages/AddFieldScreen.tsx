@@ -139,7 +139,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
   const [mapStartLocationKey, setMapStartLocationKey] = useState('');
   const [drawStartToken, setDrawStartToken] = useState(0);
   const entitlement = useEntitlementStore();
-  const manualDrawLimitDecare = entitlement.isPaid ? null : 50;
+  const manualDrawLimitDecare = null; // Unlimited drawing for all users.
   const fieldNameRef = useRef<HTMLInputElement>(null);
   const steps = ['Konum','Parsel','Ürün','Tarla Profili'];
 
@@ -713,9 +713,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
 
                   <div className="tp-draw-limit-note">
                     <strong>Çizim limiti:</strong>{' '}
-                    {entitlement.isPaid
-                      ? `${entitlement.isPremium ? 'Premium' : 'Plus'} · sınırsız çizim`
-                      : 'Ücretsiz · en fazla 50 dekar'}
+                    Ücretsiz · sınırsız çizim
                   </div>
 
                   {mapBoundaryMessage ? (
