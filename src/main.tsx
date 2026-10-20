@@ -20,14 +20,12 @@ import './styles/FieldSelectChevron.css';
 import './styles/MobileViewportFit.css';
 import './styles/AppleReviewTablet.css';
 import PusulaPointsCelebration from './gamification/PusulaPointsCelebration';
-import PlanUpgradeModal from './entitlements/PlanUpgradeModal';
 import PusulaPdfReadyBridge from './features/pusula-pdf/PusulaPdfReadyBridge';
 import { installNativeFeedback } from './mobile/nativeFeedback';
 import { installNativeAdsBridge } from './mobile/nativeAds';
 import NativePushBridge from './mobile/NativePushBridge';
 import NativeAuthBridge from './mobile/NativeAuthBridge';
 import NativeShellBridge from './mobile/NativeShellBridge';
-import NativePurchasesBridge from './mobile/NativePurchasesBridge';
 import { forwardWebOAuthCallbackToNative } from './mobile/nativeAuth';
 
 forwardWebOAuthCallbackToNative();
@@ -71,10 +69,8 @@ createRoot(document.getElementById('root')!).render(
         <PusulaPdfReadyBridge />
         <NativeAuthBridge />
         <NativeShellBridge />
-        <NativePurchasesBridge />
         <InAppAdminMode />
         <PusulaPointsCelebration />
-        <PlanUpgradeModal />
       </>
     )}
   </StrictMode>,
