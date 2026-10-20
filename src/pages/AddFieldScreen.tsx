@@ -5,8 +5,6 @@ import { TURKEY_CROP_PICKER_OPTIONS } from '../data/crops';
 import type { MapBoundaryCandidate } from '../lib/parcelService';
 import type { CropCycle, LocationOption, Screen } from '../types';
 import type { CropVarietyOption } from '../features/fields/services/cropVarietyCatalog.service';
-import { useEntitlementStore } from '../entitlements/useEntitlementStore';
-import { openPlanUpgrade } from '../entitlements/planAccess';
 import './AddFieldMobile.css';
 
 const PUSULA_BODY_SRC =
@@ -138,7 +136,6 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
   const [mapStartView, setMapStartView] = useState<MapStartView | null>(null);
   const [mapStartLocationKey, setMapStartLocationKey] = useState('');
   const [drawStartToken, setDrawStartToken] = useState(0);
-  const entitlement = useEntitlementStore();
   const manualDrawLimitDecare = null; // Unlimited drawing for all users.
   const fieldNameRef = useRef<HTMLInputElement>(null);
   const steps = ['Konum','Parsel','Ürün','Tarla Profili'];
@@ -762,14 +759,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                       drawButtonLabel="✏️ Çizerek Bul"
                       drawStartToken={drawStartToken}
                       maxDrawAreaDecare={manualDrawLimitDecare}
-                      onDrawLimitExceeded={() => {
-                        if (!entitlement.isPaid) {
-                          openPlanUpgrade({
-                            requiredPlan: 'plus',
-                            feature: '50 dekardan büyük çizerek tarla ekleme',
-                          });
-                        }
-                      }}
+                      onDrawLimitExceeded={() => undefined}}
                       constrainDrawingToParcel={false}
                       onSectionDrawn={acceptManualBoundary}
                     />
