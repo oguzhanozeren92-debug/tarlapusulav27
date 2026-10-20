@@ -81,6 +81,9 @@ export async function requestPusulaPdf(fieldId: string, period: { start: string;
     if (detail.includes('PREMIUM_REQUIRED')) {
       throw new Error('PusulaPDF erişimi sunucuda henüz ücretsiz sürüme açılmamış. Lütfen daha sonra tekrar deneyin.');
     }
+    if (detail.includes('FREE_PDF_DAILY_LIMIT')) {
+      throw new Error('PusulaPDF artık ücretsiz! Sunucu maliyetlerini korumak için 24 saatte bir yeni rapor hazırlanabilir.');
+    }
     if (detail.includes('AUTH_REQUIRED')) {
       throw new Error('Rapor hazırlamak için tekrar giriş yapmalısın.');
     }
