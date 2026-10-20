@@ -3,7 +3,6 @@ import './HomeScreen.css';
 import './ClassicPusula.css';
 import { onboardingStyles } from '../../styles/onboardingStyles';
 import { useGamificationStore } from '../../gamification/useGamificationStore';
-import { openPlanUpgrade } from '../../entitlements/planAccess';
 import AppDrawer from '../../components/AppDrawer';
 import PusulaPointsModal from '../../components/PusulaPointsModal';
 import PusulaGuide, { type PusulaInsight } from '../../assets/pusula/PusulaGuide';
@@ -192,8 +191,6 @@ export default function HomeScreen(props: HomeScreenProps) {
 
   const gamification = useGamificationStore();
   const { profileName, points } = useHomeProfile();
-  const [fieldGateNotice, setFieldGateNotice] = useState<{
-    nextFieldNumber?: number;
     requiredPoints?: number;
     remainingPoints?: number;
     reason?: string;
@@ -1294,26 +1291,6 @@ export default function HomeScreen(props: HomeScreenProps) {
       return;
     }
 
-    // App.tsx, puan/tarla hakkı yetersiz olduğunda ekranı home'da bırakıp
-    // sebebi tp_field_gate_notice içine yazıyor. Bunu görünür bir uyarıya çevir.
-    window.setTimeout(() => {
-      try {
-        const raw = window.sessionStorage.getItem('tp_field_gate_notice');
-        if (!raw) return;
-
-        const parsed = JSON.parse(raw);
-        setFieldGateNotice({
-          nextFieldNumber: Number(parsed?.nextFieldNumber) || undefined,
-          requiredPoints: Number(parsed?.requiredPoints) || undefined,
-          remainingPoints: Number(parsed?.remainingPoints) || undefined,
-          reason: String(parsed?.reason || ''),
-        });
-
-        window.sessionStorage.removeItem('tp_field_gate_notice');
-      } catch {
-        // Geçersiz/geçici storage verisinde uyarı göstermeden devam et.
-      }
-    }, 0);
   };
 
   return (
@@ -1805,90 +1782,6 @@ export default function HomeScreen(props: HomeScreenProps) {
           )}
         </main>
 
-        {fieldGateNotice && (
-          <div
-            className="tp-field-gate-backdrop"
-            role="presentation"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                setFieldGateNotice(null);
-              }
-            }}
-          >
-            <section
-              className="tp-field-gate-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="tp-field-gate-title"
-            >
-              <button
-                type="button"
-                className="tp-field-gate-x"
-                onClick={() => setFieldGateNotice(null)}
-                aria-label="Kapat"
-              >
-                ×
-              </button>
-
-              <small>TARLA HAKKI</small>
-              <h3 id="tp-field-gate-title">
-                {fieldGateNotice.reason === 'configured_limit'
-                  ? 'Tarla Limitine Ulaştın'
-                  : `${fieldGateNotice.nextFieldNumber ?? 'Yeni'}. Tarla Henüz Kilitli`}
-              </h3>
-
-              <p>
-                {fieldGateNotice.reason === 'configured_limit'
-                  ? 'Ücretsiz plandaki tarla hakkını kullandın. Premium ile sınırsız tarla ve tüm gelişmiş özellikleri açabilirsin.'
-                  : `Yeni tarla eklemek için toplam ${Number(
-                      fieldGateNotice.requiredPoints ?? 0
-                    ).toLocaleString('tr-TR')} P gerekiyor. İstersen puanlarını inceleyebilir veya Premium'a geçebilirsin.`}
-              </p>
-
-              {fieldGateNotice.reason !== 'configured_limit' && (
-                <div className="tp-field-gate-progress">
-                  <span>Kalan Puan</span>
-                  <strong>
-                    {Number(
-                      fieldGateNotice.remainingPoints ?? 0
-                    ).toLocaleString('tr-TR')} P
-                  </strong>
-                </div>
-              )}
-
-              <div className="tp-field-gate-actions">
-                <button
-                  type="button"
-                  className="tp-field-gate-premium"
-                  onClick={() => {
-                    setFieldGateNotice(null);
-                    openPlanUpgrade({
-                      requiredPlan: 'premium',
-                      feature: 'Sınırsız tarla ve Premium özellikler',
-                    });
-                  }}
-                >
-                  Premium Ol
-                </button>
-
-                <button
-                  type="button"
-                  className="tp-field-gate-points"
-                  onClick={() => {
-                    // Puan modalını aynı kullanıcı etkileşimi içinde aç.
-                    // Özellikle mobil Safari'de modal kapat -> setTimeout ->
-                    // modal aç zinciri kaybolabildiği için iki state'i tek
-                    // render döngüsünde değiştiriyoruz.
-                    setPointsOpen(true);
-                    setFieldGateNotice(null);
-                  }}
-                >
-                  Puanlarımı Gör
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
 
         <FieldOperationModal
           open={fieldOperationOpen && Boolean(fieldKey) && !homeField?.demo}
