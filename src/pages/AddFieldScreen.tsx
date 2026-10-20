@@ -759,7 +759,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                       drawButtonLabel="✏️ Çizerek Bul"
                       drawStartToken={drawStartToken}
                       maxDrawAreaDecare={manualDrawLimitDecare}
-                      onDrawLimitExceeded={() => undefined}}
+                      onDrawLimitExceeded={() => undefined}
                       constrainDrawingToParcel={false}
                       onSectionDrawn={acceptManualBoundary}
                     />
