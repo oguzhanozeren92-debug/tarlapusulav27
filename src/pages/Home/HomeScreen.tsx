@@ -191,10 +191,6 @@ export default function HomeScreen(props: HomeScreenProps) {
 
   const gamification = useGamificationStore();
   const { profileName, points } = useHomeProfile();
-    requiredPoints?: number;
-    remainingPoints?: number;
-    reason?: string;
-  } | null>(null);
   const [irrigationRecordOpen, setIrrigationRecordOpen] = useState(false);
   const [fieldOperationOpen, setFieldOperationOpen] = useState(false);
   const [fieldsSheetOpen, setFieldsSheetOpen] = useState(false);
