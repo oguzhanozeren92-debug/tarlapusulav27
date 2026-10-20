@@ -10,13 +10,13 @@ export const PLAN_ORDER: Record<TarlaPusulaPlan, number> = {
 
 export const PLAN_LABELS: Record<TarlaPusulaPlan, string> = {
   free: 'Ücretsiz',
-  plus: 'Plus',
-  premium: 'Premium',
+  plus: 'Ücretsiz',
+  premium: 'Ücretsiz',
 };
 
 export const PLAN_FIELD_LIMITS: Record<TarlaPusulaPlan, number> = {
-  free: 1,
-  plus: 10,
+  free: 999,
+  plus: 999,
   premium: 999,
 };
 
@@ -57,8 +57,9 @@ export const PLAN_FEATURE_MATRIX: Array<{
   { key: 'rotation', label: 'Münavebe / ekim nöbeti', free: false, plus: false, premium: true },
 ];
 
-export function planAllows(current: TarlaPusulaPlan, required: PaidPlan) {
-  return PLAN_ORDER[current] >= PLAN_ORDER[required];
+export function planAllows(_current: TarlaPusulaPlan, _required: PaidPlan) {
+  // All feature gates are open in the free/ad-supported release.
+  return true;
 }
 
 export const PLAN_LAUNCH_PRICES = {
