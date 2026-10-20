@@ -80,6 +80,10 @@ const CSS = String.raw`
 }
 .tp-plan-gate-legal span{color:#a0a7ae;font-size:8px}
 .tp-plan-gate-message{margin:10px 0 0;padding:10px 11px;border-radius:12px;background:#f2f4f5;color:#2e353b;font-size:9px;line-height:1.4;text-align:center}
+.tp-plan-store-diagnostic{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;padding:9px 12px;margin:0 0 12px;border:1px solid #d6dce1;border-radius:11px;background:#f6f7f8;color:#333940}
+.tp-plan-store-diagnostic p{margin:0;flex:1;min-width:185px;font-size:10px;line-height:1.45;overflow-wrap:anywhere}
+.tp-plan-store-diagnostic button{min-height:34px;padding:6px 10px;border:1px solid #25282d;border-radius:9px;background:#fff;color:#171a1e;font-size:10px;font-weight:800;cursor:pointer}
+.tp-plan-store-diagnostic button[disabled]{opacity:.5;cursor:wait}
 .tp-plan-gate-restore{display:flex;justify-content:center;margin-top:12px}
 .tp-plan-gate-restore button{min-height:34px;display:inline-flex;align-items:center;gap:6px;padding:0 12px;border:1px solid #d7dde1;border-radius:10px;background:#fff;color:#30363c;font-size:8.5px;font-weight:850;cursor:pointer}
 .tp-plan-gate-restore button[disabled]{opacity:.55;cursor:wait}
@@ -160,6 +164,8 @@ export default function PlanUpgradeModal() {
   const [messagePlan, setMessagePlan] = useState<PaidPlan | null>(null);
   const [storePrices, setStorePrices] = useState<StorePlanPrice[]>([]);
   const [storePricesLoading, setStorePricesLoading] = useState(false);
+  const [storeError, setStoreError] = useState('');
+  const [storeRetryCount, setStoreRetryCount] = useState(0);
   const [purchaseLoading, setPurchaseLoading] = useState<PaidPlan | null>(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
 
@@ -204,8 +210,19 @@ export default function PlanUpgradeModal() {
   }, [entitlement.effectivePlan]);
 
   useEffect(() => {
-    if (!request || !nativeStorePurchasesConfigured()) {
+    if (!request) {
       setStorePrices([]);
+      setStoreError('');
+      setStorePricesLoading(false);
+      return;
+    }
+    if (!nativeStorePurchasesConfigured()) {
+      setStorePrices([]);
+      setStoreError(
+        nativeStorePurchasesSupported()
+          ? 'TP-IAP-01: RevenueCat iOS SDK anahtarı eksik veya geçersiz.'
+          : '',
+      );
       setStorePricesLoading(false);
       return;
     }
@@ -213,14 +230,23 @@ export default function PlanUpgradeModal() {
     let alive = true;
     setStorePricesLoading(true);
     setStorePrices([]);
+    setStoreError('');
 
     void getNativeStorePrices()
       .then((prices) => {
-        if (alive) setStorePrices(prices);
+        if (!alive) return;
+        setStorePrices(prices);
+        setStoreError('');
       })
       .catch((error) => {
-        console.info('[RevenueCat] Mağaza fiyatları henüz alınamadı:', error);
-        if (alive) setStorePrices([]);
+        console.warn('[RevenueCat] Mağaza ürünleri yüklenemedi:', error);
+        if (!alive) return;
+        setStorePrices([]);
+        setStoreError(
+          error instanceof Error
+            ? error.message
+            : 'TP-IAP-04: Mağaza ürünü sorgusunda bilinmeyen hata oluştu.',
+        );
       })
       .finally(() => {
         if (alive) setStorePricesLoading(false);
@@ -229,7 +255,7 @@ export default function PlanUpgradeModal() {
     return () => {
       alive = false;
     };
-  }, [request]);
+  }, [request, storeRetryCount]);
 
   const targetPlan = request?.requiredPlan ?? 'premium';
   const targetLabel = PLAN_LABELS[targetPlan];
@@ -452,6 +478,23 @@ export default function PlanUpgradeModal() {
               <button type="button" className={yearly ? 'active' : ''} onClick={() => setYearly(true)}>Yıllık · %20 avantaj</button>
             </div>
           </div>
+
+          {nativeStorePurchasesSupported() && (storeError || storePricesLoading) ? (
+            <div className="tp-plan-store-diagnostic" role="status" aria-live="polite">
+              <p>
+                {storePricesLoading
+                  ? 'Apple mağaza ürünleri sorgulanıyor…'
+                  : `Mağaza tanısı: ${storeError}`}
+              </p>
+              <button
+                type="button"
+                disabled={storePricesLoading}
+                onClick={() => setStoreRetryCount((value) => value + 1)}
+              >
+                Tekrar kontrol et
+              </button>
+            </div>
+          ) : null}
 
           <div className="tp-plan-gate-cards">
             {cards.map((plan) => {
