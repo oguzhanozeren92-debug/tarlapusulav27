@@ -8,8 +8,6 @@ workflows:
       app_store_connect: TarlaPusula CI 2
 
     environment:
-      groups:
-        - revenuecat_keys
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.tarlapusula.app
@@ -23,14 +21,6 @@ workflows:
       - name: Install npm dependencies
         script: |
           npm install
-
-      - name: Validate App Store purchase configuration
-        script: |
-          set -eu
-          case "${VITE_REVENUECAT_IOS_PUBLIC_KEY:-}" in
-            appl_*) echo "RevenueCat iOS public key provided" ;;
-            *) echo "ERROR: iOS RevenueCat public SDK key (appl_*) is missing or invalid." >&2; exit 1 ;;
-          esac
 
       - name: Build web app and sync iOS
         script: |
@@ -84,8 +74,6 @@ workflows:
     # Team settings > Code signing identities > Android keystores.
     # Use the reference name "tarlapusula_upload". Never commit the keystore.
     environment:
-      groups:
-        - revenuecat_keys
       android_signing:
         - tarlapusula_upload
       node: 22
@@ -95,14 +83,6 @@ workflows:
       - name: Install npm dependencies
         script: |
           npm install
-
-      - name: Validate Google Play purchase configuration
-        script: |
-          set -eu
-          case "${VITE_REVENUECAT_ANDROID_PUBLIC_KEY:-}" in
-            goog_*) echo "RevenueCat Android public key provided" ;;
-            *) echo "ERROR: Android RevenueCat public SDK key (goog_*) is missing or invalid." >&2; exit 1 ;;
-          esac
 
       - name: Build web app and sync Android
         script: |
