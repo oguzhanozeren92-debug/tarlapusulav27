@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, BookOpen, CalendarClock, CloudSun,
-  Droplets, FileText, Leaf, Map, Newspaper, ScanSearch,
-  ShieldCheck, Sprout, Tractor, TrendingUp, X,
+  Droplets, FileText, Map, Newspaper, ScanSearch,
+  ShieldCheck, Sprout, Tractor, TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
-import { openPlanUpgrade } from '../../../entitlements/planAccess';
-import { planAllows, type PaidPlan } from '../../../entitlements/planCatalog';
-import { useEntitlementStore } from '../../../entitlements/useEntitlementStore';
 import './HomeDiscoveryCarousel.css';
 
 export type HomeDiscoveryFeatureId =
@@ -21,7 +18,6 @@ type DiscoveryFeature = {
   action: string;
   image: string;
   icon: LucideIcon;
-  plan?: PaidPlan;
 };
 
 // Her konuya ait fotoğraf proje içinde tutulur ve mobil pakete dahildir.
@@ -50,37 +46,37 @@ const FEATURES: DiscoveryFeature[] = [
   {
     id: 'spray', title: 'İlaçlama Zamanını Takip Et',
     description: 'Saatlik rüzgâr, yağış ve hava koşullarından ilaçlama için uygun zaman aralığını incele.',
-    action: 'İlaçlama Saatlerine Bak', icon: CalendarClock, plan: 'plus',
+    action: 'İlaçlama Saatlerine Bak', icon: CalendarClock,
     image: photo('spray'),
   },
   {
     id: 'workability', title: 'Tarlaya Girilebilirliğine Bak',
     description: 'Yağış ve zemin koşullarına göre traktörle çalışmaya uygunluk değerlendirmesini gör.',
-    action: 'Girilebilirliği Gör', icon: Tractor, plan: 'plus',
+    action: 'Girilebilirliği Gör', icon: Tractor,
     image: photo('workability'),
   },
   {
     id: 'soil', title: 'Tahmini Toprak Profilini Gör',
     description: 'SoilGrids modelindeki tahmini toprak yapısını ve katman bilgilerini incele.',
-    action: 'Toprak Profilini Aç', icon: Sprout, plan: 'plus',
+    action: 'Toprak Profilini Aç', icon: Sprout,
     image: photo('soil'),
   },
   {
     id: 'frost', title: 'Don Riskini Önceden Gör',
     description: 'Sıcaklık tahminlerini ve olası don uyarılarını takip ederek önlem zamanını planla.',
-    action: 'Hava Risklerini Gör', icon: CloudSun, plan: 'plus',
+    action: 'Hava Risklerini Gör', icon: CloudSun,
     image: photo('frost'),
   },
   {
     id: 'health', title: 'Tarla Sağlığını Değerlendir',
     description: 'Tarlanın durumunu, dikkat isteyen noktaları ve mevcut sağlık özetlerini birlikte gör.',
-    action: 'Tarla Durumunu Aç', icon: ShieldCheck, plan: 'plus',
+    action: 'Tarla Durumunu Aç', icon: ShieldCheck,
     image: photo('health'),
   },
   {
     id: 'pdf', title: 'PusulaPDF Raporlarını Aç',
     description: 'Hazırlanan tarla raporlarını bildirimlerinden aç, kaydet ve paylaş.',
-    action: 'Raporlarıma Git', icon: FileText, plan: 'premium',
+    action: 'Raporlarıma Git', icon: FileText,
     image: photo('pdf'),
   },
   {
@@ -106,40 +102,23 @@ const FEATURES: DiscoveryFeature[] = [
 type Props = { onOpenFeature: (featureId: HomeDiscoveryFeatureId) => void };
 
 export default function HomeDiscoveryCarousel({ onOpenFeature }: Props) {
-  const { effectivePlan } = useEntitlementStore();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [preview, setPreview] = useState<DiscoveryFeature | null>(null);
   const touchStartX = useRef<number | null>(null);
   const count = FEATURES.length;
   const active = FEATURES[index];
 
   useEffect(() => {
-    if (paused || preview || typeof window === 'undefined') return;
+    if (paused || typeof window === 'undefined') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') setIndex((current) => (current + 1) % count);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [paused, preview, count]);
-
-  useEffect(() => {
-    if (!preview) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPreview(null);
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [preview]);
+  }, [paused, count]);
 
   const go = (next: number) => setIndex((next + count) % count);
-  const open = (feature: DiscoveryFeature) => {
-    if (feature.plan && !planAllows(effectivePlan, feature.plan)) {
-      setPreview(feature);
-      return;
-    }
-    onOpenFeature(feature.id);
-  };
+  const open = (feature: DiscoveryFeature) => onOpenFeature(feature.id);
 
   return (
     <section className="tp-discovery" aria-label="TarlaPusula özelliklerini keşfet">
@@ -182,7 +161,6 @@ export default function HomeDiscoveryCarousel({ onOpenFeature }: Props) {
         <div className="tp-discovery__track" style={{ transform: `translateX(-${index * 100}%)` }}>
           {FEATURES.map((item, position) => {
             const Icon = item.icon;
-            const accessible = !item.plan || planAllows(effectivePlan, item.plan);
             return (
               <article
                 key={item.id}
@@ -199,13 +177,10 @@ export default function HomeDiscoveryCarousel({ onOpenFeature }: Props) {
                   <h3>{item.title}</h3>
                   <p>{item.description}</p>
                   <button type="button" className="tp-discovery__cta" onClick={() => open(item)}>
-                    <span>{accessible ? item.action : 'Özelliği Keşfet'}</span>
+                    <span>{item.action}</span>
                     <ArrowRight size={18} aria-hidden="true" />
                   </button>
                 </div>
-                {item.plan && (
-                  <span className="tp-discovery__premium"><Leaf size={13} aria-hidden="true" /> Premium</span>
-                )}
               </article>
             );
           })}
@@ -229,29 +204,7 @@ export default function HomeDiscoveryCarousel({ onOpenFeature }: Props) {
         </button>
       </div>
 
-      {preview && (
-        <div className="tp-discovery__modal-backdrop" onClick={() => setPreview(null)}>
-          <div className="tp-discovery__modal" role="dialog" aria-modal="true" aria-label={preview.title}
-            onClick={(event) => event.stopPropagation()}>
-            <button className="tp-discovery__modal-close" aria-label="Kapat" type="button" onClick={() => setPreview(null)}>
-              <X size={19} />
-            </button>
-            <div className="tp-discovery__modal-label">Premium özellik</div>
-            <h3>{preview.title}</h3>
-            <p>{preview.description}</p>
-            <p className="tp-discovery__modal-note">
-              {preview.plan === 'premium'
-                ? 'Bu özellik Premium planına özeldir.'
-                : 'Bu gelişmiş özellik ücretli planlarda kullanılabilir.'}
-            </p>
-            <button type="button" className="tp-discovery__modal-upgrade" onClick={() => {
-              const target = preview;
-              setPreview(null);
-              openPlanUpgrade({ requiredPlan: target.plan ?? 'premium', feature: target.title });
-            }}>Planları İncele <ArrowRight size={17} /></button>
-          </div>
-        </div>
-      )}
+
     </section>
   );
 }
