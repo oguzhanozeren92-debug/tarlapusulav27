@@ -1,10 +1,9 @@
 # TarlaPusula · Mobil reklam kurulumu
 
-TarlaPusula reklam modeli yalnız **Ücretsiz** planda çalışır.
+TarlaPusula ücretsizdir: tüm özellikler ücretsiz kullanılabilir. Tek gelir modeli isteğe bağlı ödüllü reklamlar ve seyrek tam ekran reklamlardır.
 
-- Free: seyrek interstitial + kullanıcının isteğiyle rewarded reklam
-- Plus: reklamsız
-- Premium: reklamsız
+- Tüm kullanıcılara aynı özellikler açıktır; Plus/Premium veya satın alma yoktur.
+- Seyrek interstitial + kullanıcının isteğiyle rewarded reklam
 - Banner reklam: kullanılmaz
 - App-open reklam: kullanılmaz
 
