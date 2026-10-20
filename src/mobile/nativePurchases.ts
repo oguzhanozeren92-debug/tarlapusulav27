@@ -7,6 +7,7 @@ import {
   type CustomerInfo,
   type PurchasesOffering,
   type PurchasesPackage,
+  type PurchasesStoreProduct,
 } from '@revenuecat/purchases-capacitor';
 import { supabase } from '../supabaseClient';
 import type { TarlaPusulaPlan } from '../entitlements/useEntitlementStore';
@@ -36,11 +37,7 @@ const ENTITLEMENT_IDS: Record<StorePaidPlan, string> = {
   premium: 'tarlapusula_premium',
 };
 
-function findPlanPackage(
-  offering: PurchasesOffering | null | undefined,
-  plan: StorePaidPlan,
-  period: StoreBillingPeriod,
-): PurchasesPackage | null {
+function productIdentifierFor(plan: StorePaidPlan, period: StoreBillingPeriod) {
   const envProductId = plan === 'plus'
     ? period === 'monthly'
       ? import.meta.env.VITE_REVENUECAT_PLUS_MONTHLY_PRODUCT_ID
@@ -48,12 +45,19 @@ function findPlanPackage(
     : period === 'monthly'
       ? import.meta.env.VITE_REVENUECAT_PREMIUM_MONTHLY_PRODUCT_ID
       : import.meta.env.VITE_REVENUECAT_PREMIUM_ANNUAL_PRODUCT_ID;
-  const productId = String(
+
+  return String(
     envProductId || `com.tarlapusula.${plan}.${period === 'monthly' ? 'monthly' : 'annual'}`,
   ).trim();
+}
 
-  // Never buy a different plan just because two products share a monthly
-  // package label. The real App Store product identifier is authoritative.
+function findPlanPackage(
+  offering: PurchasesOffering | null | undefined,
+  plan: StorePaidPlan,
+  period: StoreBillingPeriod,
+): PurchasesPackage | null {
+  const productId = productIdentifierFor(plan, period);
+  // Only the exact App Store SKU may be used for a plan, never a package label.
   return offering?.availablePackages?.find(
     (item) => item.product.identifier === productId,
   ) ?? null;
@@ -188,6 +192,27 @@ export async function ensureNativePurchasesConfigured() {
   }
 }
 
+function offerCandidates(offerings: Awaited<ReturnType<typeof Purchases.getOfferings>>) {
+  return [
+    offerings.all?.[OFFERING_ID],
+    offerings.current,
+    ...Object.values(offerings.all ?? {}),
+  ].filter((offering): offering is PurchasesOffering => Boolean(offering));
+}
+
+function shortStoreErrorCode(error: unknown) {
+  if (!error || typeof error !== 'object') return 'none';
+  const code = (error as { code?: string | number }).code;
+  if (code === undefined || code === null) return 'unknown';
+  return String(code).slice(0, 30);
+}
+
+async function directAppStoreProducts(ids: string[]): Promise<PurchasesStoreProduct[]> {
+  if (Capacitor.getPlatform() !== 'ios') return [];
+  const response = await Purchases.getProducts({ productIdentifiers: ids });
+  return response.products ?? [];
+}
+
 async function offeringForPlan(plan: StorePaidPlan, period: StoreBillingPeriod) {
   await ensureNativePurchasesConfigured();
 
@@ -245,20 +270,26 @@ export async function getNativeStorePrices(): Promise<StorePlanPrice[]> {
   if (!nativeStorePurchasesConfigured()) return [];
 
   await ensureNativePurchasesConfigured();
-  const offerings = await Purchases.getOfferings();
-  const candidates = [
-    offerings.all?.[OFFERING_ID],
-    offerings.current,
-    ...Object.values(offerings.all ?? {}),
-  ].filter((offering): offering is PurchasesOffering => Boolean(offering));
 
-  return (['plus', 'premium'] as const).map((plan) => {
+  let offerings: Awaited<ReturnType<typeof Purchases.getOfferings>> | null = null;
+  let offeringsError: unknown = null;
+  try {
+    offerings = await Purchases.getOfferings();
+  } catch (error) {
+    offeringsError = error;
+    console.warn('[RevenueCat] Offering sorgusu başarısız:', error);
+  }
+
+  const candidates = offerings ? offerCandidates(offerings) : [];
+  const plans = ['plus', 'premium'] as const;
+  const prices: StorePlanPrice[] = plans.map((plan) => {
     const monthly = candidates
       .map((offering) => findPlanPackage(offering, plan, 'monthly'))
       .find(Boolean) ?? null;
     const annual = candidates
       .map((offering) => findPlanPackage(offering, plan, 'annual'))
       .find(Boolean) ?? null;
+
     return {
       plan,
       monthly: priceString(monthly),
@@ -266,6 +297,57 @@ export async function getNativeStorePrices(): Promise<StorePlanPrice[]> {
       annualMonthlyEquivalent: monthlyEquivalent(annual),
     };
   });
+
+  const missingProductIds = plans.flatMap((plan) => {
+    const row = prices.find((price) => price.plan === plan);
+    return (['monthly', 'annual'] as const)
+      .filter((period) => !row?.[period])
+      .map((period) => productIdentifierFor(plan, period));
+  });
+
+  let directProducts: PurchasesStoreProduct[] = [];
+  let directError: unknown = null;
+  if (missingProductIds.length && Capacitor.getPlatform() === 'ios') {
+    try {
+      // Query Apple's StoreKit independently to distinguish empty offerings
+      // from products that are genuinely unavailable in the App Store sandbox.
+      directProducts = await directAppStoreProducts(missingProductIds);
+      for (const plan of plans) {
+        const row = prices.find((price) => price.plan === plan);
+        if (!row) continue;
+        const monthly = directProducts.find((product) =>
+          product.identifier === productIdentifierFor(plan, 'monthly'));
+        const annual = directProducts.find((product) =>
+          product.identifier === productIdentifierFor(plan, 'annual'));
+        if (!row.monthly) row.monthly = monthly?.priceString || null;
+        if (!row.annual) row.annual = annual?.priceString || null;
+        if (!row.annualMonthlyEquivalent) {
+          row.annualMonthlyEquivalent = annual?.pricePerMonthString || null;
+        }
+      }
+    } catch (error) {
+      directError = error;
+      console.warn('[RevenueCat] Apple StoreKit doğrudan ürün sorgusu başarısız:', error);
+    }
+  }
+
+  const foundCount = prices.reduce(
+    (count, price) => count + Number(Boolean(price.monthly)) + Number(Boolean(price.annual)),
+    0,
+  );
+  if (foundCount === 0) {
+    const packageCount = candidates.reduce(
+      (count, item) => count + (item.availablePackages?.length ?? 0),
+      0,
+    );
+    throw new Error(
+      `TP-IAP-02: RevenueCat paket: ${packageCount}, Apple StoreKit ürün: ${directProducts.length}/4. ` +
+      `RC hata kodu: ${shortStoreErrorCode(offeringsError)}; StoreKit hata kodu: ${shortStoreErrorCode(directError)}. ` +
+      'Apple sandbox ürün erişimi veya RevenueCat yapılandırması kontrol edilmeli.',
+    );
+  }
+
+  return prices;
 }
 
 async function syncSubscriptionToBackend(): Promise<TarlaPusulaPlan | null> {
@@ -320,12 +402,28 @@ export async function purchaseStorePlan(
   period: StoreBillingPeriod,
 ): Promise<StorePurchaseResult> {
   try {
-    const offering = await offeringForPlan(plan, period);
-    const aPackage = packageForPeriod(offering, plan, period);
+    let offering: PurchasesOffering | null = null;
+    let aPackage: PurchasesPackage | null = null;
+    let directProduct: PurchasesStoreProduct | null = null;
 
-    await Purchases.trackCustomPaywallImpression({
-      offering,
-    }).catch(() => undefined);
+    try {
+      offering = await offeringForPlan(plan, period);
+      aPackage = packageForPeriod(offering, plan, period);
+    } catch (offerError) {
+      // A direct StoreKit product is still a RevenueCat-tracked subscription.
+      // On iOS allow the exact SKU to be bought even when an offering is empty.
+      if (Capacitor.getPlatform() !== 'ios') throw offerError;
+      const expected = productIdentifierFor(plan, period);
+      const products = await directAppStoreProducts([expected]);
+      directProduct = products.find((product) => product.identifier === expected) ?? null;
+      if (!directProduct) {
+        throw new Error(`TP-IAP-03: Apple StoreKit ${expected} ürününü döndürmedi.`);
+      }
+    }
+
+    if (offering) {
+      await Purchases.trackCustomPaywallImpression({ offering }).catch(() => undefined);
+    }
 
     const currentResult = await Purchases.getCustomerInfo();
     const currentPlan = activePlanFromCustomerInfo(
@@ -336,23 +434,30 @@ export async function purchaseStorePlan(
       currentPlan,
     );
 
-    const purchaseOptions: Parameters<typeof Purchases.purchasePackage>[0] = {
-      aPackage,
-    };
-
-    if (
-      Capacitor.getPlatform() === 'android' &&
-      oldProductIdentifier &&
-      currentPlan !== 'free' &&
-      currentPlan !== plan
-    ) {
-      purchaseOptions.storeProductChangeInfo = {
-        oldProductIdentifier,
-        replacementMode: STORE_REPLACEMENT_MODE.WITH_TIME_PRORATION,
+    let result: Awaited<ReturnType<typeof Purchases.purchasePackage>>;
+    if (aPackage) {
+      const purchaseOptions: Parameters<typeof Purchases.purchasePackage>[0] = {
+        aPackage,
       };
-    }
 
-    const result = await Purchases.purchasePackage(purchaseOptions);
+      if (
+        Capacitor.getPlatform() === 'android' &&
+        oldProductIdentifier &&
+        currentPlan !== 'free' &&
+        currentPlan !== plan
+      ) {
+        purchaseOptions.storeProductChangeInfo = {
+          oldProductIdentifier,
+          replacementMode: STORE_REPLACEMENT_MODE.WITH_TIME_PRORATION,
+        };
+      }
+
+      result = await Purchases.purchasePackage(purchaseOptions);
+    } else if (directProduct) {
+      result = await Purchases.purchaseStoreProduct({ product: directProduct });
+    } else {
+      throw new Error('TP-IAP-03: Satın alınabilir mağaza ürünü bulunamadı.');
+    }
 
     const activePlan = activePlanFromCustomerInfo(
       result.customerInfo,
@@ -367,7 +472,8 @@ export async function purchaseStorePlan(
       backendVerified: activePlan !== 'free' && confirmedPlan === activePlan,
       productIdentifier:
         result.productIdentifier ??
-        aPackage.product.identifier ??
+        aPackage?.product.identifier ??
+        directProduct?.identifier ??
         null,
     };
   } catch (error) {
