@@ -34,11 +34,11 @@ let state: EntitlementSnapshot = {
   userEmail: '',
   realPlan: 'free',
   developerMode: 'real',
-  effectivePlan: 'free',
+  effectivePlan: 'premium',
   canOverride: false,
-  isPlus: false,
-  isPremium: false,
-  isPaid: false,
+  isPlus: true,
+  isPremium: true,
+  isPaid: true,
   isNewUserPreview: false,
   switching: false,
   backendSynced: false,
@@ -103,10 +103,22 @@ function emit() {
   listeners.forEach((listener) => listener());
 }
 
+// Product policy: TarlaPusula is entirely free, with optional advertising.
+ // "premium" is retained only as an internal compatibility access tier so
+ // legacy features can run; it is never a purchased subscription.
+export const TARLAPUSULA_ALL_FEATURES_FREE = true;
+
 function patch(next: Partial<EntitlementSnapshot>) {
   state = {
     ...state,
     ...next,
+    effectivePlan: 'premium',
+    isPlus: true,
+    isPremium: true,
+    isPaid: true, // legacy feature checks; no payment is required.
+    canOverride: false,
+    developerMode: 'real',
+    isNewUserPreview: false,
   };
 
   emit();
