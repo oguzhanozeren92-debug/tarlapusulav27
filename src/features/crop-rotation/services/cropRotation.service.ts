@@ -162,7 +162,7 @@ function buildDiseasePressure(
   history: CropRotationHistoryItem[],
   fallbackCrop: string | null,
 ): CropRotationDiseasePressure[] {
-  const fromActivities = activityRows.flatMap((row) => {
+  const fromActivities: CropRotationDiseasePressure[] = activityRows.flatMap((row): CropRotationDiseasePressure[] => {
     const analysis = row.ai_analysis && typeof row.ai_analysis === 'object' ? row.ai_analysis : null;
     if (!analysis) return [];
     const issueType = normalize(analysis.issueType);
