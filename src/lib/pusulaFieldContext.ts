@@ -13,13 +13,34 @@ import {
   type DssatShadowReadiness,
 } from '../features/irrigation/services/dssatShadowReadiness.service';
 import {
-  fetchWorldCerealReferenceEvidence,
-  type WorldCerealReferenceEvidence,
-} from '../services/worldCerealEvidence.service';
-import {
-  fetchNasaHarvestCropStageEvidence,
-  type NasaHarvestCropStageEvidence,
-} from '../services/nasaHarvestCropStage.service';
+  fetchWorldCerealReferenceContext,
+  type WorldCerealReferenceContext,
+} from '../services/worldCerealReference.service';
+import { getFieldPhenologySnapshot } from '../features/phenology/services/fieldPhenologySnapshot.service';
+
+type NasaHarvestCropStageEvidence = {
+  status: 'ready' | 'partial' | 'unavailable';
+  applicable: boolean;
+  stage: string | null;
+  stageDescriptionTr: string | null;
+  confidence: 'low' | 'medium' | 'high';
+  lastDate: string | null;
+  warnings: string[];
+};
+
+async function fetchNasaHarvestCropStageEvidence(fieldId: string): Promise<NasaHarvestCropStageEvidence> {
+  const snapshot = await getFieldPhenologySnapshot({ id: fieldId });
+  const nasa = snapshot.nasaHarvest;
+  return {
+    status: nasa.status === 'ready' ? 'ready' : nasa.status === 'error' ? 'unavailable' : 'partial',
+    applicable: snapshot.context.cropCycle === 'annual',
+    stage: nasa.stageCode,
+    stageDescriptionTr: nasa.stageLabel,
+    confidence: nasa.confidence === 'high' || nasa.confidence === 'medium' ? nasa.confidence : 'low',
+    lastDate: nasa.latestDate,
+    warnings: [...snapshot.warnings, ...(nasa.message ? [nasa.message] : [])],
+  };
+}
 import {
   fetchHybrisFieldEventsEvidence,
   type HybrisFieldEventsEvidence,
@@ -196,11 +217,11 @@ export type PusulaFieldContext = {
     evidence: PusulaEvidence;
   } | null;
 
-  cropReference: (WorldCerealReferenceEvidence & {
+  cropReference: (Omit<WorldCerealReferenceContext, 'evidence'> & {
     evidence: PusulaEvidence;
   }) | null;
 
-  cropSuitability: (CropSuitabilityResponse & {
+  cropSuitability: (Omit<CropSuitabilityResponse, 'evidence'> & {
     evidence: PusulaEvidence;
   }) | null;
 
@@ -420,7 +441,7 @@ async function loadExtendedContext(
     }),
     fetchFaoAsisPointContext(latitude, longitude),
     fetchHydroBasinContext(latitude, longitude),
-    fetchWorldCerealReferenceEvidence(fieldId),
+    fetchWorldCerealReferenceContext(latitude, longitude),
     fetchFieldCropSuitability(fieldId),
     fetchNasaHarvestCropStageEvidence(fieldId),
     fetchHybrisFieldEventsEvidence(fieldId),
@@ -663,13 +684,13 @@ async function loadExtendedContext(
           evidence: {
             source: 'ESA WorldCereal 10 m 2021 v100',
             priority: 'model_context',
-            state: worldCerealResult.value.aez.matched ? 'partial' : 'partial',
-            observedAt: null,
+            state: worldCerealResult.value.status === 'ready' ? 'ready' : worldCerealResult.value.status === 'partial' ? 'partial' : 'unavailable',
+            observedAt: worldCerealResult.value.latestValidityDate,
             confidence: 'low',
             notes: [
               '2021 tarihli tarihsel ürün/AEZ referansıdır; güncel ürün kimliği veya güncel sulama kanıtı değildir.',
               'Bu aşamada WorldCereal 10 m rasterı parsel üzerinde örneklenmez; yalnız AEZ ve ürün uygunluğu bağlamı kullanılır.',
-              worldCerealResult.value.crop.note,
+              worldCerealResult.value.productCatalog.note,
               ...worldCerealResult.value.warnings.slice(0, 2),
             ],
           },
