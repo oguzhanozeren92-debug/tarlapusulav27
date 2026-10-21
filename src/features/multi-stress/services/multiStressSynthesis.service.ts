@@ -258,7 +258,7 @@ export function buildMultiStressSynthesis(
     ? 'Alt karar motorlarını izlemeye devam et.'
     : status === 'conflicted' || !dominantFamily
       ? 'Önce saha kontrolüyle belirtileri ve toprak/su koşulunu doğrula; birbirine zıt sinyaller çözülmeden tek bir müdahale seçme.'
-      : `Önce ${dominantLabel.toLocaleLowerCase('tr-TR')} için ilgili üretim kararını uygula veya doğrula; eşlik eden stresleri aynı saha kontrolünde ayrı ayrı kontrol et.`;
+      : `Önce ${(dominantLabel ?? 'baskın stres').toLocaleLowerCase('tr-TR')} için ilgili üretim kararını uygula veya doğrula; eşlik eden stresleri aynı saha kontrolünde ayrı ayrı kontrol et.`;
 
   const synthesisEvidence = unique([
     ...signals.flatMap((signal) => [
