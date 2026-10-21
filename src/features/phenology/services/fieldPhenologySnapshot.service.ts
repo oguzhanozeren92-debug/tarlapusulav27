@@ -472,9 +472,7 @@ export function clearFieldPhenologySnapshotCache(
               ),
           )
         ) {
-          keys.push(
-            key,
-          );
+          if (key) keys.push(key);
         }
       }
 
