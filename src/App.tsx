@@ -356,6 +356,7 @@ export default function App() {
     pushLoading,
     pushMessage,
     openCalendarScreen,
+    loadCalendarReminders,
     openReminderModal,
     handleAddReminder,
     handleToggleReminder,
@@ -1564,7 +1565,6 @@ export default function App() {
         setSideMenuOpen={setSideMenuOpen}
         setWeatherHubFieldId={setWeatherHubFieldId}
         loadFieldWeather={loadFieldWeather}
-        weatherDayLabel={weatherDayLabel}
         weatherIcon={weatherIcon}
         openEra5Map={() => { setUnifiedMapSection('climate'); setUnifiedMapOpen(true); }}
       />
