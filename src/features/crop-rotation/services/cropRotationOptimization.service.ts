@@ -1,5 +1,4 @@
 import {
-  CROP_ROTATION_PROFILES,
   cropRotationProfileByKey,
   findCropRotationProfile,
 } from '../data/cropRotationProfiles';
