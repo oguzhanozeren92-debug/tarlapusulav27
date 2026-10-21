@@ -308,7 +308,7 @@ async function loadHeatContext(latitude: number | null, longitude: number | null
     return {
       maxTemperatureC: round(Math.max(...values), 1),
       // 35 °C burada ürün-hasar eşiği değildir; yalnız yüksek ısı yükü bağlamıdır.
-      hotDayCount: values.filter((value) => value >= 35).length,
+      hotDayCount: values.filter((value: number) => value >= 35).length,
     };
   } catch {
     return { maxTemperatureC: null, hotDayCount: null };
