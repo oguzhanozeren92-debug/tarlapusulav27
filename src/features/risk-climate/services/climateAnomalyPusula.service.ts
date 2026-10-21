@@ -158,9 +158,7 @@ export function buildClimateAnomalyPusulaNarrative(
         ? 'Son iki karşılaştırmada sıcak sapma artıyor.'
         : memory.trend === 'cooling'
           ? 'Son iki karşılaştırmada serinleme yönü var.'
-          : memory.trend === 'wetting'
-            ? 'Son iki karşılaştırmada daha ıslak yöne gidiş var.'
-            : memory.trend === 'mixed'
+              : memory.trend === 'mixed'
               ? 'Son iki karşılaştırmada karma bir iklim yönü var.'
               : 'Henüz kalıcı bir sezon yönü oluşmadı.';
 
