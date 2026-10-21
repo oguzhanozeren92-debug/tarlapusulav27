@@ -10,9 +10,7 @@ class ApplicationMapboxMap extends mapboxgl.Map {
       ...options,
       accessToken: mapboxAccessToken,
       // Keep provider credit available in embedded maps as well as fullscreen.
-      attributionControl: options.attributionControl === false
-        ? { compact: true }
-        : options.attributionControl,
+      attributionControl: true,
     });
   }
 }

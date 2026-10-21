@@ -1,4 +1,12 @@
-import type { OfficialVerification } from '../../../types';
+import type { AiFieldAnalysis } from '../../../types';
+
+type OfficialVerification = NonNullable<AiFieldAnalysis['officialVerification']> & {
+  blockedRecommendationCount?: number | null;
+  matchedRecordCount?: number | null;
+  sourceObservedAt?: string | null;
+  sourceAvailability?: 'reachable' | 'unreachable' | string | null;
+  verificationBasis?: string | null;
+};
 
 const CSS = String.raw`
 .tp-official-verification{

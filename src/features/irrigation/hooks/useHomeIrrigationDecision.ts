@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { IrrigationDecisionResult } from '../types/irrigationDecision';
 import { buildIrrigationWhatIf } from '../services/irrigationWhatIf.service';
 
+export type HomeDualKcEvidenceStatus = 'idle' | 'loading' | 'ready' | 'waiting' | 'not_applicable' | 'error';
+
 type HomeIrrigationDecisionState = {
   fieldKey: string;
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -105,7 +107,7 @@ export function useHomeIrrigationDecision(field: any | null | undefined) {
       if (changedFieldId !== fieldKey) return;
       if (
         changedFields.length > 0 &&
-        !changedFields.some((name) =>
+        !changedFields.some((name: string) =>
           [
             'irrigation_status',
             'canopy_development_class',

@@ -34,6 +34,7 @@ const SOURCE_MODELS: Record<HomeDecisionSource, string> = {
   'water-scarcity': 'water-scarcity-plan-engine',
   'microclimate-sensor': 'microclimate-sensor-engine',
   'multi-stress': 'multi-stress-synthesis',
+  'disaster-recovery': 'disaster-recovery-engine',
 };
 
 function text(value: unknown) {

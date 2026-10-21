@@ -242,6 +242,10 @@ const SOURCE_META: Record<
     label: 'Birleşik Çoklu Stres',
     basis: 'Su, ısı, don, besin, hastalık-zararlı ve yabancı ot kararları kaynak otoriteleri korunarak birlikte yorumlanıyor; uydu anomalisi tek başına yeni stres nedeni sayılmıyor.',
   },
+  'disaster-recovery': {
+    label: 'Afet sonrası tarla değerlendirmesi',
+    basis: 'Tarihli uydu ve hava verisi saha gözleminden ayrı değerlendirilir; resmî hasar tespiti yerine geçmez.',
+  },
 };
 
 const CONFIDENCE_META: Record<

@@ -6,7 +6,8 @@ export type ModelEngine =
   | 'pyfao56'
   | 'pcse'
   | 'aquacrop'
-  | 'cropforge';
+  | 'cropforge'
+  | 'dssat';
 
 export type ModelReadinessRefreshResult = {
   ok: boolean;

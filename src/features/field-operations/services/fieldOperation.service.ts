@@ -111,8 +111,8 @@ async function syncSeasonHarvestDateBestEffort(
 }
 
 function syncIrrigationAmountTaskBestEffort(fieldId: string) {
-  void supabase
-    .rpc('tp_sync_irrigation_amount_task', { p_field_id: fieldId })
+  void Promise.resolve(supabase
+    .rpc('tp_sync_irrigation_amount_task', { p_field_id: fieldId }))
     .then(({ error }) => {
       if (error) {
         console.warn('[field-operation] Sulama miktarı görevi senkronize edilemedi:', error.message);

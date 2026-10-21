@@ -584,8 +584,8 @@ export function syncIrrigationEvidenceTasksBestEffort(fieldIdInput: string) {
   const fieldId = text(fieldIdInput);
   if (!fieldId || !supabase) return;
 
-  void supabase
-    .rpc('tp_sync_irrigation_evidence_tasks', { p_field_id: fieldId })
+  void Promise.resolve(supabase
+    .rpc('tp_sync_irrigation_evidence_tasks', { p_field_id: fieldId }))
     .then(({ error }) => {
       if (error) {
         console.warn(
@@ -656,7 +656,7 @@ function isLegacyNdviRelativeAutoTask(row: any) {
     importantArea.summary,
     JSON.stringify(importantArea.evidence ?? []),
   ]
-    .map((value) => text(value, 2000).toLocaleLowerCase('tr-TR'))
+    .map((value) => text(value).slice(0, 2000).toLocaleLowerCase('tr-TR'))
     .join(' ');
 
   const explicitNdviTask =
