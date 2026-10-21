@@ -224,7 +224,7 @@ function buildWindows(hours: PollinationEvaluatedHour[]): PollinationWindow[] {
     windows.push({
       from: hour.time,
       to: hour.time + HOUR_MS,
-      status: hour.status,
+      status: hour.status === 'good' ? 'good' : 'watch',
       averageScore: hour.score,
       limitingFactor: hour.limitingFactor,
     });
