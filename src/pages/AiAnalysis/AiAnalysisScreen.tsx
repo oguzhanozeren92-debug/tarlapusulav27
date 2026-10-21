@@ -1167,12 +1167,9 @@ html body #root .tp-ai-page .tp-ai-pdf-calendar{
 
 export default function AiAnalysisScreen({
   cmsRuntimeCss,
-  cmsPageFor,
   cmsBlockFor,
   cmsText,
   cmsSub,
-  aiAccessStatus,
-  aiAccessLoading,
   realFields,
   fieldWeather,
   loadFieldWeather,
@@ -1202,18 +1199,11 @@ export default function AiAnalysisScreen({
   openAddField,
   openCalendarScreen,
 }: AiAnalysisScreenProps) {
-  const aiPage = cmsPageFor('aiAnalysis');
-  const aiHeaderBlock = cmsBlockFor('aiAnalysis', 'page-header');
-  const aiHeroBlock = cmsBlockFor('aiAnalysis', 'hero');
-  const aiAccessBlock = cmsBlockFor('aiAnalysis', 'access');
-  const aiFieldStepBlock = cmsBlockFor('aiAnalysis', 'field-step');
   const aiPhotoStepBlock = cmsBlockFor('aiAnalysis', 'photo-step');
   const aiPickerBlock = cmsBlockFor('aiAnalysis', 'photo-picker');
   const aiNoteBlock = cmsBlockFor('aiAnalysis', 'note');
   const aiAnalyzeBlock = cmsBlockFor('aiAnalysis', 'analyze-button');
 
-  // Analiz düğmesi görünür kalır; Free kullanıcı ödüllü reklamla, Premium reklamsız devam eder.
-  const canAnalyze = true;
 
   const {
     isPremium: entitlementIsPremium,
@@ -1285,11 +1275,6 @@ export default function AiAnalysisScreen({
     setPusulaPdfStatus((current) => current === 'error' ? 'idle' : current);
   }, [pusulaPdfPeriodPreset, pusulaPdfCustomStart, pusulaPdfCustomEnd]);
 
-  const pusulaPdfStages: PusulaPdfJob['stage'][] = [
-    'queued', 'collecting', 'satellite', 'weather', 'field_memory', 'interpreting', 'rendering',
-  ];
-  const currentJobStageIndex = pusulaPdfStages.indexOf(pusulaPdfJob?.stage ?? 'queued');
-  const completedStages = Math.max(0, currentJobStageIndex);
 
   const pusulaPdfMissingLabels: Record<string, string> = {
     parcel_geometry: 'Parsel geometrisi',
