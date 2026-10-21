@@ -413,8 +413,8 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
       if (newsResult.error) throw newsResult.error;
       if (articleResult.error) throw articleResult.error;
 
-      const nextNews = (newsResult.data ?? []) as LiveContentRow[];
-      const nextArticles = (articleResult.data ?? []) as LiveContentRow[];
+      const nextNews = (newsResult.data ?? []) as unknown as LiveContentRow[];
+      const nextArticles = (articleResult.data ?? []) as unknown as LiveContentRow[];
       setNews(nextNews);
       setArticles(nextArticles);
 
