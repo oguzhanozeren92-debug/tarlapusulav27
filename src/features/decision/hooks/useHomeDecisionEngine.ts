@@ -473,7 +473,7 @@ function buildObservationFollowUpEvent(
     },
     today: {
       tone:
-        ['improving', 'not_visible'].includes(decisionStatus) && !signal.dueForPhoto
+        ['improving', 'not_visible'].includes(decisionStatus ?? '') && !signal.dueForPhoto
           ? 'green'
           : 'neutral',
       visual: 'spraying',
