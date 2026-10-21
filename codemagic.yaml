@@ -89,6 +89,15 @@ workflows:
           npm run build
           npx cap sync android
 
+      - name: Validate Android Firebase configuration
+        script: |
+          set -eu
+          if [ ! -s android/app/google-services.json ]; then
+            echo 'ERROR: android/app/google-services.json is missing. Firebase Push Notifications would crash at runtime.' >&2
+            echo 'Configure the Firebase Android app (com.tarlapusula.app) and provide its google-services.json before release.' >&2
+            exit 1
+          fi
+
       - name: Build signed Google Play AAB
         script: |
           set -eu
