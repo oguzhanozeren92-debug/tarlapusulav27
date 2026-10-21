@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Bell,
   BellRing,
-  Check,
   ChevronRight,
   CircleDollarSign,
   CloudRain,
-  CreditCard,
   KeyRound,
   LogOut,
   MapPinned,
