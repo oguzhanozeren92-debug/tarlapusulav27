@@ -3,7 +3,6 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { addPoints } from '../../../gamification/useGamificationStore';
 import { showRewardedAdAndClaim } from '../../../monetization/adRuntime';
-import { getEntitlementSnapshot } from '../../../entitlements/useEntitlementStore';
 import { normalizeAiAccessStatus } from '../../../utils/aiAccessUtils';
 import {
   deletePrivateFile,
@@ -60,6 +59,10 @@ export function useFieldActivities({
   const [activityPhoto, setActivityPhoto] = useState<File | null>(null);
   const [activityPhotoPreview, setActivityPhotoPreview] = useState('');
   const [aiAnalysis, setAiAnalysis] = useState<AiFieldAnalysis | null>(null);
+  const [diagnosisSequenceNo, setDiagnosisSequenceNo] = useState(1);
+  const diagnosisNeedsMoreEvidence = Boolean(aiAnalysis?.needsMoreEvidence);
+  const diagnosisRequestedEvidence = String(aiAnalysis?.followUpPhoto ?? '').trim();
+  const previousDiagnosisContext = useRef('');
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiAnalysisError, setAiAnalysisError] = useState('');
   const [aiAccessStatus, setAiAccessStatus] = useState<AiAccessStatus | null>(null);
@@ -98,6 +101,8 @@ export function useFieldActivities({
     clearActivityPhoto();
     setActivityPhoto(file);
     setActivityPhotoPreview(URL.createObjectURL(file));
+    setDiagnosisSequenceNo(1);
+    previousDiagnosisContext.current = '';
     setAiAnalysis(null);
     setAiAnalysisError('');
     setActivityMessage('');
@@ -222,13 +227,13 @@ export function useFieldActivities({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAiAnalyzeActivityPhoto = async () => {
+  const handleAiAnalyzeActivityPhoto = async (newPhoto?: File) => {
     if (!selectedField) {
       setAiAnalysisError('Önce analiz yapılacak tarlayı seç.');
       return;
     }
 
-    let photoForAnalysis: File | null = activityPhoto;
+    let photoForAnalysis: File | null = newPhoto ?? activityPhoto;
 
     // HMR / ekran geçişi sonrası File state kaybolup önizleme kalabiliyor.
     // Önizleme hâlâ okunabiliyorsa dosyayı yeniden üret.
@@ -275,7 +280,6 @@ export function useFieldActivities({
       if (userError) throw userError;
       if (!user) throw new Error('Oturum bulunamadı.');
 
-      const entitlement = getEntitlementSnapshot();
 
       // Kullanıcı Free ise reklam ekrandayken yerel fotoğraf hazırlığını arkada bitir.
       // Böylece reklam kapanınca yalnız yükleme + AI çağrısı kalır.
@@ -324,7 +328,7 @@ export function useFieldActivities({
             p_field_id: String(selectedField.id),
             p_photo_hash: photoRewardHash,
             p_task_type: 'disease_pest_diagnosis',
-            p_notes: activityNotes.trim() || null,
+            p_notes: [activityNotes.trim(), previousDiagnosisContext.current].filter(Boolean).join('\n') || null,
             p_crop: selectedField.crop || null,
           },
         );
@@ -360,12 +364,9 @@ export function useFieldActivities({
       // Ücretsiz planda fotoğraf analizi reklam desteklidir.
       // Gerçek Free hesapta backend de reward credit ister.
       // TEST ÜCRETSİZ görünümünde de frontend reklam akışını gösterir.
-      const shouldShowRewardedAd =
-        entitlement.effectivePlan === 'free' &&
-        (
-          !accessRow?.allowed ||
-          String(accessRow?.access_source ?? '') !== 'rewarded_ad'
-        );
+      // Included analyses consume the free daily quota. Once exhausted, extra
+      // analyses require an optional verified ad credit from the server.
+      const shouldShowRewardedAd = !accessRow?.allowed;
 
       if (shouldShowRewardedAd) {
         const adResult = await showRewardedAdAndClaim('ai_extra_analysis');
@@ -429,7 +430,7 @@ export function useFieldActivities({
           storage_bucket: 'field-activity-photos',
           storage_path: uploadedPath,
           mime_type: 'image/jpeg',
-          notes: activityNotes.trim() || null,
+          notes: [activityNotes.trim(), previousDiagnosisContext.current].filter(Boolean).join('\n') || null,
           crop: selectedField.crop || null,
           field_name: selectedField.name || null,
           climate_context: climateContext,
@@ -1071,6 +1072,20 @@ export function useFieldActivities({
     }
   };
 
+  const handleDiagnosisFollowUpPhoto = async (file?: File) => {
+    if (!file || !file.type.startsWith('image/') || file.size > 12 * 1024 * 1024) {
+      setAiAnalysisError('Lütfen 12 MB altında geçerli bir takip fotoğrafı seç.');
+      return;
+    }
+    const earlier = aiAnalysis;
+    handleActivityPhotoChange(file);
+    setDiagnosisSequenceNo((sequence) => Math.max(1, sequence) + 1);
+    previousDiagnosisContext.current = earlier
+      ? `Önceki fotoğrafın teşhisi: ${earlier.headline}; olası durum: ${earlier.possibleIssue}; belirtiler: ${earlier.observations.join('; ')}. Yeni fotoğrafla karşılaştır, emin olmadığın noktaları belirt.`
+      : '';
+    await handleAiAnalyzeActivityPhoto(file);
+  };
+
   return {
     activities,
     activitiesLoading,
@@ -1102,6 +1117,9 @@ export function useFieldActivities({
     activityPhoto,
     activityPhotoPreview,
     aiAnalysis,
+    diagnosisSequenceNo,
+    diagnosisNeedsMoreEvidence,
+    diagnosisRequestedEvidence,
     aiAnalyzing,
     aiAnalysisError,
     aiAccessStatus,
@@ -1114,6 +1132,7 @@ export function useFieldActivities({
     loadAiAccessStatus,
     openAiAnalysisScreen,
     handleAiAnalyzeActivityPhoto,
+    handleDiagnosisFollowUpPhoto,
     resetActivityForm,
     loadFieldActivities,
     openActivityForm,
