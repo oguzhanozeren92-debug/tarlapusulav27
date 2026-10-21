@@ -15,7 +15,7 @@ type Props = {
 };
 
 const EMPTY: FieldScientificSignals = {
-  biophysics: { latest: null, historyCount: 0 },
+  biophysics: { latest: null, historyCount: 0, history: [] },
   rscm: null,
   dataConfidence: null,
 };

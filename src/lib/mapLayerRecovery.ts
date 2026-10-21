@@ -5,7 +5,7 @@ type MapLike = {
   getLayer: (id: string) => any;
   removeSource: (id: string) => void;
   removeLayer: (id: string) => void;
-  isStyleLoaded: () => boolean;
+  isStyleLoaded: () => boolean | void;
   once: (event: string, listener: (...args: any[]) => void) => any;
   on: (event: string, listener: (...args: any[]) => void) => any;
   off: (event: string, listener: (...args: any[]) => void) => any;
@@ -106,7 +106,7 @@ function waitForStyle(map: MapLike, timeoutMs = 5000) {
       resolve(value);
     };
     const onLoad = () => done(true);
-    const timer = window.setTimeout(() => done(map.isStyleLoaded()), timeoutMs);
+    const timer = window.setTimeout(() => done(Boolean(map.isStyleLoaded())), timeoutMs);
     try {
       map.once('load', onLoad);
     } catch {

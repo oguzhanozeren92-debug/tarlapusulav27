@@ -1,5 +1,4 @@
 import {
-  CSSProperties,
   useEffect,
   useMemo,
   useRef,
