@@ -1436,11 +1436,11 @@ export default function AiAnalysisScreen({
 
     if (!synthesisField?.id) return;
     let cancelled = false;
-    void supabase.from('weekly_field_reports').select('*')
+    void Promise.resolve(supabase.from('weekly_field_reports').select('*')
       .eq('id', String(pusulaPdfJob.report_id ?? ''))
       .eq('field_id', String(synthesisField.id))
       .eq('status','ready')
-      .single()
+      .single())
       .then(({ data: report, error }) => {
         if (cancelled) return;
         if (error || !report) throw error ?? new Error('Tamamlanan rapor bulunamadı.');
@@ -2382,7 +2382,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     <button
                       type="button"
                       className="tp-pusula-pdf"
-                      onClick={createSynthesisPdf}
+                      onClick={() => void createSynthesisPdf()}
                     >
                       PDF Raporu Oluştur
                     </button>
