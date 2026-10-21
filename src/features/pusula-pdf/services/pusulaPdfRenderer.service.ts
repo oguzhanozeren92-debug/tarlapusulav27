@@ -403,7 +403,7 @@ function progressBar(
   if (value !== null) rr(ctx, x, y, Math.max(8, w * clamp(value, 0, 100) / 100), 10, 5, accent, accent);
 }
 
-function fieldHealthScore(snapshot: PusulaPdfSnapshot) {
+export function fieldHealthScore(snapshot: PusulaPdfSnapshot) {
   // A risk score is not a field-health score. Only accept a separately
   // calculated, dated and named health metric from the actual reporting period.
   const health = layerPayload(latestPeriodLayer(snapshot, 'field-health-score'));
@@ -422,7 +422,7 @@ function latestPeriodLayer(snapshot: PusulaPdfSnapshot, name: string) {
 }
 
 // Never assign a present-day phenological stage to a previous season.
-function phenologyLabel(snapshot: PusulaPdfSnapshot) {
+export function phenologyLabel(snapshot: PusulaPdfSnapshot) {
   const pcse = layerPayload(latestPeriodLayer(snapshot, 'phenology-pcse-wofost'));
   const pcseStage = detailText(pcse, 'stageLabel', 'phenologyStage', 'stage');
   if (pcseStage) return {value:pcseStage, sub:'Dönem fenolojisi'};
@@ -432,7 +432,7 @@ function phenologyLabel(snapshot: PusulaPdfSnapshot) {
   return {value:'Kayıt yok', sub:'Dönem evresi eksik'};
 }
 
-function summaryRisk(snapshot: PusulaPdfSnapshot) {
+export function summaryRisk(snapshot: PusulaPdfSnapshot) {
   const layer = latestPeriodLayer(snapshot, 'plant-health-synthesis');
   const payload = layerPayload(layer);
   if (!payload) return {value:'Veri yok',sub:'Dönem riski eksik'};

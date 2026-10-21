@@ -153,7 +153,7 @@ type IconName =
   | 'globe';
 
 
-function WeatherArt({
+export function WeatherArt({
   kind,
   size = 48,
 }: {
@@ -526,7 +526,7 @@ function navIcon(screen?: string, label?: string): IconName {
   return 'field';
 }
 
-function weatherGlyph(condition?: string): IconName {
+export function weatherGlyph(condition?: string): IconName {
   const value = String(condition ?? '').toLocaleLowerCase('tr-TR');
 
   if (

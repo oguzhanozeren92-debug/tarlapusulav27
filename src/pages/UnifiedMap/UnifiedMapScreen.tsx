@@ -108,7 +108,7 @@ const SOIL_VISUAL_PALETTES: Record<
   silt: ['#65584d', '#b4a18a', '#ece2d2'],
 } as const;
 
-const SECTION_META: Record<UnifiedMapSection, { title: string; source: string; help: string }> = {
+export const SECTION_META: Record<UnifiedMapSection, { title: string; source: string; help: string }> = {
   vegetation: {
     title: 'Bitki Sağlığı',
     source: 'Sentinel-2 · NDVI',
@@ -496,7 +496,7 @@ function bboxImageCoordinates(
   ];
 }
 
-function colorForRatio(value: number) {
+export function colorForRatio(value: number) {
   const ratio = Math.max(0, Math.min(1, value));
   const hue = Math.round(28 + ratio * 105);
   return `hsl(${hue} 34% ${36 + ratio * 8}%)`;

@@ -627,7 +627,7 @@ function homePusulaDirectionFromPoint(
   return (found?.[0] as HomePusulaGridDirection | undefined) ?? null;
 }
 
-function homePusulaRelativeHealthForDirection(
+export function homePusulaRelativeHealthForDirection(
   spatial: any,
   direction: HomePusulaGridDirection | null,
 ) {
@@ -1243,7 +1243,7 @@ function homeInteriorPointFromFeature(
   );
 }
 
-function firstOuterRing(parcelGeometry: any): number[][] | null {
+export function firstOuterRing(parcelGeometry: any): number[][] | null {
   const geometry = parcelGeometry?.geometry ?? parcelGeometry;
   if (!geometry?.coordinates) return null;
 
@@ -1272,7 +1272,7 @@ function firstOuterRing(parcelGeometry: any): number[][] | null {
   return null;
 }
 
-function ringClipPath(ring: number[][] | null, bbox: HomeBBox | null) {
+export function ringClipPath(ring: number[][] | null, bbox: HomeBBox | null) {
   if (!ring || !bbox) return undefined;
   const [west, south, east, north] = bbox;
   const width = east - west;
@@ -1410,7 +1410,7 @@ function homeHotspotConvexHull(
   return [...lower, ...upper];
 }
 
-async function homeNdviHotspotFocus(
+export async function homeNdviHotspotFocus(
   imageUrl: string,
   bbox: HomeBBox,
 ): Promise<{
@@ -1792,7 +1792,7 @@ function gaussianKernel(radius: number, sigma: number) {
 }
 
 // VARYASYON A: güçlü/sisli geçiş — keskin Sentinel hücrelerini eritmek için.
-function gaussianBlurMasked(
+export function gaussianBlurMasked(
   scores: Float32Array,
   weights: Float32Array,
   width: number,
@@ -2157,7 +2157,7 @@ async function makeSmoothNdviOverlay(
   });
 }
 
-function InteractiveHomeHealthMap({
+export function InteractiveHomeHealthMap({
   data,
   parcelGeometry,
   height = 390,
@@ -3745,7 +3745,7 @@ function homeAgroRgb(ratio: number, layer: HomeAgroLayer) {
     : mix(palette[1], palette[2], (v - 0.5) / 0.5);
 }
 
-function homeAgroGradient(layer: HomeAgroLayer) {
+export function homeAgroGradient(layer: HomeAgroLayer) {
   const palette = HOME_AGRO_PALETTES[layer];
   const color = (rgb: readonly [number, number, number]) =>
     `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
