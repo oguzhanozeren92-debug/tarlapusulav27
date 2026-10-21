@@ -28,20 +28,7 @@ async function loadFieldForPhenology(fieldId: string) {
 
   const { data, error } = await supabase
     .from('fields')
-    .select([
-      'id',
-      'crop',
-      'crop_subtype',
-      'crop_cycle',
-      'season',
-      'planting_year',
-      'bearing',
-      'parcel_geometry',
-      'parcel_centroid_lat',
-      'parcel_centroid_lng',
-      'latitude',
-      'longitude',
-    ].join(','))
+    .select('id,crop,crop_subtype,crop_cycle,season,planting_year,bearing,parcel_geometry,parcel_centroid_lat,parcel_centroid_lng,latitude,longitude')
     .eq('id', fieldId)
     .eq('user_id', userResult.user.id)
     .maybeSingle();

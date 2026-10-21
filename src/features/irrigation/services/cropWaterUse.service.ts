@@ -404,27 +404,7 @@ export async function calculateCropWaterUse(
   } =
     await supabase
       .from('fields')
-      .select(
-        [
-          'id',
-          'name',
-          'crop',
-          'crop_subtype',
-          'crop_cycle',
-          'season',
-          'planting_year',
-          'bearing',
-          'canopy_development_class',
-          'canopy_height_class',
-          'canopy_cover_percent',
-          'canopy_height_m',
-          'parcel_geometry',
-          'parcel_centroid_lat',
-          'parcel_centroid_lng',
-          'latitude',
-          'longitude',
-        ].join(', '),
-      )
+      .select('id,name,crop,crop_subtype,crop_cycle,season,planting_year,bearing,canopy_development_class,canopy_height_class,canopy_cover_percent,canopy_height_m,parcel_geometry,parcel_centroid_lat,parcel_centroid_lng,latitude,longitude')
       .eq(
         'id',
         fieldId,

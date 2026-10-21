@@ -59,21 +59,7 @@ async function requirePdfUser() {
 async function loadFieldRecord(fieldId: string, userId: string) {
   const { data, error } = await supabase
     .from('fields')
-    .select([
-      'id',
-      'name',
-      'crop',
-      'crop_subtype',
-      'crop_cycle',
-      'season',
-      'planting_year',
-      'bearing',
-      'parcel_geometry',
-      'parcel_centroid_lat',
-      'parcel_centroid_lng',
-      'latitude',
-      'longitude',
-    ].join(','))
+    .select('id,name,crop,crop_subtype,crop_cycle,season,planting_year,bearing,parcel_geometry,parcel_centroid_lat,parcel_centroid_lng,latitude,longitude')
     .eq('id', fieldId)
     .eq('user_id', userId)
     .maybeSingle();

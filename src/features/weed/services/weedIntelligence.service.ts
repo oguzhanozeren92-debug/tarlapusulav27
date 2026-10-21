@@ -821,16 +821,7 @@ async function resolveObservationPointSpatialContext(
       .from(
         'field_observation_points',
       )
-      .select(
-        [
-          'id',
-          'field_id',
-          'direction',
-          'centroid_lat',
-          'centroid_lng',
-          'area_geometry',
-        ].join(', '),
-      )
+      .select('id,field_id,direction,centroid_lat,centroid_lng,area_geometry')
       .eq(
         'id',
         observationPointId,

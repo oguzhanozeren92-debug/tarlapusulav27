@@ -21,7 +21,7 @@ export function enrichSourceItem(source:ContentCatalogSource,item:RawSourceItem)
   const originalTitle=String(item.title||'').trim();
   const originalSummary=String(item.summary||'').trim();
   const tr=prepareFreeTranslation(originalTitle,originalSummary,language);
-  const tags=autoTagContent(`${tr.titleTr} ${tr.summaryTr}`);
+  const tags=autoTagContent(tr.titleTr,tr.summaryTr);
   const summary=buildProducerFriendlySummary(tr.titleTr,tr.summaryTr);
   const reliability=calculateReliability(source,Boolean(item.publishedAt),Boolean(item.summary));
   return {

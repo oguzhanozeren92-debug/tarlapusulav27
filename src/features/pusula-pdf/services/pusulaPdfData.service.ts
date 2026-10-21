@@ -4,11 +4,7 @@ import type { PusulaPdfFieldPhoto, PusulaPdfLayerArchiveSnapshot, PusulaPdfSatel
 import { fetchNasaPowerData } from '../../../services/nasaPowerService';
 import { getPrivateFileUrls } from '../../../services/r2Storage';
 
-const FIELD_COLUMNS = [
-  'id','name','city','district','village','area_decare','crop','crop_subtype','season',
-  'irrigation_status','irrigation_method','parcel_geometry','latitude','longitude',
-  'parcel_centroid_lat','parcel_centroid_lng'
-].join(',');
+const FIELD_COLUMNS = 'id,name,city,district,village,area_decare,crop,crop_subtype,season,irrigation_status,irrigation_method,parcel_geometry,latitude,longitude,parcel_centroid_lat,parcel_centroid_lng';
 
 function isoDate(date: Date) { return date.toISOString().slice(0, 10); }
 

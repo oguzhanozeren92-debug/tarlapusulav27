@@ -122,20 +122,7 @@ export async function loadFieldCompletionContext(
     error,
   } = await supabase
     .from('fields')
-    .select(
-      [
-        'id',
-        'crop',
-        'crop_cycle',
-        'planting_year',
-        'irrigation_status',
-        'bearing',
-        'canopy_development_class',
-        'canopy_height_class',
-        'canopy_cover_percent',
-        'canopy_height_m',
-      ].join(', '),
-    )
+    .select('id,crop,crop_cycle,planting_year,irrigation_status,bearing,canopy_development_class,canopy_height_class,canopy_cover_percent,canopy_height_m')
     .eq('id', fieldId)
     .eq('user_id', user.id)
     .maybeSingle();
