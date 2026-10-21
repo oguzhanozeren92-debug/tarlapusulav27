@@ -540,7 +540,7 @@ out center tags;
       } satisfies SoilLabResult;
     })
     .filter((item: SoilLabResult | null): item is SoilLabResult => item !== null)
-    .sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+    .sort((a: SoilLabResult, b: SoilLabResult) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
 
   const combined = [...official, ...mapResults];
   const unique = new Map<string, SoilLabResult>();
