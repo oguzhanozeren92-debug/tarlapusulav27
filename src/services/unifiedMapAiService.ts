@@ -427,7 +427,7 @@ function applyBackboneToFieldSynthesis(
 
   const evidence = [
     {
-      layer: 'field-memory' as const,
+      layer: 'field-memory' as FieldSynthesisEvidence['status'],
       layerLabel: 'Tarla Hafızası',
       finding: facts.slice(0, 3).join(' '),
       status: 'normal' as const,
@@ -740,7 +740,7 @@ function applyOrchardChillToFieldSynthesis(
       layer: 'orchard-chill',
       layerLabel: 'Meyve Soğuklama · MGM BİSİP',
       finding,
-      status: snapshot.status === 'ready' ? 'normal' : 'kontrol',
+      status: (snapshot.status === 'ready' ? 'normal' : 'kontrol') as const,
     },
     ...(Array.isArray(synthesis.evidence) ? synthesis.evidence : []),
   ].slice(0, 10);
