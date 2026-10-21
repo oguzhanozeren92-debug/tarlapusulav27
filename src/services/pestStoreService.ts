@@ -1013,7 +1013,7 @@ function normalizeAnalysis(raw: any): PesticideLabelAnalysis {
       : Array.from(
           new Set(
             dosageTable
-              .map((item) => item.crop)
+              .map((item: { crop: string }) => item.crop)
               .filter(Boolean),
           ),
         ),
@@ -1024,7 +1024,7 @@ function normalizeAnalysis(raw: any): PesticideLabelAnalysis {
       : Array.from(
           new Set(
             dosageTable
-              .map((item) => item.target)
+              .map((item: { target: string }) => item.target)
               .filter(Boolean),
           ),
         ),
