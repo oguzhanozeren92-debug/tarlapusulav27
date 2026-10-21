@@ -10,6 +10,7 @@ import PusulaLoadingOverlay from '../components/PusulaLoadingOverlay';
 import './FieldDetailLayout.css';
 import { getEntitlementSnapshot } from '../entitlements/useEntitlementStore';
 import { onboardingStyles } from '../styles/onboardingStyles';
+import type { FieldSection, FieldActivity, FieldSeason, PerennialYield } from '../types';
 
 type FieldDetailScreenProps = Record<string, any>;
 
@@ -639,7 +640,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                     ) : (selectedField.cropCycle ?? 'annual') === 'perennial' ? (
                       perennialYields.length > 0 ? (
                         <div className="tp-yield-history-list">
-                          {perennialYields.map((item) => (
+                          {perennialYields.map((item: PerennialYield) => (
                             <article key={item.id} className="tp-yield-history-card">
                               <div className="tp-yield-year">{item.year}</div>
 
@@ -686,7 +687,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                       )
                     ) : annualSeasons.length > 0 ? (
                       <div className="tp-season-history-list">
-                        {annualSeasons.map((item) => (
+                        {annualSeasons.map((item: FieldSeason) => (
                           <article key={item.id} className="tp-season-history-card">
                             <div className="tp-yield-year">{item.year}</div>
 
@@ -933,7 +934,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
 
                       <small>
                         {fieldSections
-                          .reduce((total, item) => total + (item.area ?? 0), 0)
+                          .reduce((total: number, item: FieldSection) => total + (item.area ?? 0), 0)
                           .toLocaleString('tr-TR')}{' '}
                         / {selectedField.area.toLocaleString('tr-TR')} da
                       </small>
@@ -943,7 +944,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                       <div className="tp-section-loading">Bölümler yükleniyor...</div>
                     ) : fieldSections.length > 0 ? (
                       <div className="tp-field-sections-list">
-                        {fieldSections.map((section, index) => (
+                        {fieldSections.map((section: FieldSection, index: number) => (
                           <article key={section.id} className="tp-field-section-card">
                             <div className="tp-field-section-number">{index + 1}</div>
 
@@ -1122,7 +1123,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                 <div className="tp-section-loading">İşlemler yükleniyor...</div>
               ) : activities.length > 0 ? (
                 <div className="tp-activity-list">
-                  {activities.map((activity) => {
+                  {activities.map((activity: FieldActivity) => {
                     const icon =
                       activity.type === 'Gübreleme'
                         ? '🧪'
@@ -1594,7 +1595,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                         {aiAnalysis.observations.length > 0 && (
                           <div className="tp-ai-list">
                             <span>Fotoğrafta görülenler</span>
-                            {aiAnalysis.observations.map((item, index) => (
+                            {aiAnalysis.observations.map((item: string, index: number) => (
                               <p key={`obs-${index}`}>• {item}</p>
                             ))}
                           </div>
@@ -1603,7 +1604,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                         {aiAnalysis.recommendations.length > 0 && (
                           <div className="tp-ai-list">
                             <span>Önerilen sonraki adım</span>
-                            {aiAnalysis.recommendations.map((item, index) => (
+                            {aiAnalysis.recommendations.map((item: string, index: number) => (
                               <p key={`rec-${index}`}>• {item}</p>
                             ))}
                           </div>
@@ -1731,7 +1732,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
               aria-label={fieldFabOpen ? 'Menüyü kapat' : 'Tarla işlemlerini aç'}
               aria-expanded={fieldFabOpen}
               aria-controls="field-action-menu"
-              onClick={() => setFieldFabOpen((value) => !value)}
+              onClick={() => setFieldFabOpen((value: boolean) => !value)}
             >
               {fieldFabOpen ? '×' : '+'}
             </button>
