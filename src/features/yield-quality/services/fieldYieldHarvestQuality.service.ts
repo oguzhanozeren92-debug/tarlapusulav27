@@ -323,7 +323,7 @@ export async function loadFieldYieldHarvestQualitySnapshot(
   let harvestDateSource: HarvestDateSourceKind = actualHarvestDate ? 'perennial_yields' : 'none';
 
   if (!actualHarvestDate && isoDay(currentSeason?.harvest_date)) {
-    actualHarvestDate = isoDay(currentSeason.harvest_date);
+    actualHarvestDate = isoDay(currentSeason?.harvest_date);
     harvestDateSource = 'field_seasons';
   }
   if (!actualHarvestDate && currentHarvest?.harvestDate) {
