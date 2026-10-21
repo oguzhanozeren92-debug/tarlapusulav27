@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, CloudSun, MapPin, Menu, Star } from 'lucide-react';
+import { CloudSun, MapPin, Menu, Star } from 'lucide-react';
 import PusulaGuide, { type PusulaInsight } from '../assets/pusula/PusulaGuide';
 import { PUSULAPDF_ALERT_KEY } from '../features/pusula-pdf/PusulaPdfReadyBridge';
 import { supabase } from '../supabaseClient';

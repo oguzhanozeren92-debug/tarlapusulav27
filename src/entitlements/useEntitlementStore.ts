@@ -332,48 +332,6 @@ function applyFallback(
   });
 }
 
-function applyBackendContext(row: any, email: string) {
-  const realPlan = normalizePlan(row?.real_plan ?? row?.realPlan ?? 'free');
-  const canOverride = Boolean(
-    row?.can_override ?? row?.canOverride ?? isDeveloperEmail(email),
-  );
-  const localMode = canOverride ? readLocalMode() : 'real';
-  const backendMode = canOverride
-    ? normalizeMode(row?.developer_mode ?? row?.developerMode ?? localMode)
-    : 'real';
-
-  // "Yeni Kullanıcı" gerçek bir abonelik planı değildir.
-  // Backend'den gelen plan modu local önizlemeyi ezmesin.
-  const developerMode: DeveloperPlanMode =
-    canOverride && localMode === 'new_user' ? 'new_user' : backendMode;
-
-  const effectivePlan =
-    developerMode === 'new_user'
-      ? 'free'
-      : normalizePlan(
-          row?.effective_plan ??
-            row?.effectivePlan ??
-            getEffectivePlan(realPlan, developerMode),
-        );
-
-  if (canOverride) writeLocalMode(developerMode);
-
-  patch({
-    status: 'ready',
-    userEmail: email,
-    realPlan,
-    developerMode,
-    effectivePlan,
-    canOverride,
-    isPlus: effectivePlan === 'plus',
-    isPremium: effectivePlan === 'premium',
-    isPaid: effectivePlan !== 'free',
-    isNewUserPreview: developerMode === 'new_user',
-    switching: false,
-    backendSynced: true,
-    error: null,
-  });
-}
 
 async function readFallbackRealPlan(): Promise<TarlaPusulaPlan> {
   if (!supabase) return 'free';

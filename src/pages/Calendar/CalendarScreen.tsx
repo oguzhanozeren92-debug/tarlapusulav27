@@ -413,7 +413,6 @@ export default function CalendarScreen({
   cmsRuntimeCss,
   cmsPageFor,
   cmsBlockFor,
-  cmsMenuFor,
   cmsText,
   cmsSub,
   cmsBlockStyle,
@@ -452,8 +451,7 @@ export default function CalendarScreen({
   openAiAnalysisScreen,
   initialView = 'calendar',
 }: CalendarScreenProps) {
-  const calendarPage = cmsPageFor('calendar');
-  const calendarHeaderBlock = cmsBlockFor('calendar', 'page-header');
+
   const calendarHeroBlock = cmsBlockFor('calendar', 'hero');
   const calendarPushBlock = cmsBlockFor('calendar', 'push-card');
   const calendarToolbarBlock = cmsBlockFor('calendar', 'toolbar');

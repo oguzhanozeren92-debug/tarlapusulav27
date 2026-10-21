@@ -30,12 +30,6 @@ const normalizeOptions = (
       .filter((item) => Number.isFinite(item.id) && item.name),
   );
 
-const normalizeTkgmPayload = (payload: any): LocationOption[] => {
-  const features = Array.isArray(payload?.features)
-    ? payload.features
-    : Array.isArray(payload)
-      ? payload
-      : [];
 
   return normalizeOptions(
     features.map((feature: any) => {

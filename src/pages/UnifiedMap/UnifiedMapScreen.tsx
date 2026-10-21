@@ -151,13 +151,6 @@ const SOIL_OPTIONS: Array<{ value: SoilGridsPropertyKey; label: string }> = [
   { value: 'silt', label: 'Silt' },
 ];
 
-const CLIMATE_OPTIONS: Array<{ value: Era5MapVariable; label: string }> = [
-  { value: 'soil_moisture_0_to_7cm', label: 'Yüzey Nemi' },
-  { value: 'soil_moisture_7_to_28cm', label: 'Kök Bölgesi Nemi' },
-  { value: 'soil_temperature_0_to_7cm', label: 'Toprak Sıcaklığı' },
-  { value: 'temperature_2m', label: 'Hava Sıcaklığı' },
-  { value: 'precipitation', label: 'Yağış' },
-];
 
 type MapGroup = 'vegetation' | 'water' | 'soil' | 'risk';
 
@@ -861,16 +854,11 @@ async function recolorSoilWmsImage(
       ];
 
     const p05 = percentile(0.05);
-    const p50 = percentile(0.50);
     const p95 = percentile(0.95);
 
     // Make the semantic direction stable for the requested SoilGrids style:
     // compare the palette endpoint brightness. If PC1 runs backwards, flip it.
     const firstSample = samples[0];
-    const firstProjection =
-      (firstSample[0] - meanR) * vx +
-      (firstSample[1] - meanG) * vy +
-      (firstSample[2] - meanB) * vz;
 
     // Use the image-wide median as our center; direction itself is only used for
     // spatial contrast, while the legend explicitly says "relative".
@@ -973,10 +961,6 @@ function SoilGeoMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const [processedSoilUrl, setProcessedSoilUrl] = useState<string | null>(null);
 
-  const parcelBounds = useMemo(
-    () => parcelBoundsFromField(field),
-    [field],
-  );
 
   const soilBbox = useMemo(
     () => (parcelBounds ? expandBounds(parcelBounds, 0.85) : null),
@@ -1460,7 +1444,6 @@ function VegetationGeoMap({
 function RadarGeoMap({
   field,
   radar,
-  mode,
 }: {
   field: Field | null;
   radar: Sentinel1RadarResponse | null;
@@ -2050,44 +2033,6 @@ function ClimateGeoMap({
   );
 }
 
-function ClimateGrid({ result, variable }: { result: Era5MapResponse | null; variable: Era5MapVariable }) {
-  const cells = Array.isArray(result?.cells) ? result!.cells!.filter((cell) => cell.value !== null) : [];
-  if (!cells.length) return <div style={styles.emptyStage}>İklim katmanı hazırlanıyor…</div>;
-  const minLat = Math.min(...cells.map((c) => c.latitude));
-  const maxLat = Math.max(...cells.map((c) => c.latitude));
-  const minLon = Math.min(...cells.map((c) => c.longitude));
-  const maxLon = Math.max(...cells.map((c) => c.longitude));
-  const min = finite(result?.stats?.min) ?? Math.min(...cells.map((c) => Number(c.value)));
-  const max = finite(result?.stats?.max) ?? Math.max(...cells.map((c) => Number(c.value)));
-  const spread = Math.max(0.000001, max - min);
-
-  return (
-    <div style={styles.climateCanvas}>
-      <div style={styles.climateBackdrop} />
-      {cells.map((cell) => {
-        const x = ((cell.longitude - minLon) / Math.max(0.000001, maxLon - minLon)) * 88 + 4;
-        const y = (1 - (cell.latitude - minLat) / Math.max(0.000001, maxLat - minLat)) * 80 + 8;
-        const ratio = (Number(cell.value) - min) / spread;
-        return (
-          <div
-            key={cell.id}
-            title={`${cell.value} ${cell.unit}`}
-            style={{
-              ...styles.climateCell,
-              left: `${x}%`,
-              top: `${y}%`,
-              background: colorForRatio(ratio),
-            }}
-          >
-            <strong>{Number(cell.value).toFixed(1)}</strong>
-          </div>
-        );
-      })}
-      <div style={styles.parcelFocus}>SEÇİLİ TARLA</div>
-    </div>
-  );
-}
-
 
 const OPEN_METEO_ARCHIVE_URL = 'https://archive-api.open-meteo.com/v1/archive';
 
@@ -2354,7 +2299,6 @@ export default function UnifiedMapScreen({
   );
   const coords = useMemo(() => fieldCoordinates(selectedField), [selectedField]);
   const parcelBounds = useMemo(() => parcelBoundsFromField(selectedField), [selectedField]);
-  const meta = SECTION_META[section];
 
   const orchardPilot = isOrchardTreePilotCrop(selectedField?.crop);
 

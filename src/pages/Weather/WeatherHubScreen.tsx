@@ -153,10 +153,7 @@ type IconName =
   | 'globe';
 
 
-function WeatherArt({
-  kind,
-  size = 48,
-}: {
+: {
   kind: IconName;
   size?: number;
 }) {
@@ -526,24 +523,6 @@ function navIcon(screen?: string, label?: string): IconName {
   return 'field';
 }
 
-function weatherGlyph(condition?: string): IconName {
-  const value = String(condition ?? '').toLocaleLowerCase('tr-TR');
-
-  if (
-    value.includes('fırt') ||
-    value.includes('thunder') ||
-    value.includes('şimş')
-  ) {
-    return 'storm';
-  }
-
-  if (value.includes('kar') || value.includes('snow')) return 'snow';
-  if (value.includes('yağ') || value.includes('rain')) return 'rain';
-  if (value.includes('sis') || value.includes('fog')) return 'fog';
-  if (value.includes('bulut') || value.includes('cloud')) return 'cloud';
-
-  return 'sun';
-}
 
 const WEATHER_3D_BASE =
   'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/weather';
@@ -697,9 +676,6 @@ function providerDisplayName(name: string | undefined, index: number) {
 export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   const {
     cmsRuntimeCss = '',
-    cmsPageFor = () => null,
-    cmsBlockFor = () => null,
-    cmsText = (_block, fallback) => fallback,
     realFields = [],
     fieldWeather = {},
     fieldHourlyWeather = {},
@@ -716,7 +692,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
     loadFieldWeather = () => undefined,
     weatherDayLabel = (index) =>
       ['Bugün', 'Yarın', '3. Gün', '4. Gün', '5. Gün'][index] ?? `${index + 1}. Gün`,
-    openEra5Map = () => undefined,
   } = props;
 
   const [sprayGuideOpen, setSprayGuideOpen] = useState(false);

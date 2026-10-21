@@ -12,28 +12,7 @@ function normalizeSupabaseProjectUrl(value: unknown) {
     .replace(/\/(?:rest|auth|storage|functions)\/v1$/i, '');
 }
 
-function getSupabaseRuntimeConfig() {
-  const client = supabase as any;
 
-  const rawUrl =
-    env.VITE_SUPABASE_URL ??
-    env.VITE_SUPABASE_PROJECT_URL ??
-    client?.supabaseUrl ??
-    '';
-
-  const url =
-    normalizeSupabaseProjectUrl(rawUrl);
-
-  const key = String(
-    env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-      env.VITE_SUPABASE_ANON_KEY ??
-      env.VITE_SUPABASE_KEY ??
-      client?.supabaseKey ??
-      '',
-  ).trim();
-
-  return { url, key };
-}
 
 export type PusulaTriggerSource =
   | 'home'

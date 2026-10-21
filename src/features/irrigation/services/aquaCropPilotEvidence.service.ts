@@ -295,7 +295,7 @@ export async function runAquaCropPilotEvidence(fieldIdInput: string) {
 
   const request = (async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('aquacrop-pilot-run', {
+      const { error } = await supabase.functions.invoke('aquacrop-pilot-run', {
         body: { field_id: fieldId },
       });
       if (error) throw error;

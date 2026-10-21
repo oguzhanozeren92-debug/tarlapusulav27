@@ -1308,8 +1308,6 @@ export default function ContentAdminPanel() {
     }
   };
 
-  const scanAllResearch = async () => {
-    const activeSources = sources.filter((source) => source.active);
     if (!activeSources.length) {
       setMessage('Taranacak aktif kaynak yok.');
       return;

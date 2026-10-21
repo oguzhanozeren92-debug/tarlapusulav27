@@ -127,10 +127,6 @@ export const fetchOpenMeteoForecast = async (
   }));
 };
 
-const getDeviceWeatherLocation = () =>
-  new Promise<WeatherLocation | null>((resolve) => {
-    if (!('geolocation' in navigator)) {
-      resolve(null);
       return;
     }
 
