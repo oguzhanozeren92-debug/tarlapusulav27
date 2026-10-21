@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, ClipboardList, Gauge } from 'lucide-react';
 import HomeMapSection from './HomeMapSection';
@@ -4413,7 +4413,7 @@ export default function HomeMapSectionMapFirst(
     >
       <style>{CSS}</style>
 
-      <HomeMapSection {...props as React.ComponentProps<typeof HomeMapSection>} />
+      <HomeMapSection {...props as ComponentProps<typeof HomeMapSection>} />
 
       {operationToolbarButton}
       {quickToolbarButtons}
