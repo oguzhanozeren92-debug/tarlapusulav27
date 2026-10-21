@@ -407,12 +407,16 @@ export function buildPusulaPdfGuidance(
     const mergedDifferential = metrics.mergedDifferential === true;
     const productionAuthorityPresent = metrics.productionAuthorityPresent === true;
     const alternatives = listText(details.alternativeCauseLabels, 4);
-    const fertilization = details.recentFertilization ?? {};
-    const phenology = details.phenologyContext ?? {};
-    const localNutrient = details.localNutrientContext ?? {};
-    const zoning = details.zoningReadiness ?? {};
-    const samplingPlan = zoning.samplingPlan ?? {};
-    const prescriptionGate = zoning.prescriptionGate ?? {};
+    const asRecord = (value: unknown): Record<string, any> =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, any>
+        : {};
+    const fertilization = asRecord(details.recentFertilization);
+    const phenology = asRecord(details.phenologyContext);
+    const localNutrient = asRecord(details.localNutrientContext);
+    const zoning = asRecord(details.zoningReadiness);
+    const samplingPlan = asRecord(zoning.samplingPlan);
+    const prescriptionGate = asRecord(zoning.prescriptionGate);
     const samplingCandidates = Array.isArray(samplingPlan.candidates)
       ? samplingPlan.candidates
           .map((candidate: any) => String(candidate?.area ?? '').trim())
@@ -600,7 +604,7 @@ export function buildPusulaPdfGuidance(
     const metrics = plantingWindow.metrics ?? {};
     const summary = String(details.summary ?? '').trim();
     const actionContext = String(details.actionContext ?? '').trim();
-    const lowerScenario = details.lowerHistoricalExposureScenario ?? null;
+    const lowerScenario = details.lowerHistoricalExposureScenario && typeof details.lowerHistoricalExposureScenario === 'object' ? details.lowerHistoricalExposureScenario as Record<string, any> : null;
     const lowerLabel = String(lowerScenario?.label ?? '').trim();
     const lowerDate = String(lowerScenario?.plantingDate ?? '').trim();
     const scenarioCount = modelMetric(metrics.scenarioCount);
@@ -811,7 +815,6 @@ export function buildPusulaPdfGuidance(
   const storageRiskEvidence = latestDecisionEvidence(snapshot, 'storage-risk');
   if (storageRiskEvidence) {
     const metrics: any = storageRiskEvidence.metrics ?? {};
-    const details: any = storageRiskEvidence.details ?? {};
     const riskLevel = String(metrics.riskLevel ?? 'unknown');
     const lotCount = modelMetric(metrics.lotCount) ?? 0;
     const highCount = modelMetric(metrics.highRiskLotCount) ?? 0;

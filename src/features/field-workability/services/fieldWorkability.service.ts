@@ -96,7 +96,7 @@ async function fetchAutomaticWeatherContext(
     });
     if (!response.ok) return null;
     const payload = await response.json().catch(() => null);
-    const times = Array.isArray(payload?.hourly?.time) ? payload.hourly.time.map(String) : [];
+    const times: string[] = Array.isArray(payload?.hourly?.time) ? payload.hourly.time.map(String) : [];
     const precipitation = Array.isArray(payload?.hourly?.precipitation) ? payload.hourly.precipitation : [];
     const probability = Array.isArray(payload?.hourly?.precipitation_probability)
       ? payload.hourly.precipitation_probability
