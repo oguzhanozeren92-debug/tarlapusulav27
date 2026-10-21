@@ -406,6 +406,7 @@ function progressBar(
 function fieldHealthScore(snapshot: PusulaPdfSnapshot) {
   // A risk score is not a field-health score. Only accept a separately
   // calculated, dated and named health metric from the actual reporting period.
+  const health = layerPayload(latestPeriodLayer(snapshot, 'field-health-score'));
   const value = metricNumber(health, 'healthScore', 'fieldHealthScore');
   return value !== null && value >= 0 && value <= 100 ? value : null;
 }
@@ -618,6 +619,12 @@ function periodWeatherSummary(rows:any[],from:string,to:string){
     buckets};
 }
 const numTr=(n:number|null,decimals=1)=>n===null?'—':n.toLocaleString('tr-TR',{maximumFractionDigits:decimals});
+function climateInterpretation(c:ReturnType<typeof periodWeatherSummary>){
+  if(c.totalRain===null||c.totalEt0===null) return 'Seçilen dönemin hava kayıtlarında eksik günler var. Eksik yağış ve buharlaşma değerleri tamamlanmadan kesin dönem yorumu yapılmaz.';
+  const rainText='Dönem yağışı '+numTr(c.totalRain)+' mm, referans ET₀ toplamı '+numTr(c.totalEt0)+' mm.';
+  const caution='ET₀ yağışla çıkarılarak sulama ihtiyacı hesaplanamaz; ürün katsayısı, sulama ve toprak su deposu ayrıca gerekir.';
+  return rainText+' '+(c.totalRain<5?'Yağış oldukça sınırlı; ':'')+caution;
+}
 
 function soilGridsProfile(snapshot: PusulaPdfSnapshot) {
   const layers = [...(snapshot.layerArchive ?? [])]
@@ -701,6 +708,26 @@ async function drawQr(
   text(ctx, label, x + 12, y + size + 12, 9, 850, MUTED);
 }
 
+function summaryCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  titleValue: string,
+  value: string,
+  sub: string,
+  accent: string,
+  soft: string,
+  symbol: string,
+) {
+  rr(ctx, x, y, w, 104, 12, soft, soft);
+  circleIcon(ctx, x + w / 2, y + 28, 15, accent, symbol, WHITE, 12);
+  ctx.textAlign = 'center';
+  fittedText(ctx, titleValue, x + w / 2, y + 54, w-10, 10, 750, MUTED);
+  fittedText(ctx, value, x + w / 2, y + 78, w-10, 17, 900, accent);
+  fittedText(ctx, sub, x + w / 2, y + 96, w-10, 9, 700, INK);
+  ctx.textAlign = 'left';
+}
 
 function footerSocial(ctx: CanvasRenderingContext2D, x: number, y: number, symbol: string, fill: string, label: string, value: string) {
   circleIcon(ctx, x + 17, y + 15, 14, fill, symbol, WHITE, 11);
@@ -735,6 +762,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const riskRows = riskItems(guidance);
   const soilRows = latestSoilValues(snapshot);
   const soilGrids = soilGridsProfile(snapshot);
+  const stage = phenologyLabel(snapshot);
+  const primaryRisk = summaryRisk(snapshot);
   const location = [snapshot.field.city, snapshot.field.district].filter(Boolean).join(' / ') || 'Konum kaydı yok';
 
   // Print-safe header: a fixed, subtle topographic motif, with protected
@@ -810,6 +839,8 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   const statY = top + 399;
   const statGap = 7;
+  const statW = (leftW - 16 - statGap * 3) / 4;
+  const lastMeasured = knownSeries(sat, 'ndvi').at(-1);
   const lastNdmi = [...sat].filter((p) => valid(p.ndmi)).at(-1);
   const ndmiValue = lastNdmi?.ndmi ?? null;
   // The cover identifies the REPORT'S FOCUS, not a second copy of its metrics.
@@ -834,7 +865,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     if(sceneDates.length){
       fittedText(ctx,`Kontrol edilen dönem: ${fmt(sceneDates[0],false)} – ${fmt(sceneDates.at(-1)!,false)}`,
         leftX+28,754,leftW-56,10.2,800,INK);
-      sceneDates.slice(0,14).forEach((_,i)=>{
+      sceneDates.slice(0,14).forEach((d,i)=>{
         const x=leftX+28+i*24;
         ctx.beginPath();ctx.fillStyle='#9fadb4';ctx.arc(x,785,4,0,Math.PI*2);ctx.fill();
       });
@@ -1078,6 +1109,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
   sectionHeader(ctx, midX + 10, 1214, 5, latestPhoto?'Saha Gözlemleri':'Saha Kayıtlarının Kapsamı', PURPLE, '▣');
+  const observationInsight = guidance.insights.find((item) => item.id === 'field-observation-follow-up-evidence');
   if (latestPhoto?.signedUrl) {
     await drawImage(ctx, latestPhoto.signedUrl, midX + 16, 1260, 174, 195, { radius: 9, placeholder: 'Fotoğraf açılamadı' });
     rr(ctx, midX + 200, 1260, 174, 195, 9, '#f8fafb', LINE);
