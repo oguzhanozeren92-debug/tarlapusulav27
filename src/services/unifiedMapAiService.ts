@@ -378,7 +378,7 @@ function applyOrchardToUnifiedResult(
   }
 
   const observedTreeCount = orchard.observedTreeCount ?? 0;
-  const stressCount = orchard.stressTreeCount ?? 0;
+  const stressCount = orchard.stressedTreeCount ?? 0;
   const highStressCount = orchard.highStressTreeCount ?? 0;
   const waterStressCount = orchard.waterStressTreeCount ?? 0;
   const hasAttention = highStressCount > 0 || waterStressCount > 0;
