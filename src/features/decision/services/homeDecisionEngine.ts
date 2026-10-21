@@ -92,12 +92,6 @@ function normalizeOperationType(value: unknown) {
     .replace(/\s+/g, ' ');
 }
 
-function normalizeTaskAreaKey(value: unknown) {
-  return String(value ?? '')
-    .trim()
-    .toLocaleLowerCase('tr-TR')
-    .replace(/\s+/g, '-');
-}
 
 function operationAgeDays(
   operation: HomeFieldOperationSignal | null | undefined,

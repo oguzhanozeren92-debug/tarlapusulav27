@@ -1688,14 +1688,6 @@ export default function HomeMapPusulaStrip({
   const importantArea =
     resolvedSpatialImportantArea(result);
 
-  const ndviMetricsVisible = Boolean(
-    ndviStats &&
-      (
-        result?.interpretedLayer === 'vegetation' ||
-        result?.activeLayer === 'vegetation' ||
-        showOnMapAvailable
-      ),
-  );
 
   const signal = useMemo<PusulaSignal | null>(
     () => visibleDecision

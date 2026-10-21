@@ -950,30 +950,6 @@ async function getSynthesisPhenologySnapshot(input: FieldSynthesisInput) {
   }
 }
 
-function riskRadarStatus(
-  result: RiskRadarResult,
-): 'normal' | 'dikkat' | 'kontrol' {
-  if (
-    result.overall?.level === 'critical' ||
-    result.overall?.level === 'high'
-  ) {
-    return 'kontrol';
-  }
-
-  if (result.overall?.level === 'moderate') {
-    return 'dikkat';
-  }
-
-  return 'normal';
-}
-
-function riskRadarProbability(
-  score: number,
-): 'dusuk' | 'orta' | 'yuksek' {
-  if (score >= 65) return 'yuksek';
-  if (score >= 30) return 'orta';
-  return 'dusuk';
-}
 
 function applyRiskRadarToFieldSynthesis(
   synthesis: FieldSynthesisResult,

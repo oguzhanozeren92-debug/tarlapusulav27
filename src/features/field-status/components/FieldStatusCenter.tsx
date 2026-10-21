@@ -289,17 +289,6 @@ function fieldEventSummaryTitle(event: HybrisFieldEvent) {
   return 'Toprak işleme yapılmış olabilir';
 }
 
-function fieldEventSummaryDetail(event: HybrisFieldEvent) {
-  const when = trDate(event.signalDate);
-  if (event.type === 'sowing') {
-    return `${when} civarında ekim dönemine benzeyen bir tarla değişikliği algılandı.`;
-  }
-  if (event.type === 'harvest') {
-    return `${when} civarında hasat dönemine benzeyen bir tarla değişikliği algılandı.`;
-  }
-  return `${when} civarında sürüm veya benzeri toprak işlemeye benzeyen bir değişiklik algılandı.`;
-}
-
 
 const SCIENTIFIC_AUTO_REFRESH_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -330,15 +319,6 @@ function suitabilityDiagnostic(response: CropSuitabilityResponse | null, loading
   return `${Math.round(score)}/100${limiting ? ` · sınır: ${limiting}` : ''}`;
 }
 
-function suitabilityLabel(response: CropSuitabilityResponse | null) {
-  const score = finite(response?.screening?.score);
-  if (score === null) {
-    return response?.status === 'unsupported_crop'
-      ? 'Bu ürün henüz desteklenmiyor'
-      : 'Hazırlanıyor';
-  }
-  return `${Math.round(score)}/100 · ${response?.screening?.label ?? 'Uygunluk'}`;
-}
 
 function riskTone(item: { severity?: string; source?: string; title?: string }) {
   if (item.severity === 'danger') return 'danger';
@@ -401,32 +381,7 @@ function stepReason(step: ScientificRefreshStep | undefined) {
   return null;
 }
 
-function irrigationConfidence(value: unknown) {
-  const normalized = String(value ?? '').toLowerCase();
-  if (normalized === 'high') return 'Yüksek';
-  if (normalized === 'medium') return 'Orta';
-  if (normalized === 'low') return 'Düşük';
-  return '—';
-}
 
-function irrigationMissingLabel(value: unknown) {
-  const key = String(value ?? '');
-  const map: Record<string, string> = {
-    canopy_cover: 'Bitki örtüsü / taç gelişimi',
-    canopy_height: 'Bitki / ağaç yüksekliği',
-    irrigation_method: 'Sulama yöntemi',
-    soil_profile: 'Toprak su profili',
-    soil_water_measurement: 'Gerçek toprak nem ölçümü',
-    current_surface_water_measurement: '0–15 cm gerçek toprak nem ölçümü',
-    current_root_zone_water_measurement: 'Kök bölgesi gerçek toprak nem ölçümü',
-    current_root_zone_depletion: 'Kök bölgesi su durumu',
-    last_irrigation: 'Son sulama kaydı',
-    crop_water_reference_profile: 'Üzüm tipi (Sofralık / Şaraplık)',
-    current_surface_depletion_measurement: '0–15 cm gerçek toprak nem ölçümü',
-    phenology: 'Gelişim evresi',
-  };
-  return map[key] ?? key.replaceAll('_', ' ');
-}
 
 const USER_ACTIONABLE_IRRIGATION_MISSING = new Set([
   'canopy_cover',

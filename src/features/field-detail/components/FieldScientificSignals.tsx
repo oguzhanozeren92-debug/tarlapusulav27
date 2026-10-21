@@ -66,12 +66,7 @@ export default function FieldScientificSignals({ fieldId }: Props) {
   const [message, setMessage] = useState('');
   const autoRefreshStarted = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!fieldId) return EMPTY;
-    const next = await loadFieldScientificSignals(fieldId);
-    setSignals(next);
-    return next;
-  }, [fieldId]);
+
 
   const refresh = useCallback(async (manual = false) => {
     if (!fieldId || refreshing) return;

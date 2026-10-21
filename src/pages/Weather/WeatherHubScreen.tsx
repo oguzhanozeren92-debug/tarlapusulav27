@@ -719,8 +719,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
     openEra5Map = () => undefined,
   } = props;
 
-  const weatherPage = cmsPageFor('weatherHub');
-  const weatherHeroBlock = cmsBlockFor('weatherHub', 'hero');
   const [sprayGuideOpen, setSprayGuideOpen] = useState(false);
   const [premiumDetailOpen, setPremiumDetailOpen] =
     useState<WeatherPremiumDetailKey>(null);
@@ -887,7 +885,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   const nasaSummary = nasaMatchesField ? nasaPowerState.data?.summary : undefined;
   const nasaTemperature = safeNumber(nasaSummary?.averageTemperature);
   const nasaRainfall = safeNumber(nasaSummary?.totalPrecipitation);
-  const nasaHumidity = safeNumber(nasaSummary?.averageHumidity);
   const nasaSolar = safeNumber(nasaSummary?.averageSolarRadiation);
 
   const climateTone =
@@ -910,8 +907,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   const soilTempRoot = safeNumber(era5Summary?.averageSoilTemperature7To28CmC);
   const soilMoistureSurface = safeNumber(era5Summary?.averageSoilMoisture0To7Cm);
   const soilMoistureRoot = safeNumber(era5Summary?.averageSoilMoisture7To28Cm);
-  const soilMoistureDeep = safeNumber(era5Summary?.averageSoilMoisture28To100Cm);
-  const soilMoistureVeryDeep = safeNumber(era5Summary?.averageSoilMoisture100To255Cm);
 
   const era5Tone =
     era5ClimateState.status === 'error'
@@ -1113,30 +1108,8 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
     return probability >= 40 || precipitation > 0;
   }).length;
 
-  const windStatus =
-    windSpeed === null
-      ? { label: 'Veri bekleniyor', tone: 'neutral' }
-      : windSpeed >= 35
-        ? { label: 'Saha işi için riskli', tone: 'warning' }
-        : windSpeed >= 20
-          ? { label: 'Dikkatli çalış', tone: 'attention' }
-          : { label: 'Uygun', tone: 'good' };
 
-  const irrigationStatus =
-    rainChance >= 60
-      ? { label: 'Sulamayı ertele', tone: 'good' }
-      : rainChance >= 30
-        ? { label: 'Yağışı kontrol et', tone: 'attention' }
-        : { label: 'Toprak nemini kontrol et', tone: 'neutral' };
 
-  const heatStatus =
-    tempMax === null
-      ? { label: 'Veri bekleniyor', tone: 'neutral' }
-      : tempMax >= 36
-        ? { label: 'Sıcaklık stresi', tone: 'warning' }
-        : tempMax >= 30
-          ? { label: 'Öğle saatlerine dikkat', tone: 'attention' }
-          : { label: 'Uygun', tone: 'good' };
 
   const summaryText =
     consensus.length === 0
@@ -1207,7 +1180,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   );
 
   const warmSeason = pusulaMonth >= 5 && pusulaMonth <= 9;
-  const peakSummer = pusulaMonth >= 6 && pusulaMonth <= 8;
   const coldSeason = pusulaMonth === 12 || pusulaMonth <= 2;
 
   const decisionForecast =
@@ -1219,8 +1191,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   const next72Hours = decisionForecast.slice(0, 3);
   const rainLikelyNext48h = next48Hours.some(isRainSignal);
   const rainLikelyNext72h = next72Hours.some(isRainSignal);
-  const dryWindowNext48h =
-    next48Hours.length >= 2 && next48Hours.every((day: any) => !isRainSignal(day));
   const dryWindowNext72h =
     next72Hours.length >= 2 && next72Hours.every((day: any) => !isRainSignal(day));
 

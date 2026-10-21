@@ -495,33 +495,6 @@ function isRealUsableInsight(
   );
 }
 
-function buildLoadingInsight(
-  screen: string,
-  fieldName?: string | null,
-): PusulaInsight {
-  const field = String(fieldName ?? '').trim();
-
-  const messages =
-    PUSULA_GUIDE_MESSAGES[screen] ?? [
-      {
-        title: 'Pusula bu bölümü hazırlıyor',
-        text:
-          'Bu ekrandaki kayıtları diğer tarla verilerinle birlikte değerlendireceğim.',
-      },
-    ];
-
-  const first = messages[0];
-
-  return {
-    id: `pusula-loading-${screen}-${Date.now()}`,
-    gozlem: first.title,
-    yonlendirme:
-      `${first.text} ` +
-      `${field ? `${field} için ` : ''}verilerin yükleniyor; ` +
-      'Pusula güncel kayıtlarını bir araya getirip yorumluyor. ' +
-      'Gerçek değerlendirme hazır olduğunda ayrıca göstereceğim.',
-  };
-}
 
 function buildGuideInsight(
   screen: string,

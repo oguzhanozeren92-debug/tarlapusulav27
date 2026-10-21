@@ -68,11 +68,6 @@ export default function KnowledgeAdminPanel() {
     rejected: claims.filter((item) => item.status === 'rejected').length,
   }), [claims]);
 
-  const relationCounts = useMemo(() => ({
-    candidate: relations.filter((item) => item.status === 'candidate').length,
-    approved: relations.filter((item) => item.status === 'approved').length,
-    rejected: relations.filter((item) => item.status === 'rejected').length,
-  }), [relations]);
 
   const clearMessages = () => {
     setMessage('');
