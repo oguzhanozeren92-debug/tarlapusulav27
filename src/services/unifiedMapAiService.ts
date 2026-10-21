@@ -737,7 +737,7 @@ function applyOrchardChillToFieldSynthesis(
 
   const evidence: FieldSynthesisEvidence[] = [
     {
-      layer: 'orchard-chill',
+      layer: 'orchard-chill' as const,
       layerLabel: 'Meyve Soğuklama · MGM BİSİP',
       finding,
       status: snapshot.status === 'ready' ? 'normal' as const : 'kontrol' as const,
