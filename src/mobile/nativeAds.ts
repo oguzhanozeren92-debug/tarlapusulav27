@@ -34,7 +34,6 @@ const TEST_UNITS = {
 let initPromise: Promise<boolean> | null = null;
 let bridgeInstalled = false;
 
-type AdKind = 'rewarded' | 'interstitial';
 
 function env(name: string) {
   return String((import.meta.env as Record<string, unknown>)[name] ?? '').trim();

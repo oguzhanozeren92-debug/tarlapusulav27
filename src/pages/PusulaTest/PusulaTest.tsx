@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { CSSProperties } from 'react';
 
 import './PusulaTest.css';
 

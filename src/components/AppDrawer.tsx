@@ -5,7 +5,6 @@ import { supabase } from '../supabaseClient';
 import { useGamificationStore } from '../gamification/useGamificationStore';
 import DrawerSupportFooter from './DrawerSupportFooter';
 import PusulaPointsModal from './PusulaPointsModal';
-import drawerFieldBg from '../assets/login-bg.webp';
 import approvedOrbitHeader from '../assets/drawer-orbit-approved.jpg';
 
 type AppDrawerProps = {

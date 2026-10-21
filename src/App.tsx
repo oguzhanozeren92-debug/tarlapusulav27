@@ -222,7 +222,6 @@ export default function App() {
     setFieldFormMessage,
     fieldName,
     setFieldName,
-    fieldCity,
     provinceOptions,
     districtOptions,
     villageOptions,
@@ -390,7 +389,6 @@ export default function App() {
     sectionArea,
     setSectionArea,
     resetSectionForm,
-    resetSectionsUi,
     loadFieldSections,
     handleAddFieldSection,
     handleDeleteFieldSection,
@@ -401,7 +399,6 @@ export default function App() {
     perennialYields,
     historyLoading,
     historyMessage,
-    setHistoryMessage,
     annualFormOpen,
     setAnnualFormOpen,
     annualFormLoading,
@@ -446,7 +443,6 @@ export default function App() {
     handleAddPerennialYield,
     handleDeletePerennialYield,
     syncProfileFromField,
-    resetProductionUi,
   } = useFieldProductionHistory({ selectedField, setSelectedField, setRealFields });
 
   const {
@@ -754,7 +750,7 @@ export default function App() {
 
       if (target === 'calendar') {
         setScreen('calendar');
-        void loadCalendarReminders();
+        openCalendarScreen();
         window.scrollTo({ top: 0, behavior: 'auto' });
         return;
       }
@@ -1564,8 +1560,6 @@ export default function App() {
         sideMenuOpen={false}
         screen={screen}
         desktopMenuItems={desktopMenuItems}
-        realFields={realFields}
-        openFieldDetail={openFieldDetail}
         setScreen={setScreen}
         setSideMenuOpen={setSideMenuOpen}
         setWeatherHubFieldId={setWeatherHubFieldId}
@@ -1590,7 +1584,6 @@ export default function App() {
           String(realFields[0]?.id ?? '')
         }
         screen={screen}
-        desktopMenuItems={desktopMenuItems}
         sideMenuOpen={false}
         setScreen={setScreen}
         setSideMenuOpen={setSideMenuOpen}

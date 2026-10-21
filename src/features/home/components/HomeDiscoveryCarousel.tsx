@@ -106,7 +106,6 @@ export default function HomeDiscoveryCarousel({ onOpenFeature }: Props) {
   const [paused, setPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const count = FEATURES.length;
-  const active = FEATURES[index];
 
   useEffect(() => {
     if (paused || typeof window === 'undefined') return;

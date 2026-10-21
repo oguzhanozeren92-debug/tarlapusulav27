@@ -1,10 +1,10 @@
 import {
-  CSSProperties,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import type { CSSProperties } from 'react';
 
 import './PusulaGuide.css';
 
