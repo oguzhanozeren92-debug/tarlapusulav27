@@ -1276,6 +1276,11 @@ export default function AiAnalysisScreen({
   }, [pusulaPdfPeriodPreset, pusulaPdfCustomStart, pusulaPdfCustomEnd]);
 
 
+  const pusulaPdfStages: PusulaPdfJob['stage'][] = [
+    'queued', 'collecting', 'satellite', 'weather', 'field_memory', 'interpreting', 'rendering',
+  ];
+  const currentJobStageIndex = pusulaPdfStages.indexOf(pusulaPdfJob?.stage ?? 'queued');
+
   const pusulaPdfMissingLabels: Record<string, string> = {
     parcel_geometry: 'Parsel geometrisi',
     satellite_30d: '30 günlük uydu serisi',
