@@ -2,7 +2,6 @@ import type {
   PlantingWindowDecisionResult,
   PlantingWindowScenario,
   PlantingWindowScenarioDecision,
-  PlantingWindowScenarioKey,
   PlantingWindowStageExposure,
   WheatPlantingWindowResult,
 } from '../types/plantingWindow';
