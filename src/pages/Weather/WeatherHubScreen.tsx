@@ -697,9 +697,6 @@ function providerDisplayName(name: string | undefined, index: number) {
 export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   const {
     cmsRuntimeCss = '',
-    cmsPageFor = () => null,
-    cmsBlockFor = () => null,
-    cmsText = (_block, fallback) => fallback,
     realFields = [],
     fieldWeather = {},
     fieldHourlyWeather = {},
@@ -716,7 +713,6 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
     loadFieldWeather = () => undefined,
     weatherDayLabel = (index) =>
       ['Bugün', 'Yarın', '3. Gün', '4. Gün', '5. Gün'][index] ?? `${index + 1}. Gün`,
-    openEra5Map = () => undefined,
   } = props;
 
   const [sprayGuideOpen, setSprayGuideOpen] = useState(false);

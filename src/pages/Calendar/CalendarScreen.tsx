@@ -411,7 +411,6 @@ type CalendarScreenProps = {
 
 export default function CalendarScreen({
   cmsRuntimeCss,
-  cmsPageFor,
   cmsBlockFor,
   cmsText,
   cmsSub,

@@ -1,16 +1,7 @@
 import { supabase } from '../supabaseClient';
 
-const env = import.meta.env;
 
-function normalizeSupabaseProjectUrl(value: unknown) {
-  const raw = String(value ?? '').trim();
 
-  if (!raw) return '';
-
-  return raw
-    .replace(/\/+$/, '')
-    .replace(/\/(?:rest|auth|storage|functions)\/v1$/i, '');
-}
 
 
 
