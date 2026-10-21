@@ -1323,7 +1323,7 @@ function renderedNdviScore(r: number, g: number, b: number) {
     { rgb: [13, 122, 46], value: 0.90 },
   ] as const;
 
-  let best = palette[0];
+  let best: (typeof palette)[number] = palette[0];
   let bestDistance = Number.POSITIVE_INFINITY;
 
   for (const entry of palette) {
