@@ -627,6 +627,22 @@ function homePusulaDirectionFromPoint(
   return (found?.[0] as HomePusulaGridDirection | undefined) ?? null;
 }
 
+function homePusulaRelativeHealthForDirection(
+  spatial: any,
+  direction: HomePusulaGridDirection | null,
+) {
+  if (!direction || !Array.isArray(spatial?.findings)) {
+    return null;
+  }
+
+  const finding = spatial.findings.find(
+    (item: any) =>
+      normalizeHomePusulaDirection(item?.area ?? item?.direction) === direction,
+  );
+
+  const value = Number(finding?.ndvi?.relativeHealth);
+  return Number.isFinite(value) ? value : null;
+}
 
 function homePusulaGridBounds(
   base: HomeBBox,
@@ -1227,7 +1243,57 @@ function homeInteriorPointFromFeature(
   );
 }
 
+function firstOuterRing(parcelGeometry: any): number[][] | null {
+  const geometry = parcelGeometry?.geometry ?? parcelGeometry;
+  if (!geometry?.coordinates) return null;
 
+  if (geometry.type === 'Polygon') {
+    return Array.isArray(geometry.coordinates?.[0])
+      ? geometry.coordinates[0]
+      : null;
+  }
+
+  if (geometry.type === 'MultiPolygon') {
+    const polygons = geometry.coordinates as any[];
+    if (!Array.isArray(polygons) || !polygons.length) return null;
+
+    let best: number[][] | null = null;
+    let bestSize = 0;
+    for (const polygon of polygons) {
+      const ring = polygon?.[0];
+      if (Array.isArray(ring) && ring.length > bestSize) {
+        best = ring;
+        bestSize = ring.length;
+      }
+    }
+    return best;
+  }
+
+  return null;
+}
+
+function ringClipPath(ring: number[][] | null, bbox: HomeBBox | null) {
+  if (!ring || !bbox) return undefined;
+  const [west, south, east, north] = bbox;
+  const width = east - west;
+  const height = north - south;
+  if (width <= 0 || height <= 0) return undefined;
+
+  const points = ring
+    .filter(
+      (p) =>
+        Array.isArray(p) &&
+        Number.isFinite(Number(p[0])) &&
+        Number.isFinite(Number(p[1]))
+    )
+    .map(([lng, lat]) => {
+      const x = ((Number(lng) - west) / width) * 100;
+      const y = ((north - Number(lat)) / height) * 100;
+      return `${x.toFixed(3)}% ${y.toFixed(3)}%`;
+    });
+
+  return points.length >= 3 ? `polygon(${points.join(',')})` : undefined;
+}
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
@@ -1344,7 +1410,14 @@ function homeHotspotConvexHull(
   return [...lower, ...upper];
 }
 
- | null> {
+async function homeNdviHotspotFocus(
+  imageUrl: string,
+  bbox: HomeBBox,
+): Promise<{
+  feature: any;
+  bounds: HomeBBox;
+  hotspotCount: number;
+} | null> {
   if (!imageUrl || !bbox) return null;
 
   return new Promise((resolve) => {
@@ -1719,6 +1792,62 @@ function gaussianKernel(radius: number, sigma: number) {
 }
 
 // VARYASYON A: güçlü/sisli geçiş — keskin Sentinel hücrelerini eritmek için.
+function gaussianBlurMasked(
+  scores: Float32Array,
+  weights: Float32Array,
+  width: number,
+  height: number
+) {
+  const radius = 7;
+  const kernel = gaussianKernel(radius, 3.9);
+
+  const horizontal = new Float32Array(scores.length);
+  const horizontalWeight = new Float32Array(scores.length);
+  const output = new Float32Array(scores.length);
+  const outputWeight = new Float32Array(scores.length);
+
+  for (let y = 0; y < height; y += 1) {
+    const row = y * width;
+
+    for (let x = 0; x < width; x += 1) {
+      let sum = 0;
+      let weightSum = 0;
+
+      for (let k = -radius; k <= radius; k += 1) {
+        const sx = Math.max(0, Math.min(width - 1, x + k));
+        const index = row + sx;
+        const w = kernel[k + radius] * weights[index];
+        sum += scores[index] * w;
+        weightSum += w;
+      }
+
+      const index = row + x;
+      horizontal[index] = weightSum > 0 ? sum / weightSum : 0;
+      horizontalWeight[index] = weightSum > 0 ? 1 : 0;
+    }
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let sum = 0;
+      let weightSum = 0;
+
+      for (let k = -radius; k <= radius; k += 1) {
+        const sy = Math.max(0, Math.min(height - 1, y + k));
+        const index = sy * width + x;
+        const w = kernel[k + radius] * horizontalWeight[index];
+        sum += horizontal[index] * w;
+        weightSum += w;
+      }
+
+      const index = y * width + x;
+      output[index] = weightSum > 0 ? sum / weightSum : 0;
+      outputWeight[index] = weightSum > 0 ? 1 : 0;
+    }
+  }
+
+  return { scores: output, weights: outputWeight };
+}
 
 async function makeSmoothNdviOverlay(
   imageUrl: string,
@@ -2028,7 +2157,12 @@ async function makeSmoothNdviOverlay(
   });
 }
 
-: {
+function InteractiveHomeHealthMap({
+  data,
+  parcelGeometry,
+  height = 390,
+  onOpen,
+}: {
   data: any;
   parcelGeometry?: any;
   height?: number;
@@ -3611,6 +3745,16 @@ function homeAgroRgb(ratio: number, layer: HomeAgroLayer) {
     : mix(palette[1], palette[2], (v - 0.5) / 0.5);
 }
 
+function homeAgroGradient(layer: HomeAgroLayer) {
+  const palette = HOME_AGRO_PALETTES[layer];
+  const color = (rgb: readonly [number, number, number]) =>
+    `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+
+  return `linear-gradient(90deg,${color(palette[0])},${color(
+    palette[1],
+  )},${color(palette[2])})`;
+}
+
 
 function homeBboxSizeMeters(bbox: HomeBBox | null) {
   if (!bbox) {
@@ -3622,6 +3766,7 @@ function homeBboxSizeMeters(bbox: HomeBBox | null) {
   }
 
   const [west, south, east, north] = bbox;
+  const centerLat = ((south + north) / 2) * (Math.PI / 180);
   const height = Math.abs(north - south) * 111320;
   const width =
     Math.abs(east - west) *
@@ -3763,6 +3908,7 @@ function homeRepresentativeCellValue(
   bbox: HomeBBox,
 ) {
   const centerLat = (bbox[1] + bbox[3]) / 2;
+  const centerLng = (bbox[0] + bbox[2]) / 2;
 
   const prepared = cells
     .map((cell: any) => ({
@@ -4227,7 +4373,30 @@ function makeSmoothAgroOverlay(
     const representative =
       homeRepresentativeCellValue(valid, targetBbox);
 
-
+    const centerLat = (targetBbox[1] + targetBbox[3]) / 2;
+    const centerLng = (targetBbox[0] + targetBbox[2]) / 2;
+    const representativeCell = valid
+      .map((cell: any) => ({
+        ...cell,
+        latitude: Number(cell?.latitude),
+        longitude: Number(cell?.longitude),
+        value: Number(cell?.value),
+      }))
+      .filter(
+        (cell: any) =>
+          Number.isFinite(cell.latitude) &&
+          Number.isFinite(cell.longitude) &&
+          Number.isFinite(cell.value),
+      )
+      .sort((a: any, b: any) => {
+        const ad =
+          (a.latitude - centerLat) ** 2 +
+          (a.longitude - centerLng) ** 2;
+        const bd =
+          (b.latitude - centerLat) ** 2 +
+          (b.longitude - centerLng) ** 2;
+        return ad - bd;
+      })[0];
 
     // Kaba çözünürlüklü veride parseli tek renge boyamak sahte bir
     // tarla-içi ayrım hissi veriyordu. Rasterı görünmez bırakıyoruz;
