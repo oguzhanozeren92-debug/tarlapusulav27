@@ -12,7 +12,7 @@ import type {
 export type YieldHarvestEnsembleSupport = {
   dssat: DssatShadowRunResult | null;
   aquacrop: Awaited<ReturnType<typeof loadLatestAquaCropPilotAudit>>;
-  pcse: Awaited<ReturnType<typeof loadLatestPcsePilotEvidence>>;
+  pcse: Awaited<ReturnType<typeof loadLatestPcsePilotEvidence>> | null;
   sl2p: Awaited<ReturnType<typeof loadFieldScientificSignals>> | null;
   warnings: string[];
 };
