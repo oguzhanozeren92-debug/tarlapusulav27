@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { mapRuntime } from '../../lib/mapRuntime';
-import type { GeoJSONSource, ImageSource, Map } from 'maplibre-gl';
+import type { GeoJSONSource, Map } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
