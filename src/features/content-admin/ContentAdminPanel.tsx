@@ -11,7 +11,6 @@ import {
   Upload,
   RefreshCw,
   Search,
-  Star,
   Trash2,
   X,
 } from 'lucide-react';
@@ -1178,7 +1177,6 @@ export default function ContentAdminPanel() {
       const data = await invokeContentScan(config.functionName, config.body);
       const created = Number(data?.candidatesCreated ?? 0);
       const upgraded = Number(data?.candidatesUpgraded ?? 0);
-      const rejected = Number(data?.lowQualityRejected ?? 0);
       const engine = String(data?.engine || config.functionName).trim();
 
       if (config.guideSource) {

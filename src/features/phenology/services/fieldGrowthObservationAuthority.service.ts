@@ -215,7 +215,7 @@ function observedBasis(observation: FieldGrowthObservationEvidence) {
 
 function contextualizeOnly(
   base: PhenologyResult | null | undefined,
-  observation: FieldGrowthObservationEvidence,
+  _observation: FieldGrowthObservationEvidence,
   warning: string,
 ): PhenologyResult | null {
   if (!base) return null;

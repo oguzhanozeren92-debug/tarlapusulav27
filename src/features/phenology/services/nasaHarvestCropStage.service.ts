@@ -83,9 +83,6 @@ const CANONICAL_LABEL: Record<NasaHarvestStageCode, string> = {
   E: 'Hasat sonrası',
 };
 
-function finite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
 
 function dateMs(value: unknown): number | null {
   const raw = String(value ?? '').trim().slice(0, 10);

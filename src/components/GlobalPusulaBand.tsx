@@ -192,9 +192,6 @@ function StarPointIcon() {
   return <Star className="tp-3d-star" aria-hidden="true" />;
 }
 
-function LeafBellIcon() {
-  return <Bell className="tp-3d-bell" aria-hidden="true" />;
-}
 
 type CachedWeatherPusula = {
   fieldName?: string;
@@ -233,8 +230,6 @@ const DEPOT_STATE_CACHE_KEY = 'tp_pusula_depot_state_v1';
 
 const WEATHER_PUSULA_CACHE_KEY = 'tp_pusula_weather_latest_v2';
 
-const PUSULA_GUIDE_DELAY_MS = 5200;
-const PUSULA_GUIDE_INTERVAL_MS = 9000;
 
 type GuideMessage = {
   title: string;

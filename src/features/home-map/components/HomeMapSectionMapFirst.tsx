@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, ClipboardList, Gauge } from 'lucide-react';
 import HomeMapSection from './HomeMapSection';
 import {
   HOME_CLIMATE_DEPTH_LABELS,

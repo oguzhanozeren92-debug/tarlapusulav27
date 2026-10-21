@@ -120,10 +120,7 @@ function finite(value: unknown) {
   return Number.isFinite(number) ? number : null;
 }
 
-function metricValue(snapshot: BiophysicalSnapshot | null, key: string) {
-  const metric = snapshot?.metrics?.[key];
-  return finite(metric?.value ?? metric?.mean);
-}
+
 
 function emptyMetric(): LocalNutrientMetric {
   return { value: null, trend: 'unknown', significant: false };

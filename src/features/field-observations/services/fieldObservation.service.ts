@@ -1055,7 +1055,7 @@ export async function findDueObservationFollowUps(
   currentSatelliteDate?: string | null,
 ) {
   const user = await requireUser();
-  const now = new Date().toISOString();
+
 
   const { data, error } = await supabase
     .from('field_observation_points')

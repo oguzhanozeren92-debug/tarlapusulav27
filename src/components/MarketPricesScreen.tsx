@@ -14,7 +14,6 @@ import {
   type MarketCropPrice,
   type MarketData,
   type MarketFertilizerPrice,
-  type MarketFuelPrice,
   type MarketLocation,
 } from '../services/marketPricesService';
 import './MarketPricesScreen.css';

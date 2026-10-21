@@ -640,7 +640,6 @@ export default function FieldStatusCenter({
   onFieldPatch,
   recordsRefreshNonce = 0,
   fieldEventCandidate = null,
-  onOpenFieldEvent,
 }: Props) {
   const [tab, setTab] = useState<FieldStatusTabKey>('summary');
   const [signals, setSignals] = useState<FieldScientificSignals>(EMPTY_SIGNALS);
@@ -1776,9 +1775,7 @@ export default function FieldStatusCenter({
   const irrigationUserMissing = irrigationMissing
     .map((value: unknown) => String(value))
     .filter((code: string) => USER_ACTIONABLE_IRRIGATION_MISSING.has(code));
-  const irrigationSystemMissing = irrigationMissing
-    .map((value: unknown) => String(value))
-    .filter((code: string) => !USER_ACTIONABLE_IRRIGATION_MISSING.has(code));
+
 
   const missingDataItems = useMemo(() => {
     const codes = new Set<string>();
