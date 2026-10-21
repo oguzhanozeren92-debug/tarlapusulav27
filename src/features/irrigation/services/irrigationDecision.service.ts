@@ -1,8 +1,4 @@
 import {
-  supabase,
-} from '../../../supabaseClient';
-
-import {
   loadIrrigationContext,
 } from './irrigationContext.service';
 
@@ -276,7 +272,7 @@ async function fetchBalanceWeather(
   latitude: number,
   longitude: number,
   pastDays: number,
-) {
+): Promise<Array<{ date: string; etoMm: number | null; precipitationMm: number | null }>> {
   const params =
     new URLSearchParams({
       latitude:
