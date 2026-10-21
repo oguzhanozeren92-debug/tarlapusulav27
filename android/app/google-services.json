@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1011229691842",
+    "project_id": "tarlapusula-20f5d",
+    "storage_bucket": "tarlapusula-20f5d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1011229691842:android:ea6bfccf8f84864846105b",
+        "android_client_info": {
+          "package_name": "com.tarlapusula.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOeEgnbzltEZYnEiN-zGrBUQ_W5Y1jZlM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
