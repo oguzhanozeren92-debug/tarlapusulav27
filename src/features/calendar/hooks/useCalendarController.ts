@@ -431,6 +431,7 @@ export function useCalendarController({
     pushLoading,
     pushMessage,
     openCalendarScreen,
+    loadCalendarReminders,
     openReminderModal,
     handleAddReminder,
     handleToggleReminder,
