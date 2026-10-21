@@ -206,7 +206,7 @@ export function formatPollinationHour(time: number, timezone: string) {
 }
 
 function buildWindows(hours: PollinationEvaluatedHour[]): PollinationWindow[] {
-  const usable = hours.filter((hour) => hour.status !== 'poor');
+  const usable = hours.filter((hour) => hour.status === 'good' || hour.status === 'watch');
   const windows: PollinationWindow[] = [];
 
   for (const hour of usable) {
