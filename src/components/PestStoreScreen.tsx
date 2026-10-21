@@ -1739,7 +1739,7 @@ export default function PestStoreScreen({
                       : analysis.source === 'verified-local'
                         ? 'Doğrulanmış yerel kayıt'
                         : analysis.bkuLookup?.status === 'exact'
-                          ? analysis.bkuLookup.usageSource === 'official-bku'
+                          ? analysis.bkuLookup?.usageSource === 'official-bku'
                             ? 'Canlı AI + Resmî BKÜ kullanım verisi'
                             : 'Canlı AI + BKÜ ruhsat doğrulaması'
                           : 'Canlı AI etiket okuma'}
@@ -1750,7 +1750,7 @@ export default function PestStoreScreen({
                       : analysis.source === 'verified-local'
                         ? 'Kayıt yalnızca fotoğraf hash’i birebir eşleştiği için kullanıldı.'
                         : analysis.bkuLookup?.status === 'exact'
-                          ? analysis.bkuLookup.usageSource === 'official-bku'
+                          ? analysis.bkuLookup?.usageSource === 'official-bku'
                             ? 'Ürün etiketten tanındı; bitki, hedef ve doz bilgileri doğrudan T.C. Tarım ve Orman Bakanlığı BKÜ kullanım detaylarından okundu.'
                             : 'Ürün kimliği resmî BKÜ ruhsat kaydıyla doğrulandı; kullanım/doz satırları doğrudan BKÜ Tavsiye Arama üzerinden bekleniyor.'
                           : 'AI etiketi okudu ancak resmî BKÜ eşleşmesi henüz kesinleşmedi.'}
@@ -1957,7 +1957,7 @@ export default function PestStoreScreen({
                         </span>
                         <div>
                           <small>
-                            {analysis.bkuLookup.usageSource === 'official-bku'
+                            {analysis.bkuLookup?.usageSource === 'official-bku'
                               ? 'CANLI RESMÎ BKÜ KULLANIM VERİSİ'
                               : 'BKÜ RUHSATI + KAYNAKLI ÜRÜN ETİKETİ'}
                           </small>
@@ -1968,7 +1968,7 @@ export default function PestStoreScreen({
                         </div>
                       </div>
                       <b>
-                        {analysis.bkuLookup.usageSource === 'official-bku'
+                        {analysis.bkuLookup?.usageSource === 'official-bku'
                           ? 'BKÜ DOĞRULANDI'
                           : 'ÜRÜN DOĞRULANDI'}
                       </b>
@@ -2016,7 +2016,7 @@ export default function PestStoreScreen({
                           </div>
                           <div className="dose">
                             <small>
-                              {analysis.bkuLookup.usageSource === 'official-bku'
+                              {analysis.bkuLookup?.usageSource === 'official-bku'
                                 ? 'Resmî BKÜ dozu'
                                 : 'Kaynaklı etiket dozu'}
                             </small>
@@ -2040,7 +2040,7 @@ export default function PestStoreScreen({
                               target="_blank"
                               rel="noreferrer"
                             >
-                              {analysis.bkuLookup.usageSource === 'official-bku'
+                              {analysis.bkuLookup?.usageSource === 'official-bku'
                                 ? 'BKÜ kaynağını aç'
                                 : 'Etiket kaynağını aç'}
                             </a>
