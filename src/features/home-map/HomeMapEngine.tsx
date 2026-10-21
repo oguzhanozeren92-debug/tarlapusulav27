@@ -157,6 +157,7 @@ const HOME_MAP_CLIMATE_VISUAL_INFLIGHT = new Map<
     url: string;
     bbox: HomeBBox;
     summary: HomeLayerSpatialSummary;
+    variable: HomeClimateVariable;
   }>
 >();
 const HOME_MAP_AGRO_INFLIGHT = new Map<string, Promise<any[]>>();
