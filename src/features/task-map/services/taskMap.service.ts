@@ -197,6 +197,7 @@ function buildZone(task: FieldTask): TaskMapZone | null {
     source: task.source,
     actionTarget: task.actionTarget,
     priority: task.priority,
+    rewardPoints: task.rewardPoints,
     direction: spatial.direction,
     geometry: spatial.geometry,
     bounds: spatial.bounds,

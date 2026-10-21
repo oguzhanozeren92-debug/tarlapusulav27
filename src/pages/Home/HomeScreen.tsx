@@ -523,7 +523,6 @@ export default function HomeScreen(props: HomeScreenProps) {
   });
 
   const {
-    todayWeather,
     headerTemperatureLabel: headerWeatherTemperatureLabel,
     headerCondition: headerWeatherCondition,
     headerLocation: headerWeatherLocation,
@@ -1235,7 +1234,6 @@ export default function HomeScreen(props: HomeScreenProps) {
     if (pusulaDecision) {
       setSeenHomePusulaDecisionId(pusulaDecision.id);
       const confidence =
-        pusulaDecision.gateway?.confidence ??
         pusulaDecision.confidence ??
         'preliminary';
 

@@ -80,6 +80,13 @@ export async function fetchUserFields(): Promise<Field[]> {
     }
   }
 
+  function readLinkedVarietyName(value: unknown): string | null {
+    const item = Array.isArray(value) ? value[0] : value;
+    if (!item || typeof item !== 'object') return null;
+    const name = (item as Record<string, unknown>).variety_name;
+    return typeof name === 'string' && name.trim() ? name.trim() : null;
+  }
+
   return (data ?? []).map((item) => ({
     id: item.id,
     name: item.name,
@@ -88,12 +95,8 @@ export async function fetchUserFields(): Promise<Field[]> {
     area: Number(item.area_decare ?? 0),
     crop: item.crop ?? 'Ürün belirtilmedi',
     varietyId: item.variety_id ?? null,
-    varietyName:
-      (Array.isArray(item.crop_varieties)
-        ? item.crop_varieties[0]?.variety_name ?? null
-        : item.crop_varieties?.variety_name ?? null) ??
-      latestSeasonVarietyByField.get(String(item.id)) ??
-      null,
+    varietyName: readLinkedVarietyName(item.crop_varieties) ??
+      latestSeasonVarietyByField.get(String(item.id)) ?? null,
     season: Number(item.season ?? new Date().getFullYear()),
     status: (item.status ?? 'good') as FieldStatus,
     city: item.city ?? undefined,

@@ -2439,28 +2439,6 @@ function InteractiveHomeHealthMap({
 
       <MapDataDate latestDate={data?.latestImageDate} hasData={Boolean(smoothNdvi && bbox)} />
 
-      {fieldOperationToast ? (
-        <div
-          role="status"
-          style={{
-            position: 'absolute',
-            zIndex: 48,
-            left: 12,
-            top: 54,
-            maxWidth: 230,
-            padding: '7px 9px',
-            border: '1px solid rgba(34,197,94,.16)',
-            borderRadius: 10,
-            background: 'rgba(2,10,5,.93)',
-            color: '#bbf7d0',
-            fontSize: 7.2,
-            fontWeight: 800,
-            boxShadow: '0 8px 24px rgba(0,0,0,.32)',
-          }}
-        >
-          ✓ {fieldOperationToast}
-        </div>
-      ) : null}
 
       <button
         type="button"
@@ -9575,6 +9553,12 @@ export function HomeInlineLayerMap({
           }
         }
       `}</style>
+
+      {fieldOperationToast ? (
+        <div role="status" style={{ position: 'fixed', left: 16, bottom: 90, zIndex: 1000, padding: '10px 14px', borderRadius: 10, color: '#fff', background: '#151b1f', fontWeight: 700 }}>
+          ✓ {fieldOperationToast}
+        </div>
+      ) : null}
 
       <FieldOperationModal
         open={fieldOperationOpen}

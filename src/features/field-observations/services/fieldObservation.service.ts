@@ -618,6 +618,8 @@ async function compareObservationPhotosWithAi(
   }
 }
 
+type ObservationPhotoLocationReference = { lat: number; lng: number; capturedAt: string | null };
+
 export async function getObservationPhotoLocationReference(
   pointIdInput: string,
 ): Promise<ObservationPhotoLocationReference | null> {

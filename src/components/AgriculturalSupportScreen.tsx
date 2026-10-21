@@ -1104,9 +1104,7 @@ export default function AgriculturalSupportScreen({
 
               <section className="tp-support-filter-row tp-support-global-tabs">
                 {FEED_TABS.map((tab) => {
-                  const active = activeView === 'calculator'
-                    ? tab.id === 'calculator'
-                    : tab.id !== 'calculator' && activeFeedTab === tab.id;
+                  const active = tab.id !== 'calculator' && activeFeedTab === tab.id;
 
                   return (
                     <button
