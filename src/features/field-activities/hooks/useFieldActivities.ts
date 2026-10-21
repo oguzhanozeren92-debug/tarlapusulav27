@@ -444,15 +444,9 @@ export function useFieldActivities({
 
       setActivityMessage('Pusula AI görüntüyü inceliyor… Genellikle 10–50 saniye sürer.');
 
-      const developerPreviewPlan =
-        entitlement.canOverride && entitlement.developerMode === 'premium'
-          ? 'premium'
-          : null;
-
       const analysisRequest = supabase.functions.invoke('analyze-field-image', {
         body: {
           jobId,
-          developerPreviewPlan,
         },
       });
 
