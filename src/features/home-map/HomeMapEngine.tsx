@@ -4227,13 +4227,7 @@ function makeSmoothAgroOverlay(
     const representative =
       homeRepresentativeCellValue(valid, targetBbox);
 
-    const centerLat = (targetBbox[1] + targetBbox[3]) / 2;
-    const centerLng = (targetBbox[0] + targetBbox[2]) / 2;
-        const bd =
-          (b.latitude - centerLat) ** 2 +
-          (b.longitude - centerLng) ** 2;
-        return ad - bd;
-      })[0];
+
 
     // Kaba çözünürlüklü veride parseli tek renge boyamak sahte bir
     // tarla-içi ayrım hissi veriyordu. Rasterı görünmez bırakıyoruz;

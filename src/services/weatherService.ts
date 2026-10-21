@@ -127,25 +127,7 @@ export const fetchOpenMeteoForecast = async (
   }));
 };
 
-      return;
-    }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          label: 'Mevcut konum',
-        });
-      },
-      () => resolve(null),
-      {
-        enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: 10 * 60 * 1000,
-      },
-    );
-  });
 
 export const resolveHomeWeatherLocation = async (
   field?: Field | null,

@@ -1308,48 +1308,6 @@ export default function ContentAdminPanel() {
     }
   };
 
-    if (!activeSources.length) {
-      setMessage('Taranacak aktif kaynak yok.');
-      return;
-    }
-
-    setWorkingId('__research__');
-    setMessage(`${activeSources.length} aktif kaynak sırayla taranıyor…`);
-
-    let createdTotal = 0;
-    let upgradedTotal = 0;
-    let rejectedTotal = 0;
-    const failures: string[] = [];
-
-    try {
-      for (let index = 0; index < activeSources.length; index += 1) {
-        const source = activeSources[index];
-        const config = sourceScanConfig(source);
-        setMessage(`${index + 1}/${activeSources.length} · ${source.name} taranıyor…`);
-
-        try {
-          const data = await invokeContentScan(config.functionName, config.body);
-          createdTotal += Number(data?.candidatesCreated ?? 0);
-          upgradedTotal += Number(data?.candidatesUpgraded ?? 0);
-          rejectedTotal += Number(data?.lowQualityRejected ?? 0);
-        } catch (error: any) {
-          const detail = String(error?.message || 'bilinmeyen hata');
-          failures.push(`${source.name}: ${detail}`);
-          console.error('[TarlaPusula full content scan]', source.name, error);
-        }
-      }
-
-      await loadAll();
-      setMessage(
-        failures.length
-          ? `Tam tarama bitti. ${createdTotal} yeni, ${upgradedTotal} güncellendi, ${rejectedTotal} düşük kalite elendi. ${failures.length} kaynak hata verdi: ${failures.slice(0, 3).join(' | ')}`
-          : `Tam tarama bitti. ${createdTotal} yeni, ${upgradedTotal} güncellendi, ${rejectedTotal} düşük kalite elendi. ${activeSources.length} kaynak başarıyla tarandı.`,
-      );
-    } finally {
-      setWorkingId('');
-    }
-  };
-
   return (
     <section className="tp-content-admin">
       <header className="tp-content-admin__head">

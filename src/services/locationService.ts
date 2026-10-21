@@ -31,26 +31,6 @@ const normalizeOptions = (
   );
 
 
-  return normalizeOptions(
-    features.map((feature: any) => {
-      const properties = feature?.properties ?? feature ?? {};
-
-      return {
-        id:
-          properties.id ??
-          properties.kod ??
-          properties.code ??
-          feature?.id,
-        name:
-          properties.text ??
-          properties.name ??
-          properties.ad ??
-          properties.label ??
-          '',
-      };
-    }),
-  );
-};
 
 
 async function fetchTkgmProxyOptions(
