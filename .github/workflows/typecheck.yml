@@ -1,0 +1,38 @@
+name: TypeScript Error Report
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout v27
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check TypeScript and save full errors
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck-errors.log 2>&1
+          code=$?
+          cat typecheck-errors.log
+          echo "Exit code: $code"
+          exit "$code"
+      - name: Upload full error report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-errors
+          path: typecheck-errors.log
+          if-no-files-found: warn
