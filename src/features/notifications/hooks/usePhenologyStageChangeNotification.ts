@@ -62,13 +62,13 @@ export function usePhenologyStageChangeNotification({
 
     let cancelled = false;
 
-    void supabase
+    void Promise.resolve(supabase
       .rpc('tp_sync_phenology_stage_notification', {
         p_field_id: fieldId,
         p_stage: stage,
         p_confidence: confidence,
         p_source: sourceForPhenology(phenology),
-      })
+      }))
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) throw error;

@@ -434,7 +434,7 @@ export async function fetchWorldCerealReferenceContext(
   }
 
   try {
-    const collections = await loadCollections();
+    const collections: CollectionRow[] = await loadCollections();
 
     const matched = collections
       .filter((collection) => {

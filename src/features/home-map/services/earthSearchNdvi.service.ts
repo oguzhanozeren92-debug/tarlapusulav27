@@ -545,7 +545,7 @@ export async function analyzeEarthSearchSceneNdvi(
   const windowWidth = x1 - x0;
   const windowHeight = y1 - y0;
 
-  const [redRaster, nirRaster] = await Promise.all([
+  const [redRaw, nirRaw] = await Promise.all([
     redImage.readRasters({ window, interleave: true }),
     nirImage.readRasters({
       window,
@@ -554,6 +554,13 @@ export async function analyzeEarthSearchSceneNdvi(
       interleave: true,
     }),
   ]);
+  const asNumericRaster = (raster: unknown): ArrayLike<number> => {
+    if (Array.isArray(raster) && raster.every((pixel) => typeof pixel === 'number')) return raster;
+    if (ArrayBuffer.isView(raster) && 'length' in raster) return raster as unknown as ArrayLike<number>;
+    throw new Error('Uydu raster piksel dizisi alınamadı.');
+  };
+  const redRaster = asNumericRaster(redRaw);
+  const nirRaster = asNumericRaster(nirRaw);
 
   const ndviRows: number[][] = Array.from(
     { length: windowHeight },
