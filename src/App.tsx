@@ -26,7 +26,7 @@ import PlaceholderScreen from './pages/Placeholder/PlaceholderScreen';
 import NotificationsHubScreen from './pages/Notifications/NotificationsHubScreen';
 import FieldDetailScreen from './pages/FieldDetailScreen';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FALLBACK_DESKTOP_MENU_ITEMS, BASE_PLACEHOLDER_META, weatherDayLabel, weatherIcon } from './data/navigation';
+import { FALLBACK_DESKTOP_MENU_ITEMS, BASE_PLACEHOLDER_META, weatherIcon } from './data/navigation';
 import PusulaIntroTrailer from './components/PusulaIntroTrailer';
 import AppDrawer from './components/AppDrawer';
 import GlobalPusulaBand from './components/GlobalPusulaBand';
@@ -356,7 +356,6 @@ export default function App() {
     pushLoading,
     pushMessage,
     openCalendarScreen,
-    loadCalendarReminders,
     openReminderModal,
     handleAddReminder,
     handleToggleReminder,
