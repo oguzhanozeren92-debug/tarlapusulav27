@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
-import { supabase } from '../../../supabaseClient';
-import { urlBase64ToUint8Array } from '../../../utils/fileUtils';
-import { calendarLocalDate } from '../services/weeklyFieldPlan';
-import type { CalendarReminder, Field, Screen } from '../../../types';
+import { supabase } from '../../supabaseClient';
+import { urlBase64ToUint8Array } from '../../utils/fileUtils';
+import { calendarLocalDate } from '../../features/calendar/services/weeklyFieldPlan';
+import type { CalendarReminder, Field, Screen } from '../../types';
 
 type UseCalendarControllerOptions = {
   realFields: Field[];
