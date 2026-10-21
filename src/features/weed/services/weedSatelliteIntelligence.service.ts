@@ -330,7 +330,7 @@ export function buildWeedSatelliteScreening(input: {
     .slice(0, 3);
 
   const previous = previousSnapshot(fieldId, sceneDate);
-  const currentAreas = candidateAreas.map((item) => item.area);
+  const currentAreas = candidateAreas.map((item: WeedSatelliteCandidateArea) => item.area);
   const previousAreas = previous?.candidateAreas ?? [];
   const overlap = sameAreaSet(currentAreas, previousAreas);
 
