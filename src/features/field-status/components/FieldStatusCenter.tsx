@@ -23,7 +23,6 @@ import {
   Sprout,
   Tractor,
   Upload,
-  Waves,
   X,
 } from 'lucide-react';
 
