@@ -879,6 +879,8 @@ export function resolveCropCoefficient(
     cropName:
       profile.displayName,
 
+    cropSubtype: profile.cropSubtype,
+
     stage:
       input.stage,
 
