@@ -1,9 +1,9 @@
 import type { ContentCatalogSource } from '../../knowledge/data/sources';
 import type { RawSourceItem } from './contentSourceAdapter.types';
 import { prepareFreeTranslation } from './contentFreeTranslation.service';
-import { createProducerFriendlySummary, producerUsefulnessScore } from './producerFriendlySummary.service';
+import { buildProducerFriendlySummary, producerUsefulnessScore } from './producerFriendlySummary.service';
 import { autoTagContent } from './contentAutoTagger.service';
-import { calculateContentReliability } from './contentReliabilityScore.service';
+import { calculateReliability } from './contentReliabilityScore.service';
 
 export interface EnrichedCandidate {
   title:string;url:string;publishedAt?:string;summary:string;
@@ -22,8 +22,8 @@ export function enrichSourceItem(source:ContentCatalogSource,item:RawSourceItem)
   const originalSummary=String(item.summary||'').trim();
   const tr=prepareFreeTranslation(originalTitle,originalSummary,language);
   const tags=autoTagContent(`${tr.titleTr} ${tr.summaryTr}`);
-  const summary=createProducerFriendlySummary(tr.summaryTr||tr.titleTr);
-  const reliability=calculateContentReliability(source,item);
+  const summary=buildProducerFriendlySummary(tr.titleTr,tr.summaryTr);
+  const reliability=calculateReliability(source,Boolean(item.publishedAt),Boolean(item.summary));
   return {
     title:tr.titleTr,url:item.url,publishedAt:item.publishedAt,summary,
     originalTitle,originalSummary,language,translationStatus:tr.translationStatus,

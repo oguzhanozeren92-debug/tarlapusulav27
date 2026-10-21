@@ -7,3 +7,5 @@ export function verifyEventCluster(cluster:EventCluster):VerificationResult{
  const score=Math.min(100,Math.round(avg+bonus));
  return {verified:count>=2||score>=90,score,label:count>=3?'Çoklu kaynak':count===2?'İki kaynak':'Tek kaynak',sourceCount:count};
 }
+
+export const crossVerifyCluster = verifyEventCluster;

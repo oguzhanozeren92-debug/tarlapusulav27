@@ -1,4 +1,4 @@
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../../supabaseClient';
 import type { FinalCandidate } from './contentFinalCandidate.service';
 import { mapFinalCandidateToDb } from './contentCandidateDb.mapper';
 

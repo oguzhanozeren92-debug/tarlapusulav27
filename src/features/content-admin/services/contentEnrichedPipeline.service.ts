@@ -26,5 +26,5 @@ export function runEnrichedContentPipeline(
     const match=primary.source.kind==='news'?null:matchKnowledgeUpdate(primary.item,knowledgeCards);
     output.push(buildFinalCandidate(primary.source,primary.item,verification,match));
   }
-  return rankEditorialCandidates(output);
+  return rankEditorialCandidates(output).map((ranked) => ranked.candidate);
 }

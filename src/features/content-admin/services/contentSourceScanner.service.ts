@@ -32,9 +32,8 @@ export async function scanSourcesToDatabase(
         warnings.push(`${input.source.name}: otomatik adaptör yok; manuel/RSS/API bağlantısı gerekli.`);
         continue;
       }
-      const result=await adapter.fetch(input.source,limitPerSource);
-      warnings.push(...result.warnings.map(x=>`${input.source.name}: ${x}`));
-      for(const item of result.items) pipelineInputs.push({source:input.source,item,sourceId:input.sourceId});
+      const items=await adapter.fetch({source:input.source,limit:limitPerSource});
+      for(const item of items) pipelineInputs.push({source:input.source,item,sourceId:input.sourceId});
     }catch(error){
       warnings.push(`${input.source.name}: ${error instanceof Error?error.message:String(error)}`);
     }
@@ -60,4 +59,12 @@ export async function scanSourcesToDatabase(
     duplicates,
     warnings,
   };
+}
+
+export interface SourceScanResult {
+  sourceId: string;
+  status: 'success' | 'skipped' | 'error';
+  found: number;
+  imported: number;
+  message?: string;
 }

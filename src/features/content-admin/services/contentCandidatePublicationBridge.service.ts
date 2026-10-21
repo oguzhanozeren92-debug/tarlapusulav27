@@ -1,4 +1,4 @@
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../../supabaseClient';
 
 export async function markDbCandidateReviewed(id:string,note?:string,score?:number){
  const {error}=await supabase.from('content_candidates').update({

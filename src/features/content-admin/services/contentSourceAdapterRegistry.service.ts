@@ -25,3 +25,5 @@ export function canAutomaticallyScanSource(source: ContentCatalogSource) {
 export function listRegisteredContentSourceAdapters() {
   return [...adapters];
 }
+
+export const getSourceAdapter = getContentSourceAdapter;

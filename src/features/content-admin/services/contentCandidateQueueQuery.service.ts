@@ -1,4 +1,4 @@
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../../supabaseClient';
 export type QueueChannel='all'|'news'|'article'|'guide';
 export async function loadContentCandidateQueue(channel:QueueChannel='all',limit=300){
  const {data,error}=await supabase.from('content_candidates').select('*')
