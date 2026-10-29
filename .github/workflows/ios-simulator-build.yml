@@ -69,21 +69,36 @@ jobs:
         run: |
           xcodebuild             -project ios/App/App.xcodeproj             -scheme App             -configuration Debug             -sdk iphonesimulator             CODE_SIGNING_ALLOWED=NO             build
 
-      - name: Install, launch and capture iPad screenshots
+      - name: Install, launch and capture timed iPad diagnostics
         shell: bash
+        timeout-minutes: 8
         run: |
           set -euo pipefail
           APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -path '*/Build/Products/Debug-iphonesimulator/App.app' -type d -print -quit)
           test -n "$APP_PATH"
+          mkdir -p ipad-screenshots ipad-diagnostics
           xcrun simctl install "$IPAD_UDID" "$APP_PATH"
-          mkdir -p ipad-screenshots
-          xcrun simctl launch "$IPAD_UDID" com.tarlapusula.app
-          sleep 20
-          xcrun simctl io "$IPAD_UDID" screenshot ipad-screenshots/ipad-air-11-portrait.png
-          xcrun simctl ui "$IPAD_UDID" appearance light
-          xcrun simctl status_bar "$IPAD_UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState charged --batteryLevel 100
-          xcrun simctl io "$IPAD_UDID" screenshot ipad-screenshots/ipad-air-11-portrait-clean.png
+          xcrun simctl status_bar "$IPAD_UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState charged --batteryLevel 100 || true
+          xcrun simctl spawn "$IPAD_UDID" log stream --style compact --level error --predicate 'process == "App" OR process == "WebKit" OR process == "WebContent" OR subsystem CONTAINS "WebKit"' > ipad-diagnostics/app-runtime-errors.log 2>&1 &
+          LOG_PID=$!
+          trap 'kill "$LOG_PID" 2>/dev/null || true' EXIT
+          xcrun simctl launch --terminate-running-process "$IPAD_UDID" com.tarlapusula.app | tee ipad-diagnostics/launch.txt
+          for WAIT in 10 30 60 90; do
+            if [ "$WAIT" -eq 10 ]; then sleep 10; elif [ "$WAIT" -eq 30 ]; then sleep 20; else sleep 30; fi
+            xcrun simctl io "$IPAD_UDID" screenshot "ipad-screenshots/ipad-air-11-after-${WAIT}s.png"
+            xcrun simctl spawn "$IPAD_UDID" launchctl list | grep -F com.tarlapusula.app >> ipad-diagnostics/process-checks.txt || true
+          done
+          xcrun simctl spawn "$IPAD_UDID" log show --last 3m --style compact --predicate 'process == "App" OR process == "WebContent"' > ipad-diagnostics/app-recent.log 2>&1 || true
           xcrun simctl terminate "$IPAD_UDID" com.tarlapusula.app || true
+
+      - name: Upload iPad runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-air-11-runtime-diagnostics
+          path: ipad-diagnostics/*
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload iPad screenshot evidence
         if: always()
