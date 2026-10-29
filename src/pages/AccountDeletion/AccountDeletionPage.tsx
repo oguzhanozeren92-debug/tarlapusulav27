@@ -226,11 +226,6 @@ export default function AccountDeletionPage() {
                   TarlaPusula hesabın ve hesabına bağlı uygulama verilerinin
                   silme işlemi tamamlandı.
                 </p>
-                <div className="tp-delete-web-warning">
-                  App Store veya Google Play üzerinden aktif bir aboneliğin
-                  varsa mağaza aboneliğini ayrıca mağaza hesabından yönetmen
-                  gerekir.
-                </div>
               </>
             ) : user ? (
               <>
@@ -245,12 +240,6 @@ export default function AccountDeletionPage() {
                 <div className="tp-delete-web-user">
                   <strong>Doğrulanmış hesap</strong>
                   <span>{user.email || 'Oturum açılmış kullanıcı'}</span>
-                </div>
-
-                <div className="tp-delete-web-warning">
-                  Aktif App Store veya Google Play aboneliği hesabı silmekle
-                  otomatik olarak iptal olmaz. Aboneliği ilgili mağaza
-                  hesabından ayrıca iptal etmelisin.
                 </div>
 
                 <label className="tp-delete-web-label" htmlFor="delete-confirm">
@@ -289,7 +278,7 @@ export default function AccountDeletionPage() {
               </>
             ) : (
               <>
-                <span className="tp-delete-web-kicker">GOOGLE PLAY & GİZLİLİK</span>
+                <span className="tp-delete-web-kicker">HESAP & GİZLİLİK</span>
                 <h1>Hesap ve verilerini sil</h1>
                 <p>
                   TarlaPusula uygulaması telefonunda olmasa bile buradan
