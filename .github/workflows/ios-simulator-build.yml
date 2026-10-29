@@ -46,7 +46,49 @@ jobs:
           npm run build
           npx cap sync ios
 
+      - name: Boot iPad Air 11-inch simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available
+          DEVICE_ID=$(xcrun simctl list devices available | sed -nE '/iPad Air 11-inch/{s/.*\\(([0-9A-F-]{36})\\).*/\\1/p;q;}')
+          if [ -z "$DEVICE_ID" ]; then
+            DEVICE_ID=$(xcrun simctl list devices available | sed -nE '/iPad Air/{s/.*\\(([0-9A-F-]{36})\\).*/\\1/p;q;}')
+          fi
+          if [ -z "$DEVICE_ID" ]; then
+            echo "No available iPad Air simulator found"
+            exit 1
+          fi
+          echo "IPAD_UDID=$DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+
       - name: Compile iOS simulator target
         shell: bash
         run: |
           xcodebuild             -project ios/App/App.xcodeproj             -scheme App             -configuration Debug             -sdk iphonesimulator             CODE_SIGNING_ALLOWED=NO             build
+
+      - name: Install, launch and capture iPad screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -path '*/Build/Products/Debug-iphonesimulator/App.app' -type d -print -quit)
+          test -n "$APP_PATH"
+          xcrun simctl install "$IPAD_UDID" "$APP_PATH"
+          mkdir -p ipad-screenshots
+          xcrun simctl launch "$IPAD_UDID" com.tarlapusula.app
+          sleep 20
+          xcrun simctl io "$IPAD_UDID" screenshot ipad-screenshots/ipad-air-11-portrait.png
+          xcrun simctl ui "$IPAD_UDID" appearance light
+          xcrun simctl status_bar "$IPAD_UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState charged --batteryLevel 100
+          xcrun simctl io "$IPAD_UDID" screenshot ipad-screenshots/ipad-air-11-portrait-clean.png
+          xcrun simctl terminate "$IPAD_UDID" com.tarlapusula.app || true
+
+      - name: Upload iPad screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-air-11-review-screenshots
+          path: ipad-screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 14
