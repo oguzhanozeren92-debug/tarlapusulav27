@@ -315,7 +315,7 @@ export default function PlanUpgradeModal() {
         price: annual || (storePricesLoading ? 'Yükleniyor…' : 'Mağazada bulunamadı'),
         detail: annual
           ? (equivalent ? `yaklaşık ${equivalent} / ay` : 'yıllık abonelik')
-          : 'App Store / Google Play ürünü doğrulanmalı',
+          : 'uygulama mağazası ürünü doğrulanmalı',
       };
     }
 
@@ -323,7 +323,7 @@ export default function PlanUpgradeModal() {
 
     return {
       price: monthly || (storePricesLoading ? 'Yükleniyor…' : 'Mağazada bulunamadı'),
-      detail: monthly ? 'aylık abonelik' : 'App Store / Google Play ürünü doğrulanmalı',
+      detail: monthly ? 'aylık abonelik' : 'uygulama mağazası ürünü doğrulanmalı',
     };
   };
 
@@ -339,14 +339,14 @@ export default function PlanUpgradeModal() {
         }),
       );
       setMessage(
-        'App Store / Google Play aboneliği mobil uygulamada açılır. Web sürümünde mağaza satın alma ekranı gösterilmez.',
+        'uygulama mağazası aboneliği mobil uygulamada açılır. Web sürümünde mağaza satın alma ekranı gösterilmez.',
       );
       return;
     }
 
     if (!nativeStorePurchasesConfigured()) {
       setMessage(
-        'Mağaza bağlantısının son anahtarı henüz girilmedi. RevenueCat public API anahtarı tanımlandığında bu düğme doğrudan App Store / Google Play ödeme ekranını açacak.',
+        'Mağaza bağlantısının son anahtarı henüz girilmedi. RevenueCat public API anahtarı tanımlandığında bu düğme doğrudan uygulama mağazası ödeme ekranını açacak.',
       );
       return;
     }
@@ -459,7 +459,7 @@ export default function PlanUpgradeModal() {
             <small>PLAN KARŞILAŞTIRMA</small>
             <h2>{request.feature || 'Bu özellik'} · {targetLabel}</h2>
             <p>
-              Planları karşılaştır. Mobil uygulamada fiyatlar App Store / Google Play hesabından canlı alınır.
+              Planları karşılaştır. Mobil uygulamada fiyatlar uygulama mağazası hesabından canlı alınır.
             </p>
             <span className="tp-plan-gate-current">
               <LockKeyhole size={12} />
@@ -607,7 +607,7 @@ export default function PlanUpgradeModal() {
             <div className="tp-plan-gate-message" role="alert">{message}</div>
           ) : null}
           <p className="tp-plan-gate-note">
-            Satın alma onaylandığında ücret App Store / Google Play hesabına yansıtılır.
+            Satın alma onaylandığında ücret uygulama mağazası hesabına yansıtılır.
             Aylık veya yıllık abonelikler iptal edilmediği sürece seçilen dönem sonunda otomatik yenilenir
             ve mağaza hesabından yönetilir. Kuru Tarım tüm planlarda kullanılabilir.
             Kritik tarımsal risk uyarıları plan kilidi arkasına saklanmaz.
