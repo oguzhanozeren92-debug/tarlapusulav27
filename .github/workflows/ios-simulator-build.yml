@@ -51,9 +51,10 @@ jobs:
         run: |
           set -euo pipefail
           xcrun simctl list devices available
-          DEVICE_ID=$(xcrun simctl list devices available | sed -nE '/iPad Air 11-inch/{s/.*\\(([0-9A-F-]{36})\\).*/\\1/p;q;}')
+          # Prefer the exact device used by App Review, available on iOS 26.2.
+          DEVICE_ID=$(xcrun simctl list devices available | grep 'iPad Air 11-inch (M3)' | tail -1 | awk -F '[()]' '{print $(NF-1)}' | tr -d ' ')
           if [ -z "$DEVICE_ID" ]; then
-            DEVICE_ID=$(xcrun simctl list devices available | sed -nE '/iPad Air/{s/.*\\(([0-9A-F-]{36})\\).*/\\1/p;q;}')
+            DEVICE_ID=$(xcrun simctl list devices available | grep 'iPad Air' | tail -1 | awk -F '[()]' '{print $(NF-1)}' | tr -d ' ')
           fi
           if [ -z "$DEVICE_ID" ]; then
             echo "No available iPad Air simulator found"
