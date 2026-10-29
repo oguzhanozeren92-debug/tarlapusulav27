@@ -1264,10 +1264,7 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
           />
           <section className="tp-account-delete-modal" role="dialog" aria-modal="true" aria-label="TarlaPusula hesabını sil">
             <h3>Hesabını kalıcı olarak sil</h3>
-            <p>Bu işlem geri alınamaz. Tarlaların, tarımsal kayıtların, fotoğrafların, analizlerin, bildirimlerin ve TarlaPusula hesap verilerin silinir.</p>
-            <div className="tp-account-delete-warning">
-              Aktif App Store veya Google Play aboneliğin varsa hesabı silmek mağaza aboneliğini otomatik olarak iptal etmez. Aboneliğini ayrıca mağaza hesabından yönetmelisin.
-            </div>
+            <p>Bu işlem geri alınamaz. Tarlaların, tarımsal kayıtların, fotoğrafların, analizlerin, bildirimlerin ve TarlaPusula hesap verilerin silinir.</p>
             <label className="tp-account-delete-label" htmlFor="tp-delete-account-confirm">Onaylamak için SİL yaz</label>
             <input
               id="tp-delete-account-confirm"
