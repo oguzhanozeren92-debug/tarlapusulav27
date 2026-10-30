@@ -137,7 +137,7 @@ jobs:
           - takeScreenshot: ipad-native-authenticated/fields
           YAML
           # The flow references environment variables; never write their values to the artifact.
-          maestro test --device "$IPAD_UDID" --output ipad-native-authenticated/report.xml ipad-native-authenticated/flow.yaml
+          maestro test --device "$IPAD_UDID" -e TEST_USER_EMAIL="$TEST_USER_EMAIL" -e TEST_USER_PASSWORD="$TEST_USER_PASSWORD" --output ipad-native-authenticated/report.xml ipad-native-authenticated/flow.yaml
 
       - name: Upload native authenticated iPad evidence
         if: always()
