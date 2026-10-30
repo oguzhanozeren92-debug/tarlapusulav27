@@ -67,6 +67,33 @@ export default function NativeShellBridge() {
 
     void configureNativeChrome();
 
+    // WKWebView may report stale geometry during cold launch or resume.
+    // Refresh layout after the native viewport settles; MapLibre listens to resize.
+    let viewportTimer: ReturnType<typeof setTimeout> | undefined;
+    const refreshViewport = () => {
+      if (disposed) return;
+      window.dispatchEvent(new Event('resize'));
+    };
+    const scheduleViewportRefresh = () => {
+      if (disposed) return;
+      if (viewportTimer) clearTimeout(viewportTimer);
+      viewportTimer = setTimeout(refreshViewport, 180);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') scheduleViewportRefresh();
+    };
+    window.addEventListener('orientationchange', scheduleViewportRefresh);
+    window.addEventListener('pageshow', scheduleViewportRefresh);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.visualViewport?.addEventListener('resize', scheduleViewportRefresh);
+    const startupTimers = [250, 900, 2200].map((ms) => setTimeout(refreshViewport, ms));
+    void App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) scheduleViewportRefresh();
+    }).then((handle) => {
+      if (disposed) void handle.remove();
+      else removers.push(() => void handle.remove());
+    });
+
     void Keyboard.addListener('keyboardWillShow', (info) => {
       if (disposed) return;
       setKeyboardState(true, Number(info.keyboardHeight) || 0);
@@ -114,6 +141,12 @@ export default function NativeShellBridge() {
 
     return () => {
       disposed = true;
+      if (viewportTimer) clearTimeout(viewportTimer);
+      for (const timer of startupTimers) clearTimeout(timer);
+      window.removeEventListener('orientationchange', scheduleViewportRefresh);
+      window.removeEventListener('pageshow', scheduleViewportRefresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.visualViewport?.removeEventListener('resize', scheduleViewportRefresh);
       setKeyboardState(false);
       for (const remove of removers) remove();
     };
