@@ -340,3 +340,30 @@
     flex-shrink: 0;
   }
 }
+
+/* Map toolbar: keep the tractor and field name visible without an oversized selector. */
+@media (max-width: 760px) {
+  html.tp-native-app body #root .tp-v1 .tp-map-first-shell .tp-field-toolbar .tp-field-select-wrap {
+    flex: 0 0 auto !important;
+    width: clamp(146px, 38vw, 190px) !important;
+    max-width: 46vw !important;
+    min-width: 0 !important;
+  }
+  html.tp-native-app body #root .tp-v1 .tp-map-first-shell .tp-field-toolbar .tp-field-select-box {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  html.tp-native-app body #root .tp-v1 .tp-map-first-shell .tp-field-toolbar .tp-field-select-box :is(span, strong, label) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  html.tp-native-app body #root .tp-v1 .tp-map-first-shell .tp-field-toolbar .tp-field-select-box svg {
+    flex-shrink: 0;
+  }
+}
