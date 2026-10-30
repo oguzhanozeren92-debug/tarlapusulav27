@@ -122,6 +122,7 @@ jobs:
           - tapOn:
               text: "Giriş Yap"
               retryTapIfNoChange: true
+          - takeScreenshot: ipad-native-authenticated/after-login-tap
           - extendedWaitUntil:
               notVisible: "Kullanıcı adı / E-posta"
               timeout: 60000
