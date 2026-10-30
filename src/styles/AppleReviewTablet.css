@@ -221,3 +221,60 @@
     transform: none !important;
   }
 }
+
+
+/* Native iPad content fit: prevent intrinsic grid/flex widths from pushing
+   shared screens past the visible viewport. Preserve local map/rail gestures. */
+@media (min-width: 481px) {
+  html.tp-native-app,
+  html.tp-native-app body,
+  html.tp-native-app #root {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: clip !important;
+  }
+
+  html.tp-native-app #root :is(
+    .tp-v1, .tp-main, .tp-app-shell-content,
+    .tp-field-detail-page, .tp-field-detail-content,
+    .tp-calendar-page, .tp-calendar-content,
+    .tp-ai-page, .tp-wxr-page, .tp-wxr-main,
+    .tp-wxv2-page, .soil-page, .soil-main,
+    .tp-peststore-page, .tp-peststore-main,
+    .tp-market-ref-page, .tp-market-ref-main,
+    .tp-hub-page, .tp-knowledge-canvas,
+    .tp-home-top-split, .tp-home-field,
+    .tp-map-first-shell, .tp-map-stage
+  ) {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  html.tp-native-app #root :is(
+    .tp-main, .tp-app-shell-content, .tp-field-detail-content,
+    .tp-calendar-content, .tp-wxr-main, .soil-main,
+    .tp-peststore-main, .tp-market-ref-main
+  ) > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  html.tp-native-app #root :is(
+    .tp-home-top-split, .tp-field-head, .tp-field-toolbar,
+    .tp-global-page-header
+  ) > * {
+    min-width: 0;
+  }
+
+  html.tp-native-app #root :is(img, video, canvas) {
+    max-width: 100%;
+  }
+
+  html.tp-native-app #root :is(
+    .tp-home-top-split, .tp-field-head, .tp-field-toolbar
+  ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
