@@ -132,11 +132,17 @@ jobs:
               for(const [label,pattern] of [['03-map',/Harita/i],['04-weather',/Hava/i],['05-fields',/Tarla/i]]){
                 const nav=page.getByRole('button',{name:pattern}).first();
                 const link=page.getByRole('link',{name:pattern}).first();
-                if(await nav.isVisible().catch(()=>false)) await nav.click();
-                else if(await link.isVisible().catch(()=>false)) await link.click();
-                else {require('fs').writeFileSync('ipad-authenticated/'+label+'-not-found.txt','Navigation control not found');continue;}
-                await page.waitForTimeout(3500);
-                await audit(label);
+                const target=(await nav.isVisible().catch(()=>false)) ? nav : ((await link.isVisible().catch(()=>false)) ? link : null);
+                if(!target){require('fs').writeFileSync('ipad-authenticated/'+label+'-not-found.txt','Navigation control not found');continue;}
+                try {
+                  await target.click({timeout:4500});
+                  await page.waitForTimeout(3500);
+                  await audit(label);
+                } catch(e) {
+                  require('fs').writeFileSync('ipad-authenticated/'+label+'-navigation-error.txt',String(e));
+                  await page.screenshot({path:'ipad-authenticated/'+label+'-navigation-error.png',fullPage:true});
+                  console.log(label+' navigation could not complete: '+String(e).slice(0,200));
+                }
               }
               require('fs').writeFileSync('ipad-authenticated/page-errors.json',JSON.stringify(errors,null,2));
             } finally {await browser.close();}
