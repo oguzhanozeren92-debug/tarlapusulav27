@@ -129,6 +129,7 @@ jobs:
                 if(data.documentWidth>data.screenWidth+4) throw new Error(label+' horizontal overflow '+data.documentWidth+'/'+data.screenWidth);
               };
               await audit('02-home');
+              let verifiedSections=0;
               for(const [label,pattern] of [['03-map',/Harita/i],['04-weather',/Hava/i],['05-fields',/Tarla/i]]){
                 const nav=page.getByRole('button',{name:pattern}).first();
                 const link=page.getByRole('link',{name:pattern}).first();
@@ -138,6 +139,7 @@ jobs:
                   await target.click({timeout:4500});
                   await page.waitForTimeout(3500);
                   await audit(label);
+                  verifiedSections++;
                 } catch(e) {
                   require('fs').writeFileSync('ipad-authenticated/'+label+'-navigation-error.txt',String(e));
                   await page.screenshot({path:'ipad-authenticated/'+label+'-navigation-error.png',fullPage:true});
@@ -145,6 +147,8 @@ jobs:
                 }
               }
               require('fs').writeFileSync('ipad-authenticated/page-errors.json',JSON.stringify(errors,null,2));
+              require('fs').writeFileSync('ipad-authenticated/verified-sections.json',JSON.stringify({verifiedSections,required:3},null,2));
+              if(verifiedSections<3) throw new Error('Only '+verifiedSections+'/3 sections were verified; refusing false green test result');
             } finally {await browser.close();}
           })().catch(e=>{console.error(e.message);process.exitCode=1});
           NODE
