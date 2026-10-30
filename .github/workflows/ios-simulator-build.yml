@@ -91,6 +91,67 @@ jobs:
           xcrun simctl spawn "$IPAD_UDID" log show --last 3m --style compact --predicate 'process == "App" OR process == "WebContent"' > ipad-diagnostics/app-recent.log 2>&1 || true
           xcrun simctl terminate "$IPAD_UDID" com.tarlapusula.app || true
 
+      - name: Authenticated iPad-size browser layout audit
+        shell: bash
+        timeout-minutes: 10
+        env:
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TEST_USER_EMAIL:-}" ] || [ -z "${TEST_USER_PASSWORD:-}" ]; then
+            echo "::error::TEST_USER_EMAIL and TEST_USER_PASSWORD repository secrets are required"
+            exit 1
+          fi
+          npm install --no-save --package-lock=false playwright
+          npx playwright install chromium
+          mkdir -p ipad-authenticated
+          (npm run dev -- --host 127.0.0.1 > ipad-authenticated/vite.log 2>&1 & echo $! > ipad-authenticated/vite.pid)
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage({viewport:{width:834,height:1194},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+            const errors=[];
+            page.on('pageerror',e=>errors.push(String(e)));
+            try {
+              await page.goto('http://127.0.0.1:5173/',{waitUntil:'domcontentloaded',timeout:60000});
+              await page.locator('#tp-login-email').fill(process.env.TEST_USER_EMAIL);
+              await page.locator('#tp-login-password').fill(process.env.TEST_USER_PASSWORD);
+              await page.locator('form:has(#tp-login-email) button[type="submit"]').click();
+              await page.waitForTimeout(12000);
+              await page.screenshot({path:'ipad-authenticated/01-after-login.png',fullPage:true});
+              if(await page.locator('#tp-login-email').isVisible()) throw new Error('Login screen remains visible after test login');
+              const audit=async(label)=>{
+                const data=await page.evaluate(()=>({screenWidth:innerWidth,documentWidth:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll('body *')].filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&(r.right>innerWidth+4||r.left< -4)}).slice(0,15).map(el=>({tag:el.tagName,cls:String(el.className).slice(0,90)}))}));
+                require('fs').writeFileSync('ipad-authenticated/'+label+'.json',JSON.stringify(data,null,2));
+                await page.screenshot({path:'ipad-authenticated/'+label+'.png',fullPage:true});
+                if(data.documentWidth>data.screenWidth+4) throw new Error(label+' horizontal overflow '+data.documentWidth+'/'+data.screenWidth);
+              };
+              await audit('02-home');
+              for(const [label,pattern] of [['03-map',/Harita/i],['04-weather',/Hava/i],['05-fields',/Tarla/i]]){
+                const nav=page.getByRole('button',{name:pattern}).first();
+                const link=page.getByRole('link',{name:pattern}).first();
+                if(await nav.isVisible().catch(()=>false)) await nav.click();
+                else if(await link.isVisible().catch(()=>false)) await link.click();
+                else {require('fs').writeFileSync('ipad-authenticated/'+label+'-not-found.txt','Navigation control not found');continue;}
+                await page.waitForTimeout(3500);
+                await audit(label);
+              }
+              require('fs').writeFileSync('ipad-authenticated/page-errors.json',JSON.stringify(errors,null,2));
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e.message);process.exitCode=1});
+          NODE
+
+      - name: Upload authenticated layout evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-authenticated-layout-audit
+          path: ipad-authenticated/*
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload iPad runtime diagnostics
         if: always()
         uses: actions/upload-artifact@v4
