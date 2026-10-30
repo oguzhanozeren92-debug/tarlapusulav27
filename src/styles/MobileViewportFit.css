@@ -308,3 +308,35 @@
     min-width: 0 !important;
   }
 }
+
+
+/* Native iPhone map toolbar: retain every action within the visible viewport.
+   The toolbar scrolls locally; map gestures and vertical page scrolling remain intact. */
+@media (max-width: 760px) {
+  html.tp-native-app body #root .tp-v1 .tp-map-first-shell,
+  html.tp-native-app body #root .tp-v1 .tp-field-head,
+  html.tp-native-app body #root .tp-v1 .tp-field-toolbar {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  html.tp-native-app body #root .tp-v1 .tp-field-toolbar {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  html.tp-native-app body #root .tp-v1 .tp-field-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  html.tp-native-app body #root .tp-v1 .tp-field-toolbar > * {
+    flex-shrink: 0;
+  }
+}
