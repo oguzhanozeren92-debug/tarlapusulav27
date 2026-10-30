@@ -91,6 +91,64 @@ jobs:
           xcrun simctl spawn "$IPAD_UDID" log show --last 3m --style compact --predicate 'process == "App" OR process == "WebContent"' > ipad-diagnostics/app-recent.log 2>&1 || true
           xcrun simctl terminate "$IPAD_UDID" com.tarlapusula.app || true
 
+      - name: Real iPad simulator authenticated UI walkthrough
+        shell: bash
+        timeout-minutes: 12
+        env:
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p ipad-native-authenticated
+          if [ -z "${TEST_USER_EMAIL:-}" ] || [ -z "${TEST_USER_PASSWORD:-}" ]; then
+            echo "::error::Missing test account secrets"
+            exit 1
+          fi
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+          cat > ipad-native-authenticated/flow.yaml <<'YAML'
+          appId: com.tarlapusula.app
+          ---
+          - launchApp:
+              clearState: true
+          - extendedWaitUntil:
+              visible: "Giriş Yap"
+              timeout: 45000
+          - tapOn: "Kullanıcı adı / E-posta"
+          - inputText: ${TEST_USER_EMAIL}
+          - tapOn: "Şifre"
+          - inputText: ${TEST_USER_PASSWORD}
+          - hideKeyboard
+          - tapOn: "Giriş Yap"
+          - extendedWaitUntil:
+              notVisible: "Kullanıcı adı / E-posta"
+              timeout: 60000
+          - takeScreenshot: ipad-native-authenticated/home
+          - tapOn:
+              text: "Harita"
+          - takeScreenshot: ipad-native-authenticated/map
+          - tapOn:
+              text: "Hava"
+          - takeScreenshot: ipad-native-authenticated/weather
+          - tapOn:
+              text: "Tarla"
+          - takeScreenshot: ipad-native-authenticated/fields
+          YAML
+          # The flow references environment variables; never write their values to the artifact.
+          maestro test --device "$IPAD_UDID" --output ipad-native-authenticated/report.xml ipad-native-authenticated/flow.yaml
+
+      - name: Upload native authenticated iPad evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-native-authenticated-evidence
+          path: |
+            ipad-native-authenticated/*.png
+            ipad-native-authenticated/report.xml
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Authenticated iPad-size browser layout audit
         shell: bash
         timeout-minutes: 10
