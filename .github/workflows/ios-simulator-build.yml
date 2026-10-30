@@ -119,8 +119,9 @@ jobs:
           - inputText: ${TEST_USER_EMAIL}
           - tapOn: "Şifre"
           - inputText: ${TEST_USER_PASSWORD}
-          - hideKeyboard
-          - tapOn: "Giriş Yap"
+          - tapOn:
+              text: "Giriş Yap"
+              retryTapIfNoChange: true
           - extendedWaitUntil:
               notVisible: "Kullanıcı adı / E-posta"
               timeout: 60000
