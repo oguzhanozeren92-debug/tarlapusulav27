@@ -41,9 +41,11 @@ function installationId() {
 }
 
 function apnsEnvironment() {
-  return import.meta.env.VITE_APNS_ENVIRONMENT === 'production'
-    ? 'production'
-    : 'sandbox';
+  // App Store and TestFlight use production APNs; local Xcode debug builds
+  // must explicitly set VITE_APNS_ENVIRONMENT=sandbox.
+  return import.meta.env.VITE_APNS_ENVIRONMENT === 'sandbox'
+    ? 'sandbox'
+    : 'production';
 }
 
 async function saveNativeToken(token: string) {
@@ -55,7 +57,9 @@ async function saveNativeToken(token: string) {
     error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) return;
+  if (userError || !user) {
+    throw new Error('Cihaz bildirim kaydı için oturum açılması gerekiyor.');
+  }
 
   let appVersion: string | null = null;
   try {
@@ -89,7 +93,7 @@ async function saveNativeToken(token: string) {
 
   if (error) {
     console.warn('[native-push] Cihaz tokenı kaydedilemedi:', error.message);
-    return;
+    throw new Error('Telefon bildirim kaydı sunucuya kaydedilemedi: ' + error.message);
   }
 
   try {
@@ -145,7 +149,9 @@ async function ensureListeners() {
     lastToken = String(token.value ?? '').trim();
 
     if (lastToken) {
-      void saveNativeToken(lastToken);
+      void saveNativeToken(lastToken).catch(error => {
+        console.warn('[native-push] APNs token kaydı tamamlanamadı:', error);
+      });
       registrationResolve?.(lastToken);
     } else {
       registrationReject?.(new Error('Cihaz bildirim tokenı boş döndü.'));
@@ -225,7 +231,8 @@ export async function getNativePushStatus(): Promise<NativePushStatus> {
   const permission = await PushNotifications.checkPermissions();
   return {
     supported: true,
-    enabled: permission.receive === 'granted',
+    enabled: permission.receive === 'granted' &&
+      window.localStorage.getItem(REGISTERED_KEY) === '1',
     permission: permission.receive,
   };
 }
