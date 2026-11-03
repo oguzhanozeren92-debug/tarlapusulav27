@@ -521,8 +521,8 @@ async function processNdviMapUpdates(force = false) {
       }
 
       const result = await sendToUser(userId, {
-        title: "Yeni haritan hazır 🌿",
-        body: `${String(field.name ?? "Tarlan")} için ${trDate(latest.date)} tarihli yeni NDVI haritası hazır.`,
+        title: `${String(field.name ?? "Tarlan").slice(0, 60)} • Yeni NDVI 🌿`,
+        body: `${String(field.name ?? "Tarlan").slice(0, 60)} için ${trDate(latest.date)} tarihli yeni NDVI görüntüsü hazır. Haritanı görmek ister misin?`,
         tag: `ndvi-${fieldId}-${latest.date}`,
         url: `/?open=ndvi&fieldId=${encodeURIComponent(fieldId)}`,
         fieldId,
