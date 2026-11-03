@@ -798,64 +798,8 @@ async function dispatchAppNotification(job: any) {
   return { id, ...result };
 }
 
-/** One relevant published news item or article per subscribed user per 24h.
- * Only newly published, approved content enters this queue; no old backfill.
- * Existing quiet hours, 24h caps and opt-outs apply in dispatchAppNotification.
- */
-async function enqueueFreshPublishedContentPush() {
-  const now = new Date();
-  const since = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-  const { data: fresh, error: contentError } = await supabaseAdmin.from("content_items")
-    .select("id,title,content_type,content_subtype,published_at")
-    .eq("status", "published").gte("published_at", since)
-    .lte("published_at", now.toISOString())
-    .order("published_at", { ascending: false }).limit(12);
-  if (contentError) throw contentError;
-  const candidate = (fresh ?? []).find((item: any) =>
-    item.content_type === "news" ||
-    (item.content_type === "knowledge" && item.content_subtype === "article"));
-  if (!candidate) return { candidates: 0, queued: 0, skipped: 0 };
-
-  const { data: webDevices, error: subscriptionError } = await supabaseAdmin
-    .from("push_subscriptions").select("user_id").eq("enabled", true).limit(500);
-  if (subscriptionError) throw subscriptionError;
-  const nativeUsers = await listNativePushUserIds(supabaseAdmin, 500);
-  const subscribers = [...new Set([
-    ...(webDevices ?? []).map((row: any) => String(row.user_id ?? "")),
-    ...nativeUsers,
-  ].filter(Boolean))];
-  const isArticle = candidate.content_subtype === "article";
-  const title = isArticle ? "Yeni makale 📖" : "Yeni tarım haberi 📰";
-  const contentTitle = cleanText(candidate.title, 180);
-  let queued = 0, skipped = 0;
-  for (const userId of subscribers) {
-    const pref = await getPushPreference(userId);
-    if (!pref.push_enabled || !pref.news_enabled) { skipped++; continue; }
-    const { count, error: recentError } = await supabaseAdmin
-      .from("app_notifications").select("id", { count: "exact", head: true })
-      .eq("user_id", userId).eq("category", "news")
-      .gte("created_at", new Date(now.getTime() - 24 * 3600000).toISOString());
-    if (recentError) { skipped++; continue; }
-    if ((count ?? 0) > 0) { skipped++; continue; }
-    const { error } = await supabaseAdmin.from("app_notifications").upsert({
-      user_id: userId,
-      kind: isArticle ? "published_article" : "published_news",
-      source: "published_content",
-      severity: "info",
-      title,
-      message: contentTitle + " • Okumak ister misin?",
-      target: "notificationsHub",
-      data: { contentId: candidate.id, actionTarget: isArticle ? "articles" : "news" },
-      category: "news",
-      push_eligible: true, push_critical: false,
-      push_available_at: now.toISOString(),
-      dedupe_key: "published-content:" + userId + ":" + candidate.id,
-    }, { onConflict: "dedupe_key", ignoreDuplicates: true });
-    if (error) { console.warn("Fresh content queue:", error.message); skipped++; }
-    else queued++;
-  }
-  return { candidates: fresh?.length || 0, subscribers: subscribers.length, queued, skipped };
-}
+// Newly published news/articles are enqueued at the database trigger layer
+// (trg_tp_queue_fresh_content_push), not by periodic content polling.
 
 async function processAppPushQueue(limit = 50) {
   const { data: jobs, error } = await supabaseAdmin.rpc(
@@ -1515,7 +1459,7 @@ Deno.serve(async (req) => {
 
     const reengagement = await enqueueReengagementNotifications();
     const fieldActivity = await processFieldActivityUpdates(cronSecret, body?.forceFieldActivity === true);
-    const freshContent = await enqueueFreshPublishedContentPush();
+    const freshContent = { mode: 'publication_database_trigger' };
     const appPush = await processAppPushQueue(50);
     const ndvi = await processNdviMapUpdates(false);
 
