@@ -11,6 +11,7 @@ import AuthScreens from './pages/Auth/AuthScreens';
 import OnboardingScreen from './pages/Onboarding/OnboardingScreen';
 import ReadyScreen from './pages/Onboarding/ReadyScreen';
 import HomeScreen from './pages/Home/HomeScreen';
+import NativeLocalReminderOffer from './mobile/NativeLocalReminderOffer';
 import PusulaTest from './pages/PusulaTest/PusulaTest';
 import CalendarScreen from './pages/Calendar/CalendarScreen';
 import AiAnalysisScreen from './pages/AiAnalysis/AiAnalysisScreen';
@@ -1657,6 +1658,7 @@ export default function App() {
   }
 
   return withGlobalDrawer(
+    <>
     <HomeScreen
       cmsRuntimeCss={cmsRuntimeCss}
       realFields={realFields}
@@ -1680,7 +1682,9 @@ export default function App() {
       setSideMenuOpen={setSideMenuOpen}
       sideMenuOpen={false}
       fieldStatusRequest={fieldStatusRequest}
-    />,
+    />
+    <NativeLocalReminderOffer />
+    </>,
     false,
   );
 }
