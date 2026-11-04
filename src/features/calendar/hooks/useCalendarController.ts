@@ -10,6 +10,7 @@ import {
   getNativePushStatus,
   isNativePushPlatform,
 } from '../../../mobile/nativePush';
+import { nativeLocalEnabled, enableNativeLocalReminders, disableNativeLocalReminders, testNativeLocalReminder } from '../../../mobile/nativeLocalReminders';
 
 type UseCalendarControllerOptions = {
   realFields: Field[];
@@ -71,7 +72,7 @@ export function useCalendarController({
       try {
         const status = await getNativePushStatus();
         setPushSupported(status.supported);
-        setPushEnabled(status.enabled);
+        setPushEnabled(status.enabled || nativeLocalEnabled());
 
         if (status.permission === 'denied') {
           setPushMessage(
@@ -128,12 +129,17 @@ export function useCalendarController({
 
     try {
       if (isNativePushPlatform()) {
-        await enableNativePushNotifications();
+        await enableNativeLocalReminders();
+        await testNativeLocalReminder();
+        // Remote alerts are additional: APNs registration must not block OS reminders.
+        let remoteReady = false;
+        try { await enableNativePushNotifications(); remoteReady = true; }
+        catch (err) { console.info('Native remote push registration:', err); }
         setPushSupported(true);
         setPushEnabled(true);
-        setPushMessage(
-          'Telefon bildirimleri açık. Tarla, hava, uydu ve Pusula uyarıları cihazına gelebilir.',
-        );
+        setPushMessage(remoteReady
+          ? 'Bildirimler açık. Haftalık tarla kontrolü ve sunucu uyarıları etkin. Test 5 saniye içinde gelecek.'
+          : 'iPhone hatırlatmaları açık; 5 saniyelik test planlandı. Uydu/hava uyarıları için APNs kaydını ayrıca kontrol edeceğiz.');
         return;
       }
 
@@ -212,7 +218,9 @@ export function useCalendarController({
 
     try {
       if (isNativePushPlatform()) {
-        await disableNativePushNotifications();
+        await disableNativeLocalReminders();
+        try { await disableNativePushNotifications(); }
+        catch (error) { console.warn('Remote push disable:', error); }
         setPushEnabled(false);
         setPushMessage('Telefon bildirimleri kapatıldı.');
         return;
@@ -245,6 +253,11 @@ export function useCalendarController({
     setPushMessage('');
 
     try {
+      if (isNativePushPlatform()) {
+        await testNativeLocalReminder();
+        setPushMessage('5 saniye sonrasına iPhone test bildirimi ayarlandı. Ekranı kilitleyip dene.');
+        return;
+      }
       const { data, error } = await supabase.functions.invoke('send-due-reminders', {
         body: { test: true },
       });
