@@ -524,35 +524,42 @@ async function processNdviMapUpdates(force = false) {
         return "checked";
       }
 
-      const result = await sendToUser(userId, {
-        title: `${String(field.name ?? "Tarlan").slice(0, 60)} • Yeni NDVI 🌿`,
-        body: `${String(field.name ?? "Tarlan").slice(0, 60)} için ${trDate(latest.date)} tarihli yeni NDVI görüntüsü hazır.`,
-        tag: `ndvi-${fieldId}-${latest.date}`,
-        url: `/?open=ndvi&fieldId=${encodeURIComponent(fieldId)}`,
-        fieldId,
-        source: "satellite",
-        satelliteDate: latest.date,
-      });
-
-      await supabaseAdmin
+      // The common dispatcher applies preferences, quiet hours and daily
+      // limits, and records failures per delivery channel.
+      const fieldName = String(field.name ?? "Tarlan").slice(0, 60);
+      const { error: queueError } = await supabaseAdmin
+        .from("app_notifications")
+        .upsert({
+          user_id: userId,
+          kind: "ndvi_new_scene",
+          source: "satellite",
+          severity: "info",
+          title: `${fieldName} • Yeni NDVI 🌿`,
+          message: `${fieldName} için ${trDate(latest.date)} tarihli yeni NDVI görüntüsü hazır.`,
+          target: "map_vegetation",
+          data: { fieldId, fieldName, satelliteDate: latest.date, actionTarget: "map_vegetation" },
+          category: "satellite",
+          push_eligible: true,
+          push_critical: false,
+          push_available_at: checkedAt,
+          dedupe_key: `ndvi-new-scene:${userId}:${fieldId}:${latest.date}`,
+        }, { onConflict: "dedupe_key", ignoreDuplicates: true });
+      if (queueError) throw queueError;
+      const { error: stateError } = await supabaseAdmin
         .from("field_satellite_notification_state")
         .upsert({
           user_id: userId,
           field_id: fieldId,
           last_scene_date: latest.date,
           last_scene_id: latest.sceneId,
-          last_notified_scene_date: result.sent > 0 ? latest.date : lastNotified || null,
+          // Last QUEUED scene, not a claim that iPhone delivery succeeded.
+          last_notified_scene_date: latest.date,
           last_checked_at: checkedAt,
-          last_error:
-            result.sent > 0
-              ? null
-              : result.noSubscriptions
-                ? "no_active_subscription"
-                : "push_send_failed",
+          last_error: null,
           updated_at: checkedAt,
         }, { onConflict: "user_id,field_id" });
-
-      return result.sent > 0 ? "notified" : "failed";
+      if (stateError) throw stateError;
+      return "queued";
     } catch (error) {
       const checkedAt = new Date().toISOString();
       console.error("NDVI push kontrolü başarısız:", fieldId, error);
@@ -581,6 +588,7 @@ async function processNdviMapUpdates(force = false) {
   return {
     checked: results.length,
     notified: results.filter((item) => item === "notified").length,
+    queued: results.filter((item) => item === "queued").length,
     seeded: results.filter((item) => item === "seeded").length,
     skipped,
     failed: results.filter((item) => item === "failed").length,
@@ -710,6 +718,9 @@ async function normalPushCountLast24Hours(userId: string) {
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("push_critical", false)
+    // A web-only success must not consume the iPhone daily quota.
+    .is("push_error", null)
+    .neq("kind", "diagnostic")
     .not("push_sent_at", "is", null)
     .gte("push_sent_at", since);
   if (error) return 0;
@@ -1482,8 +1493,8 @@ Deno.serve(async (req) => {
     // Günlük özet, uzun uydu/faaliyet taramasını beklemeden gönderilsin.
     const weatherPush = await processAppPushQueue(50);
     const fieldActivity = await processFieldActivityUpdates(cronSecret, body?.forceFieldActivity === true);
-    const appPush = await processAppPushQueue(50);
     const ndvi = await processNdviMapUpdates(false);
+    const appPush = await processAppPushQueue(50);
 
     return new Response(
       JSON.stringify({
