@@ -4,6 +4,7 @@ import {
   listNativePushUserIds,
   sendNativePushToUser,
 } from "../_shared/nativePush.ts";
+import { enqueueDailyWeatherNotifications } from "./dailyWeather.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,6 +96,9 @@ async function sendToUser(
     noSubscriptions: !hasWeb && !hasNative,
     webSent,
     nativeSent: native.sent,
+    nativeRegistered: native.registered,
+    nativeAvailable: native.available,
+    nativeFailed: native.failed,
   };
 }
 
@@ -522,7 +526,7 @@ async function processNdviMapUpdates(force = false) {
 
       const result = await sendToUser(userId, {
         title: `${String(field.name ?? "Tarlan").slice(0, 60)} • Yeni NDVI 🌿`,
-        body: `${String(field.name ?? "Tarlan").slice(0, 60)} için ${trDate(latest.date)} tarihli yeni NDVI görüntüsü hazır. Haritanı görmek ister misin?`,
+        body: `${String(field.name ?? "Tarlan").slice(0, 60)} için ${trDate(latest.date)} tarihli yeni NDVI görüntüsü hazır.`,
         tag: `ndvi-${fieldId}-${latest.date}`,
         url: `/?open=ndvi&fieldId=${encodeURIComponent(fieldId)}`,
         fieldId,
@@ -785,7 +789,13 @@ async function dispatchAppNotification(job: any) {
       .update({
         push_sent_at: new Date().toISOString(),
         push_claimed_at: null,
-        push_error: null,
+        // Web Push success does NOT prove delivery to an iPhone. Keep a
+        // non-retrying diagnostic while avoiding duplicate web notifications.
+        push_error: result.nativeRegistered > 0 && result.nativeSent === 0
+          ? result.nativeAvailable === 0
+            ? "native_provider_not_configured"
+            : "native_delivery_failed"
+          : null,
       })
       .eq("id", id);
   } else {
@@ -797,9 +807,6 @@ async function dispatchAppNotification(job: any) {
 
   return { id, ...result };
 }
-
-// Newly published news/articles are enqueued at the database trigger layer
-// (trg_tp_queue_fresh_content_push), not by periodic content polling.
 
 async function processAppPushQueue(limit = 50) {
   const { data: jobs, error } = await supabaseAdmin.rpc(
@@ -1395,7 +1402,16 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: result.sent > 0,
           ...result,
-          error: result.sent > 0 ? null : "Aktif push aboneliği bulunamadı.",
+          // A browser subscription must not mask a failed native APNs test.
+          nativeTestOk: result.nativeRegistered > 0 && result.nativeSent > 0,
+          nativeTestStatus: result.nativeRegistered === 0
+            ? "native_device_not_registered"
+            : result.nativeSent > 0
+              ? "apns_accepted"
+              : result.nativeAvailable === 0
+                ? "native_provider_not_configured"
+                : "native_provider_rejected",
+          error: result.sent > 0 ? null : "Push sağlayıcısı isteği kabul etmedi.",
         }),
         {
           status: 200,
@@ -1458,8 +1474,14 @@ Deno.serve(async (req) => {
     }
 
     const reengagement = await enqueueReengagementNotifications();
+    const dailyWeather = await enqueueDailyWeatherNotifications(supabaseAdmin)
+      .catch((error) => {
+        console.error("Günlük hava bildirimleri hazırlanamıyor:", error);
+        return { error: error instanceof Error ? error.message : "daily_weather_error" };
+      });
+    // Günlük özet, uzun uydu/faaliyet taramasını beklemeden gönderilsin.
+    const weatherPush = await processAppPushQueue(50);
     const fieldActivity = await processFieldActivityUpdates(cronSecret, body?.forceFieldActivity === true);
-    const freshContent = { mode: 'publication_database_trigger' };
     const appPush = await processAppPushQueue(50);
     const ndvi = await processNdviMapUpdates(false);
 
@@ -1469,8 +1491,9 @@ Deno.serve(async (req) => {
         processedReminders: reminderResults.length,
         reminderResults,
         reengagement,
+        dailyWeather,
+        weatherPush,
         fieldActivity,
-        freshContent,
         appPush,
         ndvi,
       }),
