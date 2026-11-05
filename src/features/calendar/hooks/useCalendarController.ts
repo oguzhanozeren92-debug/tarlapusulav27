@@ -138,7 +138,7 @@ export function useCalendarController({
         setPushSupported(true);
         setPushEnabled(true);
         setPushMessage(remoteReady
-          ? 'Bildirimler açık. Haftalık tarla kontrolü ve sunucu uyarıları etkin. Test 5 saniye içinde gelecek.'
+          ? 'iPhone bildirim izni ve cihaz kaydı tamamlandı. Gerçek APNs gönderimini doğrulamak için “Test bildirimi”ne bas.'
           : 'iPhone hatırlatmaları açık; 5 saniyelik test planlandı. Uydu/hava uyarıları için APNs kaydını ayrıca kontrol edeceğiz.');
         return;
       }
@@ -263,12 +263,19 @@ export function useCalendarController({
       const nativeSent = Number(data?.nativeSent ?? 0);
       const webSent = Number(data?.webSent ?? 0);
       if (native) {
+        const nativeStatus = String(data?.nativeTestStatus ?? '');
         if (nativeSent > 0) {
           setPushMessage('Sunucu iPhone bildirimini Apple APNs servisine kabul ettirdi. Telefon kilitliyken görünmesini kontrol et.');
+        } else if (nativeStatus === 'native_device_not_registered') {
+          setPushMessage('⚠️ Bu iPhone sunucuda kayıtlı görünmüyor. Bildirim iznini kontrol edip “Bildirimleri aç” işlemini tekrar dene.');
+        } else if (nativeStatus === 'native_provider_not_configured') {
+          setPushMessage('⚠️ iPhone kayıtlı, fakat sunucunun Apple APNs gönderim anahtarı hazır değil. APNS_KEY_ID, APNS_TEAM_ID, APNS_PRIVATE_KEY ve bundle ID ayarları tamamlanmalı.');
+        } else if (nativeStatus === 'native_provider_rejected') {
+          setPushMessage('⚠️ Apple APNs gönderim isteği başarısız oldu. Sunucu hata kayıtlarında APNs durum kodu, anahtar ve bundle ID eşleşmesi incelenmeli.');
         } else if (webSent > 0) {
-          setPushMessage('⚠️ Yalnız web bildirimi gönderildi; iPhone APNs bildirimi gönderilemedi. Sunucudaki Apple APNs anahtarını ve uygulama kimliğini kontrol etmek gerekiyor.');
+          setPushMessage('⚠️ Web bildirimi kabul edildi ama iPhone bildirimi gönderilemedi. Bu iki kanal bağımsızdır.');
         } else {
-          setPushMessage('⚠️ iPhone APNs testi başarısız. Uygulama bildirimi açık görünse bile uzaktan bildirim ulaşmıyor. APNs sunucu ayarları kontrol edilmeli.');
+          setPushMessage('⚠️ iPhone uzaktan bildirim testi başarısız. Bildirim izni açık görünse de sunucudan telefona ulaşım doğrulanmadı.');
         }
         return;
       }
