@@ -32,6 +32,8 @@ function base64UrlJson(value: unknown) {
 
 function pemBytes(value: string) {
   const body = String(value || "")
+    // Supabase Secrets accepts both pasted multi-line PEM and escaped \\n text.
+    .replace(/\\n/g, "\n")
     .replace(/-----BEGIN [^-]+-----/g, "")
     .replace(/-----END [^-]+-----/g, "")
     .replace(/\s+/g, "");
