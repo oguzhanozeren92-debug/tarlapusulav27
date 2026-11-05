@@ -828,6 +828,84 @@ function apnsConfigurationStatus() {
   return { keyId, teamId, privateKey, bundleId, ready: keyId && teamId && privateKey && bundleId };
 }
 
+// Recover only recent weather/NDVI alerts where Web Push worked but APNs
+// was unavailable. Never duplicate the browser push, replay old forecasts,
+// or bypass the user's category/quiet-hour preferences.
+async function replayMissedNativeAlerts() {
+  const apns = apnsConfigurationStatus();
+  if (!apns.ready) return { checked: 0, sent: 0, skipped: "apns_unconfigured" };
+
+  const olderThan = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const newerThan = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const { data: missed, error } = await supabaseAdmin.from("app_notifications")
+    .select("id,user_id,title,message,target,source,category,data,push_attempts,push_error")
+    .in("category", ["weather", "satellite"])
+    .in("push_error", ["native_provider_not_configured", "native_delivery_failed"])
+    .not("push_sent_at", "is", null)
+    .gte("created_at", newerThan)
+    .lt("created_at", olderThan)
+    .lt("push_attempts", 5)
+    .order("created_at", { ascending: false })
+    .limit(8);
+  if (error) {
+    console.error("Native retry query:", error.message);
+    return { checked: 0, sent: 0, error: "retry_query_failed" };
+  }
+
+  let checked = 0;
+  let sent = 0;
+  for (const row of missed ?? []) {
+    const userId = String(row.user_id || "");
+    const noticeId = String(row.id || "");
+    if (!userId || !noticeId) continue;
+    const prefs = await getPushPreference(userId);
+    if (!prefs.push_enabled || !categoryEnabled(prefs, String(row.category || "system")) ||
+        isQuietHours(prefs)) continue;
+
+    // Atomic claim avoids double sends if two cron runs overlap.
+    const { data: claimed, error: claimError } = await supabaseAdmin
+      .from("app_notifications")
+      .update({ push_claimed_at: new Date().toISOString() })
+      .eq("id", noticeId)
+      .eq("push_error", row.push_error)
+      .is("push_claimed_at", null)
+      .select("id")
+      .maybeSingle();
+    if (claimError || !claimed) continue;
+    checked++;
+
+    try {
+      const result = await sendNativePushToUser(supabaseAdmin, userId, {
+        title: cleanText(row.title, 120) || "TarlaPusula",
+        body: cleanText(row.message, 320) || "Yeni tarla bildirimi",
+        tag: `app-notification-${noticeId}`,
+        url: "/",
+        notificationId: noticeId,
+        fieldId: cleanText(row.data?.fieldId ?? "", 80) || null,
+        target: cleanText(row.target, 80) || "notificationsHub",
+        source: cleanText(row.source, 60) || "system",
+        category: row.category,
+      });
+      const delivered = result.sent > 0;
+      if (delivered) sent++;
+      await supabaseAdmin.from("app_notifications").update({
+        push_claimed_at: null,
+        push_error: delivered ? null : result.available === 0
+          ? "native_provider_not_configured" : "native_delivery_failed",
+        push_attempts: Number(row.push_attempts || 0) + (result.available > 0 ? 1 : 0),
+      }).eq("id", noticeId);
+    } catch (error) {
+      console.error("Native retry send:", error);
+      await supabaseAdmin.from("app_notifications").update({
+        push_claimed_at: null,
+        push_error: "native_delivery_failed",
+        push_attempts: Number(row.push_attempts || 0) + 1,
+      }).eq("id", noticeId);
+    }
+  }
+  return { checked, sent };
+}
+
 async function processAppPushQueue(limit = 50) {
   const { data: jobs, error } = await supabaseAdmin.rpc(
     "claim_due_app_push_notifications",
@@ -1504,6 +1582,7 @@ Deno.serve(async (req) => {
     const fieldActivity = await processFieldActivityUpdates(cronSecret, body?.forceFieldActivity === true);
     const ndvi = await processNdviMapUpdates(false);
     const appPush = await processAppPushQueue(50);
+    const nativeRecovery = await replayMissedNativeAlerts();
 
     return new Response(
       JSON.stringify({
@@ -1516,6 +1595,7 @@ Deno.serve(async (req) => {
         fieldActivity,
         appPush,
         ndvi,
+        nativeRecovery,
         apnsConfig: apnsConfigurationStatus(),
       }),
       {
