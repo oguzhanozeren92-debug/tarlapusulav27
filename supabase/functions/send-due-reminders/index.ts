@@ -819,6 +819,15 @@ async function dispatchAppNotification(job: any) {
   return { id, ...result };
 }
 
+function apnsConfigurationStatus() {
+  // Report presence ONLY. Never expose private keys or their contents.
+  const keyId = Boolean(String(Deno.env.get("APNS_KEY_ID") || "").trim());
+  const teamId = Boolean(String(Deno.env.get("APNS_TEAM_ID") || "").trim());
+  const privateKey = Boolean(String(Deno.env.get("APNS_PRIVATE_KEY") || "").trim());
+  const bundleId = Boolean(String(Deno.env.get("APNS_BUNDLE_ID") || "com.tarlapusula.app").trim());
+  return { keyId, teamId, privateKey, bundleId, ready: keyId && teamId && privateKey && bundleId };
+}
+
 async function processAppPushQueue(limit = 50) {
   const { data: jobs, error } = await supabaseAdmin.rpc(
     "claim_due_app_push_notifications",
@@ -1507,6 +1516,7 @@ Deno.serve(async (req) => {
         fieldActivity,
         appPush,
         ndvi,
+        apnsConfig: apnsConfigurationStatus(),
       }),
       {
         status: 200,
