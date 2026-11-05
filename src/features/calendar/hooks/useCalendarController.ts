@@ -253,17 +253,31 @@ export function useCalendarController({
     setPushMessage('');
 
     try {
-      if (isNativePushPlatform()) {
-        await testNativeLocalReminder();
-        setPushMessage('5 saniye sonrasına iPhone test bildirimi ayarlandı. Ekranı kilitleyip dene.');
-        return;
-      }
+      // This must test the REMOTE APNs/FCM path. A local reminder can work
+      // while Apple push credentials are missing; never label it a push success.
+      const native = isNativePushPlatform();
       const { data, error } = await supabase.functions.invoke('send-due-reminders', {
         body: { test: true },
       });
       if (error) throw error;
+      const nativeSent = Number(data?.nativeSent ?? 0);
+      const webSent = Number(data?.webSent ?? 0);
+      if (native) {
+        if (nativeSent > 0) {
+          setPushMessage('Sunucu iPhone bildirimini Apple APNs servisine kabul ettirdi. Telefon kilitliyken görünmesini kontrol et.');
+        } else if (webSent > 0) {
+          setPushMessage('⚠️ Yalnız web bildirimi gönderildi; iPhone APNs bildirimi gönderilemedi. Sunucudaki Apple APNs anahtarını ve uygulama kimliğini kontrol etmek gerekiyor.');
+        } else {
+          setPushMessage('⚠️ iPhone APNs testi başarısız. Uygulama bildirimi açık görünse bile uzaktan bildirim ulaşmıyor. APNs sunucu ayarları kontrol edilmeli.');
+        }
+        return;
+      }
       if (data?.error) throw new Error(data.error);
-      setPushMessage('Test bildirimi gönderildi. Birkaç saniye içinde görünmeli.');
+      if (webSent > 0) {
+        setPushMessage('Web bildirimi gönderim servisi tarafından kabul edildi. Birkaç saniye içinde görünmeli.');
+      } else {
+        setPushMessage('⚠️ Web bildirimi gönderilemedi. Aboneliği ve bildirim iznini kontrol et.');
+      }
     } catch (error) {
       setPushMessage(error instanceof Error ? error.message : 'Test bildirimi gönderilemedi.');
     } finally {
