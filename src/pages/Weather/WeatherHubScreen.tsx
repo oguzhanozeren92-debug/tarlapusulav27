@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Field, FieldWeatherState, Screen } from '../../types';
 import ClassicBottomNav from '../../components/ClassicBottomNav';
 import SprayWeatherGuide from '../../features/weather/components/SprayWeatherGuide';
+import { addQuickCalendarReminder, calendarDateAfterDays } from '../../features/calendar/services/quickCalendar.service';
 import type { HourlySprayState } from '../../features/weather/services/hourlySprayForecast';
 import {
   fetchWaterClimatePoint,
@@ -744,6 +745,11 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   } = props;
 
   const [sprayGuideOpen, setSprayGuideOpen] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState(() => calendarDateAfterDays(1));
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleStatus, setScheduleStatus] = useState('');
   const [premiumDetailOpen, setPremiumDetailOpen] =
     useState<WeatherPremiumDetailKey>(null);
   const [fieldConditionCards, setFieldConditionCards] = useState<FieldConditionCardsState>({
@@ -755,13 +761,14 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   });
 
   useEffect(() => {
-    if ((!sprayGuideOpen && !premiumDetailOpen) || typeof document === 'undefined') return;
+    if ((!sprayGuideOpen && !premiumDetailOpen && !scheduleOpen) || typeof document === 'undefined') return;
 
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       setSprayGuideOpen(false);
       setPremiumDetailOpen(null);
+      setScheduleOpen(false);
     };
 
     document.body.style.overflow = 'hidden';
@@ -771,7 +778,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [sprayGuideOpen, premiumDetailOpen]);
+  }, [sprayGuideOpen, premiumDetailOpen, scheduleOpen]);
 
   const safeFields = Array.isArray(realFields) ? realFields : [];
   const fallbackField = safeFields[0] ?? null;
@@ -1592,7 +1599,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
             </button>
           </div>
         </main>
-        <ClassicBottomNav activeScreen="weatherHub" setScreen={setScreen} />
+        <ClassicBottomNav activeScreen="weatherHub" setScreen={setScreen} variant="weather" />
       </div>
     );
   }
@@ -1605,6 +1612,8 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
   const currentCondition =
     String((firstDay as any)?.condition ?? (firstDay as any)?.description ?? 'Güncel hava');
+  const fiveDayForecast = (consensus.length ? consensus : providers[0]?.forecast ?? []).slice(0, 5);
+  const rainProbability = safeNumber(firstDay?.precipitationProbability);
 
   const totalRain =
     safeNumber((firstDay as any)?.precipitation) ??
@@ -1632,7 +1641,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           : 'Bugün belirgin bir hava engeli görünmüyor. İlaçlama yapacaksan saatlik yağış-rüzgârı ve ürün etiketini yine kontrol et.';
 
   const rainRisk = rainChance >= 60 ? 'Yüksek' : rainChance >= 30 ? 'Orta' : 'Düşük';
-  const frostRisk = tempMin !== null && tempMin <= 2 ? 'Var' : 'Yok';
+  const frostRisk = tempMin === null ? 'Bilinmiyor' : tempMin <= 2 ? 'Var' : 'Yok';
 
   const alertTitle =
     rainyDays >= 2
@@ -1653,10 +1662,35 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           : 'Tahminleri günlük olarak takip etmeye devam et.';
 
   const goToComparison = () => {
-    document.querySelector('.tp-wxr-forecast')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
+    setShowSources(true);
+    window.setTimeout(() => {
+      document.querySelector('.tp-wxr-forecast')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 60);
+  };
+
+  const saveWeatherPlan = async () => {
+    if (!weatherField?.id || scheduleSaving || !scheduleDate) return;
+    setScheduleSaving(true);
+    setScheduleStatus('');
+    try {
+      const saved = await addQuickCalendarReminder({
+        fieldId: String(weatherField.id),
+        reminderType: 'Kontrol',
+        title: `${String(weatherField.name || 'Tarla')} · Hava koşulları saha kontrolü`,
+        reminderDate: scheduleDate,
+        notes: `Pusula hava önerisi: ${agriculturalMessage}`.slice(0, 850),
+      });
+      setScheduleStatus(saved.created
+        ? 'Takvimine eklendi. Görev ve hatırlatmaları Takvim bölümünde görebilirsin.'
+        : 'Bu kontrol zaten takviminde kayıtlı.');
+    } catch (error) {
+      setScheduleStatus(error instanceof Error ? error.message : 'Takvim kaydı oluşturulamadı.');
+    } finally {
+      setScheduleSaving(false);
+    }
   };
 
   const openSprayGuide = () => {
@@ -1668,6 +1702,11 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
       <style>{cmsRuntimeCss + WEATHER_STYLES}</style>
 
       <main className="tp-wxr-main">
+        <header className="tp-color-hero-head">
+          <div className="tp-color-brand"><Icon name="brand" size={29} /><span>TarlaPusula</span></div>
+          <h1>Hava Durumu</h1>
+          <p>Tarlandaki hava koşulları ve Pusula'nın önerileri</p>
+        </header>
         <section
           className="tp-wxref-fieldbar"
           style={{
@@ -1756,6 +1795,75 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
             </div>
           </div>
 
+          <div className={`tp-color-frost ${frostRisk === 'Var' ? 'is-alert' : 'is-safe'}`}>
+            <span className="tp-color-frost-symbol"><Icon name={frostRisk === 'Var' ? 'snow' : 'weather'} size={29}/></span>
+            <div>
+              <strong>{frostRisk === 'Var' ? 'Don riski var' : frostRisk === 'Bilinmiyor' ? 'Don verisi bekleniyor' : 'Don riski düşük'}</strong>
+              <p>{tempMin === null
+                ? 'Düşük sıcaklık tahmini alınamadı; tarlanı kontrol etmeye devam et.'
+                : `Tahmini en düşük sıcaklık ${Math.round(tempMin)}°C. ${frostRisk === 'Var'
+                  ? 'Hassas ürünlerde saha koşullarını kontrol et.'
+                  : 'Tahmin güncellemelerini takip et.'}`}</p>
+            </div>
+            <Icon name="chevron" size={23}/>
+          </div>
+
+          <div className="tp-color-metrics" aria-label="Tarla hava özeti">
+            <div className="tp-color-metric is-humidity">
+              <span className="tp-color-metric-icon"><Icon name="drop" size={30}/></span>
+              <div><small>Nem</small><strong>{humidity === null ? '—' : `%${Math.round(humidity)}`}</strong></div>
+            </div>
+            <div className="tp-color-metric is-wind">
+              <span className="tp-color-metric-icon"><Icon name="wind" size={30}/></span>
+              <div><small>Rüzgâr</small><strong>{windSpeed === null ? '—' : `${Math.round(windSpeed)} km/sa`}</strong></div>
+            </div>
+            <div className="tp-color-metric is-rain">
+              <span className="tp-color-metric-icon"><Icon name="rain" size={30}/></span>
+              <div><small>Yağış İhtimali</small><strong>{rainProbability === null ? '—' : `%${Math.round(rainProbability)}`}</strong></div>
+            </div>
+            <div className="tp-color-metric is-soil">
+              <span className="tp-color-metric-icon"><Icon name="soil" size={30}/></span>
+              <div><small>Toprak Sıcaklığı</small><strong>{surfaceTemperatureValue === null ? '—' : `${surfaceTemperatureValue.toFixed(1)}°C`}</strong></div>
+            </div>
+          </div>
+
+          <section className="tp-color-five-day" aria-labelledby="tp-color-five-day-title">
+            <div className="tp-color-section-head">
+              <strong id="tp-color-five-day-title">5 Günlük Tahmin</strong>
+              <button type="button" onClick={goToComparison}>Detaylı Tahmin <Icon name="chevron" size={16}/></button>
+            </div>
+            <div className="tp-color-five-day-grid">
+              {Array.from({length: 5}).map((_, index) => {
+                const day = fiveDayForecast[index];
+                return (
+                  <div className={`tp-color-day ${index === 0 ? 'is-today' : ''}`} key={index}>
+                    <small>{weatherDayLabel(index)}</small>
+                    {day ? <WeatherArt kind={weatherArtKind(day.condition)} size={42} /> : <Icon name="weather" size={35}/>}
+                    <strong>{day ? `${formatTemp(day.tempMax)} / ${formatTemp(day.tempMin)}` : '—'}</strong>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="tp-color-pusula">
+            <span className="tp-color-pusula-icon"><Icon name="brand" size={27}/></span>
+            <div>
+              <strong>Pusula'nın Önerisi</strong>
+              <p>{agriculturalMessage}</p>
+            </div>
+            <Icon name="chevron" size={21}/>
+          </section>
+
+          <div className="tp-color-actions">
+            <button type="button" className="tp-color-action-calendar" onClick={() => {
+              setScheduleDate(calendarDateAfterDays(1));
+              setScheduleStatus('');
+              setScheduleOpen(true);
+            }}><Icon name="calendar" size={21}/> Takvime Ekle</button>
+            <button type="button" className="tp-color-action-spray" onClick={openSprayGuide}><Icon name="wind" size={21}/> İlaçlama Uygunluğu</button>
+          </div>
+
           <div className="tp-wxref-stats">
             <span>
               <Icon name="drop" size={24} />
@@ -1796,6 +1904,8 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
             </article>
           </div>
 
+          <details className="tp-color-advanced">
+            <summary><Icon name="soil" size={20}/> Tarla iklimi ve ayrıntılı veriler <Icon name="chevron" size={18}/></summary>
           <div
             className="tp-wxref-data-grid"
             data-required-plan="plus"
@@ -1892,6 +2002,8 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
             </article>
           </div>
 
+          </details>
+
           {fieldConditionCards.status === 'loading' ? (
             <div className="tp-wxref-inline-state">Tarla verileri güncelleniyor…</div>
           ) : fieldConditionCards.status === 'error' && fieldConditionCards.message ? (
@@ -1927,7 +2039,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           </div>
         </section>
 
-        <section className="tp-wxr-forecast">
+        <section className="tp-wxr-forecast" style={{display: showSources ? 'block' : 'none'}}>
           <div className="tp-wxr-section-title">
             <h2>5 Günlük Tahmin</h2>
             <span>ⓘ</span>
@@ -2016,6 +2128,8 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           )}
         </section>
 
+        <details className="tp-color-more-weather">
+          <summary>Diğer hava analizleri ve ölçümler <Icon name="chevron" size={18}/></summary>
         <section className="tp-wxr-alert">
           <div>
             <div className="tp-wxr-card-title gold">
@@ -2098,9 +2212,26 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
               : 'İklim verisi hazırlanıyor'}
           </small>
         </section>
+        </details>
       </main>
 
-      <ClassicBottomNav activeScreen="weatherHub" setScreen={setScreen} />
+      <ClassicBottomNav activeScreen="weatherHub" setScreen={setScreen} variant="weather" />
+
+      {scheduleOpen && (
+        <div className="tp-color-plan-layer">
+          <button className="tp-color-plan-backdrop" type="button" aria-label="Takvim penceresini kapat" onClick={() => setScheduleOpen(false)} />
+          <section className="tp-color-plan-dialog" role="dialog" aria-modal="true" aria-labelledby="tp-color-plan-title">
+            <header><strong id="tp-color-plan-title">Hava kontrolünü takvime ekle</strong><button type="button" aria-label="Kapat" onClick={() => setScheduleOpen(false)}>×</button></header>
+            <p>{weatherField?.name || 'Seçili tarla'} için hava koşullarını kontrol edeceğin günü seç.</p>
+            <label htmlFor="tp-color-plan-date">Kontrol tarihi</label>
+            <input id="tp-color-plan-date" type="date" value={scheduleDate} min={calendarDateAfterDays(0)} onChange={e => setScheduleDate(e.target.value)} />
+            <button className="tp-color-plan-save" type="button" disabled={scheduleSaving || !scheduleDate} onClick={() => void saveWeatherPlan()}>
+              {scheduleSaving ? 'Kaydediliyor…' : 'Takvime Kaydet'}
+            </button>
+            {scheduleStatus && <p role="status" className="tp-color-plan-status">{scheduleStatus}</p>}
+          </section>
+        </div>
+      )}
 
       {sprayGuideOpen && (
         <div className="tp-wxr-spray-modal-layer" role="presentation">
