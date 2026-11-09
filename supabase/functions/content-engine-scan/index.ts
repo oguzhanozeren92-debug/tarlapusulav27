@@ -382,6 +382,13 @@ function feedText(value: string) {
 function parseFeed(raw: string, source: Source, limit: number): Found[] {
   const $ = cheerio.load(raw, { xmlMode: true });
   const out: Found[] = [];
+  // Respect the same source-specific relevance and exclusion filters as HTML.
+  // Official feeds often include livestock, staff appointments or general policy:
+  // these should never crowd out crop-production news.
+  let include: RegExp | null = null;
+  let exclude: RegExp | null = null;
+  try { if (clean(source.metadata?.include_pattern, 500)) include = new RegExp(clean(source.metadata?.include_pattern, 500), "i"); } catch {}
+  try { if (clean(source.metadata?.exclude_pattern, 500)) exclude = new RegExp(clean(source.metadata?.exclude_pattern, 500), "i"); } catch {}
   $("item,entry").each((_, el) => {
     if (out.length >= limit) return false;
     const n = $(el);
@@ -392,12 +399,17 @@ function parseFeed(raw: string, source: Source, limit: number): Found[] {
     const linkNode = n.find("link").first();
     const url = abs(clean(linkNode.attr("href") ?? linkNode.text(), 1200), source.base_url);
     if (!title || !url) return;
+    const summary = feedText(n.find("description,summary,content\\:encoded,content").first().text());
+    const hay = `${title} ${url} ${summary}`;
+    if (include && !include.test(hay)) return;
+    if (exclude && exclude.test(hay)) return;
+    if (matchesAny(norm(title), HARD_JUNK)) return;
     const media = clean(n.find("media\\:content,media\\:thumbnail,enclosure").first().attr("url"), 1200);
     out.push({
       title,
       url,
       publishedAt: date(n.find("pubDate,published,updated,date").first().text()),
-      summary: feedText(n.find("description,summary,content\\:encoded,content").first().text()),
+      summary,
       body: "",
       language: source.language || "tr",
       imageUrl: media ? abs(media, source.base_url) : null,
