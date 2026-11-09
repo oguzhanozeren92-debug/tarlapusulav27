@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CloudSun, MapPin, Menu, Star } from 'lucide-react';
 import PusulaGuide, { type PusulaInsight } from '../assets/pusula/PusulaGuide';
+import { personalizedGuideMessages, type PersonalGuideContext } from '../features/pusula/services/personalizedGuideMessages';
 import { PUSULAPDF_ALERT_KEY } from '../features/pusula-pdf/PusulaPdfReadyBridge';
 import { supabase } from '../supabaseClient';
 import { useGamificationStore } from '../gamification/useGamificationStore';
@@ -32,6 +33,7 @@ type UserGuideContext = {
   onboardingCompleted: boolean;
   fieldCount: number;
   hasCrop: boolean;
+  crop: string;
   hasFieldLocation: boolean;
   city: string;
   district: string;
@@ -499,15 +501,19 @@ function isRealUsableInsight(
 function buildGuideInsight(
   screen: string,
   index: number,
+  context: PersonalGuideContext,
 ): PusulaInsight {
-  const messages =
-    PUSULA_GUIDE_MESSAGES[screen] ?? [
+  // Kişiselleştirilmiş ipuçları önce; mevcut 34 güvenli rehber mesajı yedek.
+  const messages = [
+    ...personalizedGuideMessages(screen, context),
+    ...(PUSULA_GUIDE_MESSAGES[screen] ?? [
       {
         title: 'Verilerini yorumlarken kısa bir ipucu',
         text:
           'Bu bölümdeki kayıtları hazırlıyorum. Gerçek Pusula değerlendirmesi hazır olduğunda rehber mesajının yerini otomatik olarak alacak.',
       },
-    ];
+    ]),
+  ];
 
   const message =
     messages[index % messages.length];
@@ -517,6 +523,19 @@ function buildGuideInsight(
     gozlem: message.title,
     yonlendirme: message.text,
   };
+}
+
+// Sayfadan çıkıp dönüldüğünde aynı ipucunu yeniden başlatmayalım.
+function nextGuideTurn(screen: string, userId: string | null, fieldName: string | null, fallback: number) {
+  const key = `tp_pusula_guide_rotation_v2:${userId ?? 'guest'}:${screen}:${String(fieldName ?? '').trim()}`;
+  try {
+    const stored = Number(window.sessionStorage.getItem(key));
+    const index = Number.isFinite(stored) && stored >= 0 ? stored : fallback;
+    window.sessionStorage.setItem(key, String(index + 1));
+    return index;
+  } catch {
+    return fallback;
+  }
 }
 
 function readCachedWeatherPusula(expectedFieldName?: string | null) {
@@ -608,6 +627,7 @@ export default function GlobalPusulaBand({
     onboardingCompleted: false,
     fieldCount: 0,
     hasCrop: false,
+    crop: '',
     hasFieldLocation: false,
     city: '',
     district: '',
@@ -818,6 +838,7 @@ export default function GlobalPusulaBand({
             const crop = String(item?.crop ?? '').trim().toLocaleLowerCase('tr-TR');
             return Boolean(crop && crop !== 'ürün belirtilmedi' && crop !== 'urun belirtilmedi');
           }),
+          crop: String(selectedField?.crop ?? '').trim(),
           hasFieldLocation: latitude !== null && longitude !== null,
           city,
           district,
@@ -1522,12 +1543,24 @@ export default function GlobalPusulaBand({
     }
 
     if (!latest) {
+      const guideTurn = nextGuideTurn(
+        screen,
+        userGuideContext.userId,
+        fieldName ?? null,
+        guideIndexRef.current,
+      );
+      guideIndexRef.current = guideTurn + 1;
       setHasUnreadInsight(false);
       setInsight({
-        ...buildGuideInsight(screen, guideIndexRef.current),
+        ...buildGuideInsight(screen, guideTurn, {
+          fieldName,
+          crop: userGuideContext.crop,
+          city: userGuideContext.city,
+          district: userGuideContext.district,
+          fieldCount: userGuideContext.fieldCount,
+        }),
         id: `pusula-guide-manual-${screen}-${Date.now()}`,
       });
-      guideIndexRef.current += 1;
       return;
     }
 
