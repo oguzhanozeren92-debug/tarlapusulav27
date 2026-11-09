@@ -425,7 +425,7 @@ export default function PusulaGuide({
     setPhase('talk');
 
     const text = [data.gozlem, data.yonlendirme].filter(Boolean).join('\n\n');
-    await wait(Math.max(3900, text.length * 29));
+    await wait(Math.min(4200, Math.max(1900, text.length * 13)));
 
     if (token !== runRef.current) return;
 
@@ -434,7 +434,7 @@ export default function PusulaGuide({
     if (data.calendarAction?.fieldId || data.openAction) keepOpenRef.current = true;
     // Kullanıcının minik 👍 / 👎 alanını rahatça kullanabilmesi için
     // paneli önceki 2.3 saniyeden biraz daha uzun açık tutuyoruz.
-    await wait(6500);
+    await wait(14000);
 
     if (token !== runRef.current) return;
     if (keepOpenRef.current) return;
@@ -472,13 +472,13 @@ export default function PusulaGuide({
       .filter(Boolean)
       .join('\n\n');
 
-    await wait(Math.max(3200, text.length * 29));
+    await wait(Math.min(4200, Math.max(1900, text.length * 13)));
 
     if (token !== runRef.current) return;
 
     setPhase('hold');
     if (lastInsight.calendarAction?.fieldId || lastInsight.openAction) keepOpenRef.current = true;
-    await wait(6500);
+    await wait(14000);
 
     if (token !== runRef.current) return;
     if (keepOpenRef.current) return;
