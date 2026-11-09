@@ -1059,3 +1059,14 @@
     animation:none!important;
   }
 }
+
+/* iOS WKWebView/Safari auto-zoom safeguard (2026-11-09).
+   14px auth fields caused iPhone to zoom on the first keyboard focus;
+   the scaled viewport could remain after the auth view unmounted.
+   Keep real font glyphs at >=16px rather than disabling pinch zoom. */
+@supports (-webkit-touch-callout: none) {
+  .tp-authv2 .tp-authv2-input:not(.tp-authv2-code-input) input:not([type='checkbox']) {
+    font-size: 16px !important;
+    line-height: normal;
+  }
+}
