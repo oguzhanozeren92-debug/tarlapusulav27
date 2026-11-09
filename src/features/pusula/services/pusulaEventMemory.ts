@@ -118,8 +118,8 @@ export function buildPusulaMemoryEvents(input:MemorySnapshot):PusulaMemoryEvent[
     : 'Son ilaçlamadan sonra belirtilerin durumunu kontrol edebildin mi?';
   put({id:'followup:'+clean(operation.id,90),module:'followup',
    title:'Son işleminin sonucunu birlikte takip edelim',
-   detail:dd(operation.activity_date)+' tarihinde '+(clean(input.fieldName,90)||'bu tarla')+
-    ' için '+label+' kaydı var. '+question,
+   detail:(clean(input.fieldName,90)?clean(input.fieldName,90)+' tarlasında ':'Bu tarlada ')+
+    dd(operation.activity_date)+' tarihinde '+label+' kaydı var. '+question,
    action:'Gözlemini Tarla Defteri’ne kaydet. Yeni uydu ve hava verilerini bu kayıtla birlikte değerlendirelim.',
    screen:'fieldNotebookHub',source:'Tarla Defteri',
    recordedAt:iso(now),priority:72,
