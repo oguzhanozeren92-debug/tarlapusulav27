@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { CloudSun, MapPin, Menu, Star } from 'lucide-react';
 import PusulaGuide, { type PusulaInsight } from '../assets/pusula/PusulaGuide';
 import { personalizedGuideMessages, type PersonalGuideContext } from '../features/pusula/services/personalizedGuideMessages';
+import {usePusulaFieldMemory} from '../features/pusula/hooks/usePusulaFieldMemory';
+import {memoryEventAsInsight} from '../features/pusula/services/pusulaEventMemory';
 import {
   latestCropPublication,
   publicationSignalSeenKey,
@@ -655,6 +657,17 @@ export default function GlobalPusulaBand({
     longitude: null,
     points: null,
   });
+  const fieldMemory=usePusulaFieldMemory({
+    userId:userGuideContext.userId,fieldId,fieldName,crop:userGuideContext.crop,
+  });
+  const openMemoryEvent = () => {
+    if(!fieldMemory.pending)return false;
+    const current=fieldMemory.pending;
+    fieldMemory.markSeen(current.id);
+    setHasUnreadInsight(false);
+    setInsight(memoryEventAsInsight(current,String(fieldName??'')));
+    return true;
+  };
   const [locationPermission, setLocationPermission] =
     useState<LocationPermissionState>('unknown');
   const [headerWeather, setHeaderWeather] = useState<HeaderWeatherState>({
@@ -675,7 +688,8 @@ export default function GlobalPusulaBand({
 
   const pageTitle = String(title ?? 'TarlaPusula').trim() || 'TarlaPusula';
   const hasPusulaSignal =
-    hasUnreadInsight || hasInteractiveSignal || hasDepotSignal || Boolean(readyPdf) || Boolean(relevantPublication);
+    hasUnreadInsight || hasInteractiveSignal || hasDepotSignal || Boolean(readyPdf) ||
+    Boolean(relevantPublication) || Boolean(fieldMemory.pending);
 
   const resolvedPoints =
     pointsProp !== undefined && pointsProp !== null
@@ -1504,6 +1518,11 @@ export default function GlobalPusulaBand({
       window.dispatchEvent(new CustomEvent('tp:open-pusulapdf', { detail: { reportId } }));
       return;
     }
+    // Cross-module weather alerts and due work are more important than the
+    // current page's ordinary guide; never turn them into automatic actions.
+    if(fieldMemory.pending && fieldMemory.pending.priority>=75){
+      if(openMemoryEvent())return;
+    }
     if (relevantPublication && userGuideContext.userId) {
       const activeFieldId = String(fieldId ?? fieldName ?? '').trim();
       const selected = relevantPublication;
@@ -1530,6 +1549,7 @@ export default function GlobalPusulaBand({
       });
       return;
     }
+    if(fieldMemory.pending && openMemoryEvent())return;
     if (screen === 'inventoryHub') {
       setHasDepotSignal(false);
 
