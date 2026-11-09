@@ -443,13 +443,13 @@ export function useHomePusula({
       satellite?.recommendations?.[0] ||
       'Uydu, radar, toprak ve hava verilerini birlikte izlemeyi sürdürelim.',
     );
-    const linkedEvidence = Array.isArray(synthesized?.evidence)
+    const linkedEvidence: string[] = Array.isArray(synthesized?.evidence)
       ? synthesized.evidence
           .filter((value: any) => value && value.layerLabel)
-          .map((value: any) => String(value.layerLabel).trim())
-          .filter(Boolean)
+          .map((value: any): string => String(value.layerLabel).trim())
+          .filter((value: string) => Boolean(value))
       : [];
-    const sources = Array.from(new Set(linkedEvidence)).slice(0, 5);
+    const sources: string[] = Array.from(new Set<string>(linkedEvidence)).slice(0, 5);
     const combinedAction = String(synthesized?.action || '').trim();
     const actionable = Boolean(
       synthesized && synthesized.status !== 'normal' &&
