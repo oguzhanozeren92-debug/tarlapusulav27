@@ -143,7 +143,7 @@ test('Pusula asks a follow-up two days after a real irrigation record, without c
  assert.match(check.detail,/toprak neminde/);
  assert.doesNotMatch(check.detail,/iyileşti|düzeldi|kesin/i);
  assert.equal(check.screen,'fieldNotebookHub');
- assert.equal(memoryEventAsInsight(check,'Şenpınar').openAction.label,'Gözlem kaydet');
+ assert.equal(memoryEventAsInsight(check,'Şenpınar').followUpAction.operationId,'irrig-1');
 });
 
 test('no follow-up after an actual later field inspection or replacement operation',()=>{
