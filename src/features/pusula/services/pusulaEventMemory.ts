@@ -67,7 +67,7 @@ export function buildPusulaMemoryEvents(input:MemorySnapshot):PusulaMemoryEvent[
   put({id:'task:'+clean(r.id,90),module:'tasks',title:'Açık bir tarla görevin var',
    detail:title+(dd(r.due_date)?' · '+dd(r.due_date):'')+'.',
    action:'Görevi gözden geçir. Yaptıysan tamamlandı olarak işaretle.',
-   screen:'calendar',source:'Görevler',recordedAt:clean(r.created_at)||iso(now),
+   screen:'home',source:'Görevler',recordedAt:clean(r.created_at)||iso(now),
    priority:Number.isFinite(due)?(due<=t+DAY?91:75):Math.min(73,Math.max(50,Number(r.priority)||55)),
    validUntil:Number.isFinite(due)?new Date(due+2*DAY).toISOString():undefined});
  }
@@ -172,7 +172,8 @@ export function memoryEventAsInsight(e:PusulaMemoryEvent,fieldName:string){
   gozlem:e.title+'\n'+e.detail,yonlendirme:e.action,
   guven_skoru:e.priority>=90?'Orta' as const:'Düşük' as const,
   sources:[e.source],
-  openAction:{label:e.screen==='calendar'?'Takvimi aç':
+  openAction:{label:e.screen==='home'?'Görevleri aç':
+   e.screen==='calendar'?'Takvimi aç':
    e.screen==='weatherHub'?'Hava tahminini aç':
    e.screen==='fieldNotebookHub'?'Tarla Defteri’ni aç':
    e.screen==='inventoryHub'?'Depoyu aç':
