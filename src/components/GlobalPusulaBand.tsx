@@ -663,7 +663,7 @@ export default function GlobalPusulaBand({
   const openMemoryEvent = () => {
     if(!fieldMemory.pending)return false;
     const current=fieldMemory.pending;
-    fieldMemory.markSeen(current.id);
+    if(current.module !== 'followup') fieldMemory.markSeen(current.id);
     setHasUnreadInsight(false);
     setInsight(memoryEventAsInsight(current,String(fieldName??'')));
     return true;
