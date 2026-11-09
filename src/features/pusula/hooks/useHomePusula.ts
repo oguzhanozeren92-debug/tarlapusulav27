@@ -316,26 +316,16 @@ export function useHomePusula({
         return;
       }
 
-      const alignedSynthesis = sourceAreaName
-        ? {
-            ...synthesis,
-            importantArea: sourceArea,
-            headline: `${sourceAreaName} bölümünü öncelikli kontrol et`,
-            summary: `Katmanlar birlikte değerlendirildiğinde saha kontrolünde öncelik ${sourceAreaName.toLocaleLowerCase(
-              'tr-TR',
-            )} bölümünde tutulmalı. ${String(
-              sourceArea?.summary || input.sourceAnalysis?.summary || '',
-            ).trim()}`.trim(),
-            prioritySource: {
-              layer: input.sourceLayer,
-              label: input.sourceLayerLabel,
-            },
-          }
-        : {
-            ...synthesis,
-            importantArea: null,
-            headline: 'Katmanların genel değerlendirmesi',
-          };
+      // A hotspot on the currently opened layer is NOT proof that the other
+      // layers confirm the same issue. Keep the true cross-layer synthesis
+      // as the primary narrative and only retain the source-layer context.
+      const alignedSynthesis = {
+        ...synthesis,
+        prioritySource: {
+          layer: input.sourceLayer,
+          label: input.sourceLayerLabel,
+        },
+      };
 
       setFieldSynthesis(alignedSynthesis);
       setSynthesisScope(scope);
