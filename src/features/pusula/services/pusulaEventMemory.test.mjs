@@ -91,3 +91,41 @@ test('both compasses consume the same memory and navigate into each module',()=>
  assert.match(home,/tp_pusula_open_tasks_v1/);
  assert.match(global,/tp_pusula_open_tasks_v1/);
 });
+
+test('Pusula synthesizes weather + nearby calendar plan without treating them as proof of each other',()=>{
+ const items=buildPusulaMemoryEvents({...base,
+  notifications:[{
+   id:'risk-1',field_id:field,category:'weather',severity:'danger',
+   title:'Don riski',message:'Sıcaklık düşebilir',
+   created_at:now.toISOString(),
+   data:{fieldId:field,forecastAt:'2026-11-10T01:00:00Z'},
+  }],
+  calendar:[{
+   id:'plan-1',field_id:field,title:'Saha kontrolü',
+   completed:false,reminder_date:'2026-11-10',
+  }],
+ });
+ const frost=items.find(e=>e.module==='weather');
+ assert.ok(frost);
+ assert.match(frost.detail,/Takvim bölümünde yaklaşan bir saha işin/);
+ assert.match(frost.detail,/Saha kontrolü/);
+ assert.match(frost.action,/Saatlik hava tahminini kontrol et/);
+ assert.ok(items.some(e=>e.module==='calendar'));
+});
+test('Depot advisory is grounded in a recorded field operation, not an inferred application',()=>{
+ const items=buildPusulaMemoryEvents({...base,
+  activities:[{
+   id:'op-2',field_id:field,activity_type:'Sulama',
+   title:'Sulama yapıldı',activity_date:'2026-11-09',created_at:now.toISOString(),
+  }],
+  depot:[{
+   id:'stock-2',fieldIds:[field],productName:'Gübre A',
+   totalAmount:20,remainingAmount:2,unit:'kg',
+  }],
+ });
+ const stock=items.find(e=>e.module==='depot');
+ assert.ok(stock);
+ assert.match(stock.detail,/Tarla Defteri’nde/);
+ assert.match(stock.action,/kaydı doğrula/);
+ assert.doesNotMatch(stock.action,/gübre uygula|ilaçla/i);
+});
