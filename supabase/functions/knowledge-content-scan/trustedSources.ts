@@ -127,5 +127,25 @@ export const TRUSTED_GUIDE_SEEDS: Array<{title:string;url:string;keywords:string
     "title": "Kiraz Yetiştiriciliği ve Zararlı Yönetimi — MAREM",
     "url": "https://arastirma.tarimorman.gov.tr/marem/Belgeler/2022/Yeti%C5%9Ftiricilik%20Bilgileri/Kiraz%20Yeti%C5%9Ftiricili%C4%9Fi.pdf",
     "keywords": "kiraz yetiştiricilik kiraz sineği monilya entegre mücadele zararlı hastalık meyve tozlaşma bahçe"
+  },
+  {
+    "title": "Bademde Delik Leke Hastalığı — UC IPM",
+    "url": "https://ipm.ucanr.edu/agriculture/almond/shot-hole/",
+    "keywords": "badem almond yaprak delik leke hastalık mantar shot hole Wilsonomyces carpophilus yağış gözlem"
+  },
+  {
+    "title": "Badem İç Kurdu ve Hasar Takibi — UC IPM",
+    "url": "https://ipm.ucanr.edu/agriculture/almond/navel-orangeworm/",
+    "keywords": "badem almond badem iç kurdu Amyelois transitella larva hasar mumya meyve feromon tuzak biyoteknik"
+  },
+  {
+    "title": "Bademde Kök Boğazı ve Gövde Zararlısı — UC IPM",
+    "url": "https://ipm.ucanr.edu/agriculture/almond/peachtree-borer/",
+    "keywords": "badem ağaç gövde kök boğazı zararlı larva Synanthedon exitiosa zamklanma gözlem"
+  },
+  {
+    "title": "Çeltikte Su Yönetimi — IRRI",
+    "url": "https://www.knowledgebank.irri.org/ericeproduction/PDF_%26_Docs/WaterMgmt.pdf",
+    "keywords": "çeltik pirinç rice water management sulama su yönetimi bitki su ihtiyacı toprak su drenaj evapotranspirasyon"
   }
 ];
