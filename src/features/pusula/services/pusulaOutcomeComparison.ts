@@ -1,4 +1,3 @@
-import { supabase } from '../../../supabaseClient';
 
 export type NdviObservation = { date: string; average: number };
 type FieldActivity = {
@@ -101,6 +100,7 @@ export async function loadPusulaOutcomeComparison(input: {
   fieldId: string; fieldName: string; ndviPoints: NdviObservation[];
 }): Promise<PusulaOutcomeComparison | null> {
   if (!input.fieldId || !input.ndviPoints.length) return null;
+  const { supabase } = await import('../../../supabaseClient');
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError || !auth.user) return null;
   const since = new Date(Date.now()-150*DAY_MS).toISOString().slice(0,10);
