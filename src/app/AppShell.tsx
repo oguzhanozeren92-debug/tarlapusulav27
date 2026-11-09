@@ -17,6 +17,7 @@ type AppShellProps = {
   menuItems: AppMenuItem[];
   fields: Field[];
   favoriteFieldId: string;
+  weatherHubFieldId?: string;
   showGlobalBand?: boolean;
   onCloseDrawer: () => void;
   onOpenDrawer: () => void;
@@ -40,6 +41,7 @@ export default function AppShell({
   menuItems,
   fields,
   favoriteFieldId,
+  weatherHubFieldId,
   showGlobalBand = true,
   onCloseDrawer,
   onOpenDrawer,
@@ -50,6 +52,12 @@ export default function AppShell({
   const favoriteField = fields.find(
     (field) => String(field.id) === String(favoriteFieldId),
   );
+  // WeatherHub has its own field picker. The global Pusula must follow the
+  // weather screen's actual field, not the Home/favourite field.
+  const weatherField = screen === 'weatherHub'
+    ? fields.find((field) => String(field.id) === String(weatherHubFieldId)) ?? fields[0] ?? null
+    : null;
+  const pusulaField = weatherField ?? favoriteField ?? fields[0] ?? null;
 
   const canonicalTitles: Partial<Record<Screen, string>> = {
     weatherHub: 'Hava Durumu',
@@ -90,7 +98,8 @@ export default function AppShell({
         <GlobalPusulaBand
           screen={String(screen)}
           title={shellTitle}
-          fieldName={favoriteField?.name ?? fields[0]?.name ?? null}
+          fieldName={pusulaField?.name ?? null}
+          fieldId={pusulaField?.id ? String(pusulaField.id) : null}
           onBack={onBack}
           onMenu={onOpenDrawer}
           onOpenAi={onOpenAi}
