@@ -1185,3 +1185,21 @@
   .pusula-guide__speech { padding-left: 22px; padding-right: 22px; }
   .pusula-guide__structured { gap: 11px; }
 }
+
+/* Every Pusula recommendation may lead to the relevant module. */
+.pusula-guide__open-action { margin: 10px 0 12px; }
+.pusula-guide__open-action button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(196,239,203,.42);
+  background: rgba(44,118,84,.90);
+  border-radius: 11px;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pusula-guide__open-action button:focus-visible {
+  outline: 3px solid #d5f5dc;
+  outline-offset: 3px;
+}
