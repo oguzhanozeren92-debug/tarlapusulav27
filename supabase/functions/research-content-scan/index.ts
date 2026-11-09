@@ -54,14 +54,14 @@ function articleScore(x:Found){ const text = norm(`${x.title} ${x.summary}`); le
 function articleYear(x:Found){ if(!x.publishedAt) return null; const y=new Date(x.publishedAt).getUTCFullYear(); return Number.isFinite(y)?y:null; }
 
 async function openAlex(query:string, limit:number):Promise<Found[]> {
-  const p = new URLSearchParams({ search: query, per_page: String(Math.max(1, Math.min(limit, 25))), select: "id,doi,title,publication_year,language,abstract_inverted_index,primary_location" });
+  const p = new URLSearchParams({ search: query, per_page: String(Math.max(1, Math.min(limit, 25))), select: "id,doi,title,publication_year,language,abstract_inverted_index,primary_location", filter: "from_publication_date:2010-01-01" });
   const key = clean(Deno.env.get("OPENALEX_API_KEY"),300); if(key) p.set("api_key",key);
   const r=await fetch(`https://api.openalex.org/works?${p.toString()}`,{headers:{"User-Agent":"TarlaPusula-Research-Radar/5.1"},signal:AbortSignal.timeout(25000)});
   if(!r.ok){const body=clean(await r.text(),1200);throw new Error(`OpenAlex HTTP ${r.status}${body?`: ${body}`:""}`);} const d=await r.json();
   return (Array.isArray(d?.results)?d.results:[]).map((w:any)=>{ const doi=clean(w?.doi,400).replace(/^https?:\/\/(dx\.)?doi\.org\//i,"")||null; return { title:clean(w?.title,900), url:doiUrl(doi)||clean(w?.primary_location?.landing_page_url||w?.id,1200), doi, summary:abstractFromInverted(w?.abstract_inverted_index), language:clean(w?.language,20)||"unknown", publishedAt:yearDate(w?.publication_year), query, provider:"openalex" }; }).filter((x:Found)=>x.title&&x.url);
 }
 async function crossref(query:string, limit:number):Promise<Found[]> {
-  const p=new URLSearchParams({"query.bibliographic":query,rows:String(limit),select:"DOI,title,abstract,published,URL,language",filter:"type:journal-article"});
+  const p=new URLSearchParams({"query.bibliographic":query,rows:String(limit),select:"DOI,title,abstract,published,URL",filter:"type:journal-article,from-pub-date:2010-01-01"});
   const r=await fetch(`https://api.crossref.org/works?${p.toString()}`,{headers:{"User-Agent":"TarlaPusula-Research-Radar/5.1 (mailto:admin@tarlapusula.app)"},signal:AbortSignal.timeout(25000)});
   if(!r.ok){const body=clean(await r.text(),1200);throw new Error(`Crossref HTTP ${r.status}${body?`: ${body}`:""}`);} const d=await r.json();
   return (Array.isArray(d?.message?.items)?d.message.items:[]).map((w:any)=>{ const doi=clean(w?.DOI,400)||null; const year=w?.published?.["date-parts"]?.[0]?.[0]; return { title:clean(Array.isArray(w?.title)?w.title[0]:w?.title,900), url:doiUrl(doi)||clean(w?.URL,1200), doi, summary:clean(w?.abstract,5000), language:clean(w?.language,20)||"unknown", publishedAt:yearDate(year), query, provider:"crossref" }; }).filter((x:Found)=>x.title&&x.url);
@@ -77,7 +77,7 @@ async function semantic(query:string, limit:number):Promise<Found[]> {
 async function markTranslation(admin:any, candidateId:string, status:"translated"|"failed_auto", errorMessage?:string) {
   const current = await admin.from("content_candidates").select("structured_body").eq("id", candidateId).maybeSingle();
   const structured = current.data?.structured_body && typeof current.data.structured_body === "object" ? current.data.structured_body : {};
-  await admin.from("content_candidates").update({ workflow_status: status === "translated" ? "pending" : "rejected", payload_status: status === "translated" ? "ready" : "error", structured_body: { ...structured, translation_status: status, producer_summary_status: status === "translated" ? "ready" : "blocked", ...(errorMessage ? { translation_error: clean(errorMessage, 600) } : {}) } }).eq("id", candidateId);
+  await admin.from("content_candidates").update({ workflow_status: status === "translated" ? "pending" : "held", payload_status: status === "translated" ? "ready" : "error", structured_body: { ...structured, translation_status: status, producer_summary_status: status === "translated" ? "ready" : "blocked", ...(errorMessage ? { translation_error: clean(errorMessage, 600) } : {}) } }).eq("id", candidateId);
 }
 
 Deno.serve(async (req:Request)=>{
@@ -93,7 +93,7 @@ Deno.serve(async (req:Request)=>{
     else { const s=await admin.from("content_sources").select("*").eq("active",true).eq("source_type","api").eq("metadata->>channel","article").order("trust_score",{ascending:false}).limit(1).maybeSingle(); if(s.error) throw s.error; source=s.data; sourceId=source?.id||""; if(!sourceId) return json({error:"Aktif makale kaynağı bulunamadı."},409); }
     const providerText=norm(`${source?.name||""} ${source?.base_url||""} ${source?.metadata?.provider||""} ${source?.metadata?.api_provider||""}`);
     if(/researchgate/.test(providerText)) return json({ok:true,engine:"research-v5.2",source:source?.name,skipped:true,reason:"ResearchGate otomatik taramaya uygun kaynak olarak kullanılmıyor; yayın keşfi indeks API'lerinden yapılır.",candidatesCreated:0});
-    const providers = /semantic/.test(providerText) ? ["semantic"] : /crossref/.test(providerText) ? ["crossref"] : /openalex/.test(providerText) ? ["openalex"] : ["openalex","crossref","semantic"];
+    const providers = /semantic/.test(providerText) ? ["semantic","openalex"] : /crossref/.test(providerText) ? ["crossref","openalex"] : ["openalex"];
     const requested=Array.isArray(body?.queries)?body.queries.map((x:any)=>clean(x,240)).filter((x:string)=>x.length>2):[];
     const metadataQuery=clean(source?.metadata?.query,240);
     const allQueries=requested.length?requested:[...new Set([...QUERY_POOL,...(metadataQuery?[metadataQuery]:[])])];
