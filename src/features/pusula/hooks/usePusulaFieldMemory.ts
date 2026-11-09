@@ -111,10 +111,15 @@ export function usePusulaFieldMemory(input:Input){
   let live=true;
   if(userId){setResolvedUser(userId);return;}
   setResolvedUser('');
+  // Home remains mounted during some auth transitions. Clear the previous
+  // user's memory immediately on sign-out or account switch.
+  const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+   if(live)setResolvedUser(session?.user?.id||'');
+  });
   void supabase.auth.getUser().then(({data})=>{
    if(live)setResolvedUser(data.user?.id||'');
   }).catch(()=>{if(live)setResolvedUser('')});
-  return()=>{live=false};
+  return()=>{live=false;subscription.unsubscribe()};
  },[userId,fieldId]);
  useEffect(()=>{
   setEvents([]);
