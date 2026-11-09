@@ -1,0 +1,31 @@
+name: Weather Color Reference Check
+
+on:
+  push:
+    branches: [feat/weather-color-landscape-20261109]
+  pull_request:
+    paths:
+      - 'src/pages/Weather/**'
+      - 'src/components/ClassicBottomNav.tsx'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weather-color-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

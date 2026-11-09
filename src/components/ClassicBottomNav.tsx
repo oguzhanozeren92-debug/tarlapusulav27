@@ -14,6 +14,7 @@ type ClassicBottomNavProps = {
   onOpenAi?: () => void;
   onOpenCalendar?: () => void;
   onOpenFields?: () => void;
+  variant?: 'default' | 'weather';
 };
 
 const CLASSIC_BOTTOM_NAV_CSS = String.raw`
@@ -324,6 +325,40 @@ html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav button.active .tp-c
   stroke:#060708!important;
 }
 
+
+/* Weather page's light navigation is isolated from all other modules. */
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather {
+  background:rgba(255,255,255,.97)!important;
+  background-image:none!important;
+  border-top:1px solid #dce9dd!important;
+  box-shadow:0 -6px 25px rgba(22,62,44,.12)!important;
+  backdrop-filter:blur(18px)!important;
+}
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather button,
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather button .tp-classic-bottom-label {
+  color:#173d2b!important;
+  -webkit-text-fill-color:#173d2b!important;
+  font-weight:750!important;
+}
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather .tp-classic-bottom-icon,
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather .tp-classic-bottom-icon svg {
+  color:#163e2e!important;stroke:#163e2e!important;
+}
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather button.active .tp-classic-bottom-icon {
+  background:linear-gradient(135deg,#4dba8b,#11664a)!important;
+  border-radius:13px!important;
+  color:#fff!important;
+  box-shadow:0 4px 10px rgba(23,91,61,.24)!important;
+}
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather button.active .tp-classic-bottom-icon svg {
+  color:#fff!important;stroke:#fff!important;
+}
+html body #root .tp-classic-bottom-nav.tp-classic-bottom-nav--weather button.active .tp-classic-bottom-label {
+  color:#176445!important;
+  -webkit-text-fill-color:#176445!important;
+  font-weight:850!important;
+}
+
 `;
 
 export default function ClassicBottomNav({
@@ -331,6 +366,7 @@ export default function ClassicBottomNav({
   setScreen,
   onOpenAi,
   onOpenFields,
+  variant = 'default',
 }: ClassicBottomNavProps) {
 
   const go = (screen: Screen) => {
@@ -407,7 +443,7 @@ export default function ClassicBottomNav({
 
 
       <nav
-        className="tp-classic-bottom-nav"
+        className={`tp-classic-bottom-nav${variant === 'weather' ? ' tp-classic-bottom-nav--weather' : ''}`}
         aria-label="Ana menü"
       >
 
