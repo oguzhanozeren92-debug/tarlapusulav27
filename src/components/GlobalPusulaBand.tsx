@@ -1279,8 +1279,15 @@ export default function GlobalPusulaBand({
       const incomingField = String(customEvent.detail.fieldName ?? '').trim();
       const expectedId = String(fieldId ?? '').trim();
       const incomingId = String(customEvent.detail.fieldId ?? '').trim();
-      if ((expectedId && incomingId !== expectedId) ||
-          (expectedField && incomingField !== expectedField)) return;
+      if (screen === 'weatherHub') {
+        // Weather events always carry the selected field id and name.
+        if ((expectedId && incomingId !== expectedId) ||
+            (expectedField && incomingField !== expectedField)) return;
+      } else {
+        // Other screens can emit generic insights without a field binding.
+        if ((expectedId && incomingId && incomingId !== expectedId) ||
+            (expectedField && incomingField && incomingField !== expectedField)) return;
+      }
 
       const pageInsight = customEvent.detail.insight;
       const guideOnly = isGuideInsight(pageInsight);
