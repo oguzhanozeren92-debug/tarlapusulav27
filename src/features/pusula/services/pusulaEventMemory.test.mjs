@@ -1,0 +1,90 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {
+ buildPusulaMemoryEvents,markPusulaEventSeen,nextUnseenPusulaEvent,memoryEventAsInsight
+} from './pusulaEventMemory.ts';
+
+const now=new Date('2026-11-09T18:00:00Z');
+const date='2026-11-09';
+const field='tarla-a';
+const base={fieldId:field,fieldName:'Şenpınar',crop:'Üzüm',now};
+
+test('critical, field-specific and fresh frost alert comes before open calendar tasks',()=>{
+ const items=buildPusulaMemoryEvents({...base,
+  notifications:[
+   {id:'fresh',fieldId:field,category:'weather',severity:'danger',
+    title:'Don riski',message:'0°C olabilir',created_at:now.toISOString(),
+    data:{fieldId:field,forecastAt:'2026-11-10T01:00:00Z'}},
+   {id:'other',fieldId:'tarla-b',category:'weather',severity:'danger',
+    title:'Başka tarla riski',created_at:now.toISOString()}
+  ],
+  tasks:[{id:'task-1',field_id:field,title:'Saha kontrolü',completed:false,
+    dismissed:false,due_date:'2026-11-10',created_at:now.toISOString()}]
+ });
+ assert.equal(items[0].module,'weather');
+ assert.ok(items.every(x=>x.fieldId===field&&!x.title.includes('Başka tarla')));
+});
+test('old weather risks, completed/snoozed/dismissed tasks never produce an event',()=>{
+ const items=buildPusulaMemoryEvents({...base,
+  notifications:[{id:'old',fieldId:field,category:'weather',severity:'danger',
+    created_at:'2026-11-01T18:00:00Z',data:{fieldId:field,forecastAt:'2026-11-02T01:00:00Z'}}],
+  tasks:[
+   {id:'done',field_id:field,title:'Tamamlandı',completed:true},
+   {id:'dismissed',field_id:field,title:'Reddedildi',dismissed:true},
+   {id:'snoozed',field_id:field,title:'Ertelendi',metadata:{snoozedUntil:'2026-11-12T20:00:00Z'}}
+  ]});
+ assert.deepEqual(items,[]);
+});
+test('notebook is historical evidence, not an instruction to repeat an already logged operation',()=>{
+ const items=buildPusulaMemoryEvents({...base,
+  activities:[{id:'op1',field_id:field,activity_type:'Sulama',title:'Sulama yapıldı',
+    activity_date:date,created_at:now.toISOString()}],
+  tasks:[{id:'t1',field_id:field,title:'Sulama işlemi',completed:false,due_date:date}]
+ });
+ assert.ok(items.some(x=>x.module==='notebook'));
+ assert.ok(!items.some(x=>x.module==='tasks'));
+});
+test('calendar, depot, market and crop-tagged guides have proper field and date guards',()=>{
+ const items=buildPusulaMemoryEvents({...base,
+  calendar:[{id:'cal1',field_id:field,title:'Budama kontrolü',completed:false,reminder_date:'2026-11-11'}],
+  depot:[{id:'dep1',fieldIds:[field],productName:'Gübre',remainingAmount:2,totalAmount:20,unit:'kg'},
+   {id:'dep2',fieldIds:['tarla-b'],productName:'Başka tarla',remainingAmount:1,totalAmount:20}],
+  prices:[{id:'p1',product_name:'grape',avg_price:23.4,unit:'TL/kg',price_date:'2026-11-09'},
+   {id:'p2',product_name:'elma',avg_price:50,price_date:'2026-11-09'}],
+  guides:[{id:'g1',title:'Asma bakım rehberi',crop_tags:['asma'],published_at:'2026-11-08T12:00:00Z'},
+   {id:'g2',title:'Elma rehberi',crop_tags:['elma'],published_at:'2026-11-08T12:00:00Z'}]
+ });
+ assert.deepEqual(new Set(items.map(x=>x.module)),new Set(['calendar','depot','market','knowledge']));
+ assert.ok(items.every(e=>!e.detail.includes('Başka tarla')&&!e.detail.includes('Elma rehberi')));
+ const guide=items.find(x=>x.module==='knowledge');
+ assert.equal(memoryEventAsInsight(guide,'Şenpınar').openAction.screen,'pestGuideHub');
+});
+test('seen memory is isolated by user and field',()=>{
+ const saved=new Map();
+ const previous=globalThis.window;
+ const previousEvent=globalThis.CustomEvent;
+ globalThis.window={
+  localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,v)},
+  dispatchEvent(){},
+ };
+ globalThis.CustomEvent=class{constructor(name,options){this.name=name;this.detail=options.detail;}};
+ try{
+  const items=buildPusulaMemoryEvents({...base,calendar:[
+   {id:'cal',field_id:field,title:'Saha gözlemi',completed:false,reminder_date:'2026-11-10'}]});
+  assert.ok(nextUnseenPusulaEvent('u1',field,items,now));
+  markPusulaEventSeen('u1',field,items[0].id);
+  assert.equal(nextUnseenPusulaEvent('u1',field,items,now),null);
+  assert.ok(nextUnseenPusulaEvent('u2',field,items,now));
+  assert.equal(nextUnseenPusulaEvent('u1','other-field',items,now),null);
+ }finally{globalThis.window=previous;globalThis.CustomEvent=previousEvent}
+});
+test('both compasses consume the same memory and navigate into each module',()=>{
+ const home=readFileSync(new URL('../../../pages/Home/HomeScreen.tsx',import.meta.url),'utf8');
+ const global=readFileSync(new URL('../../../components/GlobalPusulaBand.tsx',import.meta.url),'utf8');
+ const shell=readFileSync(new URL('../../../app/AppShell.tsx',import.meta.url),'utf8');
+ assert.match(home,/usePusulaFieldMemory/);
+ assert.match(home,/homeMemory\.markSeen/);
+ assert.match(global,/fieldMemory\.markSeen/);
+ assert.match(shell,/onNavigate=\{\(target\) => onNavigate/);
+});
