@@ -6,6 +6,7 @@ import {
 } from 'react';
 import type { CSSProperties } from 'react';
 import { addQuickCalendarReminder, calendarDateAfterDays } from '../../features/calendar/services/quickCalendar.service';
+import { createFieldOperation } from '../../features/field-operations/services/fieldOperation.service';
 
 import './PusulaGuide.css';
 
@@ -27,6 +28,7 @@ export type PusulaInsight = {
   observationDate?: string;
   sources?: string[];
   openAction?: { label: string; screen: string; contentId?: string };
+  followUpAction?: { fieldId: string; operationId: string; operationLabel: string };
   calendarAction?: {
     fieldId: string;
     title: string;
@@ -141,6 +143,10 @@ export default function PusulaGuide({
   const [calendarDate, setCalendarDate] = useState(() => calendarDateAfterDays(0));
   const [calendarSaving, setCalendarSaving] = useState(false);
   const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
+  const [followUpSaving, setFollowUpSaving] = useState(false);
+  const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null);
+  const [followUpNote, setFollowUpNote] = useState('');
+  const [followUpMessage, setFollowUpMessage] = useState<string | null>(null);
 
   const [anchor, setAnchor] = useState({
     x: typeof window === 'undefined' ? 0 : window.innerWidth / 2,
@@ -171,6 +177,9 @@ export default function PusulaGuide({
     setShowDislikeReasons(false);
     setCalendarDate(calendarDateAfterDays(0));
     setCalendarMessage(null);
+    setFollowUpAnswer(null);
+    setFollowUpNote('');
+    setFollowUpMessage(null);
     keepOpenRef.current = false;
   }, [activeInsight?.id]);
 
@@ -195,6 +204,47 @@ export default function PusulaGuide({
       setCalendarMessage(error instanceof Error ? error.message : 'Takvim kaydı oluşturulamadı.');
     } finally {
       setCalendarSaving(false);
+    }
+  };
+
+  const saveFollowUp = async (answer: string) => {
+    const action = activeInsight?.followUpAction;
+    if (!action?.fieldId || !action.operationId || followUpSaving || followUpAnswer) return;
+    keepOpenRef.current = true;
+    setFollowUpSaving(true);
+    setFollowUpMessage(null);
+    const choices: Record<string, string> = {
+      improved: 'İyileşme gördüm',
+      unchanged: 'Belirgin değişiklik yok',
+      worsened: 'Durum kötüleşti',
+      uncertain: 'Henüz emin değilim',
+    };
+    try {
+      const text = choices[answer];
+      if (!text) throw new Error('Lütfen bir gözlem seç.');
+      await createFieldOperation({
+        fieldId: action.fieldId,
+        type: 'Saha Kontrolü',
+        date: calendarDateAfterDays(0),
+        notes: [
+          'Pusula işlem takibi',
+          'İşlem: ' + action.operationLabel,
+          'Kaynak işlem: ' + action.operationId,
+          'Gözlem: ' + text,
+          followUpNote.trim().slice(0, 450),
+        ].filter(Boolean).join(' | '),
+      });
+      setFollowUpAnswer(answer);
+      setFollowUpMessage('Gözlemin Tarla Defteri’ne kaydedildi. Sonraki analizlerde bunu dikkate alacağım.');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tp:pusula-followup-saved', {
+          detail: { fieldId: action.fieldId, operationId: action.operationId, answer },
+        }));
+      }
+    } catch (error) {
+      setFollowUpMessage(error instanceof Error ? error.message : 'Gözlem kaydedilemedi.');
+    } finally {
+      setFollowUpSaving(false);
     }
   };
 
@@ -431,7 +481,7 @@ export default function PusulaGuide({
 
     setPhase('hold');
     // An actionable suggestion stays open until the user closes it.
-    if (data.calendarAction?.fieldId || data.openAction) keepOpenRef.current = true;
+    if (data.calendarAction?.fieldId || data.openAction || data.followUpAction?.fieldId) keepOpenRef.current = true;
     // Kullanıcının minik 👍 / 👎 alanını rahatça kullanabilmesi için
     // paneli önceki 2.3 saniyeden biraz daha uzun açık tutuyoruz.
     await wait(14000);
@@ -477,7 +527,7 @@ export default function PusulaGuide({
     if (token !== runRef.current) return;
 
     setPhase('hold');
-    if (lastInsight.calendarAction?.fieldId || lastInsight.openAction) keepOpenRef.current = true;
+    if (lastInsight.calendarAction?.fieldId || lastInsight.openAction || lastInsight.followUpAction?.fieldId) keepOpenRef.current = true;
     await wait(14000);
 
     if (token !== runRef.current) return;
@@ -674,6 +724,40 @@ export default function PusulaGuide({
                     >
                       {activeInsight.openAction.label}
                     </button>
+                  </div>
+                )}
+
+                {activeInsight.followUpAction?.fieldId && (
+                  <div className="pusula-guide__calendar-action" aria-label="İşlem sonu gözlem">
+                    <label htmlFor="pusula-followup-note">Tarlada ne değişti?</label>
+                    <div className="pusula-guide__followup-options">
+                      {([
+                        ['improved', 'İyileşme var'],
+                        ['unchanged', 'Değişmedi'],
+                        ['worsened', 'Kötüleşti'],
+                        ['uncertain', 'Emin değilim'],
+                      ] as const).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          disabled={followUpSaving || Boolean(followUpAnswer)}
+                          aria-pressed={followUpAnswer === value}
+                          onClick={() => void saveFollowUp(value)}
+                        >{followUpAnswer === value ? '✓ ' : ''}{label}</button>
+                      ))}
+                    </div>
+                    {!followUpAnswer && (
+                      <textarea
+                        id="pusula-followup-note"
+                        maxLength={450}
+                        rows={2}
+                        value={followUpNote}
+                        onChange={event => { keepOpenRef.current = true; setFollowUpNote(event.target.value); }}
+                        placeholder="İstersen kısa bir gözlem ekle (isteğe bağlı)"
+                      />
+                    )}
+                    {followUpMessage && <p role="status">{followUpMessage}</p>}
+                    <small>Bu kayıt bir hastalık teşhisi değildir. Gözlemini daha sonra Tarla Defteri’nde inceleyebilirsin.</small>
                   </div>
                 )}
 
