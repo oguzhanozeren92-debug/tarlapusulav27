@@ -43,6 +43,9 @@ export function buildPusulaMemoryEvents(input:MemorySnapshot):PusulaMemoryEvent[
   const created=ms(r.created_at??r.createdAt);
   if(!Number.isFinite(created)||created<t-36*3600000||created>t+60000)continue;
   const forecast=ms(r.data?.forecastAt??r.data?.forecast_at);
+  // A frost warning without a forecast time could refer to yesterday's
+  // already-passed minimum. Do not repeat it as a current Pusula risk.
+  if(/don|frost/i.test(clean(r.title)+' '+clean(r.message))&&!Number.isFinite(forecast))continue;
   if(Number.isFinite(forecast)&&(forecast<t-12*3600000||forecast>t+72*3600000))continue;
   put({id:'weather:'+clean(r.id,90),module:'weather',
     title:clean(r.title)||'Hava tahmini uyarısı',
@@ -58,8 +61,9 @@ export function buildPusulaMemoryEvents(input:MemorySnapshot):PusulaMemoryEvent[
   const due=ms(r.due_date),title=clean(r.title,150);
   if(!title||(Number.isFinite(due)&&(due<t-2*DAY||due>t+7*DAY)))continue;
   // If an identical activity was logged recently, do not suggest doing it again.
-  if(recent&&title.toLocaleLowerCase('tr-TR').includes(
-    clean(recent.activity_type).toLocaleLowerCase('tr-TR'))&&ms(recent.activity_date)>t-2*DAY)continue;
+  const operationType=clean(recent?.activity_type).toLocaleLowerCase('tr-TR');
+  if(recent&&operationType.length>2&&title.toLocaleLowerCase('tr-TR').includes(
+    operationType)&&ms(recent.activity_date)>t-2*DAY)continue;
   put({id:'task:'+clean(r.id,90),module:'tasks',title:'Açık bir tarla görevin var',
    detail:title+(dd(r.due_date)?' · '+dd(r.due_date):'')+'.',
    action:'Görevi gözden geçir. Yaptıysan tamamlandı olarak işaretle.',
