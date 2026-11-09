@@ -46,6 +46,8 @@ import { useHomeSatelliteDate } from '../../features/home-map/hooks/useHomeSatel
 import type { EarthSearchNdviStats } from '../../features/home-map/services/earthSearchNdvi.service';
 import HomeMapPusulaStrip from '../../features/pusula/components/HomeMapPusulaStrip';
 import { useHomePusula } from '../../features/pusula/hooks/useHomePusula';
+import { supabase } from '../../supabaseClient';
+import { latestCropPublication, publicationSignalSeenKey, type PusulaContentSignal, type PusulaPublication } from '../../features/pusula/services/pusulaContentSignals';
 import PusulaOperationQuestion from '../../features/pusula/components/PusulaOperationQuestion';
 import PusulaFieldChange from '../../features/field-changes/components/PusulaFieldChange';
 import PusulaFieldQuestion from '../../features/pusula/components/PusulaFieldQuestion';
@@ -204,6 +206,8 @@ export default function HomeScreen(props: HomeScreenProps) {
   const [pointsOpen, setPointsOpen] = useState(false);
   const [homeHeaderPusulaInsight, setHomeHeaderPusulaInsight] =
     useState<PusulaInsight | null>(null);
+  const [homePublication, setHomePublication] = useState<PusulaContentSignal | null>(null);
+  const homePublicationUserRef = useRef('');
   const [readyPdfNotice, setReadyPdfNotice] = useState<{ reportId: string; fieldName: string } | null>(null);
   useEffect(() => {
     const update = (event?: Event) => {
@@ -574,6 +578,51 @@ export default function HomeScreen(props: HomeScreenProps) {
     ndviStats: homeNdviStats,
     phenology: decisionPhenology,
   });
+
+  // Home uses its own compass. Give it the same published crop alerts as
+  // the side-menu compass without relying on another screen having mounted.
+  useEffect(() => {
+    let alive = true;
+    setHomePublication(null);
+    homePublicationUserRef.current = '';
+    const fieldId = String(homeField?.id ?? '').trim();
+    const crop = String(homeField?.crop ?? '').trim();
+    if (!fieldId || !crop || homeField?.demo) return;
+
+    const scan = async () => {
+      try {
+        const auth = await supabase.auth.getUser();
+        const userId = auth.data.user?.id;
+        if (!userId || auth.error || !alive) return;
+        homePublicationUserRef.current = userId;
+        const columns = 'id,content_type,content_subtype,title,crop_tags,published_at,source_refs';
+        const cutoff = new Date(Date.now() - 14 * 86400000).toISOString();
+        const [n, a] = await Promise.all([
+          supabase.from('content_items').select(columns)
+            .eq('status','published').eq('content_type','news')
+            .gte('published_at',cutoff).order('published_at',{ascending:false}).limit(24),
+          supabase.from('content_items').select(columns)
+            .eq('status','published').eq('content_subtype','article')
+            .gte('published_at',cutoff).order('published_at',{ascending:false}).limit(24),
+        ]);
+        if (!alive || n.error || a.error) return;
+        const item = latestCropPublication(
+          [...(n.data || []), ...(a.data || [])] as PusulaPublication[], crop);
+        if (!item) return;
+        try {
+          if (window.localStorage.getItem(publicationSignalSeenKey(userId, fieldId, item.id))) return;
+        } catch { /* Private browsing may disable storage. */ }
+        setHomePublication(item);
+      } catch (error) {
+        console.warn('[Pusula] Ana sayfa ürün yayınları okunamadı:',error);
+      }
+    };
+    void scan();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void scan();
+    }, 15 * 60 * 1000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [homeField?.id, homeField?.crop, homeField?.demo]);
 
   const {
     loading: homePusulaLoading,
@@ -1231,7 +1280,8 @@ export default function HomeScreen(props: HomeScreenProps) {
     // V58: Ana sayfadaki Pusula artık ham harita metnini değil,
     // HomeDecisionEngine'in bütün motorları birleştirdikten sonra seçtiği
     // kanonik Pusula kararını kullanır. Logo yine yalnız kullanıcı tıklayınca iner.
-    if (pusulaDecision) {
+    if (pusulaDecision &&
+        (pusulaDecision.severity === 'danger' || pusulaDecision.priority >= 90)) {
       setSeenHomePusulaDecisionId(pusulaDecision.id);
       const confidence =
         pusulaDecision.confidence ??
@@ -1258,6 +1308,40 @@ export default function HomeScreen(props: HomeScreenProps) {
                 notes: String(pusulaDecision.detail || '').trim().slice(0, 850),
               }
             : undefined,
+      });
+      return;
+    }
+
+    if (homePublication && homePublicationUserRef.current && homeField?.id) {
+      const item = homePublication;
+      try {
+        window.localStorage.setItem(
+          publicationSignalSeenKey(homePublicationUserRef.current, String(homeField.id), item.id),
+          new Date().toISOString());
+      } catch { /* Best effort. */ }
+      setHomePublication(null);
+      setHomeHeaderPusulaInsight({
+        id: `home-crop-publication-${item.id}`,
+        fieldName: String(homeField.name ?? '').trim() || undefined,
+        observationDate: item.publishedAt,
+        gozlem: `Kayıtlı ${item.crop} ürününle ilgili yeni bir ${item.kind === 'article' ? 'makale' : 'haber'} yayımlandı: ${item.title}.`,
+        yonlendirme: 'Kaynak ve tarih bilgisini inceleyebilirsin. Genel yayınlar, tarlan için doğrudan uygulama kararı değildir.',
+        sources: [item.source || 'TarlaPusula içerik arşivi'],
+        openAction: {label: item.kind === 'article' ? 'Makaleyi incele' : 'Haberi incele', screen: 'agendaHub', contentId: item.id},
+      });
+      return;
+    }
+
+    if (pusulaDecision) {
+      setSeenHomePusulaDecisionId(pusulaDecision.id);
+      const confidence = pusulaDecision.confidence ?? 'preliminary';
+      setHomeHeaderPusulaInsight({
+        id: `home-decision-${pusulaDecision.id}`,
+        fieldName: String(homeField?.name ?? '').trim() || undefined,
+        observationDate: new Date().toISOString().slice(0, 10),
+        gozlem: String(pusulaDecision.title || pusulaDecision.label || 'Pusula').trim(),
+        yonlendirme: String(pusulaDecision.detail || '').trim(),
+        guven_skoru: confidence === 'strong' ? 'Yüksek' : confidence === 'medium' ? 'Orta' : 'Düşük',
       });
       return;
     }
@@ -1332,9 +1416,17 @@ export default function HomeScreen(props: HomeScreenProps) {
           anchorSelector=".tp-brand-pusula-anchor"
           hasUnread={Boolean(
             (fieldEventPrompt.candidate && fieldEventPrompt.needsAttention) ||
-              homePusulaDecisionAttention || Boolean(readyPdfNotice),
+              homePusulaDecisionAttention || Boolean(readyPdfNotice) || Boolean(homePublication),
           )}
           onLogoClick={handleHomeHeaderPusulaClick}
+          onOpenAction={(target, contentId) => {
+            if (target === 'agendaHub' && contentId) {
+              try { window.sessionStorage.setItem('tp_pusula_content_open_v1', contentId); }
+              catch { /* navigation still works */ }
+            }
+            setHomeHeaderPusulaInsight(null);
+            setScreen?.(target);
+          }}
         />
       ) : null}
 
