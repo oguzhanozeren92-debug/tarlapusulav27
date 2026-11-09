@@ -160,7 +160,7 @@ async function fetchHtml(url: string) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const ct = r.headers.get("content-type") || "";
   if (!ct.includes("html")) return "";
-  return (await r.text()).slice(0, 700_000);
+  return (await r.text()).slice(0, 300_000);
 }
 
 function diagnoseHtml(html: string, url: string, crops: Crop[], allowGeneric = false) {
@@ -244,7 +244,12 @@ function seeds(s: Source, crops: Crop[]) {
   try { host = new URL(s.base_url).hostname.replace(/^www\./, ""); } catch { }
   const out = [s.base_url];
   if (host === "ipm.ucanr.edu") {
-    for (const c of crops) { const slug = UC_SLUG[norm(c.crop_key)]; if (slug) out.push(`https://ipm.ucanr.edu/agriculture/${slug}/`); }
+    const cursor = Math.max(0, Number(s.metadata?.guide_seed_cursor || 0)) % Math.max(1, crops.length);
+    for (let n = 0; n < Math.min(3, crops.length); n++) {
+      const c = crops[(cursor + n) % crops.length];
+      const slug = UC_SLUG[norm(c.crop_key)];
+      if (slug) out.push(`https://ipm.ucanr.edu/agriculture/${slug}/`);
+    }
   }
   if (host.includes("extension.umn.edu")) out.push("https://extension.umn.edu/agriculture/crop-production");
   if (host.includes("cropwatch.unl.edu")) out.push("https://cropwatch.unl.edu/plant-disease/", "https://cropwatch.unl.edu/crops/");
@@ -254,9 +259,10 @@ function seeds(s: Source, crops: Crop[]) {
   return [...new Set(out)];
 }
 
-async function discover(s: Source, crops: Crop[], limit: number) {
+async function discover(s: Source, crops: Crop[], limit: number, knownTerminalUrls = new Set<string>()) {
   const urls = new Map<string, number>();
   const seedSet = new Set(seeds(s, crops));
+  const seedHtmlCache = new Map<string, string>();
   const found: Item[] = [];
   const errors: string[] = [];
 
@@ -267,9 +273,10 @@ async function discover(s: Source, crops: Crop[], limit: number) {
     try {
       const seedHtml = await fetchHtml(seed);
       if (seedHtml) {
+        seedHtmlCache.set(seed, seedHtml);
         const allowGeneric = s.language === "tr" || s.metadata?.allow_generic_guide === true;
         const seedItem = extract(seedHtml, seed, crops, allowGeneric);
-        if (seedItem) found.push(seedItem);
+        if (seedItem && !knownTerminalUrls.has(seed)) found.push(seedItem);
         else if (s.language === "tr") errors.push(`diagnostic:${JSON.stringify(diagnoseHtml(seedHtml, seed, crops, allowGeneric))}`);
       }
     } catch (e) {
@@ -279,11 +286,11 @@ async function discover(s: Source, crops: Crop[], limit: number) {
 
   for (const seed of seedSet) {
     try {
-      const h = await fetchHtml(seed);
+      const h = seedHtmlCache.get(seed) || await fetchHtml(seed);
       const $ = cheerio.load(h);
       $("a[href]").each((_, e) => {
         const a = $(e), u = abs(seed, a.attr("href") || ""), t = clean(a.text(), 300), hay = `${t} ${u}`;
-        if (!u || seedSet.has(u) || !sameHost(s.base_url, u) || SKIP.test(u) || JUNK.test(hay)) return;
+        if (!u || seedSet.has(u) || knownTerminalUrls.has(u) || !sameHost(s.base_url, u) || SKIP.test(u) || JUNK.test(hay)) return;
         const hits = cropHits(hay, crops);
         const practical = PRACTICAL.test(hay), specific = SPECIFIC.test(hay);
         if (hits.length || practical || specific || AGRI.test(hay)) {
@@ -298,7 +305,7 @@ async function discover(s: Source, crops: Crop[], limit: number) {
     } catch { }
   }
 
-  for (const [u] of [...urls.entries()].sort((a, b) => b[1] - a[1]).slice(0, 36)) {
+  for (const [u] of [...urls.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)) {
     if (found.length >= limit) break;
     try {
       const h = await fetchHtml(u);
@@ -368,11 +375,24 @@ Deno.serve(async (req: Request) => {
     if (src.error) throw src.error;
     const sources = (src.data || []).filter((s: any) => ["guide","guide_reference","guide_catalog"].includes(String(s.metadata?.channel || ""))) as Source[];
     let created = 0, reprocessed = 0, held = 0, duplicates = 0, lowValueHeld = 0;
+    const terminalGuideCandidates = await db.from("content_candidates")
+      .select("source_item_id")
+      .eq("content_subtype", "guide")
+      .in("workflow_status", ["approved", "rejected"])
+      .limit(1500);
+    if (terminalGuideCandidates.error) throw terminalGuideCandidates.error;
+    const terminalSourceItemIds = new Set((terminalGuideCandidates.data || []).map((c: any) => c.source_item_id).filter(Boolean));
     const report: any[] = [];
 
     for (const s of sources) {
       const discoveryLimit = Math.min(Math.max(limit * 8, 8), 16);
-      const d = await discover(s, crops, discoveryLimit);
+      const previous = await db.from("content_source_items")
+        .select("id,url").eq("source_id", s.id).limit(1500);
+      if (previous.error) throw previous.error;
+      const terminalUrls = new Set<string>([...publishedGuideUrls,
+        ...(previous.data || []).filter((v: any) => terminalSourceItemIds.has(v.id)).map((v: any) => clean(v.url, 1200))
+      ]);
+      const d = await discover(s, crops, discoveryLimit, terminalUrls);
       const r: any = { source: s.name, qualified: d.found.length, created: 0, reprocessed: 0, held: 0, lowValueHeld: 0, duplicates: 0, examples: d.found.slice(0, 5).map(x => ({ title: x.title, url: x.url, score: x.score, practicalSignals: x.practicalSignals })), errors: d.errors.slice(0, 6) };
 
       for (const item of d.found) {
@@ -504,7 +524,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      await db.from("content_sources").update({ last_scanned_at: new Date().toISOString(), updated_at: new Date().toISOString(), metadata: { ...(s.metadata || {}), channel: "guide", knowledge_engine: "knowledge-v28-retry-held-auto-tr", active_crop_count: crops.length, last_guide_qualified: r.qualified, last_guide_created: r.created, last_guide_reprocessed: r.reprocessed, last_guide_held: r.held, last_guide_low_value_held: r.lowValueHeld } }).eq("id", s.id);
+      await db.from("content_sources").update({ last_scanned_at: new Date().toISOString(), updated_at: new Date().toISOString(), metadata: { ...(s.metadata || {}), channel: "guide", knowledge_engine: "knowledge-v28-retry-held-auto-tr", active_crop_count: crops.length, last_guide_qualified: r.qualified, last_guide_created: r.created, last_guide_reprocessed: r.reprocessed, last_guide_held: r.held, last_guide_low_value_held: r.lowValueHeld, guide_seed_cursor: Number(s.metadata?.guide_seed_cursor || 0) + 3, last_guide_errors: r.errors.slice(0, 3) } }).eq("id", s.id);
       report.push(r);
     }
 
