@@ -2477,6 +2477,10 @@ export default function GlobalPusulaBand({
           hasUnread={hasPusulaSignal}
           onLogoClick={handlePusulaClick}
           onOpenAction={(target, contentId) => {
+            if (target === 'home') {
+              try { window.sessionStorage.setItem('tp_pusula_open_tasks_v1', '1'); }
+              catch { /* Navigation remains available. */ }
+            }
             if (target === 'agendaHub' && contentId) {
               try {
                 window.sessionStorage.setItem('tp_pusula_content_open_v1', contentId);
