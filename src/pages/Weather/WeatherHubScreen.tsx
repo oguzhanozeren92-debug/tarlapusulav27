@@ -5828,6 +5828,41 @@ const WEATHER_STYLES = `
     .tp-wxr-page .tp-color-actions button{font-size:10px;gap:4px}
     .tp-wxr-page .tp-color-crop{padding:8px 6px;font-size:10px}
   }
+
+  /* The existing functional global navigation blends with the scenic weather page. */
+  html body:has(.tp-wxr-page) #root .tp-global-page-header{
+    background:linear-gradient(110deg,#0a352a,#184e3e)!important;
+    border-bottom-color:rgba(228,248,227,.2)!important;
+    box-shadow:0 3px 14px rgba(6,30,22,.12)!important;
+  }
+  html body:has(.tp-wxr-page) #root .tp-global-page-header .tp-global-page-title{
+    color:#e9fae9!important;
+    -webkit-text-fill-color:#e9fae9!important;
+    font-weight:850!important;
+    letter-spacing:.04em!important;
+  }
+  html body:has(.tp-wxr-page) #root .tp-global-page-header .tp-global-page-menu{
+    color:#e9fae9!important;
+    border-color:rgba(240,255,246,.25)!important;
+    background:rgba(255,255,255,.08)!important;
+  }
+  html body:has(.tp-wxr-page) #root .tp-global-page-header .tp-global-page-menu svg{
+    color:#fff!important;
+    stroke:#fff!important;
+  }
+  html body:has(.tp-wxr-page) #root .tp-global-page-header .tp-global-glass{
+    border-color:rgba(235,249,234,.28)!important;
+    background:rgba(255,255,255,.12)!important;
+    color:#f7fff5!important;
+    box-shadow:none!important;
+  }
+  html body:has(.tp-wxr-page) #root .tp-global-page-header .tp-global-glass strong,
+  html body:has(.tp-wxr-page) #root .tp-global-page-header .tp-global-glass em,
+  html body:has(.tp-wxr-page) #root .tp-global-page-header .tp-global-glass small{
+    color:#f7fff5!important;
+    -webkit-text-fill-color:#f7fff5!important;
+  }
+
   @media(prefers-reduced-motion:reduce){
     .tp-wxr-page .tp-color-advanced summary svg,
     .tp-wxr-page .tp-color-more-weather summary svg{transition:none}
