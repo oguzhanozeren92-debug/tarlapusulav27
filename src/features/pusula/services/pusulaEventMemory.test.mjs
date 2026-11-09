@@ -129,3 +129,56 @@ test('Depot advisory is grounded in a recorded field operation, not an inferred 
  assert.match(stock.action,/kaydı doğrula/);
  assert.doesNotMatch(stock.action,/gübre uygula|ilaçla/i);
 });
+
+
+test('Pusula asks a follow-up two days after a real irrigation record, without claiming success',()=>{
+ const items=buildPusulaMemoryEvents({...base,
+  activities:[{id:'irrig-1',field_id:field,activity_type:'Sulama',
+   title:'Sulama yapıldı',activity_date:'2026-11-06',created_at:'2026-11-06T12:00:00Z'}],
+ });
+ const check=items.find(x=>x.module==='followup');
+ assert.ok(check);
+ assert.equal(check.id,'followup:irrig-1');
+ assert.match(check.detail,/Şenpınar/);
+ assert.match(check.detail,/toprak neminde/);
+ assert.doesNotMatch(check.detail,/iyileşti|düzeldi|kesin/i);
+ assert.equal(check.screen,'fieldNotebookHub');
+ assert.equal(memoryEventAsInsight(check,'Şenpınar').openAction.label,'Gözlem kaydet');
+});
+
+test('no follow-up after an actual later field inspection or replacement operation',()=>{
+ const older={id:'irrig-1',field_id:field,activity_type:'Sulama',
+  activity_date:'2026-11-06',created_at:'2026-11-06T12:00:00Z'};
+ for(const newer of [
+  {id:'check-1',field_id:field,activity_type:'Saha Kontrolü',
+   activity_date:'2026-11-08',created_at:'2026-11-08T12:00:00Z'},
+  {id:'irrig-2',field_id:field,activity_type:'Sulama',
+   activity_date:'2026-11-08',created_at:'2026-11-08T12:00:00Z'}
+ ]){
+  const items=buildPusulaMemoryEvents({...base,activities:[older,newer]});
+  assert.ok(!items.some(x=>x.id==='followup:irrig-1'));
+ }
+});
+
+test('follow-up is limited by field, age, known operations and urgency',()=>{
+ const items=buildPusulaMemoryEvents({...base,activities:[
+  {id:'other',field_id:'tarla-b',activity_type:'Sulama',activity_date:'2026-11-06'},
+  {id:'too-new',field_id:field,activity_type:'Sulama',activity_date:'2026-11-09'},
+  {id:'too-old',field_id:field,activity_type:'Sulama',activity_date:'2026-10-20'},
+  {id:'unknown',field_id:field,activity_type:'Bilinmeyen',activity_date:'2026-11-06'},
+ ],notifications:[{id:'urgent',field_id:field,category:'weather',severity:'danger',
+  title:'Don',created_at:now.toISOString(),data:{forecastAt:'2026-11-10T01:00:00Z'}}]});
+ assert.equal(items[0].module,'weather');
+ assert.ok(!items.some(x=>x.module==='followup'));
+});
+
+test('follow-up prioritizes one latest eligible operation and respects seen receipts',()=>{
+ const items=buildPusulaMemoryEvents({...base,activities:[
+  {id:'old-fertilizer',field_id:field,activity_type:'Gübreleme',activity_date:'2026-11-05'},
+  {id:'last-spray',field_id:field,activity_type:'İlaçlama',activity_date:'2026-11-07'},
+ ]});
+ const followups=items.filter(x=>x.module==='followup');
+ assert.equal(followups.length,1);
+ assert.equal(followups[0].id,'followup:last-spray');
+ assert.match(followups[0].detail,/belirtilerin durumunu/);
+});
