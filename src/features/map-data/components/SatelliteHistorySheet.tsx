@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { getSatelliteHistoryPreview } from '../services/satelliteHistory';
+import { CANONICAL_NDVI_PALETTE, canonicalizeNdviRaster } from '../../home-map/services/canonicalNdviRaster';
 import { useEntitlementStore } from '../../../entitlements/useEntitlementStore';
 import './SatelliteHistorySheet.css';
 
@@ -43,13 +44,23 @@ type ImageNdviEstimate = {
   sampleCount: number;
 };
 
-const NDVI_IMAGE_PALETTE = [
-  { rgb: [230, 26, 20] as const, value: 0.10 },
-  { rgb: [245, 110, 26] as const, value: 0.275 },
-  { rgb: [242, 194, 31] as const, value: 0.425 },
-  { rgb: [112, 191, 61] as const, value: 0.575 },
-  { rgb: [13, 122, 46] as const, value: 0.75 },
-];
+const NDVI_IMAGE_PALETTE = CANONICAL_NDVI_PALETTE;
+
+// Show the source preview immediately; replace it with the same opaque
+// five-class raster used on the home map once canvas decoding completes.
+function useCanonicalHistoryImage(source: string | null) {
+  const [ready, setReady] = useState<{ source: string; image: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (source) {
+      void canonicalizeNdviRaster(source).then((image) => {
+        if (alive) setReady({ source, image });
+      });
+    }
+    return () => { alive = false; };
+  }, [source]);
+  return ready?.source === source ? ready.image : source;
+}
 
 function formatDate(date: string) {
   const parts = date.split('-');
@@ -212,6 +223,9 @@ export default function SatelliteHistorySheet(props: Props) {
   const beforeDate = compareDates[1] ?? null;
   const afterImage = afterDate ? getSatelliteHistoryPreview(afterDate) : null;
   const beforeImage = beforeDate ? getSatelliteHistoryPreview(beforeDate) : null;
+  const canonicalActiveImage = useCanonicalHistoryImage(activeImage);
+  const canonicalBeforeImage = useCanonicalHistoryImage(beforeImage);
+  const canonicalAfterImage = useCanonicalHistoryImage(afterImage);
 
   const beforeMetrics = beforeDate ? metricsByDate[beforeDate] ?? null : null;
   const afterMetrics = afterDate ? metricsByDate[afterDate] ?? null : null;
@@ -601,7 +615,7 @@ export default function SatelliteHistorySheet(props: Props) {
             >
               {activeImage ? (
                 <img
-                  src={activeImage}
+                  src={canonicalActiveImage ?? activeImage}
                   alt={`${formatDate(activeDate)} NDVI görüntüsü`}
                   draggable={false}
                   style={{ transform: `scale(${zoom})` }}
@@ -654,7 +668,7 @@ export default function SatelliteHistorySheet(props: Props) {
               {beforeImage && afterImage ? (
                 <div className="tp-satellite-compare-stage">
                   <img
-                    src={beforeImage}
+                    src={canonicalBeforeImage ?? beforeImage}
                     alt={`${formatDate(beforeDate!)} NDVI`}
                     draggable={false}
                     style={{ transform: `scale(${zoom})` }}
@@ -665,7 +679,7 @@ export default function SatelliteHistorySheet(props: Props) {
                     style={{ clipPath: `inset(0 0 0 ${slider}%)` }}
                   >
                     <img
-                      src={afterImage}
+                      src={canonicalAfterImage ?? afterImage}
                       alt={`${formatDate(afterDate!)} NDVI`}
                       draggable={false}
                       style={{ transform: `scale(${zoom})` }}
