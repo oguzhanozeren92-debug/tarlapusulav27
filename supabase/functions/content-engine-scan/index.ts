@@ -899,7 +899,7 @@ Deno.serve(async (req: Request) => {
     if(archives[1].error)throw archives[1].error;
     const seenTitles:string[]=[],seenUrls=new Set<string>();
     for(const row of [...(archives[0].data||[]),...(archives[1].data||[])]){
-      const title=storyTitleKey(row.title_suggested??row.title??"");
+      const title=storyTitleKey(("title_suggested" in row ? row.title_suggested : row.title)??"");
       if(title)seenTitles.push(title);
       for(const ref of Array.isArray(row.source_refs)?row.source_refs:[]){
         const url=storyUrlKey(ref?.url);if(url)seenUrls.add(url);
