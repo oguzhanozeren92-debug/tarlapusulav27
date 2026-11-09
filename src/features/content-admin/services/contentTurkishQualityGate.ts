@@ -4,6 +4,7 @@
  */
 export type TranslationCandidate = {
   original_language?: string | null;
+  source_refs?: Array<{language?: string | null}> | null;
   title_suggested?: string | null;
   short_summary?: string | null;
   body_draft?: string | null;
@@ -13,7 +14,7 @@ const leftoverEnglish = /\b(?:late[- ]deficit irrigation|post[- ]harvest|crop yi
 const obviousEnglishSentence = /\b(?:the|this|these|those|with|from|which|should|their|farmers|researchers|according|study)\s+(?:[a-z]+\s+){2,}/gi;
 
 export function translationPublicationProblem(item: TranslationCandidate): string | null {
-  const language = String(item.original_language || 'tr').toLowerCase().trim();
+  const language = String(item.original_language || item.source_refs?.[0]?.language || 'tr').toLowerCase().trim();
   if (!language || language.startsWith('tr')) return null;
   if (item.structured_body?.translation_status !== 'translated_full_tr') {
     return 'Yabancı kaynaklı içerik önce tam Türkçe çeviri ve editoryal kontrolden geçmeli.';
