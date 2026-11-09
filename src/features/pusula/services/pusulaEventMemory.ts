@@ -150,10 +150,23 @@ function seenMap(userId:string,fieldId:string):Record<string,number>{
   return obj;
  }catch{return {}}
 }
-export function nextUnseenPusulaEvent(userId:string,fieldId:string,events:PusulaMemoryEvent[],now=new Date()){
+/** Local receipts from existing installations; migrate them to the user's cloud account. */
+export function readPusulaLocalSeenIds(userId:string,fieldId:string):string[]{
+ if(!userId||!fieldId)return [];
+ return Object.keys(seenMap(userId,fieldId))
+   .filter(id=>id.length>0&&id.length<=320)
+   .slice(-140);
+}
+
+/** Remote and local receipts are merged; failures never erase offline history. */
+export function nextUnseenPusulaEvent(
+ userId:string,fieldId:string,events:PusulaMemoryEvent[],now=new Date(),
+ cloudSeen?:ReadonlySet<string>,
+){
  if(!userId||!fieldId)return null;
  const seen=seenMap(userId,fieldId),t=now.getTime();
- return events.find(e=>e.fieldId===fieldId&&(!e.validUntil||ms(e.validUntil)>=t)&&!seen[e.id])??null;
+ return events.find(e=>e.fieldId===fieldId&&(!e.validUntil||ms(e.validUntil)>=t)
+   &&!seen[e.id]&&!cloudSeen?.has(e.id))??null;
 }
 export function markPusulaEventSeen(userId:string,fieldId:string,eventId:string){
  if(!userId||!fieldId||!eventId||typeof window==='undefined')return;
