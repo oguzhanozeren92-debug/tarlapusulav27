@@ -66,7 +66,8 @@ export function latestCropPublication(
     // Never infer crop relevance from title alone.
     if (!Array.isArray(row.crop_tags) || !row.crop_tags.some((tag) =>
       normalizeCropForContent(tag) === crop)) return [];
-    const kind = row.content_subtype === 'article' ? 'article'
+    const kind: PusulaContentSignal['kind'] | null =
+      row.content_subtype === 'article' ? 'article'
       : row.content_type === 'news' ? 'news' : null;
     if (!kind) return [];
     return [{
