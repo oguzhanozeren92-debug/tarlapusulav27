@@ -122,7 +122,7 @@ export function buildPusulaMemoryEvents(input:MemorySnapshot):PusulaMemoryEvent[
     dd(operation.activity_date)+' tarihinde '+label+' kaydı var. '+question,
    action:'Gözlemini Tarla Defteri’ne kaydet. Yeni uydu ve hava verilerini bu kayıtla birlikte değerlendirelim.',
    screen:'fieldNotebookHub',source:'Tarla Defteri',
-   recordedAt:iso(now),priority:72,
+   recordedAt:iso(now),priority:79,
    validUntil:new Date(operationAt+8*DAY).toISOString()});
   break; // Never present several follow-up questions for the same field at once.
  }
