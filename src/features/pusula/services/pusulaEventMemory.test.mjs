@@ -23,6 +23,7 @@ test('critical, field-specific and fresh frost alert comes before open calendar 
     dismissed:false,due_date:'2026-11-10',created_at:now.toISOString()}]
  });
  assert.equal(items[0].module,'weather');
+ assert.equal(items.find(x=>x.module==='tasks')?.screen,'home');
  assert.ok(items.every(x=>x.fieldId===field&&!x.title.includes('Başka tarla')));
 });
 test('old weather risks, completed/snoozed/dismissed tasks never produce an event',()=>{
@@ -87,4 +88,6 @@ test('both compasses consume the same memory and navigate into each module',()=>
  assert.match(home,/homeMemory\.markSeen/);
  assert.match(global,/fieldMemory\.markSeen/);
  assert.match(shell,/onNavigate=\{\(target\) => onNavigate/);
+ assert.match(home,/tp_pusula_open_tasks_v1/);
+ assert.match(global,/tp_pusula_open_tasks_v1/);
 });
