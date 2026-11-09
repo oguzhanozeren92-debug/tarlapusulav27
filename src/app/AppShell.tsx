@@ -103,6 +103,7 @@ export default function AppShell({
           onBack={onBack}
           onMenu={onOpenDrawer}
           onOpenAi={onOpenAi}
+          onNavigate={(target) => onNavigate(target as Screen, 'Pusula')}
         />
       )}
 
