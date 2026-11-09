@@ -318,3 +318,94 @@ export async function enqueueDailyWeatherNotifications(
   }
   return stats;
 }
+
+
+/**
+ * All subscribed fields, not only the morning-summary favorite, take part in
+ * proactive frost watch. A durable last-check receipt gives every field a turn
+ * and bounds external forecast requests. This is a weather forecast, never a
+ * crop-damage diagnosis.
+ */
+export async function enqueueFieldFrostRiskAlerts(
+  db: Database,
+  now = new Date(),
+) {
+  const stats = { checked: 0, queued: 0, skipped: 0, failed: 0 };
+  const [web, native] = await Promise.all([
+    db.from("push_subscriptions").select("user_id").eq("enabled",true).limit(500),
+    db.from("native_push_tokens").select("user_id").eq("enabled",true).limit(500),
+  ]);
+  if(web.error) throw web.error;
+  if(native.error) console.warn("Pusula native token listesi okunamadı:",native.error.message);
+  const subscribed = [...new Set([...(web.data??[]),...(native.data??[])]
+    .map((row:any)=>String(row.user_id??"")).filter(Boolean))];
+  if(!subscribed.length) return stats;
+  const prefs=await db.from("user_notification_preferences")
+    .select("user_id,push_enabled,weather_enabled")
+    .in("user_id",subscribed).limit(500);
+  if(prefs.error) throw prefs.error;
+  const blocked=new Set((prefs.data??[]).filter((r:any)=>
+    r.push_enabled===false||r.weather_enabled===false).map((r:any)=>String(r.user_id)));
+  const active=subscribed.filter(id=>!blocked.has(id));
+  if(!active.length)return stats;
+  const [fields,checks]=await Promise.all([
+    db.from("fields").select("id,user_id,name,latitude,longitude,parcel_centroid_lat,parcel_centroid_lng,is_favorite,created_at")
+      .in("user_id",active).limit(2000),
+    db.from("pusula_frost_scan_state").select("field_id,last_checked_at").limit(2000),
+  ]);
+  if(fields.error)throw fields.error;
+  if(checks.error)throw checks.error;
+  const checkedByField=new Map<string,number>((checks.data??[]).map((row:any)=>
+    [String(row.field_id),Date.parse(String(row.last_checked_at??""))||0]));
+  const nowMs=now.getTime();
+  const queue=([...(fields.data??[])] as FieldRow[])
+    .filter(field=>coordinates(field))
+    .filter(field=>nowMs-(checkedByField.get(String(field.id))??0)>=4*60*60*1000)
+    .sort((a,b)=>(checkedByField.get(String(a.id))??0)-(checkedByField.get(String(b.id))??0))
+    .slice(0,12);
+  for(let i=0;i<queue.length;i+=4){
+    await Promise.all(queue.slice(i,i+4).map(async field=>{
+      const checkedAt=new Date().toISOString();
+      stats.checked++;
+      let errorMessage:string|null=null;
+      try{
+        const forecast=await forecastForField(field,localDay(now));
+        if(forecast.frostFirstAt && forecast.frostMinNext24h!==null &&
+           forecast.frostMinNext24h<=2){
+          const riskDay=forecast.frostFirstAt.slice(0,10);
+          const temp=forecast.frostMinNext24h.toFixed(1).replace(".",",");
+          const {data,error}=await db.from("app_notifications").upsert({
+            user_id:field.user_id,
+            kind:"weather",source:"open-meteo",
+            severity:forecast.frostMinNext24h<=0?"danger":"warning",
+            title:"Pusula · Don riski",
+            message:((field.name||"Tarlan")+" için önümüzdeki 24 saat içinde "+
+              temp+"°C'ye kadar sıcaklık düşüşü tahmin ediliyor. "+
+              "Sıcaklığı ve bitkinin gelişim dönemini kontrol et; bu kesin hasar tahmini değildir.").slice(0,320),
+            target:"weatherHub",
+            data:{fieldId:field.id,weatherFieldId:field.id,
+              fieldName:field.name||"Tarlan",riskType:"frost",
+              forecastAt:forecast.frostFirstAt,minTemperatureC:forecast.frostMinNext24h,
+              forecastDate:riskDay,actionTarget:"weatherHub",source:"Open-Meteo"},
+            category:"weather",push_eligible:true,
+            push_critical:forecast.frostMinNext24h<=0,
+            push_available_at:checkedAt,
+            dedupe_key:"frost-watch:"+field.user_id+":"+field.id+":"+riskDay,
+          },{onConflict:"dedupe_key",ignoreDuplicates:true})
+            .select("id").maybeSingle();
+          if(error)throw error;
+          if(data?.id)stats.queued++;else stats.skipped++;
+        }else stats.skipped++;
+      }catch(error){
+        stats.failed++;
+        errorMessage=error instanceof Error?error.message.slice(0,200):"forecast_error";
+      }
+      const saved=await db.from("pusula_frost_scan_state").upsert({
+        field_id:field.id,user_id:field.user_id,last_checked_at:checkedAt,
+        last_error:errorMessage,
+      },{onConflict:"field_id"});
+      if(saved.error)console.warn("Pusula don kontrol kaydı başarısız:",saved.error.message);
+    }));
+  }
+  return stats;
+}
