@@ -4,7 +4,7 @@
  */
 export type TranslationCandidate = {
   original_language?: string | null;
-  source_refs?: Array<{language?: string | null}> | null;
+  source_refs?: Array<Record<string, unknown>> | null;
   title_suggested?: string | null;
   short_summary?: string | null;
   body_draft?: string | null;
