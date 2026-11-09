@@ -3,6 +3,12 @@ import { createPortal } from 'react-dom';
 import { CloudSun, MapPin, Menu, Star } from 'lucide-react';
 import PusulaGuide, { type PusulaInsight } from '../assets/pusula/PusulaGuide';
 import { personalizedGuideMessages, type PersonalGuideContext } from '../features/pusula/services/personalizedGuideMessages';
+import {
+  latestCropPublication,
+  publicationSignalSeenKey,
+  type PusulaContentSignal,
+  type PusulaPublication,
+} from '../features/pusula/services/pusulaContentSignals';
 import { PUSULAPDF_ALERT_KEY } from '../features/pusula-pdf/PusulaPdfReadyBridge';
 import { supabase } from '../supabaseClient';
 import { useGamificationStore } from '../gamification/useGamificationStore';
@@ -601,6 +607,7 @@ export default function GlobalPusulaBand({
   const gamification = useGamificationStore();
   const [insight, setInsight] = useState<PusulaInsight | null>(null);
   const [hasUnreadInsight, setHasUnreadInsight] = useState(false);
+  const [relevantPublication, setRelevantPublication] = useState<PusulaContentSignal | null>(null);
   const [hasInteractiveSignal, setHasInteractiveSignal] = useState(false);
   const [hasDepotSignal, setHasDepotSignal] = useState(false);
   const [readyPdf, setReadyPdf] = useState<{ reportId: string; fieldName: string } | null>(null);
@@ -668,7 +675,7 @@ export default function GlobalPusulaBand({
 
   const pageTitle = String(title ?? 'TarlaPusula').trim() || 'TarlaPusula';
   const hasPusulaSignal =
-    hasUnreadInsight || hasInteractiveSignal || hasDepotSignal || Boolean(readyPdf);
+    hasUnreadInsight || hasInteractiveSignal || hasDepotSignal || Boolean(readyPdf) || Boolean(relevantPublication);
 
   const resolvedPoints =
     pointsProp !== undefined && pointsProp !== null
@@ -1247,6 +1254,47 @@ export default function GlobalPusulaBand({
     };
   }, [screen]);
 
+  // Birleşik Pusula: yayınlanan makale/haber ile seçili tarlanın ürününü
+  // eşleştir. Sadece yayınlanmış, son 14 gündeki, açık ürün etiketi olan
+  // içerikler gösterilir. Kullanıcı onayı olmadan push gönderilmez.
+  useEffect(() => {
+    let alive = true;
+    setRelevantPublication(null);
+    const userId = userGuideContext.userId;
+    const crop = userGuideContext.crop;
+    const activeFieldId = String(fieldId ?? fieldName ?? '').trim();
+    if (!userId || !crop || !activeFieldId || userGuideContext.loading) return;
+    const scan = async () => {
+      try {
+        const fieldsToRead = 'id,content_type,content_subtype,title,crop_tags,published_at,source_refs';
+        const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+        const [news, articles] = await Promise.all([
+          supabase.from('content_items').select(fieldsToRead)
+            .eq('status', 'published').eq('content_type', 'news')
+            .gte('published_at', cutoff).order('published_at', { ascending: false }).limit(24),
+          supabase.from('content_items').select(fieldsToRead)
+            .eq('status', 'published').eq('content_subtype', 'article')
+            .gte('published_at', cutoff).order('published_at', { ascending: false }).limit(24),
+        ]);
+        if (news.error || articles.error) {
+          throw news.error || articles.error;
+        }
+        if (!alive) return;
+        const all = [...(news.data || []), ...(articles.data || [])] as PusulaPublication[];
+        const matching = latestCropPublication(all, crop);
+        if (!matching) return;
+        const seenKey = publicationSignalSeenKey(userId, activeFieldId, matching.id);
+        if (window.localStorage.getItem(seenKey)) return;
+        setRelevantPublication(matching);
+      } catch (error) {
+        // Haber servisi geçici olarak kapalıysa Pusula uydurma gelişme sunmaz.
+        console.warn('[Pusula] Ürünle ilgili yayın taraması yapılamadı:', error);
+      }
+    };
+    void scan();
+    return () => { alive = false; };
+  }, [userGuideContext.userId, userGuideContext.crop, userGuideContext.loading, fieldId, fieldName]);
+
   // Sayfalar kendi gerçek verilerinden bir Pusula önerisi ürettiğinde
   // mevcut global Pusula animasyonuna aktar. Header yerleşimi değişmez.
   // Hava Durumu dahil tüm ekranlarda gerçek mesaj yalnızca sinyal üretir; otomatik konuşma yoktur.
@@ -1443,6 +1491,31 @@ export default function GlobalPusulaBand({
       setReadyPdf(null);
       try { sessionStorage.removeItem(PUSULAPDF_ALERT_KEY); } catch { /* noop */ }
       window.dispatchEvent(new CustomEvent('tp:open-pusulapdf', { detail: { reportId } }));
+      return;
+    }
+    if (relevantPublication && userGuideContext.userId) {
+      const activeFieldId = String(fieldId ?? fieldName ?? '').trim();
+      const selected = relevantPublication;
+      try {
+        window.localStorage.setItem(
+          publicationSignalSeenKey(userGuideContext.userId, activeFieldId, selected.id),
+          new Date().toISOString(),
+        );
+      } catch { /* Storage may be disabled; still show the message once. */ }
+      setRelevantPublication(null);
+      setHasUnreadInsight(false);
+      setInsight({
+        id: `published-crop-${selected.kind}-${selected.id}`,
+        fieldName: String(fieldName ?? '').trim() || undefined,
+        observationDate: selected.publishedAt,
+        gozlem: `Kayıtlı ${selected.crop} ürününle ilgili yeni bir ${selected.kind === 'article' ? 'makale' : 'haber'} yayımlandı: ${selected.title}.`,
+        yonlendirme: 'Kaynağını ve yayımlanma tarihini inceleyebilirsin. Bu içerik tek başına tarlana uygulanacak bir işlem önerisi değildir.',
+        sources: [selected.source || 'TarlaPusula içerik arşivi'],
+        openAction: {
+          label: selected.kind === 'article' ? 'Makaleyi incele' : 'Haberi incele',
+          screen: 'agendaHub',
+        },
+      });
       return;
     }
     if (screen === 'inventoryHub') {
@@ -2371,6 +2444,10 @@ export default function GlobalPusulaBand({
           anchorSelector=".tp-global-pusula-anchor"
           hasUnread={hasPusulaSignal}
           onLogoClick={handlePusulaClick}
+          onOpenAction={(target) => {
+            setInsight(null);
+            requestNavigation(target, 'pusula-content');
+          }}
         />
       )}
 
