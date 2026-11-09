@@ -1394,6 +1394,7 @@ export default function App() {
       menuItems={desktopMenuItems}
       fields={realFields}
       favoriteFieldId={favoriteFieldId}
+      weatherHubFieldId={weatherHubFieldId}
       showGlobalBand={showGlobalBand}
       onCloseDrawer={() => setSideMenuOpen(false)}
       onOpenDrawer={() => setSideMenuOpen(true)}
