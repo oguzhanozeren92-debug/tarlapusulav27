@@ -59,6 +59,8 @@ test('cloud sync only saves opaque ids, retries local backlog and gates initial 
  assert.match(hook,/depot:inventoryFromServer\?linkedInventory/);
  assert.match(hook,/writeDepot\(activeUser,fieldId,linkedInventory\)/);
  assert.match(hook,/new Promise<Set<string>>/);
+ assert.match(hook,/onAuthStateChange/);
+ assert.match(hook,/initialRevision===authRevision/);
  assert.match(hook,/if\(!cloud.ready\|\|cloud.scope!==activeScope\)return null/);
  assert.match(hook,/savePusulaCloudReceipts\(activeUser,fieldId,\[eventId\]\)/);
  assert.match(migration,/enable row level security/);
