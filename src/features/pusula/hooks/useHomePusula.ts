@@ -5,6 +5,7 @@ import {
   type ActiveLayerContext,
 } from '../../../services/fieldContextSnapshotService';
 import { synthesizeFieldObservations } from '../../../services/unifiedMapAiService';
+import { loadPusulaOutcomeComparison, type PusulaOutcomeComparison } from '../services/pusulaOutcomeComparison';
 import {
   HOME_CLIMATE_DEPTH_LABELS,
   HOME_CLIMATE_LAYER_LABELS,
@@ -58,6 +59,8 @@ export function useHomePusula({
   const [spatialSummary, setSpatialSummary] =
     useState<HomeLayerSpatialSummary | null>(null);
   const [fieldSynthesis, setFieldSynthesis] = useState<any>(null);
+  const [outcome, setOutcome] = useState<PusulaOutcomeComparison | null>(null);
+  const [outcomeScope, setOutcomeScope] = useState('');
   const [arrivalVisible, setArrivalVisible] = useState(false);
   const [loadingDots, setLoadingDots] = useState('.');
   const synthesisSeenRef = useRef(new Set<string>());
@@ -103,6 +106,7 @@ export function useHomePusula({
   const [synthesisScope, setSynthesisScope] = useState('');
   const visibleResult = resultScope === scope ? result : null;
   const visibleSynthesis = synthesisScope === scope ? fieldSynthesis : null;
+  const visibleOutcome = outcomeScope === scope ? outcome : null;
 
   useEffect(() => {
     ++requestRef.current;
@@ -111,6 +115,8 @@ export function useHomePusula({
     setResultScope('');
     setFieldSynthesis(null);
     setSynthesisScope('');
+    setOutcome(null);
+    setOutcomeScope('');
     setError(null);
     setLoading(false);
     setArrivalVisible(false);
@@ -386,6 +392,22 @@ export function useHomePusula({
       });
       setResultScope(scope);
 
+      // Outcomes are compared only when fresh, genuine NDVI time-series exists.
+      const realSeries = nextResult.context?.ndvi?.timeSeries?.points;
+      if (requestedLayer === 'vegetation' && Array.isArray(realSeries) && realSeries.length) {
+        void loadPusulaOutcomeComparison({
+          fieldId:String(field.id),
+          fieldName:String(field.name ?? 'Tarlan'),
+          ndviPoints:realSeries,
+        }).then(comparison => {
+          if (requestId === requestRef.current) {
+            setOutcome(comparison);
+            setOutcomeScope(scope);
+          }
+        }).catch(error => {
+          console.warn('Pusula işlem sonrası NDVI karşılaştırması alınamadı:', error);
+        });
+      }
       void runFieldSynthesis({
         memoryKey:
           nextResult.analysis?.memoryObservationId ?? nextResult.snapshotId ?? null,
@@ -449,7 +471,9 @@ export function useHomePusula({
           .map((value: any): string => String(value.layerLabel).trim())
           .filter((value: string) => Boolean(value))
       : [];
-    const sources: string[] = Array.from(new Set<string>(linkedEvidence)).slice(0, 5);
+    const sources: string[] = Array.from(new Set<string>([
+      ...linkedEvidence, ...(visibleOutcome ? visibleOutcome.evidence : []),
+    ])).slice(0, 5);
     const combinedAction = String(synthesized?.action || '').trim();
     const actionable = Boolean(
       synthesized && synthesized.status !== 'normal' &&
@@ -461,9 +485,12 @@ export function useHomePusula({
       observationDate: synthesized?.generatedAt || satellite?.latestImageDate || undefined,
       sources: synthesized ? sources : undefined,
       gozlem: synthesized
-        ? [String(synthesized.headline ?? '').trim(), String(synthesized.summary ?? '').trim()]
-            .filter(Boolean).join('\n')
-        : defaultObservation,
+        ? [String(synthesized.headline ?? '').trim(), String(synthesized.summary ?? '').trim(),
+            ...(visibleOutcome ? [visibleOutcome.headline, visibleOutcome.summary] : [])]
+            .filter(Boolean).join('\n\n')
+        : [defaultObservation,
+            ...(visibleOutcome ? [visibleOutcome.headline, visibleOutcome.summary] : [])]
+            .filter(Boolean).join('\n\n'),
       yonlendirme: synthesized ? (combinedAction || defaultAction) : defaultAction,
       guven_skoru: synthesized
         ? synthesized.confidence === 'yuksek' ? 'Yüksek'
@@ -481,7 +508,7 @@ export function useHomePusula({
   }, [
     fieldKey, layer, field?.id, field?.name,
     satellite?.latestImageDate, satellite?.generatedAt, satellite?.summary,
-    satellite?.recommendations, visibleResult, visibleSynthesis,
+    satellite?.recommendations, visibleResult, visibleSynthesis, visibleOutcome,
   ]);
 
   const activeLayerGuide = getHomeLayerFarmerGuide(
@@ -539,6 +566,7 @@ export function useHomePusula({
     result: visibleResult,
     error,
     fieldSynthesis: visibleSynthesis,
+    outcomeEvidence: visibleOutcome,
     cropMode,
     arrivalVisible: arrivalVisible && synthesisScope === scope,
     loadingDots,
