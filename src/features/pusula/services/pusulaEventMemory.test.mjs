@@ -182,3 +182,35 @@ test('follow-up prioritizes one latest eligible operation and respects seen rece
  assert.equal(followups[0].id,'followup:last-spray');
  assert.match(followups[0].detail,/belirtilerin durumunu/);
 });
+
+
+test('worsening field response is remembered and can open a user-confirmed calendar action',()=>{
+ const items=buildPusulaMemoryEvents({...base,activities:[
+  {id:'irrigation-9',field_id:field,activity_type:'Sulama',title:'Sulama yapıldı',
+   activity_date:'2026-11-05',created_at:'2026-11-05T12:00:00Z'},
+  {id:'response-9',field_id:field,activity_type:'Saha Kontrolü',
+   title:'Saha kontrolü yapıldı',activity_date:'2026-11-08',created_at:'2026-11-08T12:00:00Z',
+   notes:'Pusula işlem takibi | İşlem: Sulama | Kaynak işlem: irrigation-9 | Gözlem: Durum kötüleşti'},
+ ]});
+ const outcome=items.find(e=>e.module==='outcome');
+ assert.ok(outcome);
+ assert.match(outcome.detail,/kötüleşti/);
+ assert.equal(outcome.priority,92);
+ assert.equal(outcome.screen,'fieldControlHub');
+ const insight=memoryEventAsInsight(outcome,'Şenpınar');
+ assert.equal(insight.calendarAction.fieldId,field);
+ assert.equal(insight.openAction.screen,'fieldControlHub');
+ assert.ok(!items.some(e=>e.id==='followup:irrigation-9'));
+});
+
+test('ordinary follow-up feedback is recorded without inventing a dangerous state',()=>{
+ const items=buildPusulaMemoryEvents({...base,activities:[{
+  id:'note1',field_id:field,activity_type:'Saha Kontrolü',
+  activity_date:'2026-11-08',created_at:'2026-11-08T12:00:00Z',
+  notes:'Pusula işlem takibi | İşlem: İlaçlama | Kaynak işlem: op-1 | Gözlem: Belirgin değişiklik yok',
+ }]});
+ const outcome=items.find(e=>e.module==='outcome');
+ assert.ok(outcome);
+ assert.ok(!memoryEventAsInsight(outcome,'Şenpınar').calendarAction);
+ assert.doesNotMatch(outcome.action,/ilacı artır|tekrar ilaçla/i);
+});
