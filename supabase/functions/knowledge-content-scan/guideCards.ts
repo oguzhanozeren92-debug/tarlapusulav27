@@ -11,6 +11,9 @@ const countWords=(x:string)=>x.trim().split(/\s+/).filter(Boolean).length;
 const domains=[
  ["arastirma.tarimorman.gov.tr","T.C. Tarım ve Orman Bakanlığı / TAGEM","Türkçe","Resmî rehber",100],
  ["tarimorman.gov.tr","T.C. Tarım ve Orman Bakanlığı","Türkçe","Teknik bülten",96],
+ ["ipm.ucanr.edu","University of California UC IPM","İngilizce","Bilimsel mücadele rehberi",94],
+ ["www.knowledgebank.irri.org","IRRI Rice Knowledge Bank","İngilizce","Üretici teknik rehberi",91],
+ ["knowledgebank.irri.org","IRRI Rice Knowledge Bank","İngilizce","Üretici teknik rehberi",91],
  ["extension.psu.edu","Penn State Extension","İngilizce","Fact sheet",88],
  ["extension.usu.edu","Utah State University Extension","İngilizce","Extension publication",88],
  ["pubs.extension.wsu.edu","Washington State University Extension","İngilizce","Extension publication",88],
