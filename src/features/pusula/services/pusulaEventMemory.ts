@@ -132,6 +132,25 @@ export function buildPusulaMemoryEvents(input:MemorySnapshot):PusulaMemoryEvent[
    recordedAt:clean(guide.published_at),priority:60,
    validUntil:new Date(ms(guide.published_at)+14*DAY).toISOString()});
  }
+ // Connect facts across modules without claiming that one dataset proves
+ // another. A weather alert can affect an approaching calendar appointment;
+ // a low-stock record can be compared with an already logged field operation.
+ const urgentWeather=out.find(e=>e.module==='weather'&&e.priority>=94);
+ const soonPlan=out.find(e=>
+  (e.module==='calendar'||e.module==='tasks')&&e.priority>=89);
+ if(urgentWeather&&soonPlan){
+  urgentWeather.detail=clean(
+   urgentWeather.detail+' Ayrıca '+soonPlan.source+
+   ' bölümünde yaklaşan bir saha işin bulunuyor: '+soonPlan.detail,450);
+  urgentWeather.action='Saatlik hava tahminini kontrol et; planladığın saha işini bu bilgiyle birlikte değerlendir.';
+ }
+ const lowStock=out.find(e=>e.module==='depot');
+ if(lowStock&&recent){
+  lowStock.detail=clean(lowStock.detail+
+    ' Tarla Defteri’nde '+dd(recent.activity_date)+' tarihli bir işlem kaydın da var.',450);
+  lowStock.action='Stok miktarını son tarla işleminle ve sıradaki planınla karşılaştır; uygulama kararı vermeden kaydı doğrula.';
+ }
+
  const unique=new Map<string,PusulaMemoryEvent>();
  for(const e of out)if(e.id&&!unique.has(e.id))unique.set(e.id,e);
  return [...unique.values()].filter(e=>!e.validUntil||ms(e.validUntil)>=t)
