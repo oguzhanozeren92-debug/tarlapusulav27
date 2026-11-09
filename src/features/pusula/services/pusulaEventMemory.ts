@@ -1,6 +1,6 @@
 import { normalizeCropForContent } from './pusulaContentSignals';
 
-export type MemoryModule = 'weather'|'calendar'|'tasks'|'notebook'|'followup'|'depot'|'market'|'knowledge';
+export type MemoryModule = 'weather'|'calendar'|'tasks'|'notebook'|'followup'|'outcome'|'depot'|'market'|'knowledge';
 export type PusulaMemoryEvent = {
  id:string; fieldId:string; module:MemoryModule; title:string; detail:string;
  action:string; screen:string; source:string; recordedAt:string; priority:number;
@@ -90,6 +90,29 @@ export function buildPusulaMemoryEvents(input:MemorySnapshot):PusulaMemoryEvent[
    priority:44,validUntil:new Date(ms(recent.activity_date)+14*DAY).toISOString()});
  }
 
+ // Farmer-reported outcome is a factual field log, not a satellite diagnosis.
+ const lastOutcome=(input.activities??[]).filter(r=>
+  fieldMatch(r,id)&&clean(r.activity_type)==='Saha Kontrolü'&&
+  clean(r.notes,900).startsWith('Pusula işlem takibi |')&&
+  ms(r.activity_date)>=t-10*DAY&&ms(r.activity_date)<=t+DAY)
+  .sort((a,b)=>ms(b.activity_date)-ms(a.activity_date))[0];
+ if(lastOutcome){
+  const note=clean(lastOutcome.notes,900);
+  const reported=note.match(/Gözlem: ([^|]+)/)?.[1]?.trim()||'Gözlem kaydedildi';
+  const worsening=/kötüleşti/i.test(reported);
+  put({id:'outcome:'+clean(lastOutcome.id,90),module:'outcome',
+   title:worsening?'Tarlandaki kötüleşme gözlemini gördüm':'Son saha gözlemini hafızama aldım',
+   detail:dd(lastOutcome.activity_date)+' tarihli kayıt: '+reported+'. '+
+    (worsening?'Yeni bir saha kontrolü ve güncel harita verilerini karşılaştırmak önemli.':
+     'Yeni uydu ölçümleri geldiğinde önceki işlemle birlikte değerlendirebiliriz.'),
+   action:worsening?
+    'Belirtiyi ve yerini fotoğrafla kaydet; gerekirse yerel ziraat uzmanından destek al. Tek bir uydu göstergesini teşhis sayma.':
+    'Tarla haritasını ve işlem geçmişini birlikte incele; uydu değişimi tek başına işlemin sonucunu kanıtlamaz.',
+   screen:'fieldControlHub',source:'Tarla Defteri',
+   recordedAt:clean(lastOutcome.created_at)||iso(now),
+   priority:worsening?92:56,
+   validUntil:new Date(ms(lastOutcome.activity_date)+10*DAY).toISOString()});
+ }
  // Close the loop after a recorded field operation. This is a prompt for
  // evidence, not a claim that the treatment helped or that a diagnosis exists.
  // A later field inspection prevents asking again about an already observed job.
@@ -241,6 +264,12 @@ export function memoryEventAsInsight(e:PusulaMemoryEvent,fieldName:string){
   gozlem:e.title+'\n'+e.detail,yonlendirme:e.action,
   guven_skoru:e.priority>=90?'Orta' as const:'Düşük' as const,
   sources:[e.source],
+  calendarAction:e.module==='outcome'&&/kötüleşme/i.test(e.title)?{
+   fieldId:e.fieldId,
+   title:(clean(fieldName,80)||'Tarla')+' · Saha kontrolü',
+   reminderType:'Kontrol',
+   notes:'Pusula: çiftçinin kötüleşme gözleminden sonra saha kontrolü.',
+  }:undefined,
   followUpAction:e.module==='followup'?{
    fieldId:e.fieldId,
    operationId:e.id.replace(/^followup:/,''),
@@ -250,6 +279,7 @@ export function memoryEventAsInsight(e:PusulaMemoryEvent,fieldName:string){
    e.screen==='calendar'?'Takvimi aç':
    e.screen==='weatherHub'?'Hava tahminini aç':
    e.screen==='fieldNotebookHub'?(e.module==='followup'?'Gözlem kaydet':'Tarla Defteri’ni aç'):
+   e.screen==='fieldControlHub'?'Haritayı incele':
    e.screen==='inventoryHub'?'Depoyu aç':
    e.screen==='marketHub'?'Piyasayı aç':
    e.screen==='pestGuideHub'?'Rehberi aç':'İncele',screen:e.screen},
