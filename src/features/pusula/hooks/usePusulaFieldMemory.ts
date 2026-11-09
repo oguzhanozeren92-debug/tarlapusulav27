@@ -62,8 +62,16 @@ export function usePusulaFieldMemory(input:Input){
   const sync=async()=>{
    if(closed||busy)return;
    busy=true;
+   let timeoutId:number|null=null;
    try{
-    const server=await fetchPusulaCloudReceipts(activeUser,fieldId);
+    // A stalled network must not hide all recommendations indefinitely.
+    // After a short timeout, show the offline/local view and retry later.
+    const server=await Promise.race([
+     fetchPusulaCloudReceipts(activeUser,fieldId),
+     new Promise<Set<string>>((_,reject)=>{
+      timeoutId=window.setTimeout(()=>reject(new Error('Cloud memory timeout')),6500);
+     }),
+    ]);
     if(closed||scopeRef.current!==activeScope)return;
     setCloud({scope:activeScope,ready:true,ids:server});
     // Migrate reads from old single-device installations. Never overwrite
@@ -79,7 +87,10 @@ export function usePusulaFieldMemory(input:Input){
      }));
      console.warn('[Pusula] Hafıza eşitlemesi şu anda çevrimdışı:',error);
     }
-   }finally{busy=false;}
+   }finally{
+    if(timeoutId!==null)window.clearTimeout(timeoutId);
+    busy=false;
+   }
   };
   void sync();
   const timer=window.setInterval(()=>{
