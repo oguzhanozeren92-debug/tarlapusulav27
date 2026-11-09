@@ -32,8 +32,30 @@ type OverlayState = {
   requestId: number;
   activeSlot: 'a' | 'b' | null;
   spec: RecoverableImageOverlaySpec | null;
+  renderedSpec: RecoverableImageOverlaySpec | null;
+  pendingSpec: RecoverableImageOverlaySpec | null;
+  pending: Promise<boolean> | null;
   recoveryTimer: number | null;
 };
+
+/**
+ * Don't start another image decode / MapLibre source swap for the same raster.
+ * Especially on iOS, styledata and ResizeObserver can fire while the first
+ * image is being decoded. Restarting the swap on every event used to cancel
+ * itself indefinitely and leave the underlying satellite photo uncoloured.
+ */
+function sameOverlaySpec(
+  a: RecoverableImageOverlaySpec | null,
+  b: RecoverableImageOverlaySpec | null,
+): boolean {
+  if (!a || !b || a.key !== b.key || a.url !== b.url ||
+      a.beforeLayerId !== b.beforeLayerId) return false;
+  for (let i = 0; i < 4; i += 1) {
+    if (a.coordinates[i][0] !== b.coordinates[i][0] ||
+        a.coordinates[i][1] !== b.coordinates[i][1]) return false;
+  }
+  return JSON.stringify(a.paint ?? {}) === JSON.stringify(b.paint ?? {});
+}
 
 const overlayStates = new WeakMap<object, Map<string, OverlayState>>();
 const installedLifecycle = new WeakSet<object>();
@@ -52,6 +74,9 @@ function stateFor(map: MapLike, key: string): OverlayState {
       requestId: 0,
       activeSlot: null,
       spec: null,
+      renderedSpec: null,
+      pendingSpec: null,
+      pending: null,
       recoveryTimer: null,
     };
     byKey.set(key, state);
@@ -162,14 +187,26 @@ function scheduleVerify(map: MapLike, key: string) {
   }, 1600);
 }
 
-export async function swapRecoverableImageOverlay(
+export function swapRecoverableImageOverlay(
   map: MapLike,
   spec: RecoverableImageOverlaySpec,
 ): Promise<boolean> {
   const state = stateFor(map, spec.key);
+
+  if (sameOverlaySpec(state.renderedSpec, spec) &&
+      state.activeSlot &&
+      map.getLayer(layerId(spec.key, state.activeSlot)) &&
+      map.getSource(sourceId(spec.key, state.activeSlot))) {
+    return Promise.resolve(true);
+  }
+  if (sameOverlaySpec(state.pendingSpec, spec) && state.pending) {
+    return state.pending;
+  }
+
   const requestId = state.requestId + 1;
   state.requestId = requestId;
   state.spec = spec;
+  const operation = (async (): Promise<boolean> => {
 
   // Yeni görüntünün gerçekten yüklenebildiğini doğrulamadan son başarılı
   // rastera dokunma. Böylece ağ/geçici servis hatası haritayı çıplak bırakmaz.
@@ -230,8 +267,20 @@ export async function swapRecoverableImageOverlay(
     safeRemove(map, spec.key, previousSlot);
   }
 
+  state.renderedSpec = spec;
   scheduleVerify(map, spec.key);
   return true;
+  })();
+
+  state.pending = operation;
+  state.pendingSpec = spec;
+  const cleanup = () => {
+    if (state.pending !== operation) return;
+    state.pending = null;
+    state.pendingSpec = null;
+  };
+  void operation.then(cleanup, cleanup);
+  return operation;
 }
 
 export async function ensureRecoverableImageOverlay(map: MapLike, key: string) {
@@ -258,6 +307,9 @@ export function clearRecoverableImageOverlay(map: MapLike, key: string) {
   const state = stateFor(map, key);
   state.requestId += 1;
   state.spec = null;
+  state.renderedSpec = null;
+  state.pendingSpec = null;
+  state.pending = null;
   if (state.recoveryTimer != null) {
     window.clearTimeout(state.recoveryTimer);
     state.recoveryTimer = null;
@@ -339,6 +391,10 @@ export function installMapLifecycleRecovery(map: MapLike) {
     if (byKey) {
       for (const state of byKey.values()) {
         state.requestId += 1;
+        state.spec = null;
+        state.renderedSpec = null;
+        state.pendingSpec = null;
+        state.pending = null;
         if (state.recoveryTimer != null) {
           window.clearTimeout(state.recoveryTimer);
           state.recoveryTimer = null;
