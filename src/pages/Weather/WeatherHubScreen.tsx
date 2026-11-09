@@ -1420,13 +1420,14 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
   // Global üst başlıktaki Pusula'ya yalnızca gerçek hava verisinden üretilen
   // güncel öneriyi gönderir. Görsel yerleşime hiçbir şey eklemez/değiştirmez.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !hasWeatherData || !weatherKey) return;
 
-    // Global header yeniden mount olsa bile Pusula'nın son gerçek tarla yorumunu
-    // kaybetmemesi için küçük bir yerel kopya tutuyoruz. Bu yeni veri çekmez.
+    // Publish only an actual field forecast. A fallback "weather is not ready"
+    // must never overwrite a genuine insight or appear as real Pusula advice.
+    // Global header yeniden mount olsa bile son gerçek tarla yorumunu koru.
     try {
       window.localStorage.setItem(
-        'tp_pusula_weather_latest_v2',
+        'tp_pusula_weather_latest_v3',
         JSON.stringify({
           fieldName: fieldNameForPusula,
           fieldId: weatherKey,
