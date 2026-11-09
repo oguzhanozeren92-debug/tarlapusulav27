@@ -1292,7 +1292,18 @@ export default function GlobalPusulaBand({
       }
     };
     void scan();
-    return () => { alive = false; };
+    // New publications arriving during a long-lived app session are noticed
+    // without requiring the farmer to close and reopen the application.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void scan();
+    }, 15 * 60 * 1000);
+    const onFocus = () => { if (document.visibilityState === 'visible') void scan(); };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
   }, [userGuideContext.userId, userGuideContext.crop, userGuideContext.loading, fieldId, fieldName]);
 
   // Sayfalar kendi gerçek verilerinden bir Pusula önerisi ürettiğinde
