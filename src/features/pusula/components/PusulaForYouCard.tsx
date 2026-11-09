@@ -90,18 +90,13 @@ export default function PusulaForYouCard({
       </div>
 
       <div className="tp-ai-section-label">Senin Tarlada</div>
-      <h1>
-        {titleCaseEachWordTr(
-          loading ? `${layerLabel} haritası okunuyor${loadingDots}` : headline,
-        )}
-      </h1>
-      <p>
-        {titleCaseEachWordTr(
-          loading
-            ? 'Pusula yalnızca açık olan harita katmanını okuyup bu katmana ait bilgiyi hazırlıyor.'
-            : summary,
-        )}
+      <h1>{loading ? layerLabel + ' haritası okunuyor' + loadingDots : headline}</h1>
+      <p style={{ whiteSpace: 'pre-line' }}>
+        {loading
+          ? 'Pusula güncel tarla verilerini ve diğer katmanlardan gelen bulguları birlikte değerlendiriyor.'
+          : summary}
       </p>
+
       {phenology && (
         <div
           style={{
@@ -219,7 +214,7 @@ export default function PusulaForYouCard({
               color: '#e9f3e8',
             }}
           >
-            {titleCaseEachWordTr(result.analysis.action)}
+            {result.analysis.action}
           </div>
 
           {result.analysis.importantArea && (
@@ -264,7 +259,7 @@ export default function PusulaForYouCard({
             <strong>Birlikte Kontrol Et:</strong> {guide.compareWith}
           </div>
           <div className="tp-ai-compare">
-            <strong>Dikkat:</strong> {titleCaseEachWordTr(guide.caution)}
+            <strong>Dikkat:</strong> {guide.caution}
           </div>
           <div style={{ marginTop: 8, fontSize: 10, color: '#78a888' }}>
             {titleCaseEachWordTr(
@@ -294,7 +289,7 @@ export default function PusulaForYouCard({
                   {result.analysis.reasons
                     .slice(0, 3)
                     .map((reason: unknown, index: number) => (
-                      <li key={index}>{titleCaseEachWordTr(reason)}</li>
+                      <li key={index}>{String(reason ?? '')}</li>
                     ))}
                 </ul>
               </details>
@@ -304,22 +299,22 @@ export default function PusulaForYouCard({
 
       {error && (
         <div style={{ marginTop: 8, fontSize: 10, color: '#e7a89c' }}>
-          {titleCaseEachWordTr(error)}
+          {error}
         </div>
       )}
 
       <div className="tp-layer-guide" style={{ marginTop: 14 }}>
         <div className="tp-layer-guide-item">
           <span>Bu Neyi Gösteriyor?</span>
-          <strong>{titleCaseEachWordTr(guide.what)}</strong>
+          <strong>{guide.what}</strong>
         </div>
         <div className="tp-layer-guide-item">
           <span>Tarımda Ne İşe Yarar?</span>
-          <strong>{titleCaseEachWordTr(guide.agriculturalUse)}</strong>
+          <strong>{guide.agriculturalUse}</strong>
         </div>
         <div className="tp-layer-guide-item interpret">
           <span>Nasıl Yorumlanmalı?</span>
-          <strong>{titleCaseEachWordTr(guide.interpretation)}</strong>
+          <strong>{guide.interpretation}</strong>
         </div>
         <div className="tp-layer-guide-footer">
           <span>
