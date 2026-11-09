@@ -200,6 +200,15 @@ export default function HomeScreen(props: HomeScreenProps) {
   const [fieldsSheetOpen, setFieldsSheetOpen] = useState(false);
   const [quickSheet, setQuickSheet] = useState<'today' | 'notifications' | null>(null);
   const [tasksOpen, setTasksOpen] = useState(false);
+  // A due task discovered on another screen opens the actual task sheet
+  // when Home mounts; it is not just a route to an unrelated calendar view.
+  useEffect(() => {
+    try {
+      if(window.sessionStorage.getItem('tp_pusula_open_tasks_v1')!=='1')return;
+      window.sessionStorage.removeItem('tp_pusula_open_tasks_v1');
+      setTasksOpen(true);
+    } catch { /* Browser storage is optional. */ }
+  }, []);
   const [fieldStatusOpen, setFieldStatusOpen] = useState(false);
   const [fieldStatusInitialTab, setFieldStatusInitialTab] = useState<'summary' | 'plant' | 'crop' | 'soil' | 'irrigation' | 'risk' | 'data' | 'input'>('summary');
   const [fieldStatusInitialActionTarget, setFieldStatusInitialActionTarget] = useState<string | null>(null);
@@ -1442,6 +1451,11 @@ export default function HomeScreen(props: HomeScreenProps) {
           )}
           onLogoClick={handleHomeHeaderPusulaClick}
           onOpenAction={(target, contentId) => {
+            if (target === 'home') {
+              setHomeHeaderPusulaInsight(null);
+              setTasksOpen(true);
+              return;
+            }
             if (target === 'agendaHub' && contentId) {
               try { window.sessionStorage.setItem('tp_pusula_content_open_v1', contentId); }
               catch { /* navigation still works */ }
