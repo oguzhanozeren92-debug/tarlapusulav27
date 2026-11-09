@@ -1454,7 +1454,7 @@ export default function ContentAdminPanel() {
               type="button"
               className="tp-content-admin__reject-all-news"
               onClick={() => void rejectAllPendingNews()}
-              disabled={loading || Boolean(workingId) || !candidates.some(item => item.candidate_type === 'news')}
+              disabled={loading || Boolean(workingId)}
               title="Yalnızca onay bekleyen haber adaylarını reddet"
             >
               <X size={15} /> Tüm Haberleri Reddet
