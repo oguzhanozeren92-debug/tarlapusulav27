@@ -241,7 +241,12 @@ export function memoryEventAsInsight(e:PusulaMemoryEvent,fieldName:string){
   gozlem:e.title+'\n'+e.detail,yonlendirme:e.action,
   guven_skoru:e.priority>=90?'Orta' as const:'Düşük' as const,
   sources:[e.source],
-  openAction:{label:e.screen==='home'?'Görevleri aç':
+  followUpAction:e.module==='followup'?{
+   fieldId:e.fieldId,
+   operationId:e.id.replace(/^followup:/,''),
+   operationLabel:(/sulama/i.test(e.detail)?'Sulama':/gübreleme/i.test(e.detail)?'Gübreleme':'İlaçlama'),
+  }:undefined,
+  openAction:e.module==='followup'?undefined:{label:e.screen==='home'?'Görevleri aç':
    e.screen==='calendar'?'Takvimi aç':
    e.screen==='weatherHub'?'Hava tahminini aç':
    e.screen==='fieldNotebookHub'?(e.module==='followup'?'Gözlem kaydet':'Tarla Defteri’ni aç'):
