@@ -4890,6 +4890,7 @@ export function HomeInlineLayerMap({
   // render edildiğini takip eder.
   const activeLayerRequestKeyRef = useRef('');
   const renderedLayerRequestKeyRef = useRef('');
+  const renderedNdviFieldKeyRef = useRef('');
   const pusulaFocusMarkerRef = useRef<maplibregl.Marker | null>(null);
   const trackingPointMarkersRef = useRef<maplibregl.Marker[]>([]);
   const pusulaFocusTimersRef = useRef<number[]>([]);
@@ -5363,8 +5364,11 @@ export function HomeInlineLayerMap({
     }
 
     // Yeni canlı gözlem varsa önce onu göster; data-uri cache hazırlanması arkada sürer.
+    // Aynı tarla sayfadan çıkıp saniyeler içinde geri açıldığında, asenkron
+    // smooth/cache işlemi bitmemiş olsa bile ham Sentinel NDVI'yı RAM'de koru.
     setSmoothNdvi(satelliteData.ndviImage);
     setSmoothNdviKey(ndviCacheKey);
+    persistLatestSnapshot(satelliteData.ndviImage);
 
     const memoryCached = HOME_MAP_NDVI_CACHE.get(ndviCacheKey);
 
@@ -6038,6 +6042,9 @@ export function HomeInlineLayerMap({
     });
 
     mapRef.current = map;
+    // Yeni MapLibre örneği eskisinin render key'ini devralamaz.
+    renderedLayerRequestKeyRef.current = '';
+    renderedNdviFieldKeyRef.current = '';
     const stopMapRecovery = installMapLifecycleRecovery(map);
     const stopOpening = (event: { originalEvent?: unknown }) => {
       if (event.originalEvent) {
@@ -8507,13 +8514,22 @@ export function HomeInlineLayerMap({
       const clearRenderedRaster = () => {
         clearRecoverableImageOverlay(map, 'home-inline-overlay');
         renderedLayerRequestKeyRef.current = '';
+        renderedNdviFieldKeyRef.current = '';
       };
 
       if (!targetHasRaster && targetIsPending) {
-        // Aynı hedef katmanın eski/son başarılı rasterı zaten görünüyorsa
-        // arka plandaki yenileme sırasında onu koru. Başka katmanın rasterıysa
-        // yanlış veri göstermemek için temizle.
-        if (renderedLayerRequestKeyRef.current !== activeMapVisualKey) {
+        // NDVI tarihi / cache key'i değişirken, aynı parselin en son geçerli
+        // NDVI rasterını kaldırma. Yeni renkli görüntü atomik olarak gelince
+        // değiştireceğiz. Eski bir radar/toprak katmanını ise NDVI diye gösterme.
+        const sameFieldNdviStillVisible =
+          layer === 'vegetation' &&
+          renderedNdviFieldKeyRef.current === homeMapFieldKey &&
+          renderedLayerRequestKeyRef.current.startsWith('vegetation:') &&
+          (Boolean(map.getLayer('home-inline-overlay--layer-a')) ||
+           Boolean(map.getLayer('home-inline-overlay--layer-b')));
+
+        if (!sameFieldNdviStillVisible &&
+            renderedLayerRequestKeyRef.current !== activeMapVisualKey) {
           clearRenderedRaster();
         }
         return;
@@ -8546,7 +8562,11 @@ export function HomeInlineLayerMap({
             'raster-resampling': 'linear',
           },
         }).then((installed) => {
-          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+          if (installed && mapRef.current === map &&
+              activeLayerRequestKeyRef.current === activeLayerRequestKey) {
+            renderedLayerRequestKeyRef.current = activeMapVisualKey;
+            renderedNdviFieldKeyRef.current = homeMapFieldKey;
+          }
         });
       }
 
@@ -8578,7 +8598,11 @@ export function HomeInlineLayerMap({
             'raster-saturation': 0.10,
           },
         }).then((installed) => {
-          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+          if (installed && mapRef.current === map &&
+              activeLayerRequestKeyRef.current === activeLayerRequestKey) {
+            renderedLayerRequestKeyRef.current = activeMapVisualKey;
+            renderedNdviFieldKeyRef.current = '';
+          }
         });
       }
 
@@ -8608,7 +8632,11 @@ export function HomeInlineLayerMap({
             'raster-saturation': 0.06,
           },
         }).then((installed) => {
-          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+          if (installed && mapRef.current === map &&
+              activeLayerRequestKeyRef.current === activeLayerRequestKey) {
+            renderedLayerRequestKeyRef.current = activeMapVisualKey;
+            renderedNdviFieldKeyRef.current = '';
+          }
         });
       }
 
@@ -8638,7 +8666,11 @@ export function HomeInlineLayerMap({
             'raster-contrast': -0.08,
           },
         }).then((installed) => {
-          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+          if (installed && mapRef.current === map &&
+              activeLayerRequestKeyRef.current === activeLayerRequestKey) {
+            renderedLayerRequestKeyRef.current = activeMapVisualKey;
+            renderedNdviFieldKeyRef.current = '';
+          }
         });
       }
 
@@ -8670,7 +8702,11 @@ export function HomeInlineLayerMap({
             'raster-saturation': 0.12,
           },
         }).then((installed) => {
-          if (installed) renderedLayerRequestKeyRef.current = activeMapVisualKey;
+          if (installed && mapRef.current === map &&
+              activeLayerRequestKeyRef.current === activeLayerRequestKey) {
+            renderedLayerRequestKeyRef.current = activeMapVisualKey;
+            renderedNdviFieldKeyRef.current = '';
+          }
         });
       }
     };
