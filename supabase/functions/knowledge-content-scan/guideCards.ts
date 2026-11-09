@@ -348,8 +348,9 @@ export async function handleGuideCardRequest(req: Request) {
      if(created.length>=requested)break;
      const prior=duplicateFor(source.url);
      if(prior){
-       alreadyExists.push({url:source.url,title:prior.title_suggested||prior.title,
-         id:prior.id,status:prior.workflow_status||prior.status||"pending"});
+       alreadyExists.push({url:source.url,
+         title:("title_suggested" in prior ? prior.title_suggested : prior.title) || "",
+         id:prior.id,status:("workflow_status" in prior ? prior.workflow_status : prior.status) || "pending"});
        continue;
      }
      // Editorially inspected material remains usable when the publisher serves a
