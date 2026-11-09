@@ -21,3 +21,7 @@ test('complete Turkish explanations pass, native Turkish originals do not need f
  assert.equal(translationPublicationProblem(full),null);
  assert.equal(translationPublicationProblem({...full,original_language:'tr',structured_body:{translation_status:'not_required'}}),null);
 });
+
+test('missing candidate language still honors original source language',()=>{
+ assert.match(translationPublicationProblem({...full,original_language:null,source_refs:[{language:'en'}],structured_body:{translation_status:'pending_ai'}}),/tam Türkçe/);
+});
