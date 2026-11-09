@@ -591,6 +591,15 @@ type WeatherPusulaInsight = {
   gozlem: string;
   yonlendirme?: string;
   guven_skoru?: 'Yüksek' | 'Orta' | 'Düşük';
+  fieldName?: string;
+  observationDate?: string;
+  sources?: string[];
+  calendarAction?: {
+    fieldId: string;
+    title: string;
+    reminderType: string;
+    notes: string;
+  };
 };
 
 const WEATHER_AUTO_REFRESH_MS = 8 * 60 * 60 * 1000;
@@ -1415,6 +1424,22 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
     gozlem: weatherPusulaObservation,
     yonlendirme: weatherPusulaGuidance,
     guven_skoru: weatherPusulaConfidence,
+    fieldName: fieldNameForPusula,
+    observationDate: pusulaNow.toISOString().slice(0, 10),
+    sources: [
+      ...((modelCount >= 1) ? [`${modelCount} hava tahmin kaynağı`] : []),
+      ...(windSpeed !== null ? [`Rüzgâr: ${Math.round(windSpeed)} km/sa`] : []),
+      ...(minTempNext72h !== null ? [`3 günlük en düşük sıcaklık: ${Math.round(minTempNext72h)}°C`] : []),
+      ...(surfaceMoistureForPusula !== null ? ['Model tabanlı toprak nemi'] : []),
+    ],
+    // Invite the farmer to schedule a *field check*, not a pesticide,
+    // irrigation or frost-treatment decision without local confirmation.
+    calendarAction: hasWeatherData && frostSignal ? {
+      fieldId: weatherKey,
+      title: `${fieldNameForPusula} · Don riski için saha kontrolü`,
+      reminderType: 'Kontrol',
+      notes: `Pusula hava değerlendirmesi: ${weatherPusulaObservation} ${weatherPusulaGuidance}`.slice(0, 850),
+    } : undefined,
   };
 
   // Global üst başlıktaki Pusula'ya yalnızca gerçek hava verisinden üretilen
