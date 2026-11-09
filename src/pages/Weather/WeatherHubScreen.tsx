@@ -150,7 +150,8 @@ type IconName =
   | 'briefcase'
   | 'book'
   | 'more'
-  | 'globe';
+  | 'globe'
+  | 'night';
 
 
 export function WeatherArt({
@@ -247,7 +248,18 @@ export function WeatherArt({
         </g>
       </>
     );
-  } else if (kind === 'cloud' || kind === 'weather') {
+  } else if (kind === 'night') {
+    art = (
+      <>
+        <path d="M42 11c-3 16 3 24 15 26-4 12-18 20-31 15C12 47 9 34 14 24c6-11 16-15 28-13Z" fill="#b0cbea" />
+        <path d="M34 13c-4 12 0 21 11 26-5 6-15 9-23 5-9-5-11-16-7-24 4-7 11-10 19-7Z" fill="#d9e9ff" />
+        <circle cx="48" cy="15" r="2" fill="#edcf7b" />
+        <circle cx="54" cy="27" r="1.6" fill="#edcf7b" />
+      </>
+    );
+  } else if (kind === 'cloud') {
+    art = cloud;
+  } else if (kind === 'weather') {
     art = (
       <>
         <g transform="translate(-8 -9) scale(.82)">
@@ -545,9 +557,6 @@ export function weatherGlyph(condition?: string): IconName {
   return 'sun';
 }
 
-const WEATHER_3D_BASE =
-  'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/pusula/weather';
-
 type Weather3DKey =
   | 'sunny'
   | 'partly-cloudy'
@@ -582,8 +591,18 @@ function weather3DKey(condition?: string): Weather3DKey {
   return 'sunny';
 }
 
-function weather3DIcon(condition?: string) {
-  return `${WEATHER_3D_BASE}/${weather3DKey(condition)}.webp`;
+/** Vector-only artwork: consistent sharp icons without external image requests. */
+function weatherArtKind(condition?: string): IconName {
+  const conditionKey = weather3DKey(condition);
+  if (conditionKey === 'storm') return 'storm';
+  if (conditionKey === 'snow') return 'snow';
+  if (conditionKey === 'fog') return 'fog';
+  if (conditionKey === 'light-rain' || conditionKey === 'heavy-rain') return 'rain';
+  if (conditionKey === 'night') return 'night';
+  if (conditionKey === 'cloudy') return 'cloud';
+  if (conditionKey === 'partly-cloudy') return 'weather';
+  if (conditionKey === 'wind') return 'weather';
+  return 'sun';
 }
 
 type WeatherPusulaInsight = {
@@ -1713,22 +1732,9 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
         </section>
 
         <section className="tp-wxref-card">
-          <img
-            className="tp-wxref-ambient-art"
-            src={weather3DIcon(currentCondition)}
-            crossOrigin="anonymous"
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-          />
           <div className="tp-wxref-current">
             <div className="tp-wxref-art">
-              <img
-                src={weather3DIcon(currentCondition)}
-                crossOrigin="anonymous"
-                alt={currentCondition || 'Hava durumu'}
-                draggable={false}
-              />
+              <WeatherArt kind={weatherArtKind(currentCondition)} size={112} />
             </div>
 
             <div className="tp-wxref-current-copy">
@@ -1737,12 +1743,12 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
               <div className="tp-wxref-minmax">
                 <span>
-                  <Icon name="thermo" size={16} />
+                  <Icon name="thermo" size={22} />
                   <b>{tempMax === null ? '—' : `${Math.round(tempMax)}°C`}</b>
                   <small>En Yüksek</small>
                 </span>
                 <span>
-                  <Icon name="thermo" size={16} />
+                  <Icon name="thermo" size={22} />
                   <b>{tempMin === null ? '—' : `${Math.round(tempMin)}°C`}</b>
                   <small>En Düşük</small>
                 </span>
@@ -1752,26 +1758,26 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
           <div className="tp-wxref-stats">
             <span>
-              <Icon name="drop" size={18} />
+              <Icon name="drop" size={24} />
               <b>{humidity === null ? '—' : `%${Math.round(humidity)}`}</b>
               <small>Nem</small>
             </span>
             <span>
-              <Icon name="wind" size={18} />
+              <Icon name="wind" size={24} />
               <b>{windSpeed === null ? '—' : `${Math.round(windSpeed)} km/sa`}</b>
               <small>Rüzgâr</small>
             </span>
             <span>
-              <Icon name="globe" size={18} />
-              <b>{nasaTemperature === null ? '—' : `${Math.round(nasaTemperature)}°`}</b>
-              <small>Rüzgâr Yönü</small>
+              <Icon name="thermo" size={24} />
+              <b>{nasaTemperature === null ? '—' : `${Math.round(nasaTemperature)}°C`}</b>
+              <small>NASA İklim Ort.</small>
             </span>
           </div>
 
           <div className="tp-wxref-risk-grid">
             <article className={rainChance >= 60 ? 'is-danger' : ''}>
               <span className="tp-wxref-risk-accent" />
-              <span className="tp-wxref-risk-icon"><Icon name="rain" size={19} /></span>
+              <span className="tp-wxref-risk-icon"><Icon name="rain" size={26} /></span>
               <div>
                 <small>Yağış Riski</small>
                 <strong>%{Math.round(rainChance)}</strong>
@@ -1781,7 +1787,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
             <article className={frostRisk === 'Var' ? 'is-danger' : 'is-calm'}>
               <span className="tp-wxref-risk-accent" />
-              <span className="tp-wxref-risk-icon"><Icon name="thermo" size={19} /></span>
+              <span className="tp-wxref-risk-icon"><Icon name="thermo" size={26} /></span>
               <div>
                 <small>Don Riski</small>
                 <strong>{frostRisk}</strong>
@@ -1806,13 +1812,13 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon"><Icon name="rain" size={17} /></span>
+              <span className="tp-wxref-data-icon"><Icon name="rain" size={25} /></span>
               <div>
                 <small>Yağış Geçmişi</small>
                 <strong>{rain30dValue === null ? '—' : `${rain30dValue.toFixed(1)} mm`}</strong>
                 <p>Son 30 günlük birikim</p>
               </div>
-              <b className="tp-wxref-chevron">›</b>
+              <b className="tp-wxref-chevron"><Icon name="chevron" size={20} /></b>
             </article>
 
             <article
@@ -1826,13 +1832,13 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon"><Icon name="thermo" size={17} /></span>
+              <span className="tp-wxref-data-icon"><Icon name="thermo" size={25} /></span>
               <div>
                 <small>Yüzey Sıcaklığı</small>
                 <strong>{surfaceTemperatureValue === null ? '—' : `${surfaceTemperatureValue.toFixed(1)}°C`}</strong>
                 <p>Üst toprak model sıcaklığı</p>
               </div>
-              <b className="tp-wxref-chevron">›</b>
+              <b className="tp-wxref-chevron"><Icon name="chevron" size={20} /></b>
             </article>
 
             <article
@@ -1846,7 +1852,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon"><Icon name="soil" size={17} /></span>
+              <span className="tp-wxref-data-icon"><Icon name="soil" size={25} /></span>
               <div>
                 <small>Tarla İklimi</small>
                 <strong>{climatePrimaryValue}</strong>
@@ -1858,7 +1864,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                       : 'Birleşik iklim özeti'}
                 </p>
               </div>
-              <b className="tp-wxref-chevron">›</b>
+              <b className="tp-wxref-chevron"><Icon name="chevron" size={20} /></b>
             </article>
 
             <article
@@ -1872,7 +1878,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon is-blue"><Icon name="drop" size={17} /></span>
+              <span className="tp-wxref-data-icon is-blue"><Icon name="drop" size={25} /></span>
               <div>
                 <small>ET₀ · Su Talebi</small>
                 <strong>{et0SevenDayValue === null ? '—' : `${et0SevenDayValue.toFixed(1)} mm / 7 gün`}</strong>
@@ -1882,7 +1888,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                     : `≈ ${et0DailyAverage.toFixed(1)} mm/gün`}
                 </p>
               </div>
-              <b className="tp-wxref-chevron">›</b>
+              <b className="tp-wxref-chevron"><Icon name="chevron" size={20} /></b>
             </article>
           </div>
 
@@ -1893,7 +1899,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           ) : null}
 
           <div className="tp-wxref-advice">
-            <span aria-hidden="true">✦</span>
+            <span aria-hidden="true"><Icon name="sparkles" size={22} /></span>
             <p>{agriculturalMessage}</p>
             <b aria-hidden="true">›</b>
           </div>
@@ -1905,7 +1911,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
               onClick={() => void refreshWeatherNow(weatherField)}
               disabled={weatherState.status === 'loading'}
             >
-              <Icon name="refresh" size={16} />
+              <Icon name="refresh" size={20} />
               {weatherState.status === 'loading' ? 'Güncelleniyor…' : 'Tahmini Yenile'}
             </button>
 
@@ -1914,9 +1920,9 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
               className="tp-wxref-primary"
               onClick={openSprayGuide}
             >
-              <Icon name="wind" size={16} />
+              <Icon name="wind" size={20} />
               İlaçlama Hava Kontrolü
-              <Icon name="chevron" size={15} />
+              <Icon name="chevron" size={18} />
             </button>
           </div>
         </section>
@@ -1984,13 +1990,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                                     {formatTemp(day?.tempMax)} / {formatTemp(day?.tempMin)}
                                   </strong>
                                   <span>
-                                    <img
-                                      src={weather3DIcon(day?.condition)}
-                                      crossOrigin="anonymous"
-                                      alt={day?.condition || 'Hava durumu'}
-                                      draggable={false}
-                                      style={{ width: 58, height: 58, objectFit: 'contain', display: 'block' }}
-                                    />
+                                    <WeatherArt kind={weatherArtKind(day?.condition)} size={58} />
                                   </span>
                                   <small>💧 {Math.round(probability)}%</small>
                                 </div>
@@ -2027,23 +2027,15 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           </div>
 
           <span className="tp-wxr-alert-icon">
-            <img
-              src={weather3DIcon(
+            <WeatherArt
+              kind={weatherArtKind(
                 rainyDays >= 2
                   ? 'Kuvvetli Yağmur'
                   : tempMax !== null && tempMax >= 36
                     ? 'Güneşli'
                     : 'Bulutlu',
               )}
-              crossOrigin="anonymous"
-              alt="Hava durumu uyarısı"
-              draggable={false}
-              style={{
-                width: 98,
-                height: 98,
-                objectFit: 'contain',
-                display: 'block',
-              }}
+              size={94}
             />
           </span>
         </section>
