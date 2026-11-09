@@ -841,6 +841,16 @@ Deno.serve(async req => {
       } : {}),
     };
 
+    // A successfully rewritten article has passed the existing Turkish-language
+    // checks in editorial(). Do not leave it in translation_incomplete indefinitely.
+    if (candidateId && !isGuide && channel === "article" && rewrite) {
+      structured.translation_status = "translated_full_tr";
+      structured.producer_summary_status = "ready";
+      structured.admin_visibility = "admin_ready";
+      structured.queue_block_reason = null;
+      delete structured.translation_error;
+    }
+
     const payload = {
       version: 4, id, type: candidateId ? "candidate" : "content", content_subtype: isGuide ? "guide" : row.content_subtype || "general", title: e.title, summary: e.summary,
       coverage: { scope: e.scope, country_code: e.countryCode, country_name: e.countryName, location: e.location, event_date: e.eventDate },
@@ -870,6 +880,14 @@ Deno.serve(async req => {
     else Object.assign(update, { title: e.title, excerpt: e.summary, body: guidePreview, category: e.category, tags: e.tags, crop_tags: e.crops, updated_at: new Date().toISOString(), ...(isGuide ? { content_subtype: "guide" } : {}) });
     const ur = await db.from(tn).update(update).eq("id", id);
     if (ur.error) throw ur.error;
+
+    if (candidateId && !isGuide && channel === "article" && rewrite && row.workflow_status === "held" && !row.reviewed_at) {
+      const ready = await db.from("content_candidates")
+        .update({ workflow_status: "pending", payload_status: "ready", structured_body: structured,
+          admin_note: "Makale Türkçeleştirildi; editör incelemesine hazır." })
+        .eq("id", candidateId).eq("workflow_status", "held").is("reviewed_at", null);
+      if (ready.error) throw ready.error;
+    }
 
     if (candidateId && isGuide) {
       const quality = Number(e.guide?.producer_value_score || 0);
