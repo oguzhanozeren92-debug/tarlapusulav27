@@ -12,6 +12,10 @@ on:
       - 'supabase/functions/send-due-reminders/**'
   workflow_dispatch:
 
+concurrency:
+  group: pusula-integration-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -27,3 +31,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: npm run build
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/send-due-reminders/dailyWeather.ts
