@@ -25,6 +25,8 @@ type Forecast = {
   windKmh: number | null;
   rainChance: number | null;
   humidityNow: number | null;
+  frostMinNext24h: number | null;
+  frostFirstAt: string | null;
 };
 
 const ZONE = "Europe/Istanbul";
@@ -80,7 +82,10 @@ async function forecastForField(field: FieldRow, day: string): Promise<Forecast>
   url.searchParams.set("latitude", String(point.latitude));
   url.searchParams.set("longitude", String(point.longitude));
   url.searchParams.set("timezone", ZONE);
-  url.searchParams.set("forecast_days", "1");
+  url.searchParams.set("forecast_days", "2");
+  // Daily min includes the dawn that has already passed. Use future hourly
+  // values to avoid a false "tonight" frost alert in the morning.
+  url.searchParams.set("hourly", "temperature_2m");
   url.searchParams.set("daily",
     "weather_code,temperature_2m_min,temperature_2m_max,precipitation_probability_max,wind_speed_10m_max");
   url.searchParams.set("current", "relative_humidity_2m");
@@ -100,6 +105,23 @@ async function forecastForField(field: FieldRow, day: string): Promise<Forecast>
   if (tempMin === null || tempMax === null) {
     throw new Error("Sıcaklık tahmini eksik.");
   }
+  const times = Array.isArray(data?.hourly?.time) ? data.hourly.time : [];
+  const temps = Array.isArray(data?.hourly?.temperature_2m)
+    ? data.hourly.temperature_2m : [];
+  const nowMs = Date.now();
+  const upcoming = times.map((time: unknown, index: number) => {
+    const label = String(time ?? '');
+    const at = Date.parse(label + '+03:00'); // Europe/Istanbul has UTC+3 year-round.
+    return { at, label, temperature: n(temps[index]) };
+  }).filter((point: { at: number; temperature: number | null }) =>
+    Number.isFinite(point.at) && point.at >= nowMs - 30 * 60_000 &&
+    point.at <= nowMs + 24 * 60 * 60_000 && point.temperature !== null
+  );
+  const coldest = upcoming.length
+    ? Math.min(...upcoming.map((point: { temperature: number | null }) => point.temperature!))
+    : null;
+  const frost = upcoming.find((point: { temperature: number | null }) =>
+    point.temperature !== null && point.temperature <= 2);
   return {
     date: day,
     condition: weatherCondition(Number(daily.weather_code?.[0] ?? -1)),
@@ -108,6 +130,8 @@ async function forecastForField(field: FieldRow, day: string): Promise<Forecast>
     windKmh: n(daily.wind_speed_10m_max?.[0]),
     rainChance: n(daily.precipitation_probability_max?.[0]),
     humidityNow: n(data?.current?.relative_humidity_2m),
+    frostMinNext24h: coldest,
+    frostFirstAt: frost?.label ?? null,
   };
 }
 
@@ -135,7 +159,8 @@ export async function enqueueDailyWeatherNotifications(
   now = new Date(),
 ) {
   const day = localDay(now);
-  const stats = { day, queued: 0, skipped: 0, failed: 0, checked: 0, outsideWindow: false };
+  const stats = { day, queued: 0, skipped: 0, failed: 0, checked: 0,
+    frostQueued: 0, frostSkipped: 0, outsideWindow: false };
 
   // Saat 08:00-11:59 arası cron her 15 dakikada çalışır.
   if (localClock(now).hour < 8 || localClock(now).hour >= 12) {
@@ -240,6 +265,48 @@ export async function enqueueDailyWeatherNotifications(
         if (inserted.error) throw inserted.error;
         if (inserted.data?.id) stats.queued++;
         else stats.skipped++;
+
+        // Separate high-priority frost watch: forecast, not certain damage.
+        // One event per user/field/risk-night. User push preferences are
+        // checked again by dispatchAppNotification before delivery.
+        if (forecast.frostFirstAt && forecast.frostMinNext24h !== null &&
+            forecast.frostMinNext24h <= 2) {
+          const riskDay = forecast.frostFirstAt.slice(0, 10);
+          const frostText = (field.name || "Tarlan") +
+            " için önümüzdeki 24 saatte " +
+            forecast.frostMinNext24h.toFixed(1).replace(".", ",") +
+            "°C'ye kadar sıcaklık düşüşü tahmin ediliyor. " +
+            "Bu bir tahmindir; hassas bitkilerini ve tarla koşullarını kontrol et.";
+          const frostPush = await db.from("app_notifications").upsert({
+            user_id: userId,
+            kind: "weather",
+            source: "open-meteo",
+            severity: forecast.frostMinNext24h <= 0 ? "danger" : "warning",
+            title: "Pusula · Don riski",
+            message: frostText.slice(0, 320),
+            target: "weatherHub",
+            data: {
+              fieldId: field.id,
+              weatherFieldId: field.id,
+              fieldName: field.name || "Tarlan",
+              riskType: "frost",
+              forecastAt: forecast.frostFirstAt,
+              minTemperatureC: forecast.frostMinNext24h,
+              forecastDate: riskDay,
+              actionTarget: "weatherHub",
+              source: "Open-Meteo",
+            },
+            category: "weather",
+            push_eligible: true,
+            push_critical: forecast.frostMinNext24h <= 0,
+            push_available_at: now.toISOString(),
+            dedupe_key: "frost-watch:" + userId + ":" + field.id + ":" + riskDay,
+          }, { onConflict: "dedupe_key", ignoreDuplicates: true })
+            .select("id").maybeSingle();
+          if (frostPush.error) throw frostPush.error;
+          if (frostPush.data?.id) stats.frostQueued++;
+          else stats.frostSkipped++;
+        }
       } catch (error) {
         stats.failed++;
         console.warn("Günlük hava bildirimi oluşturulamadı:", {
