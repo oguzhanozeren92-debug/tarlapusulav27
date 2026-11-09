@@ -512,6 +512,24 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
     }
   };
 
+  // A Pusula "Makaleyi/Haberi incele" action opens the exact, published
+  // content item after Gündem has loaded it. IDs are not treated as URLs.
+  useEffect(() => {
+    if (loading) return;
+    let targetId = '';
+    try { targetId = window.sessionStorage.getItem('tp_pusula_content_open_v1') || ''; }
+    catch { return; }
+    if (!targetId) return;
+    const item = [...articles, ...news].find((candidate) => candidate.id === targetId);
+    if (!item) return;
+    try { window.sessionStorage.removeItem('tp_pusula_content_open_v1'); }
+    catch { /* Fallback to showing article even if storage is unavailable. */ }
+    setActiveTab(item.content_subtype === 'article'
+      ? 'articles'
+      : item.coverage_scope === 'world' ? 'world' : 'turkey');
+    void openDetail(item);
+  }, [loading, news, articles]);
+
   const rateArticle = async (contentId: string, rating: number) => {
     if (!authUserId) { setError('Makale puanlamak için giriş yapmalısın.'); return; }
     setRatingBusyId(contentId);
