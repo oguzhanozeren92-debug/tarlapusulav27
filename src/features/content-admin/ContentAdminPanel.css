@@ -657,3 +657,31 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+
+/* Explicitly scoped bulk action: pending news only, never published/guide. */
+.tp-content-admin__reject-all-news {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 12px;
+  flex: 0 0 auto;
+  border: 1px solid #f0c5c8;
+  border-radius: 10px;
+  background: #fff4f4;
+  color: #9b272c;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tp-content-admin__reject-all-news:hover:not(:disabled){background:#fee8e8}
+.tp-content-admin__reject-all-news:disabled{cursor:not-allowed;opacity:.48}
+.tp-content-admin__reject-all-news:focus-visible{outline:2px solid #9b272c;outline-offset:2px}
+@media(max-width:640px){
+ .tp-content-admin__reject-all-news{
+   width:100%;min-height:44px;white-space:normal;
+ }
+}
