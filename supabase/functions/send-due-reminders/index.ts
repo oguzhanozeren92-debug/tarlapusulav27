@@ -4,7 +4,7 @@ import {
   listNativePushUserIds,
   sendNativePushToUser,
 } from "../_shared/nativePush.ts";
-import { enqueueDailyWeatherNotifications } from "./dailyWeather.ts";
+import { enqueueDailyWeatherNotifications, enqueueFieldFrostRiskAlerts } from "./dailyWeather.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1578,6 +1578,11 @@ Deno.serve(async (req) => {
         return { error: error instanceof Error ? error.message : "daily_weather_error" };
       });
     // Günlük özet, uzun uydu/faaliyet taramasını beklemeden gönderilsin.
+    const fieldFrost = await enqueueFieldFrostRiskAlerts(supabaseAdmin)
+      .catch((error) => {
+        console.error("Tarla bazlı don taraması başarısız:", error);
+        return { error: error instanceof Error ? error.message : "frost_scan_error" };
+      });
     const weatherPush = await processAppPushQueue(50);
     const fieldActivity = await processFieldActivityUpdates(cronSecret, body?.forceFieldActivity === true);
     const ndvi = await processNdviMapUpdates(false);
@@ -1591,6 +1596,7 @@ Deno.serve(async (req) => {
         reminderResults,
         reengagement,
         dailyWeather,
+        fieldFrost,
         weatherPush,
         fieldActivity,
         appPush,
