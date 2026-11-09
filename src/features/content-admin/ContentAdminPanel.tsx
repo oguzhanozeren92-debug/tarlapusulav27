@@ -18,6 +18,7 @@ import { supabase } from '../../supabaseClient';
 import KnowledgeUpdateSuggestions from './KnowledgeUpdateSuggestions';
 import KnowledgeAdminPanel from '../knowledge/components/KnowledgeAdminPanel';
 import { isRelevantGuideImage } from '../knowledge/services/guideImageRelevance';
+import { translationPublicationProblem } from './services/contentTurkishQualityGate';
 import GuideCardResearchPanel from './GuideCardResearchPanel';
 import ContentCoveragePanel from './ContentCoveragePanel.tsx';
 import { suggestKnowledgeUpdates, validateUpdateTarget } from './services/knowledgeUpdateSuggestions.service';
@@ -985,6 +986,9 @@ export default function ContentAdminPanel() {
       if (candidate.copyright_status === 'blocked') {
         throw new Error('Telif durumu engelli olan içerik yayınlanamaz.');
       }
+      const translationProblem = translationPublicationProblem(candidate);
+      if (translationProblem) throw new Error(translationProblem);
+
 
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error('Admin oturumu bulunamadı.');
