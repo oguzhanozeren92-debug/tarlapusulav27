@@ -9,6 +9,15 @@ type UseAuthOnboardingControllerOptions = {
   setScreen: Dispatch<SetStateAction<Screen>>;
 };
 
+// Release the iOS keyboard's focused field before replacing the auth screen.
+// WKWebView can otherwise carry its keyboard-adjusted viewport into Home.
+function blurFocusedAuthField() {
+  const focused = document.activeElement;
+  if (focused instanceof HTMLElement && focused.closest('.tp-authv2')) {
+    focused.blur();
+  }
+}
+
 export function useAuthOnboardingController({
   isNewUserPreview,
   setScreen,
@@ -260,6 +269,7 @@ export function useAuthOnboardingController({
       return;
     }
 
+    blurFocusedAuthField();
     setAuthLoading(true);
     setAuthMessage('');
 
@@ -301,6 +311,7 @@ export function useAuthOnboardingController({
       return;
     }
 
+    blurFocusedAuthField();
     setAuthLoading(true);
     setAuthMessage('');
 
