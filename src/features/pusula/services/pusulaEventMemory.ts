@@ -278,7 +278,7 @@ export function memoryEventAsInsight(e:PusulaMemoryEvent,fieldName:string){
   openAction:e.module==='followup'?undefined:{label:e.screen==='home'?'Görevleri aç':
    e.screen==='calendar'?'Takvimi aç':
    e.screen==='weatherHub'?'Hava tahminini aç':
-   e.screen==='fieldNotebookHub'?(e.module==='followup'?'Gözlem kaydet':'Tarla Defteri’ni aç'):
+   e.screen==='fieldNotebookHub'?'Tarla Defteri’ni aç':
    e.screen==='fieldControlHub'?'Haritayı incele':
    e.screen==='inventoryHub'?'Depoyu aç':
    e.screen==='marketHub'?'Piyasayı aç':
