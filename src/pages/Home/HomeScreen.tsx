@@ -46,6 +46,8 @@ import { useHomeSatelliteDate } from '../../features/home-map/hooks/useHomeSatel
 import type { EarthSearchNdviStats } from '../../features/home-map/services/earthSearchNdvi.service';
 import HomeMapPusulaStrip from '../../features/pusula/components/HomeMapPusulaStrip';
 import { useHomePusula } from '../../features/pusula/hooks/useHomePusula';
+import { usePusulaFieldMemory } from '../../features/pusula/hooks/usePusulaFieldMemory';
+import { memoryEventAsInsight } from '../../features/pusula/services/pusulaEventMemory';
 import { supabase } from '../../supabaseClient';
 import { latestCropPublication, publicationSignalSeenKey, type PusulaContentSignal, type PusulaPublication } from '../../features/pusula/services/pusulaContentSignals';
 import PusulaOperationQuestion from '../../features/pusula/components/PusulaOperationQuestion';
@@ -565,6 +567,11 @@ export default function HomeScreen(props: HomeScreenProps) {
         ? { tone: 'neutral', title: 'Saatlik hava hazırlanıyor', detail: 'İlaçlama saati için tarla tahmini bekleniyor.' }
       : dailySprayingQuick;
 
+  const homeMemory = usePusulaFieldMemory({
+    fieldId: homeField?.demo ? null : String(homeField?.id ?? ''),
+    fieldName: String(homeField?.name ?? ''),
+    crop: String(homeField?.crop ?? ''),
+  });
   const homePusula = useHomePusula({
     field: homeField,
     fieldKey,
@@ -1312,6 +1319,13 @@ export default function HomeScreen(props: HomeScreenProps) {
       return;
     }
 
+    if (homeMemory.pending && homeMemory.pending.priority >= 75) {
+      const item = homeMemory.pending;
+      homeMemory.markSeen(item.id);
+      setHomeHeaderPusulaInsight(memoryEventAsInsight(item, String(homeField?.name ?? '')));
+      return;
+    }
+
     if (homePublication && homePublicationUserRef.current && homeField?.id) {
       const item = homePublication;
       try {
@@ -1329,6 +1343,13 @@ export default function HomeScreen(props: HomeScreenProps) {
         sources: [item.source || 'TarlaPusula içerik arşivi'],
         openAction: {label: item.kind === 'article' ? 'Makaleyi incele' : 'Haberi incele', screen: 'agendaHub', contentId: item.id},
       });
+      return;
+    }
+
+    if (homeMemory.pending) {
+      const item = homeMemory.pending;
+      homeMemory.markSeen(item.id);
+      setHomeHeaderPusulaInsight(memoryEventAsInsight(item, String(homeField?.name ?? '')));
       return;
     }
 
@@ -1416,7 +1437,8 @@ export default function HomeScreen(props: HomeScreenProps) {
           anchorSelector=".tp-brand-pusula-anchor"
           hasUnread={Boolean(
             (fieldEventPrompt.candidate && fieldEventPrompt.needsAttention) ||
-              homePusulaDecisionAttention || Boolean(readyPdfNotice) || Boolean(homePublication),
+              homePusulaDecisionAttention || Boolean(readyPdfNotice) || Boolean(homePublication) ||
+                Boolean(homeMemory.pending),
           )}
           onLogoClick={handleHomeHeaderPusulaClick}
           onOpenAction={(target, contentId) => {
@@ -1505,7 +1527,7 @@ export default function HomeScreen(props: HomeScreenProps) {
                 pusulaGuideAway || operationQuestionVisible ? ' tp-brand-pusula-away' : ''
               }${
                 ((fieldEventPrompt.candidate && fieldEventPrompt.needsAttention) ||
-                  homePusulaDecisionAttention || readyPdfNotice) &&
+                  homePusulaDecisionAttention || readyPdfNotice || homePublication || homeMemory.pending) &&
                 !pusulaGuideAway &&
                 !operationQuestionVisible
                   ? ' tp-brand-pusula-event-attention'
