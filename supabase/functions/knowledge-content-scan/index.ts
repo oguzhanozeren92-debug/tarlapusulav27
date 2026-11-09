@@ -48,7 +48,7 @@ function isHubLike(url: string, title: string, body: string) {
   try {
     const u = new URL(url);
     const parts = u.pathname.split("/").filter(Boolean);
-    if (u.hostname.replace(/^www\./, "") === "ipm.ucanr.edu" && /^\/agriculture\/[^/]+\/?$/.test(u.pathname)) return true;
+    if (u.hostname.replace(/^www\./, "") === "ipm.ucanr.edu" && /^\/agriculture(?:\/[^/]+)?\/?$/.test(u.pathname)) return true;
     const shortTitle = norm(title).split(" ").length <= 3;
     const actionCount = (body.match(/\b(monitor|management|control|threshold|sampling|checklist|symptom|timing|treatment|izle|mücadele|eşik|örnekleme|belirti|zamanlama)\b/gi) || []).length;
     if (parts.length <= 1 && shortTitle && actionCount < 3) return true;
@@ -244,9 +244,10 @@ function seeds(s: Source, crops: Crop[]) {
   try { host = new URL(s.base_url).hostname.replace(/^www\./, ""); } catch { }
   const out = [s.base_url];
   if (host === "ipm.ucanr.edu") {
-    const cursor = Math.max(0, Number(s.metadata?.guide_seed_cursor || 0)) % Math.max(1, crops.length);
-    for (let n = 0; n < Math.min(3, crops.length); n++) {
-      const c = crops[(cursor + n) % crops.length];
+    const supported = crops.filter(c => Boolean(UC_SLUG[norm(c.crop_key)]));
+    const cursor = Math.max(0, Number(s.metadata?.guide_seed_cursor || 0)) % Math.max(1, supported.length);
+    for (let n = 0; n < Math.min(3, supported.length); n++) {
+      const c = supported[(cursor + n) % supported.length];
       const slug = UC_SLUG[norm(c.crop_key)];
       if (slug) out.push(`https://ipm.ucanr.edu/agriculture/${slug}/`);
     }
@@ -285,6 +286,7 @@ async function discover(s: Source, crops: Crop[], limit: number, knownTerminalUr
   }
 
   for (const seed of seedSet) {
+    if (found.length >= limit) break;
     try {
       const h = seedHtmlCache.get(seed) || await fetchHtml(seed);
       const $ = cheerio.load(h);
