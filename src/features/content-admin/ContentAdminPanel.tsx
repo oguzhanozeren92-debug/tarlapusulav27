@@ -18,6 +18,7 @@ import { supabase } from '../../supabaseClient';
 import KnowledgeUpdateSuggestions from './KnowledgeUpdateSuggestions';
 import KnowledgeAdminPanel from '../knowledge/components/KnowledgeAdminPanel';
 import { isRelevantGuideImage } from '../knowledge/services/guideImageRelevance';
+import { translationPublicationProblem } from './services/contentTurkishQualityGate';
 import GuideCardResearchPanel from './GuideCardResearchPanel';
 import ContentCoveragePanel from './ContentCoveragePanel.tsx';
 import { suggestKnowledgeUpdates, validateUpdateTarget } from './services/knowledgeUpdateSuggestions.service';
@@ -582,6 +583,53 @@ export default function ContentAdminPanel() {
     }
   };
 
+  const rejectAllPendingNews = async () => {
+    if (workingId || loading) return;
+    setMessage('');
+    try {
+      const { count, error: countError } = await supabase
+        .from('content_candidates')
+        .select('id', { count: 'exact', head: true })
+        .eq('candidate_type', 'news')
+        .eq('workflow_status', 'pending');
+      if (countError) throw countError;
+      if (!count) {
+        setMessage('Reddedilecek bekleyen haber yok.');
+        return;
+      }
+      const confirmed = window.confirm(
+        `Onay bekleyen ${count} haberin TAMAMINI reddetmek istiyor musun?\n\n` +
+        'Yalnızca henüz onaylanmamış haber adayları reddedilir. ' +
+        'Makaleler, Bilgi Rehberi içerikleri ve yayındaki haberler korunur. ' +
+        'Bu toplu işlem geri alma düğmesi içermez.',
+      );
+      if (!confirmed) return;
+
+      setWorkingId('__reject_all_news__');
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error('Admin oturumu bulunamadı.');
+      // Always update the entire pending-news scope, not just the first 300
+      // candidates loaded in the UI. RLS still controls update permission.
+      const { count: rejectedCount, error } = await supabase
+        .from('content_candidates')
+        .update({
+          workflow_status: 'rejected',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: auth.user.id,
+          admin_note: 'Toplu haber reddi: yönetici onayıyla temizlendi.',
+        }, { count: 'exact' })
+        .eq('candidate_type', 'news')
+        .eq('workflow_status', 'pending');
+      if (error) throw error;
+      await loadAll();
+      setMessage(`${rejectedCount ?? 0} bekleyen haber reddedildi. Makaleler, rehberler ve yayınlanmış haberler korunuyor.`);
+    } catch (error: any) {
+      setMessage(error?.message || 'Toplu haber reddi tamamlanamadı.');
+    } finally {
+      setWorkingId('');
+    }
+  };
+
   const reviewCandidate = async (candidate: Candidate, status: 'held' | 'rejected') => {
     setWorkingId(candidate.id);
     setMessage('');
@@ -938,6 +986,9 @@ export default function ContentAdminPanel() {
       if (candidate.copyright_status === 'blocked') {
         throw new Error('Telif durumu engelli olan içerik yayınlanamaz.');
       }
+      const translationProblem = translationPublicationProblem(candidate);
+      if (translationProblem) throw new Error(translationProblem);
+
 
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error('Admin oturumu bulunamadı.');
@@ -1399,6 +1450,15 @@ export default function ContentAdminPanel() {
               <button type="button" className={queueFilter === 'article' ? 'active' : ''} onClick={() => setQueueFilter('article')}><BookOpen size={14} /> Makale</button>
               <button type="button" className={queueFilter === 'guide' ? 'active' : ''} onClick={() => setQueueFilter('guide')}><BookOpen size={14} /> Bilgi Rehberi</button>
             </div>
+            <button
+              type="button"
+              className="tp-content-admin__reject-all-news"
+              onClick={() => void rejectAllPendingNews()}
+              disabled={loading || Boolean(workingId)}
+              title="Yalnızca onay bekleyen haber adaylarını reddet"
+            >
+              <X size={15} /> Tüm Haberleri Reddet
+            </button>
             <label className="tp-content-admin__search">
               <Search size={15} />
               <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Başlık veya kaynak ara" />

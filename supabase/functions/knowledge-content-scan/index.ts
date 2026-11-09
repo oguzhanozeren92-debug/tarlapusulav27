@@ -17,7 +17,7 @@ const JUNK = /(minister|ministry visit|meeting|ceremony|festival|fair|award|appo
 const SKIP = /\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|docx?|xlsx?|pptx?|mp4|mp3)(\?|$)/i;
 const UA = "TarlaPusula-Knowledge/18.1";
 
-type Source = { id: string; name: string; base_url: string; language: string | null; trust_score: number | null; metadata: any };
+type Source = { id: string; name: string; base_url: string; language: string | null; country?: string | null; trust_score: number | null; metadata: any };
 type Crop = { crop_name: string; crop_key: string; field_count: number; user_count: number; priority_score: number };
 type Item = { url: string; title: string; body: string; summary: string; score: number; crops: string[]; topic: string; practicalSignals: number };
 
@@ -371,7 +371,7 @@ Deno.serve(async (req: Request) => {
         if (u) publishedGuideUrls.add(u);
       }
     }
-    let q = db.from("content_sources").select("id,name,base_url,language,trust_score,metadata,active").eq("active", true);
+    let q = db.from("content_sources").select("id,name,base_url,language,country,trust_score,metadata,active").eq("active", true);
     if (sourceId) q = q.eq("id", sourceId);
     const src = await q;
     if (src.error) throw src.error;
