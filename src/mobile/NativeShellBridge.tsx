@@ -110,6 +110,17 @@ export default function NativeShellBridge() {
       else removers.push(() => void handle.remove());
     });
 
+    // iOS may keep the keyboard-sized visual viewport after the auth screen
+    // disappears. Refresh geometry only once the native keyboard has closed.
+    void Keyboard.addListener('keyboardDidHide', () => {
+      if (disposed) return;
+      setKeyboardState(false);
+      scheduleViewportRefresh();
+    }).then((handle) => {
+      if (disposed) void handle.remove();
+      else removers.push(() => void handle.remove());
+    });
+
     if (Capacitor.getPlatform() === 'android') {
       void App.addListener('backButton', ({ canGoBack }) => {
         if (disposed) return;
