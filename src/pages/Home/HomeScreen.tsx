@@ -1239,6 +1239,8 @@ export default function HomeScreen(props: HomeScreenProps) {
 
       setHomeHeaderPusulaInsight({
         id: `home-decision-${pusulaDecision.id}`,
+        fieldName: String(homeField?.name ?? '').trim() || undefined,
+        observationDate: new Date().toISOString().slice(0, 10),
         gozlem: String(pusulaDecision.title || pusulaDecision.label || 'Pusula').trim(),
         yonlendirme: String(pusulaDecision.detail || '').trim(),
         guven_skoru:
@@ -1247,6 +1249,15 @@ export default function HomeScreen(props: HomeScreenProps) {
             : confidence === 'medium'
               ? 'Orta'
               : 'Düşük',
+        calendarAction:
+          homeField?.id && pusulaDecision.severity !== 'info'
+            ? {
+                fieldId: String(homeField.id),
+                title: `${String(homeField.name ?? 'Tarla').trim()} · Pusula saha kontrolü`,
+                reminderType: 'Kontrol',
+                notes: String(pusulaDecision.detail || '').trim().slice(0, 850),
+              }
+            : undefined,
       });
       return;
     }
@@ -1254,14 +1265,38 @@ export default function HomeScreen(props: HomeScreenProps) {
     const headline = String(displayHeadline ?? '').trim();
     const summary = String(displaySummary ?? '').trim();
 
+    const combined = fieldSynthesis && Number(fieldSynthesis.layerCount) >= 2
+      ? fieldSynthesis
+      : null;
+    const sourceLabels: string[] = combined && Array.isArray(combined.evidence)
+      ? Array.from(new Set<string>(
+          combined.evidence
+            .map((evidence: any): string => String(evidence?.layerLabel ?? '').trim())
+            .filter((value: string) => Boolean(value)),
+        )).slice(0, 5)
+      : [];
+
     setHomeHeaderPusulaInsight({
       id: `home-header-manual-${fieldKey || 'field'}-${Date.now()}`,
-      gozlem:
-        headline ||
-        `${String(homeField?.name ?? 'Tarlan')} için güncel verileri birlikte takip ediyorum.`,
-      yonlendirme:
-        summary ||
-        'Harita, hava, görevler ve tarla kayıtların güncellendikçe önemli değişiklikleri burada öne çıkaracağım.',
+      fieldName: String(homeField?.name ?? '').trim() || undefined,
+      observationDate: String(combined?.generatedAt || sat?.latestImageDate || '').trim() || undefined,
+      sources: combined ? sourceLabels : undefined,
+      gozlem: combined
+        ? [String(combined.headline ?? '').trim(), String(combined.summary ?? '').trim()]
+            .filter(Boolean).join('\n')
+        : headline || 'Tarlan için güncel verileri birlikte takip ediyorum.',
+      yonlendirme: combined
+        ? String(combined.action || '').trim() || summary
+        : summary || 'Harita, hava, görevler ve tarla kayıtlarını birlikte izleyeceğim.',
+      calendarAction: combined && combined.status !== 'normal' && homeField?.id &&
+        String(combined.action ?? '').trim()
+          ? {
+              fieldId: String(homeField.id),
+              title: `${String(homeField.name ?? 'Tarla').trim()} · Saha kontrolü`,
+              reminderType: 'Kontrol',
+              notes: String(combined.action).trim().slice(0, 850),
+            }
+          : undefined,
     });
   };
 
