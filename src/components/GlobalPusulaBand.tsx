@@ -1514,6 +1514,7 @@ export default function GlobalPusulaBand({
         openAction: {
           label: selected.kind === 'article' ? 'Makaleyi incele' : 'Haberi incele',
           screen: 'agendaHub',
+          contentId: selected.id,
         },
       });
       return;
@@ -2444,7 +2445,12 @@ export default function GlobalPusulaBand({
           anchorSelector=".tp-global-pusula-anchor"
           hasUnread={hasPusulaSignal}
           onLogoClick={handlePusulaClick}
-          onOpenAction={(target) => {
+          onOpenAction={(target, contentId) => {
+            if (target === 'agendaHub' && contentId) {
+              try {
+                window.sessionStorage.setItem('tp_pusula_content_open_v1', contentId);
+              } catch { /* Best-effort deep link. */ }
+            }
             setInsight(null);
             requestNavigation(target, 'pusula-content');
           }}
