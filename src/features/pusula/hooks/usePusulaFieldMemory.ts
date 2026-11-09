@@ -3,8 +3,12 @@ import {supabase} from '../../../supabaseClient';
 import {readStoredInboxNotifications} from '../../notifications/services/notificationInboxState.service';
 import {
  buildPusulaMemoryEvents,markPusulaEventSeen,nextUnseenPusulaEvent,
+ readPusulaLocalSeenIds,
  type PusulaMemoryEvent,
 } from '../services/pusulaEventMemory';
+import {
+ canSyncPusulaScope,fetchPusulaCloudReceipts,savePusulaCloudReceipts,
+} from '../services/pusulaCloudReceipts';
 
 type Input={userId?:string|null;fieldId?:string|null;fieldName?:string|null;crop?:string|null};
 type Cache={savedAt:number;products:Record<string,any>[]};
@@ -35,11 +39,60 @@ export function usePusulaFieldMemory(input:Input){
  const [version,setVersion]=useState(0);
  const [resolvedUser,setResolvedUser]=useState('');
  const [depot,setDepot]=useState<Record<string,any>[]>([]);
+ const [cloud,setCloud]=useState<{scope:string;ready:boolean;ids:Set<string>}>({
+  scope:'',ready:false,ids:new Set<string>(),
+ });
  const lastStarted=useRef(0);
  const activeUser=userId||resolvedUser;
  const activeScope=activeUser+':'+fieldId;
  const scopeRef=useRef(activeScope);
  scopeRef.current=activeScope;
+
+ // Cloud sync is scoped to the signed-in user AND the selected field.
+ // On first mount, wait for receipts before highlighting an already-seen
+ // message; if offline, proceed with the local history instead of blocking UI.
+ useEffect(()=>{
+  if(!activeUser||!fieldId)return;
+  let closed=false,busy=false;
+  if(!canSyncPusulaScope(activeUser,fieldId)){
+   setCloud({scope:activeScope,ready:true,ids:new Set()});
+   return;
+  }
+  setCloud({scope:activeScope,ready:false,ids:new Set()});
+  const sync=async()=>{
+   if(closed||busy)return;
+   busy=true;
+   try{
+    const server=await fetchPusulaCloudReceipts(activeUser,fieldId);
+    if(closed||scopeRef.current!==activeScope)return;
+    setCloud({scope:activeScope,ready:true,ids:server});
+    // Migrate reads from old single-device installations. Never overwrite
+    // remote receipts with an empty cache after reinstalling the app.
+    const missing=readPusulaLocalSeenIds(activeUser,fieldId)
+      .filter(eventId=>!server.has(eventId));
+    if(missing.length)await savePusulaCloudReceipts(activeUser,fieldId,missing);
+   }catch(error){
+    if(!closed&&scopeRef.current===activeScope){
+     setCloud(prev=>({
+      scope:activeScope,ready:true,
+      ids:prev.scope===activeScope?prev.ids:new Set<string>(),
+     }));
+     console.warn('[Pusula] Hafıza eşitlemesi şu anda çevrimdışı:',error);
+    }
+   }finally{busy=false;}
+  };
+  void sync();
+  const timer=window.setInterval(()=>{
+   if(document.visibilityState==='visible')void sync();
+  },90_000);
+  const onFocus=()=>{if(document.visibilityState==='visible')void sync()};
+  document.addEventListener('visibilitychange',onFocus);
+  return()=>{
+   closed=true;
+   window.clearInterval(timer);
+   document.removeEventListener('visibilitychange',onFocus);
+  };
+ },[activeUser,fieldId,activeScope]);
 
  // Resolve auth for the Home compass, which does not carry the global user's
  // guide context. No memory query runs before we know the current auth user.
@@ -165,11 +218,24 @@ export function usePusulaFieldMemory(input:Input){
   };
  },[activeUser,fieldId,refresh]);
 
- const pending=useMemo(()=>nextUnseenPusulaEvent(activeUser,fieldId,events),
-  [activeUser,fieldId,events,version]);
+ const pending=useMemo(()=>{
+  if(!cloud.ready||cloud.scope!==activeScope)return null;
+  return nextUnseenPusulaEvent(activeUser,fieldId,events,new Date(),cloud.ids);
+ },[activeUser,fieldId,events,version,cloud,activeScope]);
+
  const markSeen=useCallback((eventId:string)=>{
   markPusulaEventSeen(activeUser,fieldId,eventId);
- },[activeUser,fieldId]);
+  if(!canSyncPusulaScope(activeUser,fieldId))return;
+  setCloud(prev=>prev.scope===activeScope
+   ? {...prev,ids:new Set([...prev.ids,eventId])}
+   : prev);
+  // Optimistic local UI, durable cloud receipt. A failed save is retried
+  // from local history at the next sync; it must not lose the user's read.
+  void savePusulaCloudReceipts(activeUser,fieldId,[eventId]).catch((error)=>{
+   console.warn('[Pusula] Görüldü kaydı daha sonra eşitlenecek:',error);
+  });
+ },[activeUser,fieldId,activeScope]);
 
- return {pending,events,markSeen,refresh,depotSnapshot:depot};
+ return {pending,events,markSeen,refresh,depotSnapshot:depot,
+  memorySyncReady:cloud.ready&&cloud.scope===activeScope};
 }
