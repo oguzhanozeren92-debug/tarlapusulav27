@@ -153,7 +153,7 @@ export function usePusulaFieldMemory(input:Input){
     .gte('reminder_date',new Date(t-2*86400000).toISOString().slice(0,10))
     .order('reminder_date',{ascending:true}).limit(20),
    supabase.from('activities')
-    .select('id,field_id,activity_type,title,activity_date,created_at')
+    .select('id,field_id,activity_type,title,activity_date,created_at,notes')
     .eq('user_id',activeUser).eq('field_id',fieldId)
     .order('activity_date',{ascending:false}).limit(8),
    supabase.from('app_notifications')

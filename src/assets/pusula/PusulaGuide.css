@@ -1203,3 +1203,35 @@
   outline: 3px solid #d5f5dc;
   outline-offset: 3px;
 }
+
+
+/* One-tap follow-up outcomes: touch-sized, responsive, no horizontal overflow. */
+.pusula-guide__followup-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.pusula-guide__followup-options button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(196,239,203,.4);
+  background: rgba(31,96,66,.84);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.pusula-guide__followup-options button[aria-pressed="true"] {
+  background: #286f4c;
+  border-color: #e6ffeb;
+}
+.pusula-guide__followup-options button:disabled { opacity: .68; cursor: default; }
+.pusula-guide__calendar-action textarea {
+  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%;
+  resize: vertical; border-radius: 9px; border: 1px solid #a6c5ae;
+  background: #f8fbf8; color: #1d3326; padding: 10px; font: inherit; font-size: 14px;
+}
+.pusula-guide__calendar-action small { color: #bfdfc9; line-height: 1.45; }

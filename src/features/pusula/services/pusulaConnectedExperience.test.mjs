@@ -39,3 +39,13 @@ test('Pusula reports the actual data sources and not invented confirmations', ()
   assert.match(weather, /modelCount >= 1/);
   assert.match(weather, /Model tabanlı toprak nemi/);
 });
+
+
+test('Map Pusula keeps sentence case and multiline content instead of capitalizing every word', () => {
+  const card = file('../components/PusulaForYouCard.tsx');
+  assert.match(card, /whiteSpace: 'pre-line'/);
+  assert.match(card, /\{result\.analysis\.action\}/);
+  assert.match(card, /\{guide\.interpretation\}/);
+  assert.doesNotMatch(card, /titleCaseEachWordTr\(result\.analysis\.action\)/);
+  assert.doesNotMatch(card, /titleCaseEachWordTr\(reason\)/);
+});
