@@ -1330,7 +1330,7 @@ export default function HomeScreen(props: HomeScreenProps) {
 
     if (homeMemory.pending && homeMemory.pending.priority >= 75) {
       const item = homeMemory.pending;
-      homeMemory.markSeen(item.id);
+      if(item.module !== 'followup') homeMemory.markSeen(item.id);
       setHomeHeaderPusulaInsight(memoryEventAsInsight(item, String(homeField?.name ?? '')));
       return;
     }
@@ -1357,7 +1357,7 @@ export default function HomeScreen(props: HomeScreenProps) {
 
     if (homeMemory.pending) {
       const item = homeMemory.pending;
-      homeMemory.markSeen(item.id);
+      if(item.module !== 'followup') homeMemory.markSeen(item.id);
       setHomeHeaderPusulaInsight(memoryEventAsInsight(item, String(homeField?.name ?? '')));
       return;
     }
