@@ -5,6 +5,7 @@ import {
   useState,
 } from 'react';
 import type { CSSProperties } from 'react';
+import { addQuickCalendarReminder, calendarDateAfterDays } from '../../features/calendar/services/quickCalendar.service';
 
 import './PusulaGuide.css';
 
@@ -21,6 +22,16 @@ export type PusulaInsight = {
   yonlendirme?: string;
   guven_skoru?: 'Yüksek' | 'Orta' | 'Düşük';
   puan_odulu?: number;
+  /** All fields optional for backward compatibility with existing messages. */
+  fieldName?: string;
+  observationDate?: string;
+  sources?: string[];
+  calendarAction?: {
+    fieldId: string;
+    title: string;
+    reminderType?: string;
+    notes?: string;
+  };
 };
 
 export type PusulaFeedbackReason =
@@ -124,6 +135,9 @@ export default function PusulaGuide({
   const [feedback, setFeedback] = useState<PusulaFeedbackValue | null>(null);
   const [feedbackSaving, setFeedbackSaving] = useState(false);
   const [showDislikeReasons, setShowDislikeReasons] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(() => calendarDateAfterDays(0));
+  const [calendarSaving, setCalendarSaving] = useState(false);
+  const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
 
   const [anchor, setAnchor] = useState({
     x: typeof window === 'undefined' ? 0 : window.innerWidth / 2,
@@ -144,7 +158,7 @@ export default function PusulaGuide({
 
     return [activeInsight.gozlem, activeInsight.yonlendirme]
       .filter(Boolean)
-      .join(' ');
+      .join('\n\n');
   }, [activeInsight]);
 
   useEffect(() => {
@@ -152,8 +166,34 @@ export default function PusulaGuide({
 
     setFeedback(activeId ? readStoredFeedback(activeId) : null);
     setShowDislikeReasons(false);
+    setCalendarDate(calendarDateAfterDays(0));
+    setCalendarMessage(null);
     keepOpenRef.current = false;
   }, [activeInsight?.id]);
+
+  const saveCalendarAction = async () => {
+    const suggestion = activeInsight?.calendarAction;
+    if (!suggestion?.fieldId || calendarSaving) return;
+    keepOpenRef.current = true;
+    setCalendarSaving(true);
+    setCalendarMessage(null);
+    try {
+      const result = await addQuickCalendarReminder({
+        fieldId: suggestion.fieldId,
+        title: suggestion.title,
+        reminderType: suggestion.reminderType || 'Kontrol',
+        reminderDate: calendarDate,
+        notes: suggestion.notes || activeInsight?.yonlendirme || '',
+      });
+      setCalendarMessage(result.created
+        ? 'Takvime eklendi. Tarih ve hatırlatmayı Takvim’den değiştirebilirsin.'
+        : 'Bu plan zaten takviminde kayıtlı.');
+    } catch (error) {
+      setCalendarMessage(error instanceof Error ? error.message : 'Takvim kaydı oluşturulamadı.');
+    } finally {
+      setCalendarSaving(false);
+    }
+  };
 
   const submitFeedback = async (
     liked: boolean,
@@ -381,12 +421,14 @@ export default function PusulaGuide({
     setPanelVisible(true);
     setPhase('talk');
 
-    const text = [data.gozlem, data.yonlendirme].filter(Boolean).join(' ');
+    const text = [data.gozlem, data.yonlendirme].filter(Boolean).join('\n\n');
     await wait(Math.max(3900, text.length * 29));
 
     if (token !== runRef.current) return;
 
     setPhase('hold');
+    // An actionable suggestion stays open until the user closes it.
+    if (data.calendarAction?.fieldId) keepOpenRef.current = true;
     // Kullanıcının minik 👍 / 👎 alanını rahatça kullanabilmesi için
     // paneli önceki 2.3 saniyeden biraz daha uzun açık tutuyoruz.
     await wait(6500);
@@ -425,13 +467,14 @@ export default function PusulaGuide({
 
     const text = [lastInsight.gozlem, lastInsight.yonlendirme]
       .filter(Boolean)
-      .join(' ');
+      .join('\n\n');
 
     await wait(Math.max(3200, text.length * 29));
 
     if (token !== runRef.current) return;
 
     setPhase('hold');
+    if (lastInsight.calendarAction?.fieldId) keepOpenRef.current = true;
     await wait(6500);
 
     if (token !== runRef.current) return;
@@ -567,14 +610,44 @@ export default function PusulaGuide({
               <span>AI Tarım Rehberi</span>
             </div>
 
-            <p>
-              {phase === 'hold' ? fullText : typedText}
-
-              {(phase === 'talk' || phase === 'replay') &&
-                typedText.length < fullText.length && (
-                  <span className="pusula-guide__cursor" aria-hidden="true" />
+            {phase === 'hold' ? (
+              <div className="pusula-guide__structured">
+                {(activeInsight.fieldName || activeInsight.observationDate) && (
+                  <div className="pusula-guide__context">
+                    {activeInsight.fieldName && <strong>{activeInsight.fieldName}</strong>}
+                    {activeInsight.observationDate && (
+                      <time>{/^\d{4}-\d{2}-\d{2}/.test(activeInsight.observationDate)
+                        ? new Date(activeInsight.observationDate.slice(0, 10) + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : activeInsight.observationDate}</time>
+                    )}
+                  </div>
                 )}
-            </p>
+                <div className="pusula-guide__section">
+                  <span className="pusula-guide__section-label">Gözlem</span>
+                  <p>{activeInsight.gozlem}</p>
+                </div>
+                {activeInsight.yonlendirme && (
+                  <div className="pusula-guide__section">
+                    <span className="pusula-guide__section-label">Ne yapabilirsin?</span>
+                    <p>{activeInsight.yonlendirme}</p>
+                  </div>
+                )}
+                {Boolean(activeInsight.sources?.length) && (
+                  <div className="pusula-guide__evidence">
+                    <span className="pusula-guide__section-label">Birlikte incelenen veriler</span>
+                    <p>{activeInsight.sources?.slice(0, 5).join(' · ')}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="pusula-guide__typing">
+                {typedText}
+                {(phase === 'talk' || phase === 'replay') &&
+                  typedText.length < fullText.length && (
+                    <span className="pusula-guide__cursor" aria-hidden="true" />
+                  )}
+              </p>
+            )}
 
             {phase === 'hold' && (
               <>
@@ -587,6 +660,31 @@ export default function PusulaGuide({
                     {!!activeInsight.puan_odulu && (
                       <span>+{activeInsight.puan_odulu} puan</span>
                     )}
+                  </div>
+                )}
+
+                {activeInsight.calendarAction?.fieldId && (
+                  <div className="pusula-guide__calendar-action">
+                    <label htmlFor="pusula-plan-date">Planın tarihi</label>
+                    <div className="pusula-guide__calendar-controls">
+                      <input
+                        id="pusula-plan-date"
+                        type="date"
+                        value={calendarDate}
+                        onChange={(event) => {
+                          keepOpenRef.current = true;
+                          setCalendarDate(event.target.value);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={calendarSaving || !calendarDate}
+                        onClick={() => void saveCalendarAction()}
+                      >
+                        {calendarSaving ? 'Ekleniyor…' : 'Takvime ekle'}
+                      </button>
+                    </div>
+                    {calendarMessage && <p role="status">{calendarMessage}</p>}
                   </div>
                 )}
 
