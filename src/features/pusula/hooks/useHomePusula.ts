@@ -435,39 +435,63 @@ export function useHomePusula({
   }, [fieldKey, layer, soilProperty, soilDepth, climateLayer, climateDepth, ndviStatsKey, phenologyKey, cropModeKey]);
 
   const insight = useMemo<PusulaInsight>(() => {
+    const synthesized = visibleSynthesis && Number(visibleSynthesis.layerCount) >= 2
+      ? visibleSynthesis : null;
     const dateKey = String(
+      synthesized?.generatedAt ||
       satellite?.latestImageDate || satellite?.generatedAt || fieldKey || 'home',
     ).trim();
-
+    const defaultObservation = String(
+      visibleResult?.analysis?.importantArea
+        ? `${titleCaseEachWordTr(visibleResult.analysis.importantArea.area)} bölümünde: ${visibleResult.analysis.importantArea.summary}`
+        : visibleResult?.analysis?.summary ||
+          satellite?.summary ||
+          `${field?.name ?? 'Tarlan'} için güncel tarla verilerini kontrol ettim.`,
+    );
+    const defaultAction = String(
+      visibleResult?.analysis?.action ||
+      satellite?.recommendations?.[0] ||
+      'Uydu, radar, toprak ve hava verilerini birlikte izlemeyi sürdürelim.',
+    );
+    const linkedEvidence = Array.isArray(synthesized?.evidence)
+      ? synthesized.evidence
+          .filter((value: any) => value && value.layerLabel)
+          .map((value: any) => String(value.layerLabel).trim())
+          .filter(Boolean)
+      : [];
+    const sources = Array.from(new Set(linkedEvidence)).slice(0, 5);
+    const combinedAction = String(synthesized?.action || '').trim();
+    const actionable = Boolean(
+      synthesized && synthesized.status !== 'normal' &&
+      combinedAction && field?.id
+    );
     return {
-      id: `home:${fieldKey}:${layer}:${dateKey}`,
-      gozlem: String(
-        visibleResult?.analysis?.importantArea
-          ? `${titleCaseEachWordTr(visibleResult.analysis.importantArea.area)} bölümünde: ${visibleResult.analysis.importantArea.summary}`
-          : visibleResult?.analysis?.summary ||
-              satellite?.summary ||
-              `${field?.name ?? 'Tarlan'} için güncel tarla verilerini kontrol ettim.`,
-      ),
-      yonlendirme: String(
-        visibleResult?.analysis?.action ||
-          satellite?.recommendations?.[0] ||
-          'Uydu, radar, toprak, iklim ve tür gözlemlerini birlikte takip etmeye devam etmeni öneririm.',
-      ),
-      guven_skoru:
-        satellite?.status === 'good' || satellite?.status === 'healthy'
-          ? 'Yüksek'
-          : 'Orta',
+      id: `home:${fieldKey}:${layer}:${dateKey}:${synthesized?.layerCount || 0}`,
+      fieldName: String(field?.name ?? '').trim() || undefined,
+      observationDate: synthesized?.generatedAt || satellite?.latestImageDate || undefined,
+      sources: synthesized ? sources : undefined,
+      gozlem: synthesized
+        ? [String(synthesized.headline ?? '').trim(), String(synthesized.summary ?? '').trim()]
+            .filter(Boolean).join('\n')
+        : defaultObservation,
+      yonlendirme: synthesized ? (combinedAction || defaultAction) : defaultAction,
+      guven_skoru: synthesized
+        ? synthesized.confidence === 'yuksek' ? 'Yüksek'
+          : synthesized.confidence === 'dusuk' ? 'Düşük' : 'Orta'
+        : 'Orta',
+      // The user chooses the date and explicitly confirms the task. Never
+      // convert an AI recommendation into an unattended calendar action.
+      calendarAction: actionable ? {
+        fieldId: String(field.id),
+        title: `${String(field.name ?? 'Tarla').trim()} · Saha kontrolü`,
+        reminderType: 'Kontrol',
+        notes: `Pusula birleşik değerlendirmesi: ${combinedAction}`.slice(0, 850),
+      } : undefined,
     };
   }, [
-    fieldKey,
-    layer,
-    field?.name,
-    satellite?.latestImageDate,
-    satellite?.generatedAt,
-    satellite?.summary,
-    satellite?.recommendations,
-    satellite?.status,
-    visibleResult,
+    fieldKey, layer, field?.id, field?.name,
+    satellite?.latestImageDate, satellite?.generatedAt, satellite?.summary,
+    satellite?.recommendations, visibleResult, visibleSynthesis,
   ]);
 
   const activeLayerGuide = getHomeLayerFarmerGuide(
