@@ -26,7 +26,7 @@ export type PusulaInsight = {
   fieldName?: string;
   observationDate?: string;
   sources?: string[];
-  openAction?: { label: string; screen: string };
+  openAction?: { label: string; screen: string; contentId?: string };
   calendarAction?: {
     fieldId: string;
     title: string;
@@ -116,7 +116,7 @@ type PusulaGuideProps = {
   hasUnread?: boolean;
   onLogoClick?: () => void;
   onFeedback?: (feedback: PusulaFeedbackValue) => void | Promise<void>;
-  onOpenAction?: (screen: string) => void;
+  onOpenAction?: (screen: string, contentId?: string) => void;
 };
 
 const wait = (ms: number) =>
@@ -670,7 +670,7 @@ export default function PusulaGuide({
                   <div className="pusula-guide__open-action">
                     <button
                       type="button"
-                      onClick={() => onOpenAction(activeInsight.openAction!.screen)}
+                      onClick={() => onOpenAction(activeInsight.openAction!.screen, activeInsight.openAction!.contentId)}
                     >
                       {activeInsight.openAction.label}
                     </button>
