@@ -1138,3 +1138,50 @@
     border-radius:18px!important;
   }
 }
+
+
+/* Pusula's readable field brief: clear hierarchy instead of one long sentence. */
+.pusula-guide__structured { display: grid; gap: 13px; }
+.pusula-guide__context {
+  display: flex; align-items: baseline; gap: 6px 12px; flex-wrap: wrap;
+  padding: 6px 0 12px; border-bottom: 1px solid rgba(225,244,229,.15);
+}
+.pusula-guide__context strong { font-size: 16px; color: #f8fff8; }
+.pusula-guide__context time { font-size: 12px; color: #c0d0c4; }
+.pusula-guide__section { display: grid; gap: 5px; }
+.pusula-guide__section-label {
+  font-size: 11px; letter-spacing: .045em; font-weight: 700;
+  color: #aaddb9; text-transform: uppercase;
+}
+.pusula-guide__section p, .pusula-guide__evidence p {
+  margin: 0; line-height: 1.56; overflow-wrap: anywhere; white-space: pre-line;
+}
+.pusula-guide__evidence {
+  padding-top: 10px; border-top: 1px solid rgba(225,244,229,.13);
+}
+.pusula-guide__evidence p { font-size: 12px; color: #cfddd1; margin-top: 5px; }
+.pusula-guide__typing { white-space: pre-line; overflow-wrap: anywhere; }
+.pusula-guide__calendar-action {
+  display: grid; gap: 7px; margin: 14px 0 12px; padding: 12px;
+  border-radius: 13px; background: rgba(217,239,219,.08);
+}
+.pusula-guide__calendar-action label {
+  color: #e5f2e8; font-size: 12px; font-weight: 600;
+}
+.pusula-guide__calendar-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.pusula-guide__calendar-controls input {
+  box-sizing: border-box; flex: 1 1 135px; min-width: 0;
+  padding: 10px 8px; font-size: 16px; border-radius: 9px;
+  background: #f8fbf8; color: #1d3326; border: 0;
+}
+.pusula-guide__calendar-controls button {
+  flex: 1 1 118px; min-height: 42px; border-radius: 9px;
+  border: 1px solid rgba(234,250,238,.28); color: #fff;
+  background: #2d7654; font-weight: 700; cursor: pointer;
+}
+.pusula-guide__calendar-controls button:disabled { opacity: .6; cursor: default; }
+.pusula-guide__calendar-action p { font-size: 12px; margin: 2px 0; color: #dff5e7; }
+@media (max-width: 480px) {
+  .pusula-guide__speech { padding-left: 22px; padding-right: 22px; }
+  .pusula-guide__structured { gap: 11px; }
+}
