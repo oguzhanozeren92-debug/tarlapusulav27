@@ -38,7 +38,7 @@ import NdviObservationPhotoModal from '../field-observations/components/NdviObse
 import NdviObservationTimelineModal from '../field-observations/components/NdviObservationTimelineModal';
 import FieldObservationPointsModal from '../field-observations/components/FieldObservationPointsModal';
 import type { EarthSearchNdviStats } from './services/earthSearchNdvi.service';
-import { ndviAbsoluteRgb } from './services/ndviDisplayPolicy';
+import { canonicalizeNdviRaster, CANONICAL_NDVI_CACHE_VERSION, CANONICAL_NDVI_PALETTE } from './services/canonicalNdviRaster';
 import {
   findRelativeNdviZone,
   weakerRelativeNdviZones,
@@ -1295,34 +1295,10 @@ export function ringClipPath(ring: number[][] | null, bbox: HomeBBox | null) {
   return points.length >= 3 ? `polygon(${points.join(',')})` : undefined;
 }
 
-function clamp01(value: number) {
-  return Math.max(0, Math.min(1, value));
-}
-
-function ndviValueToColor(value: number) {
-  // Bütün haritalarda aynı mutlak sınıflar:
-  // düşük < .30, orta .30-.59, yüksek >= .60.
-  return ndviAbsoluteRgb(clamp01(value));
-}
-
 function renderedNdviScore(r: number, g: number, b: number) {
-  /*
-   * satellite-field-analysis renders NDVI with four fixed absolute classes.
-   * Decode those colours back into representative NDVI values so every later
-   * operation (smoothing, hotspot search, Pusula focus) keeps the same class
-   * semantics as GeoBlaze:
-   *   red < .30, amber .30-.59, green .60-.79, dark green >= .80.
-   *
-   * Nearest-colour matching is deliberately used instead of relative hue
-   * normalization; JPEG/PNG/canvas interpolation may shift the RGB values a
-   * little, but cannot change the underlying class.
-   */
-  const palette = [
-    { rgb: [230, 26, 20], value: 0.15 },
-    { rgb: [242, 163, 26], value: 0.45 },
-    { rgb: [112, 191, 61], value: 0.70 },
-    { rgb: [13, 122, 46], value: 0.90 },
-  ] as const;
+  /* Both history and home use these same five Copernicus NDVI classes.
+     Raster-class hotspot estimates must never be treated as measured NDVI. */
+  const palette = CANONICAL_NDVI_PALETTE;
 
   let best: (typeof palette)[number] = palette[0];
   let bestDistance = Number.POSITIVE_INFINITY;
@@ -1849,312 +1825,15 @@ export function gaussianBlurMasked(
   return { scores: output, weights: outputWeight };
 }
 
-async function makeSmoothNdviOverlay(
+async function makeCanonicalNdviOverlay(
   imageUrl: string,
-  bbox: HomeBBox | null,
-  parcelGeometry: any
+  _bbox: HomeBBox | null,
+  _parcelGeometry: any,
 ): Promise<string | null> {
   if (!imageUrl) return null;
-
-  return new Promise((resolve) => {
-    const image = new Image();
-
-    if (!imageUrl.startsWith('data:')) {
-      image.crossOrigin = 'anonymous';
-    }
-
-    image.onload = () => {
-      try {
-        const sourceWidth = image.naturalWidth || image.width;
-        const sourceHeight = image.naturalHeight || image.height;
-
-        if (!sourceWidth || !sourceHeight) {
-          resolve(null);
-          return;
-        }
-
-        const sourceCanvas = document.createElement('canvas');
-        sourceCanvas.width = sourceWidth;
-        sourceCanvas.height = sourceHeight;
-
-        const sourceContext = sourceCanvas.getContext('2d', {
-          willReadFrequently: true,
-        });
-
-        if (!sourceContext) {
-          resolve(null);
-          return;
-        }
-
-        sourceContext.drawImage(image, 0, 0);
-
-        const pixels = sourceContext.getImageData(
-          0,
-          0,
-          sourceWidth,
-          sourceHeight
-        ).data;
-
-        // IMPORTANT:
-        // We do NOT blur the existing coloured rectangles anymore.
-        // Instead we sample the real Sentinel render into many health points,
-        // then rebuild a continuous heat surface from radial gradients.
-        // This is the same visual idea as SVG circles + feGaussianBlur,
-        // but the point values still come from the real NDVI raster.
-
-        const sampleCols = 18;
-        const sampleRows = 18;
-        const points: Array<{
-          x: number;
-          y: number;
-          value: number;
-          weight: number;
-        }> = [];
-
-        const cellWidth = sourceWidth / sampleCols;
-        const cellHeight = sourceHeight / sampleRows;
-
-        for (let gy = 0; gy < sampleRows; gy += 1) {
-          for (let gx = 0; gx < sampleCols; gx += 1) {
-            const x0 = Math.floor(gx * cellWidth);
-            const y0 = Math.floor(gy * cellHeight);
-            const x1 = Math.min(sourceWidth, Math.ceil((gx + 1) * cellWidth));
-            const y1 = Math.min(sourceHeight, Math.ceil((gy + 1) * cellHeight));
-
-            let scoreSum = 0;
-            let weightSum = 0;
-
-            // A few samples per cell are enough and keep this fast on phones.
-            const stepX = Math.max(1, Math.floor((x1 - x0) / 5));
-            const stepY = Math.max(1, Math.floor((y1 - y0) / 5));
-
-            for (let y = y0; y < y1; y += stepY) {
-              for (let x = x0; x < x1; x += stepX) {
-                const index = (y * sourceWidth + x) * 4;
-                const r = pixels[index];
-                const g = pixels[index + 1];
-                const b = pixels[index + 2];
-                const a = pixels[index + 3];
-
-                const max = Math.max(r, g, b);
-                const min = Math.min(r, g, b);
-                const chroma = max - min;
-
-                const noData = a < 10 || max < 32 || (max < 72 && chroma < 16);
-
-                if (noData) continue;
-
-                scoreSum += renderedNdviScore(r, g, b);
-                weightSum += 1;
-              }
-            }
-
-            if (weightSum < 2) continue;
-
-            points.push({
-              x: (gx + 0.5) / sampleCols,
-              y: (gy + 0.5) / sampleRows,
-              value: scoreSum / weightSum,
-              weight: Math.min(1, weightSum / 12),
-            });
-          }
-        }
-
-        if (!points.length) {
-          resolve(null);
-          return;
-        }
-
-        // Do not normalize the field to its own min/max here. Relative
-        // stretching was the source of the visual contradiction: a field with
-        // 0% healthy pixels could still contain green areas. Point values now
-        // remain on the absolute NDVI scale used by GeoBlaze percentages.
-
-        const width = 720;
-        const height = Math.max(
-          420,
-          Math.round(width * (sourceHeight / sourceWidth))
-        );
-
-        // Separate colour and weight canvases so overlapping circles average
-        // instead of making saturated hard blobs.
-        const colorCanvas = document.createElement('canvas');
-        colorCanvas.width = width;
-        colorCanvas.height = height;
-        const colorContext = colorCanvas.getContext('2d');
-
-        const alphaCanvas = document.createElement('canvas');
-        alphaCanvas.width = width;
-        alphaCanvas.height = height;
-        const alphaContext = alphaCanvas.getContext('2d');
-
-        if (!colorContext || !alphaContext) {
-          resolve(null);
-          return;
-        }
-
-        colorContext.clearRect(0, 0, width, height);
-        alphaContext.clearRect(0, 0, width, height);
-
-        // Large radius is intentional: this is the "Variation A / stdDeviation 12"
-        // look. Neighbouring points melt together into one continuous surface.
-        const radius = Math.max(width / sampleCols, height / sampleRows) * 2.6;
-
-        for (const point of points) {
-          const value = clamp01(point.value);
-          const color = ndviValueToColor(value);
-          const cx = point.x * width;
-          const cy = point.y * height;
-
-          const gradient = colorContext.createRadialGradient(
-            cx,
-            cy,
-            0,
-            cx,
-            cy,
-            radius
-          );
-
-          gradient.addColorStop(
-            0,
-            `rgba(${color.r},${color.g},${color.b},${0.62 * point.weight})`
-          );
-          gradient.addColorStop(
-            0.38,
-            `rgba(${color.r},${color.g},${color.b},${0.48 * point.weight})`
-          );
-          gradient.addColorStop(
-            0.72,
-            `rgba(${color.r},${color.g},${color.b},${0.22 * point.weight})`
-          );
-          gradient.addColorStop(1, `rgba(${color.r},${color.g},${color.b},0)`);
-
-          colorContext.fillStyle = gradient;
-          colorContext.beginPath();
-          colorContext.arc(cx, cy, radius, 0, Math.PI * 2);
-          colorContext.fill();
-
-          const alphaGradient = alphaContext.createRadialGradient(
-            cx,
-            cy,
-            0,
-            cx,
-            cy,
-            radius
-          );
-          alphaGradient.addColorStop(
-            0,
-            `rgba(255,255,255,${0.92 * point.weight})`
-          );
-          alphaGradient.addColorStop(
-            0.55,
-            `rgba(255,255,255,${0.58 * point.weight})`
-          );
-          alphaGradient.addColorStop(1, 'rgba(255,255,255,0)');
-
-          alphaContext.fillStyle = alphaGradient;
-          alphaContext.beginPath();
-          alphaContext.arc(cx, cy, radius, 0, Math.PI * 2);
-          alphaContext.fill();
-        }
-
-        // Strong finishing blur so there are absolutely no rectangular seams.
-        const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = width;
-        finalCanvas.height = height;
-        const finalContext = finalCanvas.getContext('2d');
-
-        if (!finalContext) {
-          resolve(colorCanvas.toDataURL('image/png'));
-          return;
-        }
-
-        finalContext.clearRect(0, 0, width, height);
-        finalContext.filter = 'blur(15px)';
-        finalContext.drawImage(colorCanvas, 0, 0);
-        finalContext.filter = 'none';
-
-        // A tiny amount of original radial detail keeps local hotspots readable.
-        finalContext.globalAlpha = 0.14;
-        finalContext.drawImage(colorCanvas, 0, 0);
-        finalContext.globalAlpha = 1;
-
-        // HARD PARCEL CLIP.
-        // The previous version clipped a DOM rectangle after MapLibre had already
-        // pitched/rotated the map. At strong 3D angles that rectangle no longer
-        // matched the geographic parcel, so the NDVI appeared to slide outside.
-        // Here we cut the heatmap to the parcel BEFORE it enters MapLibre.
-        if (bbox && parcelGeometry) {
-          const [west, south, east, north] = bbox;
-          const spanX = east - west;
-          const spanY = north - south;
-
-          if (spanX > 0 && spanY > 0) {
-            const maskCanvas = document.createElement('canvas');
-            maskCanvas.width = width;
-            maskCanvas.height = height;
-
-            const maskContext = maskCanvas.getContext('2d');
-
-            if (maskContext) {
-              const geometry = parcelGeometry?.geometry ?? parcelGeometry;
-
-              const traceRing = (ring: any[]) => {
-                let started = false;
-
-                for (const point of ring ?? []) {
-                  if (!Array.isArray(point) || point.length < 2) continue;
-
-                  const lng = Number(point[0]);
-                  const lat = Number(point[1]);
-
-                  if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
-
-                  const x = ((lng - west) / spanX) * width;
-                  const y = ((north - lat) / spanY) * height;
-
-                  if (!started) {
-                    maskContext.moveTo(x, y);
-                    started = true;
-                  } else {
-                    maskContext.lineTo(x, y);
-                  }
-                }
-
-                if (started) maskContext.closePath();
-              };
-
-              maskContext.beginPath();
-
-              if (geometry?.type === 'Polygon') {
-                (geometry.coordinates ?? []).forEach(traceRing);
-              } else if (geometry?.type === 'MultiPolygon') {
-                (geometry.coordinates ?? []).forEach((polygon: any[]) =>
-                  (polygon ?? []).forEach(traceRing)
-                );
-              }
-
-              maskContext.fillStyle = '#fff';
-              maskContext.fill('evenodd');
-
-              finalContext.save();
-              finalContext.globalCompositeOperation = 'destination-in';
-              finalContext.drawImage(maskCanvas, 0, 0);
-              finalContext.restore();
-            }
-          }
-        }
-
-        resolve(finalCanvas.toDataURL('image/png'));
-      } catch (error) {
-        console.warn('Yumuşak NDVI yüzeyi hazırlanamadı:', error);
-        resolve(null);
-      }
-    };
-
-    image.onerror = () => resolve(null);
-    image.src = imageUrl;
-  });
+  // The old generated heatmap could turn real orange pixels yellow.
+  // Retain the Sentinel-2 five-class image used by the history viewer.
+  return canonicalizeNdviRaster(imageUrl);
 }
 
 export function InteractiveHomeHealthMap({
@@ -2188,7 +1867,7 @@ export function InteractiveHomeHealthMap({
       };
     }
 
-    void makeSmoothNdviOverlay(data.ndviImage, bbox, parcelGeometry).then(
+    void makeCanonicalNdviOverlay(data.ndviImage, bbox, parcelGeometry).then(
       (result) => {
         if (!cancelled) {
           setSmoothNdvi(result || data.ndviImage);
@@ -2255,10 +1934,11 @@ export function InteractiveHomeHealthMap({
               type: 'raster',
               source: 'home-ndvi-image',
               paint: {
-                'raster-opacity': 0.82,
+                'raster-opacity': 1,
                 'raster-fade-duration': 0,
-                'raster-saturation': 0.04,
-                'raster-contrast': -0.04,
+                'raster-saturation': 0,
+                'raster-contrast': 0,
+                'raster-resampling': 'nearest',
               },
             },
             currentMap.getLayer('home-parcel-shadow')
@@ -5230,14 +4910,14 @@ export function HomeInlineLayerMap({
 
   const ndviCacheKey =
     bbox
-      ? `${homeMapFieldKey}:ndvi-overlay-v5-absolute:${ndviVersion}:${bbox.join(',')}`
-      : `${homeMapFieldKey}:ndvi-overlay-v5-absolute:${ndviVersion}:no-bbox`;
+      ? `${homeMapFieldKey}:${CANONICAL_NDVI_CACHE_VERSION}:${ndviVersion}:${bbox.join(',')}`
+      : `${homeMapFieldKey}:${CANONICAL_NDVI_CACHE_VERSION}:${ndviVersion}:no-bbox`;
 
   // Signed Sentinel URL'leri değişse veya canlı sorgu geçici olarak boş dönse bile
   // son başarıyla üretilmiş NDVI rasterı tarla+bbox anahtarında kalıcı tutulur.
   const ndviLatestCacheKey = bbox
-    ? `${homeMapFieldKey}:ndvi-latest-v1:${bbox.join(',')}`
-    : `${homeMapFieldKey}:ndvi-latest-v1:no-bbox`;
+    ? `${homeMapFieldKey}:ndvi-latest-v2:${bbox.join(',')}`
+    : `${homeMapFieldKey}:ndvi-latest-v2:no-bbox`;
 
   // Her görünür katman/alt-katman kendi request kimliğine sahiptir. Böylece
   // örneğin Yağış isteği geç cevap verse bile kullanıcı o sırada ET₀'ya
@@ -5405,7 +5085,7 @@ export function HomeInlineLayerMap({
       let pending = HOME_MAP_NDVI_INFLIGHT.get(ndviCacheKey);
 
       if (!pending) {
-        pending = makeSmoothNdviOverlay(
+        pending = makeCanonicalNdviOverlay(
           satelliteData.ndviImage,
           bbox,
           parcelGeometry,
@@ -8555,11 +8235,11 @@ export function HomeInlineLayerMap({
           ],
           beforeLayerId: 'home-inline-parcel-shadow',
           paint: {
-            'raster-opacity': 0.82,
+            'raster-opacity': 1,
             'raster-fade-duration': 0,
-            'raster-saturation': 0.04,
-            'raster-contrast': -0.04,
-            'raster-resampling': 'linear',
+            'raster-saturation': 0,
+            'raster-contrast': 0,
+            'raster-resampling': 'nearest',
           },
         }).then((installed) => {
           if (installed && mapRef.current === map &&
