@@ -156,6 +156,12 @@ export function usePusulaFieldMemory(input:Input){
    supabase.from('market_crop_prices')
     .select('id,product_name,avg_price,price_date,unit')
     .order('price_date',{ascending:false}).limit(100),
+   // Depot records already live in Supabase. Read their true shared source,
+   // not just the last device-local depot wizard snapshot.
+   supabase.from('farm_inventory_products')
+    .select('id,product_name,total_amount,remaining_amount,unit,field_ids,updated_at')
+    .eq('user_id',activeUser)
+    .order('updated_at',{ascending:false}).limit(100),
   ]);
   const rows=(index:number):Record<string,any>[]=>{
    const result=checks[index];
@@ -167,12 +173,30 @@ export function usePusulaFieldMemory(input:Input){
    category:n.source==='weather'?'weather':n.source,
   }));
   if(scopeRef.current!==activeUser+':'+fieldId)return;
+  const inventoryResult=checks[6];
+  const inventoryFromServer=inventoryResult.status==='fulfilled' && !inventoryResult.value.error;
+  const linkedInventory=rows(6)
+   .filter(product=>Array.isArray(product.field_ids) &&
+     product.field_ids.some((link:unknown)=>String(link)===fieldId))
+   .map(product=>({
+    id:String(product.id??''),
+    productName:String(product.product_name??''),
+    fieldIds:(product.field_ids as unknown[]).map(String),
+    totalAmount:Number(product.total_amount??0),
+    remainingAmount:Number(product.remaining_amount??0),
+    unit:String(product.unit??''),
+   }));
+  if(inventoryFromServer){
+   writeDepot(activeUser,fieldId,linkedInventory);
+   setDepot(linkedInventory);
+  }
   const result=buildPusulaMemoryEvents({
    fieldId,fieldName,crop,now:new Date(),
    tasks:rows(0),calendar:rows(1),activities:rows(2),
    notifications:[...rows(3),...extraLocal],
    guides:rows(4),prices:rows(5),
-   depot:activeUser?readDepot(activeUser,fieldId):[],
+   depot:inventoryFromServer?linkedInventory:
+    (activeUser?readDepot(activeUser,fieldId):[]),
   });
   // Field may have changed during awaited requests.
   setEvents(result);
