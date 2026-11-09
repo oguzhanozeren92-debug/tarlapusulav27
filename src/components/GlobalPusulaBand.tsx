@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CloudSun, MapPin, Menu, Star } from 'lucide-react';
 import PusulaGuide, { type PusulaInsight } from '../assets/pusula/PusulaGuide';
@@ -17,6 +17,7 @@ type GlobalPusulaBandProps = {
   screen: string;
   title?: string | null;
   fieldName?: string | null;
+  fieldId?: string | null;
   /** Legacy uyumluluk: global ana menü bandında geri oku artık çizilmez. */
   onBack?: () => void;
   onMenu?: () => void;
@@ -230,7 +231,7 @@ type DepotAssistantState = {
 
 const DEPOT_STATE_CACHE_KEY = 'tp_pusula_depot_state_v1';
 
-const WEATHER_PUSULA_CACHE_KEY = 'tp_pusula_weather_latest_v2';
+const WEATHER_PUSULA_CACHE_KEY = 'tp_pusula_weather_latest_v3';
 
 
 type GuideMessage = {
@@ -480,6 +481,9 @@ function isFallbackOrTechnicalInsight(
     'pusula onerisi su anda olusturulamadi',
     'ham veriler uygulamada kullanılmaya devam ediyor',
     'ham veriler uygulamada kullanilmaya devam ediyor',
+    'hava verileri henüz hazır değil',
+    'gerçek hava verisi henüz hazır değil',
+    'hava verisi hazır değil',
   ];
 
   return blockedPhrases.some((phrase) =>
@@ -538,13 +542,18 @@ function nextGuideTurn(screen: string, userId: string | null, fieldName: string 
   }
 }
 
-function readCachedWeatherPusula(expectedFieldName?: string | null) {
+function readCachedWeatherPusula(expectedFieldName?: string | null, expectedFieldId?: string | null) {
   try {
     const raw = window.localStorage.getItem(WEATHER_PUSULA_CACHE_KEY);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as CachedWeatherPusula;
     if (!parsed?.insight?.id) return null;
+    // Weather recommendations are time-sensitive and must belong to the
+    // currently selected field, not the favourite field or a previous page.
+    if (!Number.isFinite(parsed.savedAt) ||
+        Date.now() - Number(parsed.savedAt) > 8 * 60 * 60 * 1000 ||
+        Number(parsed.savedAt) > Date.now() + 60_000) return null;
     if (isFallbackOrTechnicalInsight(parsed.insight)) {
       try {
         window.localStorage.removeItem(WEATHER_PUSULA_CACHE_KEY);
@@ -556,9 +565,12 @@ function readCachedWeatherPusula(expectedFieldName?: string | null) {
 
     const expected = String(expectedFieldName ?? '').trim();
     const cachedField = String(parsed.fieldName ?? '').trim();
+    const expectedId = String(expectedFieldId ?? '').trim();
+    const cachedId = String(parsed.fieldId ?? '').trim();
 
-    // Başka tarlanın eski yorumunu yanlışlıkla okutma.
-    if (expected && cachedField && expected !== cachedField) return null;
+    // Never use an insight from a different field (IDs take precedence).
+    if (expectedId && expectedId !== cachedId) return null;
+    if (expected && expected !== cachedField) return null;
 
     return parsed.insight;
   } catch {
@@ -579,6 +591,7 @@ export default function GlobalPusulaBand({
   screen,
   title,
   fieldName,
+  fieldId,
   onBack: _onBack,
   onMenu,
   onOpenAi,
@@ -656,12 +669,6 @@ export default function GlobalPusulaBand({
   const pageTitle = String(title ?? 'TarlaPusula').trim() || 'TarlaPusula';
   const hasPusulaSignal =
     hasUnreadInsight || hasInteractiveSignal || hasDepotSignal || Boolean(readyPdf);
-
-  const fieldSuffix = useMemo(() => {
-    const name = String(fieldName ?? '').trim();
-    return name ? ` Aktif tarla: ${name}.` : '';
-  }, [fieldName]);
-
 
   const resolvedPoints =
     pointsProp !== undefined && pointsProp !== null
@@ -800,10 +807,11 @@ export default function GlobalPusulaBand({
         const profile = profileResult.data as Record<string, unknown> | null;
         const fields = Array.isArray(fieldsResult.data) ? fieldsResult.data : [];
         const expectedName = String(fieldName ?? '').trim();
+        const expectedId = String(fieldId ?? '').trim();
         const selectedField =
-          fields.find(
-            (item: any) =>
-              expectedName && String(item?.name ?? '').trim() === expectedName,
+          fields.find((item: any) => expectedId && String(item?.id ?? '') === expectedId) ??
+          fields.find((item: any) =>
+            expectedName && String(item?.name ?? '').trim() === expectedName
           ) ?? fields[0] ?? null;
 
         const latitudeCandidate = Number(
@@ -864,7 +872,7 @@ export default function GlobalPusulaBand({
     return () => {
       alive = false;
     };
-  }, [fieldName]);
+  }, [fieldName, fieldId]);
 
   // Konum iznini sorgulamak izin penceresi açmaz; yalnızca mevcut durumu okur.
   useEffect(() => {
@@ -1247,7 +1255,7 @@ export default function GlobalPusulaBand({
       // Weather ekranı event'i bu header'dan hemen önce üretmiş olsa bile
       // son gerçek tarla yorumunu kaybetmeyelim. Burada sadece cache okunur;
       // yeni hava / AI API çağrısı yapılmaz.
-      const cached = readCachedWeatherPusula(fieldName);
+      const cached = readCachedWeatherPusula(fieldName, fieldId);
       if (cached) latestWeatherInsightRef.current = cached;
     }
 
@@ -1263,6 +1271,16 @@ export default function GlobalPusulaBand({
 
       if (customEvent.detail?.screen !== screen) return;
       if (!customEvent.detail?.insight?.id) return;
+
+      // Validate the target before touching any ref or cache. The weather
+      // page may send an event while the user switches fields; storing the
+      // other field's insight used to poison the active Pusula state.
+      const expectedField = String(fieldName ?? '').trim();
+      const incomingField = String(customEvent.detail.fieldName ?? '').trim();
+      const expectedId = String(fieldId ?? '').trim();
+      const incomingId = String(customEvent.detail.fieldId ?? '').trim();
+      if ((expectedId && incomingId !== expectedId) ||
+          (expectedField && incomingField !== expectedField)) return;
 
       const pageInsight = customEvent.detail.insight;
       const guideOnly = isGuideInsight(pageInsight);
@@ -1301,19 +1319,6 @@ export default function GlobalPusulaBand({
         // Canlı state yeterli.
       }
 
-      // Tüm ekranlarda aynı kural:
-      // Başka tarladan gecikmiş bir event geldiyse gösterme.
-      const expectedField = String(fieldName ?? '').trim();
-      const incomingField = String(customEvent.detail.fieldName ?? '').trim();
-
-      if (
-        expectedField &&
-        incomingField &&
-        expectedField !== incomingField
-      ) {
-        return;
-      }
-
       if (screen === 'weatherHub' && !guideOnly) {
         latestWeatherInsightRef.current = pageInsight;
       }
@@ -1337,7 +1342,7 @@ export default function GlobalPusulaBand({
         handlePageInsight as EventListener,
       );
     };
-  }, [screen, fieldName]);
+  }, [screen, fieldName, fieldId]);
 
   // Ekran değiştiğinde logo aynı yerde ve aynı görünümde kalır.
   // Cache/gerçek mesaj varsa yalnızca ışıltı ile haber verir; otomatik olarak
@@ -1363,7 +1368,7 @@ export default function GlobalPusulaBand({
           insight?: PusulaInsight;
         };
 
-        if (cached?.screen === screen && isRealUsableInsight(cached?.insight)) {
+        if (screen !== 'weatherHub' && cached?.screen === screen && isRealUsableInsight(cached?.insight)) {
           latestPageInsightRef.current = cached.insight!;
           realInsightReadyRef.current = true;
           setHasUnreadInsight(!isInsightSeen(screen, cached.insight!.id));
@@ -1381,7 +1386,7 @@ export default function GlobalPusulaBand({
     }
 
     if (screen === 'weatherHub') {
-      const cachedWeather = readCachedWeatherPusula(fieldName);
+      const cachedWeather = readCachedWeatherPusula(fieldName, fieldId);
       if (cachedWeather) {
         latestWeatherInsightRef.current = cachedWeather;
         latestPageInsightRef.current = cachedWeather;
@@ -1393,7 +1398,7 @@ export default function GlobalPusulaBand({
     }
 
     return () => stopGuideRotation();
-  }, [screen, fieldName]);
+  }, [screen, fieldName, fieldId]);
 
   // AI/Edge Function hatası kullanıcıya teknik metin olarak gösterilmez.
   // İlk rehber mesajı zaten bir kez gösterildiği için hata durumunda yeni balon açılmaz.
@@ -1490,23 +1495,36 @@ export default function GlobalPusulaBand({
     }
 
     if (screen === 'weatherHub') {
-      const cached = readCachedWeatherPusula(fieldName);
+      const cached = readCachedWeatherPusula(fieldName, fieldId);
       if (cached) latestWeatherInsightRef.current = cached;
 
-      const latest = latestWeatherInsightRef.current ?? {
-        id: 'weather-manual-fallback',
-        gozlem: `Seçili tarla için gerçek hava verisi henüz hazır değil.${fieldSuffix}`,
-        yonlendirme:
-          'Veri geldiğinde ürün, tarih, yağış, rüzgâr, sıcaklık ve toprak nemini birlikte değerlendirip saha kararını söyleyeceğim.',
-        guven_skoru: 'Düşük' as const,
-      };
-
-      markInsightSeen(screen, latest.id);
-      setHasUnreadInsight(false);
-      setInsight({
-        ...latest,
-        id: `${latest.id}-manual-${Date.now()}`,
-      });
+      const latest = latestWeatherInsightRef.current;
+      if (latest && isRealUsableInsight(latest)) {
+        markInsightSeen(screen, latest.id);
+        setHasUnreadInsight(false);
+        setInsight({
+          ...latest,
+          id: `${latest.id}-manual-${Date.now()}`,
+        });
+      } else {
+        // Forecast may still be loading while current weather/ET0 is already
+        // visible. Never tell users there is NO real weather data.
+        const guideTurn = nextGuideTurn(
+          screen,
+          userGuideContext.userId,
+          fieldName ?? null,
+          guideIndexRef.current,
+        );
+        guideIndexRef.current = guideTurn + 1;
+        setHasUnreadInsight(false);
+        setInsight(buildGuideInsight(screen, guideTurn, {
+          fieldName,
+          crop: userGuideContext.crop,
+          city: userGuideContext.city,
+          district: userGuideContext.district,
+          fieldCount: userGuideContext.fieldCount,
+        }));
+      }
       return;
     }
 
