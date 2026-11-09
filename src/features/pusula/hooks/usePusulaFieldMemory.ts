@@ -37,6 +37,9 @@ export function usePusulaFieldMemory(input:Input){
  const [depot,setDepot]=useState<Record<string,any>[]>([]);
  const lastStarted=useRef(0);
  const activeUser=userId||resolvedUser;
+ const activeScope=activeUser+':'+fieldId;
+ const scopeRef=useRef(activeScope);
+ scopeRef.current=activeScope;
 
  // Resolve auth for the Home compass, which does not carry the global user's
  // guide context. No memory query runs before we know the current auth user.
@@ -99,6 +102,7 @@ export function usePusulaFieldMemory(input:Input){
    ...n,created_at:n.createdAt,field_id:n.fieldId,
    category:n.source==='weather'?'weather':n.source,
   }));
+  if(scopeRef.current!==activeUser+':'+fieldId)return;
   const result=buildPusulaMemoryEvents({
    fieldId,fieldName,crop,now:new Date(),
    tasks:rows(0),calendar:rows(1),activities:rows(2),
