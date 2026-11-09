@@ -26,6 +26,7 @@ export type PusulaInsight = {
   fieldName?: string;
   observationDate?: string;
   sources?: string[];
+  openAction?: { label: string; screen: string };
   calendarAction?: {
     fieldId: string;
     title: string;
@@ -115,6 +116,7 @@ type PusulaGuideProps = {
   hasUnread?: boolean;
   onLogoClick?: () => void;
   onFeedback?: (feedback: PusulaFeedbackValue) => void | Promise<void>;
+  onOpenAction?: (screen: string) => void;
 };
 
 const wait = (ms: number) =>
@@ -126,6 +128,7 @@ export default function PusulaGuide({
   hasUnread = false,
   onLogoClick,
   onFeedback,
+  onOpenAction,
 }: PusulaGuideProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [panelVisible, setPanelVisible] = useState(false);
@@ -428,7 +431,7 @@ export default function PusulaGuide({
 
     setPhase('hold');
     // An actionable suggestion stays open until the user closes it.
-    if (data.calendarAction?.fieldId) keepOpenRef.current = true;
+    if (data.calendarAction?.fieldId || data.openAction) keepOpenRef.current = true;
     // Kullanıcının minik 👍 / 👎 alanını rahatça kullanabilmesi için
     // paneli önceki 2.3 saniyeden biraz daha uzun açık tutuyoruz.
     await wait(6500);
@@ -474,7 +477,7 @@ export default function PusulaGuide({
     if (token !== runRef.current) return;
 
     setPhase('hold');
-    if (lastInsight.calendarAction?.fieldId) keepOpenRef.current = true;
+    if (lastInsight.calendarAction?.fieldId || lastInsight.openAction) keepOpenRef.current = true;
     await wait(6500);
 
     if (token !== runRef.current) return;
@@ -660,6 +663,17 @@ export default function PusulaGuide({
                     {!!activeInsight.puan_odulu && (
                       <span>+{activeInsight.puan_odulu} puan</span>
                     )}
+                  </div>
+                )}
+
+                {activeInsight.openAction && onOpenAction && (
+                  <div className="pusula-guide__open-action">
+                    <button
+                      type="button"
+                      onClick={() => onOpenAction(activeInsight.openAction!.screen)}
+                    >
+                      {activeInsight.openAction.label}
+                    </button>
                   </div>
                 )}
 
