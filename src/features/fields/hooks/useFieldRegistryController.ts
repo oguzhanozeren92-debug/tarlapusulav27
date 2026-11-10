@@ -14,6 +14,7 @@ import {
 } from '../../../services/locationService';
 import { getNextFieldGate } from '../../../gamification/useGamificationStore';
 import { getDistrictDisplayName, getDistrictLookupName } from '../../../utils/locationUtils';
+import { parseDecareAreaInput } from '../../../utils/parseDecareAreaInput';
 import { shouldShowPusulaIntro } from '../../../components/PusulaIntroTrailer';
 import {
   fetchCropVarieties,
@@ -244,7 +245,7 @@ export function useFieldRegistryController({
     setMapBoundaryCandidates([]);
     setMapBoundarySuggestedCandidateId(null);
 
-    const parsedArea = Number(fieldArea.replace(',', '.'));
+    const parsedArea = parseDecareAreaInput(fieldArea);
 
     try {
       const result = await lookupMapBoundary({
@@ -495,7 +496,7 @@ export function useFieldRegistryController({
       return;
     }
 
-    const areaValue = Number(fieldArea.replace(',', '.'));
+    const areaValue = parseDecareAreaInput(fieldArea);
     const seasonValue = Number(fieldSeason);
     const plantingYearValue = fieldPlantingYear.trim() ? Number(fieldPlantingYear) : null;
 
