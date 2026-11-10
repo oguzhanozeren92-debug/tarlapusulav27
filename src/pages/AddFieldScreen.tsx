@@ -918,6 +918,7 @@ export default function AddFieldScreen(props: AddFieldScreenProps) {
                   value={fieldArea}
                   onChange={e=>setFieldArea(e.target.value)}
                   inputMode="decimal"
+                  placeholder="Örn: 5.618 veya 5,5"
                 />
               </label>
 
