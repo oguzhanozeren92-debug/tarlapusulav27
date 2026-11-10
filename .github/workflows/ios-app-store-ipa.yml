@@ -32,8 +32,6 @@ jobs:
     env:
       VITE_PUBLIC_APP_URL: 'https://tarlapusulav27.vercel.app/'
       VITE_APP_STORE_RELEASE: 'true'
-      VITE_REVENUECAT_IOS_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_IOS_PUBLIC_KEY }}
-      VITE_REVENUECAT_ANDROID_PUBLIC_KEY: ${{ secrets.VITE_REVENUECAT_ANDROID_PUBLIC_KEY }}
       VITE_ADMOB_TEST_MODE: 'false'
       VITE_APNS_ENVIRONMENT: 'production'
       VITE_APPLE_SIGN_IN_ENABLED: 'true'
@@ -58,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for name in APPLE_TEAM_ID VITE_REVENUECAT_IOS_PUBLIC_KEY
+          for name in APPLE_TEAM_ID
           do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub secret for $name"
@@ -269,10 +267,6 @@ jobs:
         run: |
           set -euo pipefail
           npx cap ls ios | tee "$RUNNER_TEMP/cap-ios-plugins.txt"
-          grep -Fq '@revenuecat/purchases-capacitor' "$RUNNER_TEMP/cap-ios-plugins.txt" || {
-            echo "::error::RevenueCat native plugin is not installed for ios"
-            exit 1
-          }
           grep -Fq '@capacitor-community/admob' "$RUNNER_TEMP/cap-ios-plugins.txt" || {
             echo "::error::AdMob native plugin is not installed for ios"
             exit 1
