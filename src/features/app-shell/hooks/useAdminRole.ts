@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from '../../../supabaseClient';
 
 export function useAdminRole() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    // Administrative editing is managed in the browser, never in App Store builds.
+    if (Capacitor.isNativePlatform()) return;
+
     let active = true;
 
     const checkAdminRole = async () => {
