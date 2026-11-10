@@ -1,11 +1,9 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
 import AccountDeletionPage from './pages/AccountDeletion/AccountDeletionPage';
-import AdminUiRuntime from './features/admin-ui/AdminUiRuntime';
-import InAppAdminMode from './features/admin-mode/InAppAdminMode';
 import AppNotificationBridge from './features/admin-mode/AppNotificationBridge';
 import AppActivityTracker from './features/notifications/components/AppActivityTracker';
 import HomeMapLayerLoadingBridge from './features/home-map/components/HomeMapLayerLoadingBridge';
@@ -27,6 +25,12 @@ import NativePushBridge from './mobile/NativePushBridge';
 import NativeAuthBridge from './mobile/NativeAuthBridge';
 import NativeShellBridge from './mobile/NativeShellBridge';
 import { forwardWebOAuthCallbackToNative } from './mobile/nativeAuth';
+
+// App Store distributions contain no remote UI manipulation or in-app admin panel.
+// Web-only administrators retain content management in the browser dashboard.
+const WebAdminTools = import.meta.env.VITE_APP_STORE_RELEASE === 'true'
+  ? null
+  : lazy(() => import('./features/admin-mode/WebAdminTools'));
 
 forwardWebOAuthCallbackToNative();
 
@@ -62,14 +66,17 @@ createRoot(document.getElementById('root')!).render(
         <App />
         <PremiumFeedbackLayer />
         <HomeMapLayerLoadingBridge />
-        <AdminUiRuntime />
         <AppNotificationBridge />
         <AppActivityTracker />
         <NativePushBridge />
         <PusulaPdfReadyBridge />
         <NativeAuthBridge />
         <NativeShellBridge />
-        <InAppAdminMode />
+        {WebAdminTools && !Capacitor.isNativePlatform() && (
+          <Suspense fallback={null}>
+            <WebAdminTools />
+          </Suspense>
+        )}
         <PusulaPointsCelebration />
       </>
     )}
