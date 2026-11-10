@@ -35,6 +35,7 @@ export type PlanFeatureKey =
   | 'storageRisk'
   | 'rotation';
 
+// Compatibility catalog: there are no paid or restricted features.
 export const PLAN_FEATURE_MATRIX: Array<{
   key: PlanFeatureKey;
   label: string;
@@ -42,73 +43,35 @@ export const PLAN_FEATURE_MATRIX: Array<{
   plus: string | boolean;
   premium: string | boolean;
 }> = [
-  { key: 'fields', label: 'Aktif tarla', free: '1', plus: '10', premium: 'Sınırsız' },
-  { key: 'satellite', label: 'Uydu ve geçmiş', free: 'Temel', plus: 'Gelişmiş', premium: 'Tam kapsam' },
-  { key: 'pusula', label: 'Pusula AI', free: 'Temel', plus: 'Gelişmiş', premium: 'Tam kapsam' },
+  { key: 'fields', label: 'Aktif tarla', free: 'Sınırsız', plus: 'Sınırsız', premium: 'Sınırsız' },
+  { key: 'satellite', label: 'Uydu ve geçmiş', free: 'Tam kapsam', plus: 'Tam kapsam', premium: 'Tam kapsam' },
+  { key: 'pusula', label: 'Pusula AI', free: 'Tam kapsam', plus: 'Tam kapsam', premium: 'Tam kapsam' },
   { key: 'dryland', label: 'Kuru Tarım', free: true, plus: true, premium: true },
-  { key: 'irrigation', label: 'Sulama', free: 'Temel', plus: 'Optimizasyon', premium: 'Optimizasyon' },
-  { key: 'notifications', label: 'Gelişmiş bildirimler', free: false, plus: true, premium: true },
-  { key: 'weatherAdvanced', label: 'Gelişmiş hava / tarla iklimi', free: false, plus: true, premium: true },
-  { key: 'reports', label: 'Raporlar', free: false, plus: true, premium: true },
-  { key: 'pusulaPdf', label: 'PusulaPDF', free: false, plus: false, premium: true },
-  { key: 'orchard', label: 'Bahçe / ağaç zekâsı', free: false, plus: false, premium: true },
-  { key: 'bisip', label: 'BİSİP / soğuklama', free: false, plus: false, premium: true },
-  { key: 'storageRisk', label: 'Depo / mikotoksin riski', free: false, plus: false, premium: true },
-  { key: 'rotation', label: 'Münavebe / ekim nöbeti', free: false, plus: false, premium: true },
+  { key: 'irrigation', label: 'Sulama', free: true, plus: true, premium: true },
+  { key: 'notifications', label: 'Gelişmiş bildirimler', free: true, plus: true, premium: true },
+  { key: 'weatherAdvanced', label: 'Gelişmiş hava / tarla iklimi', free: true, plus: true, premium: true },
+  { key: 'reports', label: 'Raporlar', free: true, plus: true, premium: true },
+  { key: 'pusulaPdf', label: 'PusulaPDF', free: true, plus: true, premium: true },
+  { key: 'orchard', label: 'Bahçe / ağaç zekâsı', free: true, plus: true, premium: true },
+  { key: 'bisip', label: 'BİSİP / soğuklama', free: true, plus: true, premium: true },
+  { key: 'storageRisk', label: 'Depo / mikotoksin riski', free: true, plus: true, premium: true },
+  { key: 'rotation', label: 'Münavebe / ekim nöbeti', free: true, plus: true, premium: true },
 ];
 
 export function planAllows(_current: TarlaPusulaPlan, _required: PaidPlan) {
-  // All feature gates are open in the free/ad-supported release.
   return true;
 }
 
+// Legacy compatibility: old pricing helpers must never offer a purchase.
 export const PLAN_LAUNCH_PRICES = {
-  plus: {
-    monthly: '₺199,99 / ay',
-    yearly: '₺1.939,99 / yıl',
-    yearlyMonthlyEquivalent: '₺161,67 / ay eşdeğer',
-  },
-  premium: {
-    monthly: '₺249,99 / ay',
-    yearly: '₺2.399,99 / yıl',
-    yearlyMonthlyEquivalent: '₺200 / ay eşdeğer',
-  },
+  plus: { monthly: 'Ücretsiz', yearly: 'Ücretsiz', yearlyMonthlyEquivalent: 'Ücretsiz' },
+  premium: { monthly: 'Ücretsiz', yearly: 'Ücretsiz', yearlyMonthlyEquivalent: 'Ücretsiz' },
 } as const;
 
-function usableConfiguredPrice(value: unknown) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-
-  const normalized = raw
-    .toLocaleLowerCase('tr-TR')
-    .replace(/\s+/g, ' ');
-
-  if (
-    normalized === 'mağazada' ||
-    normalized === 'magazada' ||
-    normalized === 'store' ||
-    normalized === 'n/a' ||
-    normalized === '-'
-  ) {
-    return '';
-  }
-
-  return raw;
+export function planPriceLabel(_plan: PaidPlan, _yearly = false) {
+  return 'Ücretsiz';
 }
 
-export function planPriceLabel(plan: PaidPlan, yearly = false) {
-  const prefix = plan === 'plus' ? 'PLUS' : 'PREMIUM';
-  const key = yearly
-    ? `VITE_${prefix}_YEARLY_PRICE`
-    : `VITE_${prefix}_MONTHLY_PRICE`;
-
-  const configured = usableConfiguredPrice((import.meta as any)?.env?.[key]);
-  if (configured) return configured;
-
-  const launch = PLAN_LAUNCH_PRICES[plan];
-  return yearly ? launch.yearly : launch.monthly;
-}
-
-export function planYearlyEquivalentLabel(plan: PaidPlan) {
-  return PLAN_LAUNCH_PRICES[plan].yearlyMonthlyEquivalent;
+export function planYearlyEquivalentLabel(_plan: PaidPlan) {
+  return 'Ücretsiz';
 }
