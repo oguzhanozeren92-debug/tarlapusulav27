@@ -1,15 +1,16 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { PutObjectCommand, S3Client } from "npm:@aws-sdk/client-s3@3.883.0";
 
-// visual-enrichment-v7-topic-unique
+// visual-enrichment-v8-openverse
 // - Türkçe başlık/etiketler sözlükle İngilizce/bilimsel karşılığa çevrilir; "makale", "rehber", "haber" gibi
 //   kelimeler aramaya girmez.
 // - Bir görsel, konuya özel en az bir kelime (ürün, zararlı, hastalık, konu) taşımadıkça kabul edilmez.
 //   "agriculture/field/crop" gibi genel kelimeler eşleşme sayılmaz.
 // - Başka bir içerikte kullanılmış görsel tekrar seçilmez.
-// - Genel "agriculture crop field" yedeği ve alakasız sonuç yedeği yoktur. Uygun görsel yoksa durum "no_match" olur.
+// - Kaynaklar: Wikimedia Commons, iNaturalist, Openverse (Flickr vb. CC lisanslı). Yalnız CC0/PDM/CC-BY/CC-BY-SA.
+// - Haberde konu fotoğrafı yoksa ürün/tarım teması yedeği (yine tekil). Rehberde yedek yok; uygun görsel yoksa "no_match".
 
-const ENGINE = "visual-enrichment-v7-topic-unique";
+const ENGINE = "visual-enrichment-v8-openverse";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const reply = (x: unknown, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
 const clean = (v: unknown, n = 1000) => String(v ?? "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
@@ -130,6 +131,16 @@ const TERMS: Term[] = [
   { tr: /rhizobium|nodul|azot fiksasyon/, en: "rhizobium root nodules legume", match: ["rhizobium", "nodule", "nodules"] },
   { tr: /mikoriza/, en: "mycorrhiza roots", match: ["mycorrhiz"] },
   { tr: /turba/, en: "peat bog", match: ["peat"] },
+  // Haber konuları (hayvancılık, ticaret, piyasa)
+  { tr: /seker fabrika|seker uretim/, en: "sugar beet factory", match: ["sugar factory", "sugar beet", "sugar refinery", "beet"] },
+  { tr: /zeytinyag/, en: "olive oil", match: ["olive oil", "olive"] },
+  { tr: /\btmo\b|hububat|\btahil|\bhubu/, en: "grain harvest silo", match: ["grain", "wheat", "silo", "granary", "cereal"] },
+  { tr: /\bsut\b|\bsigir|buyukbas|hayvancilik|\bbesi\b/, en: "dairy cattle", match: ["cattle", "cow", "dairy", "bos taurus", "calf"] },
+  { tr: /\bkoyun|\bkuzu|kucukbas|\bkeci/, en: "sheep flock", match: ["sheep", "lamb", "goat", "ovis", "capra"] },
+  { tr: /\btavuk|\byumurta|kanatli|broiler/, en: "poultry chicken farm", match: ["chicken", "poultry", "hen", "gallus", "eggs"] },
+  { tr: /aricilik|\bbal\b|bal uretim/, en: "beekeeping beehive", match: ["beehive", "beekeep", "honey", "apiary"] },
+  { tr: /\bbalik|su urunleri|yetistiricilik balik/, en: "fish farming aquaculture", match: ["fish farm", "aquaculture", "trout", "sea bass", "fish"] },
+  { tr: /ithalat|ihracat|\bliman|\bgemi/, en: "grain cargo ship port", match: ["cargo ship", "bulk carrier", "port of", "harbor", "harbour", "grain terminal", "container ship"] },
   // Konular
   { tr: /\bdon\b|\bdonu\b|zirai don|soguk zarar/, en: "frost damage crop", match: ["frost", "freez", "frozen"] },
   { tr: /kuraklik|kurak/, en: "drought crop", match: ["drought", "wilting", "parched"] },
@@ -200,14 +211,26 @@ function compactSourceTitle(v: unknown) {
   return s.slice(0, 180);
 }
 
+// Türkçe çekim eklerini kaba olarak at: "seraları" → "sera", "örümceği" → "örümcek"
+const SUFFIXES = ["larinin", "lerinin", "larini", "lerini", "larina", "lerine", "larinda", "lerinde", "lardan", "lerden", "lari", "leri", "lar", "ler", "nin", "nun", "in", "un", "ndan", "nden", "dan", "den", "tan", "ten", "nda", "nde", "da", "de", "ta", "te", "ya", "ye", "yi", "yu", "si", "su", "ni", "nu", "i", "u", "a", "e"];
+function stems(w: string) {
+  const out: string[] = []; let x = w;
+  for (let round = 0; round < 2; round++) {
+    const suf = SUFFIXES.find((s) => x.length - s.length >= 3 && x.endsWith(s));
+    if (!suf) break; x = x.slice(0, -suf.length); out.push(x, x.replace(/g$/, "k"));
+  }
+  return out;
+}
+function withStems(text: string) { return text + " " + text.split(/\s+/).filter((w) => w.length > 4).flatMap(stems).join(" "); }
+
 // İçerikten konu terimlerini çıkar (başlık + etiket + ürün + anahtar kelime)
 function topicTerms(row: any, candidate: boolean) {
   const tags = Array.isArray(candidate ? row.suggested_tags : row.tags) ? (candidate ? row.suggested_tags : row.tags) : [];
   const crops = Array.isArray(candidate ? row.suggested_crops : row.crop_tags) ? (candidate ? row.suggested_crops : row.crop_tags) : [];
   const title = clean(candidate ? row.title_suggested : row.title, 400);
   const guideTopic = clean(row?.structured_body?.guide?.problem_or_goal || row?.structured_body?.topic, 200);
-  const text = fold([title, guideTopic, tags.join(" "), crops.join(" ")].join(" "));
-  const titleText = fold(title + " " + guideTopic);
+  const text = withStems(fold([title, guideTopic, tags.join(" "), crops.join(" ")].join(" ")));
+  const titleText = withStems(fold(title + " " + guideTopic));
   const hits = TERMS.filter((t) => t.tr.test(text));
   // Başlıkta geçenler önce
   hits.sort((a, b) => Number(b.tr.test(titleText)) - Number(a.tr.test(titleText)) || Number(Boolean(b.organism)) - Number(Boolean(a.organism)));
@@ -270,7 +293,7 @@ function subjectWords(terms: Term[], queries: string[]) { return subjectFor(term
 
 async function commons(q: string): Promise<Img[]> {
   const p = new URLSearchParams({ action: "query", format: "json", origin: "*", generator: "search", gsrsearch: `${q} filetype:bitmap`, gsrnamespace: "6", gsrlimit: "40", prop: "imageinfo", iiprop: "url|extmetadata|size|mime", iiurlwidth: "1400", iiextmetadatafilter: "LicenseShortName|Artist|Credit|ImageDescription|UsageTerms|ObjectName" });
-  const r = await fetch(`https://commons.wikimedia.org/w/api.php?${p}`, { signal: AbortSignal.timeout(15000), headers: { "User-Agent": "TarlaPusula-Visual/7.0 (agricultural knowledge guide)" } });
+  const r = await fetch(`https://commons.wikimedia.org/w/api.php?${p}`, { signal: AbortSignal.timeout(15000), headers: { "User-Agent": "TarlaPusula-Visual/8.0 (agricultural knowledge guide)" } });
   if (!r.ok) throw new Error(`Wikimedia HTTP ${r.status}`);
   const j = await r.json();
   return (Object.values(j?.query?.pages || {}) as any[]).map((page: any) => {
@@ -282,7 +305,7 @@ async function commons(q: string): Promise<Img[]> {
 
 async function inat(q: string): Promise<Img[]> {
   const p = new URLSearchParams({ q, photos: "true", photo_license: "cc0,cc-by,cc-by-sa", per_page: "30", order_by: "votes", order: "desc", quality_grade: "research" });
-  const r = await fetch(`https://api.inaturalist.org/v1/observations?${p}`, { signal: AbortSignal.timeout(15000), headers: { "User-Agent": "TarlaPusula-Visual/7.0" } });
+  const r = await fetch(`https://api.inaturalist.org/v1/observations?${p}`, { signal: AbortSignal.timeout(15000), headers: { "User-Agent": "TarlaPusula-Visual/8.0" } });
   if (!r.ok) throw new Error(`iNaturalist HTTP ${r.status}`);
   const j = await r.json(), out: Img[] = [];
   const rows = Array.isArray(j?.results) ? j.results : [];
@@ -296,6 +319,16 @@ async function inat(q: string): Promise<Img[]> {
     }
   }
   return out;
+}
+
+async function openverse(q: string): Promise<Img[]> {
+  const p = new URLSearchParams({ q, license: "cc0,pdm,by,by-sa", page_size: "20", mature: "false" });
+  const r = await fetch(`https://api.openverse.org/v1/images/?${p}`, { signal: AbortSignal.timeout(12000), headers: { "User-Agent": "TarlaPusula-Visual/8.0 (agricultural news images)" } });
+  if (!r.ok) throw new Error(`Openverse HTTP ${r.status}`);
+  const j = await r.json();
+  const rows = Array.isArray(j?.results) ? j.results : [];
+  return rows.map((x: any, i: number) => ({ url: clean(x?.url, 1800), landing: clean(x?.foreign_landing_url || x?.url, 1800), creator: clean(x?.creator, 320), license: license(x?.license === "by" ? "cc-by" : x?.license === "by-sa" ? "cc-by-sa" : x?.license), title: clean([x?.title, Array.isArray(x?.tags) ? x.tags.slice(0, 8).map((t: any) => t?.name).join(" ") : ""].filter(Boolean).join(" · "), 700), source: clean(x?.source || x?.provider || "openverse", 60) + " (openverse)", width: Number(x?.width) || undefined, height: Number(x?.height) || undefined, rank: i } as Img))
+    .filter((x: Img) => x.url && SAFE.has(x.license) && !/\.(gif|svg)(?:$|\?)/i.test(x.url));
 }
 
 function imageText(x: Img) { return fold(`${x.title} ${decodeURIComponent(x.landing || "")}`).replace(/[_]/g, " "); }
@@ -328,7 +361,7 @@ function score(x: Img, subject: Subject, q: string) {
 async function search(queries: string[], subject: Subject, organismFirst: boolean) {
   const all: Img[] = [], failures: string[] = []; let okSources = 0;
   for (const q of queries) {
-    const calls = organismFirst ? [inat(q), commons(q)] : [commons(q), inat(q)];
+    const calls = organismFirst ? [inat(q), commons(q), openverse(q)] : [commons(q), openverse(q), inat(q)];
     const settled = await Promise.allSettled(calls);
     for (const s of settled) {
       if (s.status === "fulfilled") {
@@ -344,7 +377,7 @@ async function search(queries: string[], subject: Subject, organismFirst: boolea
 }
 
 async function download(url: string) {
-  const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(18000), headers: { "User-Agent": "TarlaPusula-Visual/7.0" } }); if (!r.ok) throw new Error(`Görsel HTTP ${r.status}`);
+  const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(18000), headers: { "User-Agent": "TarlaPusula-Visual/8.0" } }); if (!r.ok) throw new Error(`Görsel HTTP ${r.status}`);
   const type = (r.headers.get("content-type") || "").split(";")[0].trim().toLowerCase(); if (!["image/jpeg", "image/png", "image/webp"].includes(type)) throw new Error(`Desteklenmeyen tür ${type || "?"}`);
   const bytes = new Uint8Array(await r.arrayBuffer()); if (!bytes.length || bytes.length > 3 * 1024 * 1024) throw new Error("Görsel 3 MB sınırını aşıyor");
   return { bytes, type, ext: type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg" };
@@ -420,9 +453,20 @@ Deno.serve(async (req) => {
       return reply({ ok: true, id, status: "no_match", reason: "no_topic_terms", queries, rejectedPrevious: invalid.length });
     }
     await db.from(table).update({ image_status: "processing", image_processing_at: new Date().toISOString() }).eq("id", id);
-    const found = await search(queries, subject, organismFirst); if (found.okSources === 0) throw new Error(`Görsel kaynaklarına ulaşılamadı: ${found.failures.join(" | ")}`);
-    const used = await usedElsewhere(db, found.images.map((x) => clean(x.landing || x.url, 1800)), ownerCol, id);
-    const pool = found.images.filter((x) => !used.has(clean(x.landing || x.url, 1800).toLowerCase()));
+    let found = await search(queries, subject, organismFirst); if (found.okSources === 0) throw new Error(`Görsel kaynaklarına ulaşılamadı: ${found.failures.join(" | ")}`);
+    let used = await usedElsewhere(db, found.images.map((x) => clean(x.landing || x.url, 1800)), ownerCol, id);
+    let pool = found.images.filter((x) => !used.has(clean(x.landing || x.url, 1800).toLowerCase()));
+    let usedFallback = false;
+    // Haber/makalede kullanılmamış konu fotoğrafı yoksa: ürün veya genel tarım teması (yine her içerikte farklı foto). Rehberde yedek yok.
+    if (!pool.length && !isGuide) {
+      const crop = terms.find((t) => isCropTerm(t));
+      const fq = crop ? [`${crop.en} field`, `${crop.en} harvest`, crop.en] : ["Turkey agriculture farmland", "farmland harvest tractor", "agricultural landscape field"];
+      const fs: Subject = crop ? { words: crop.match.map((m) => fold(m)), res: [crop.tr] } : { words: ["farmland", "agricultur", "harvest", "tractor", "crop field", "wheat field", "farm field", "cultivat"], res: [] };
+      const fb = await search(fq, fs, false);
+      const fbUsed = await usedElsewhere(db, fb.images.map((x) => clean(x.landing || x.url, 1800)), ownerCol, id);
+      const fbPool = fb.images.filter((x) => !fbUsed.has(clean(x.landing || x.url, 1800).toLowerCase()));
+      if (fbPool.length) { found = fb; used = fbUsed; pool = fbPool; usedFallback = true; }
+    }
     const s3 = new S3Client({ region: "auto", endpoint: `https://${rid}.r2.cloudflarestorage.com`, credentials: { accessKeyId: ra, secretAccessKey: rs } }), owner = candidateId ? `candidate-${candidateId}` : `content-${contentId}`, inserted: any[] = [], errors: string[] = [];
     for (const c of pool) {
       if (inserted.length >= slots) break;
@@ -454,7 +498,7 @@ Deno.serve(async (req) => {
     if (covers > 0 && count >= required) status = "ready";
     else if (count === 0 && !pool.length) status = "no_match";
     else if (count === 0 && errors.length) status = "error";
-    await finish(status, { image_count: count, cover_count: covers, sources, candidates_found: found.images.length, skipped_used_elsewhere: found.images.length - pool.length, rejected_previous: invalid.length, source_failures: found.failures });
+    await finish(status, { image_count: count, cover_count: covers, sources, fallback_theme: usedFallback, candidates_found: found.images.length, skipped_used_elsewhere: found.images.length - pool.length, rejected_previous: invalid.length, source_failures: found.failures });
     return reply({ ok: status !== "error", id, status, imageCount: count, coverCount: covers, requiredCount: required, targetCount: target, inserted: inserted.length, queries, subjectWords: words.slice(0, 12), sources, candidatesFound: found.images.length, skippedUsedElsewhere: found.images.length - pool.length, rejectedPrevious: invalid.length, sourceFailures: found.failures, errors: errors.slice(0, 6), images: inserted }, status === "error" ? 500 : 200);
   } catch (e) {
     console.error("[CONTENT_IMAGE_JOB_V7]", e);
