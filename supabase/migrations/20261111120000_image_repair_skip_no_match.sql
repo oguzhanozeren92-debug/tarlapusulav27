@@ -1,4 +1,4 @@
--- Konuya uygun görsel bulunamayan (no_match) yayınları her 20 dakikada değil, haftada bir yeniden dene.
+-- Konuya uygun görsel bulunamayan (visual_enrichment.status = no_match) yayınları her 20 dakikada değil, haftada bir yeniden dene.
 CREATE OR REPLACE FUNCTION public.invoke_published_content_image_repair(p_images integer DEFAULT 3)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -23,7 +23,7 @@ begin
         where img.content_id=ci.id and img.status<>'rejected'
       )
       and (ci.image_processing_at is null or ci.image_processing_at < now()-interval '20 minutes')
-      and not (coalesce(ci.image_status,'')='no_match' and ci.image_processing_at > now()-interval '7 days')
+      and not (coalesce(ci.structured_body->'visual_enrichment'->>'status','')='no_match' and ci.image_processing_at > now()-interval '7 days')
     order by ci.published_at desc nulls last
     limit greatest(1,least(coalesce(p_images,3),6))
   loop
