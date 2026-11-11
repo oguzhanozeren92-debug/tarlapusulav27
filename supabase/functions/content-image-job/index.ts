@@ -82,6 +82,7 @@ const TERMS: Term[] = [
   { tr: /\btutun/, en: "tobacco", match: ["tobacco", "nicotiana"] },
   // Zararlılar (organizma)
   { tr: /yaprak bit/, en: "aphid", match: ["aphid", "aphididae"], organism: true },
+  { tr: /avrupa kirmizi orumcek|panonychus/, en: "Panonychus ulmi European red mite", match: ["panonychus", "european red mite"], organism: true },
   { tr: /kirmizi orumcek|\bakar/, en: "spider mite Tetranychus", match: ["spider mite", "tetranychus", "mites"], organism: true },
   { tr: /beyaz sinek/, en: "whitefly", match: ["whitefly", "bemisia", "trialeurodes"], organism: true },
   { tr: /\btrips/, en: "thrips", match: ["thrips"], organism: true },
