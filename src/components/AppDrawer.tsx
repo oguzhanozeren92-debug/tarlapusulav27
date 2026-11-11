@@ -22,11 +22,6 @@ const PUSULA_BODY_SRC =
 const DRAWER_BG_SRC =
   'https://fkrqvwarxzmdrexsxtzw.supabase.co/storage/v1/object/public/ui-icons/backgrounds/d70787c4-3c37-4582-a2c2-f7d7e06b1cad%20(1).png';
 
-// Menü arka planı: Uluslararası Uzay İstasyonu'ndan gece Dünya'nın kenarı ve şehir ışıkları.
-// NASA, kamu malı — https://commons.wikimedia.org/wiki/File:ISS-58_Ukraine_and_Russia_nighttime_view.jpg
-const DRAWER_HEADER_SRC =
-  'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/ui-icons/backgrounds/drawer-v3/iss-night-limb.jpg?v=1920';
-
 const DRAWER_BG_FALLBACK_SRC =
   'https://fkrqvwarxzmdrexsxtzw.supabase.co/storage/v1/object/public/ui-icons/backgrounds/pusuladan-sana-bg-4.webp';
 
@@ -47,64 +42,46 @@ type DrawerItem = {
   image?: string;
   fallback?: string;
   iconType?: 'soil' | 'calendar';
-  group: 'Tarla' | 'Pazar' | 'Öğren ve hesap';
-  hint: string;
 };
-
-const GROUP_ORDER: DrawerItem['group'][] = ['Tarla', 'Pazar', 'Öğren ve hesap'];
 
 const ITEMS: DrawerItem[] = [
   {
     label: 'Hava Durumu',
-    group: 'Tarla',
-    hint: 'Tahmin ve tarım uyarıları',
     target: 'weatherHub' as Screen,
     image: 'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/ui-icons/08-hava-durumu-1.webp',
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/weather.webp`,
   },
   {
     label: 'Depom',
-    group: 'Pazar',
-    hint: 'Girdi ve ürün stoğu',
     target: 'inventoryHub' as Screen,
     image: `${DRAWER_MENU_FALLBACK_BASE}/inventory.webp`,
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/inventory.webp`,
   },
   {
     label: 'Piyasa Fiyatları',
-    group: 'Pazar',
-    hint: 'Hal ve borsa fiyatları',
     target: 'marketHub' as Screen,
     image: `${DRAWER_MENU_FALLBACK_BASE}/prices.webp`,
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/prices.webp`,
   },
   {
     label: 'Bilgi Rehberi',
-    group: 'Öğren ve hesap',
-    hint: 'Hastalık, zararlı, yetiştirme',
     target: 'pestGuideHub' as Screen,
     image: `${DRAWER_MENU_FALLBACK_BASE}/guide.webp`,
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/guide.webp`,
   },
   {
     label: 'Takvim',
-    group: 'Tarla',
-    hint: 'Ekim, gübre ve ilaç planı',
     target: 'calendar' as Screen,
     iconType: 'calendar',
   },
   {
     label: 'Bildirimler',
-    group: 'Tarla',
-    hint: 'Uyarılar ve hatırlatmalar',
     target: 'notificationsHub' as Screen,
     image: `${DRAWER_MENU_FALLBACK_BASE}/notifications.webp`,
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/notifications.webp`,
   },
   {
     label: 'Ayarlar',
-    group: 'Öğren ve hesap',
-    hint: 'Hesap, tarlalar, bildirimler',
     target: 'settingsHub' as Screen,
     image: `${DRAWER_MENU_FALLBACK_BASE}/settings.webp`,
     fallback: `${DRAWER_MENU_FALLBACK_BASE}/settings.webp`,
@@ -1314,191 +1291,6 @@ export default function AppDrawer({
             height:36px;
           }
         }
-
-        /* ===== PRO V2 (2026-11): gruplu menü, yuvarlak kart, açıklama satırı,
-           3D ikonlar korunur; arka plan fotoğrafları yüksek çözünürlüklü uydu
-           görseliyle yenilenir. Bu blok en sonda: önceki katmanları ezer. ===== */
-        html body .tp-premium-drawer{
-          background:
-            linear-gradient(180deg,rgba(1,3,6,.05) 0%,rgba(1,3,6,.22) 20%,rgba(1,3,6,.62) 42%,rgba(1,3,6,.86) 70%,rgba(1,3,6,.94) 100%),
-            url("${DRAWER_HEADER_SRC}") 62% top / cover no-repeat,
-            #020406!important;
-        }
-        html body .tp-premium-drawer .tp-premium-drawer-x{
-          width:44px!important;
-          height:44px!important;
-          border-radius:13px!important;
-          border:1px solid rgba(242,234,217,.22)!important;
-          background:rgba(6,20,12,.42)!important;
-          color:#f2ead9!important;
-          -webkit-text-fill-color:#f2ead9!important;
-          backdrop-filter:blur(10px);
-          -webkit-backdrop-filter:blur(10px);
-          font-size:26px!important;
-          box-shadow:none!important;
-        }
-        html body .tp-premium-drawer .tp-premium-drawer-welcome p{
-          display:none!important;
-        }
-        html body .tp-premium-drawer .tp-premium-points-opd{
-          min-height:58px!important;
-          border-radius:18px!important;
-          border:1px solid rgba(224,195,111,.55)!important;
-          background:
-            linear-gradient(180deg,rgba(36,52,30,.78),rgba(8,20,12,.82))!important;
-          box-shadow:0 10px 24px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.06)!important;
-          backdrop-filter:blur(12px);
-          -webkit-backdrop-filter:blur(12px);
-        }
-        html body .tp-premium-drawer .tp-premium-points-opd > span:not(.tp-premium-points-opd-emblem){
-          color:#f2ead9!important;
-          -webkit-text-fill-color:#f2ead9!important;
-          font-size:13px!important;
-          letter-spacing:0!important;
-        }
-        html body .tp-premium-drawer .tp-premium-points-opd > strong{
-          color:#e9d18b!important;
-          -webkit-text-fill-color:#e9d18b!important;
-          font-size:18px!important;
-          font-weight:850!important;
-        }
-        html body .tp-premium-drawer .tp-premium-points-opd > i{
-          color:#e9d18b!important;
-          -webkit-text-fill-color:#e9d18b!important;
-        }
-
-        /* Menü kartı: yuvarlak köşe, içinde silik monokrom fotoğraf korunur */
-        html body .tp-premium-drawer .tp-premium-drawer-nav{
-          display:flex!important;
-          flex-direction:column!important;
-          gap:2px!important;
-          margin-top:2px!important;
-          padding:4px 6px 8px!important;
-          border:1px solid rgba(255,255,255,.55)!important;
-          border-radius:20px!important;
-          background:rgba(247,248,245,.94)!important;
-          box-shadow:0 14px 30px rgba(0,0,0,.28)!important;
-        }
-        html body .tp-premium-drawer .tp-premium-drawer-nav::before{
-          border-radius:20px!important;
-          opacity:.16!important;
-        }
-        html body .tp-premium-drawer .tp-drawer-group{
-          position:relative;
-          z-index:1;
-          display:flex;
-          flex-direction:column;
-          gap:2px;
-        }
-        html body .tp-premium-drawer .tp-drawer-group + .tp-drawer-group{
-          margin-top:4px;
-          padding-top:4px;
-          border-top:1px solid rgba(28,42,32,.08);
-        }
-        html body .tp-premium-drawer .tp-drawer-group-label{
-          padding:8px 10px 3px;
-          color:#56645a;
-          -webkit-text-fill-color:#56645a;
-          font-size:10px;
-          font-weight:800;
-          letter-spacing:.14em;
-          text-transform:uppercase;
-        }
-        html body .tp-premium-drawer .tp-drawer-group > button{
-          position:relative;
-          z-index:1;
-          min-height:56px;
-          display:grid;
-          grid-template-columns:44px minmax(0,1fr) 16px;
-          align-items:center;
-          gap:12px;
-          padding:6px 10px 6px 6px;
-          border:0;
-          border-radius:14px;
-          background:transparent;
-          color:#1c2a20;
-          text-align:left;
-          cursor:pointer;
-          transition:background .16s ease, transform .16s ease;
-          -webkit-tap-highlight-color:transparent;
-        }
-        html body .tp-premium-drawer .tp-drawer-group > button:hover{
-          background:rgba(47,106,62,.07);
-        }
-        html body .tp-premium-drawer .tp-drawer-group > button.active{
-          background:rgba(47,106,62,.13);
-        }
-        html body .tp-premium-drawer .tp-drawer-group > button:active{
-          transform:scale(.99);
-        }
-        html body .tp-premium-drawer:not(.tp-neural-exit) .tp-drawer-group > button{
-          animation:tpNeuralItemIn .27s cubic-bezier(.22,.8,.22,1) both;
-        }
-        html body .tp-premium-drawer .tp-drawer-group:nth-child(2) > button{animation-delay:90ms;}
-        html body .tp-premium-drawer .tp-drawer-group:nth-child(3) > button{animation-delay:130ms;}
-        @media(prefers-reduced-motion:reduce){
-          html body .tp-premium-drawer .tp-drawer-group > button{animation:none!important;}
-        }
-        /* 3D ikonlar aynen korunur; yalnız kutucuk tek tip */
-        html body .tp-premium-drawer .tp-drawer-group .tp-premium-drawer-icon{
-          width:44px!important;
-          height:44px!important;
-          border-radius:13px!important;
-          border:1px solid #dfe3dc!important;
-          background:linear-gradient(180deg,#ffffff,#eef1ec)!important;
-          box-shadow:0 3px 8px rgba(20,30,24,.08),inset 0 1px 0 #fff!important;
-        }
-        html body .tp-premium-drawer .tp-drawer-group .tp-premium-drawer-icon img{
-          width:40px!important;
-          height:40px!important;
-          border-radius:11px!important;
-        }
-        html body .tp-premium-drawer .tp-drawer-item-text{
-          display:flex;
-          flex-direction:column;
-          gap:2px;
-          min-width:0;
-        }
-        html body .tp-premium-drawer .tp-drawer-item-label{
-          color:#1c2a20;
-          -webkit-text-fill-color:#1c2a20;
-          font-size:14.5px;
-          font-weight:700;
-          letter-spacing:-.01em;
-          white-space:nowrap;
-          overflow:hidden;
-          text-overflow:ellipsis;
-        }
-        html body .tp-premium-drawer .tp-drawer-item-hint{
-          color:#5d6b60;
-          -webkit-text-fill-color:#5d6b60;
-          font-size:11px;
-          font-weight:500;
-          white-space:nowrap;
-          overflow:hidden;
-          text-overflow:ellipsis;
-        }
-        html body .tp-premium-drawer .tp-drawer-group > button > i{
-          color:#7c877e;
-          -webkit-text-fill-color:#7c877e;
-          font-style:normal;
-          font-size:20px;
-          font-weight:300;
-          text-align:right;
-        }
-        html body .tp-premium-drawer .tp-premium-drawer-logout{
-          border-radius:16px!important;
-          border:1px solid rgba(242,234,217,.24)!important;
-          background:rgba(6,20,12,.45)!important;
-          color:#f2ead9!important;
-          -webkit-text-fill-color:#f2ead9!important;
-          backdrop-filter:blur(10px);
-          -webkit-backdrop-filter:blur(10px);
-        }
-        html body .tp-premium-drawer .tp-premium-drawer-logout-icon{
-          filter:none!important;
-          border-radius:10px!important;
-        }
       `}</style>
 
       <button
@@ -1570,33 +1362,24 @@ export default function AppDrawer({
           <i>›</i>
         </button>
 
-        <nav className="tp-premium-drawer-nav" aria-label="Ana menü">
-          {GROUP_ORDER.map((group) => (
-            <div key={group} className="tp-drawer-group" role="group" aria-label={group}>
-              <span className="tp-drawer-group-label" aria-hidden="true">{group}</span>
-              {ITEMS.filter((item) => item.group === group).map((item) => {
-                const active =
-                  String(activeScreen ?? '') === String(item.target);
+        <nav className="tp-premium-drawer-nav">
+          {ITEMS.map((item) => {
+            const active =
+              String(activeScreen ?? '') === String(item.target);
 
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    className={active ? 'active' : ''}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={() => onNavigate(item.target, item.label)}
-                  >
-                    <DrawerIcon item={item} />
-                    <span className="tp-drawer-item-text">
-                      <span className="tp-drawer-item-label">{item.label}</span>
-                      <small className="tp-drawer-item-hint">{item.hint}</small>
-                    </span>
-                    <i aria-hidden="true">›</i>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+            return (
+              <button
+                key={item.label}
+                type="button"
+                className={active ? 'active' : ''}
+                onClick={() => onNavigate(item.target, item.label)}
+              >
+                <DrawerIcon item={item} />
+                <span>{item.label}</span>
+                <i>›</i>
+              </button>
+            );
+          })}
         </nav>
 
         <DrawerSupportFooter screen={String(activeScreen ?? '')} onCloseDrawer={onClose} />
