@@ -391,47 +391,6 @@ Deno.serve(async (req) => {
       return json({ ok: true, rows: data ?? [] });
     }
 
-    if (action === "list_ui_overrides") {
-      const { data, error } = await admin.from("admin_ui_overrides").select("*").order("updated_at", { ascending: false });
-      if (error) throw error;
-      return json({ ok: true, rows: data ?? [] });
-    }
-
-    if (action === "save_ui_override") {
-      const selector = String(body?.selector ?? "").trim();
-      if (!selector || selector.length > 1000) return json({ ok: false, error: "Geçerli selector gerekli." }, 400);
-      const row = {
-        selector,
-        label: body?.label ? String(body.label).slice(0, 200) : null,
-        text_value: body?.text_value === null || body?.text_value === undefined ? null : String(body.text_value).slice(0, 5000),
-        image_src: body?.image_src ? String(body.image_src).slice(0, 3000) : null,
-        hidden: Boolean(body?.hidden),
-        style: body?.style && typeof body.style === "object" ? body.style : {},
-        parent_selector: body?.parent_selector ? String(body.parent_selector).slice(0, 1000) : null,
-        position_index: Number.isInteger(body?.position_index) ? Number(body.position_index) : null,
-        enabled: body?.enabled !== false,
-        updated_by: adminUser.id,
-        updated_at: new Date().toISOString(),
-      };
-      const { data, error } = await admin
-        .from("admin_ui_overrides")
-        .upsert({ ...row, created_by: adminUser.id }, { onConflict: "selector" })
-        .select("*")
-        .single();
-      if (error) throw error;
-      await audit(adminUser.id, "ui_override_save", "ui_element", selector, { label: row.label });
-      return json({ ok: true, row: data });
-    }
-
-    if (action === "delete_ui_override") {
-      const selector = String(body?.selector ?? "").trim();
-      if (!selector) return json({ ok: false, error: "selector gerekli." }, 400);
-      const { error } = await admin.from("admin_ui_overrides").delete().eq("selector", selector);
-      if (error) throw error;
-      await audit(adminUser.id, "ui_override_delete", "ui_element", selector);
-      return json({ ok: true });
-    }
-
     if (action === "broadcast") {
       const title = String(body?.title ?? "").trim();
       const message = String(body?.message ?? "").trim();

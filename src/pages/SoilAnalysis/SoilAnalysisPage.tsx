@@ -30,6 +30,10 @@ import {
   type SoilLabResult,
 } from '../../lib/soilAnalysisService';
 import './soilAnalysis.css';
+import sampleStep1 from '../../assets/soil/sample-step-1.webp';
+import sampleStep2 from '../../assets/soil/sample-step-2.webp';
+import sampleStep3 from '../../assets/soil/sample-step-3.webp';
+import sampleStep4 from '../../assets/soil/sample-step-4.webp';
 import { addPoints } from '../../gamification/useGamificationStore';
 import {
   fetchSoilGridsProfile,
@@ -81,8 +85,7 @@ type LocationOption = {
 const SAMPLE_STEPS = [
   {
     no: '1',
-    image:
-      'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=700&q=82',
+    image: sampleStep1,
     title: 'Tarlayı temsil edecek noktaları seç',
     short: 'Tek bir köşeden numune alma.',
     details:
@@ -90,8 +93,7 @@ const SAMPLE_STEPS = [
   },
   {
     no: '2',
-    image:
-      'https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&w=700&q=82',
+    image: sampleStep2,
     title: 'Yüzeyi temizle ve uygun derinlikten al',
     short: 'Bitki artığını numuneye katma.',
     details:
@@ -99,8 +101,7 @@ const SAMPLE_STEPS = [
   },
   {
     no: '3',
-    image:
-      'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=700&q=82',
+    image: sampleStep3,
     title: 'Alt numuneleri temiz kapta karıştır',
     short: 'Homojen bir birleşik numune hazırla.',
     details:
@@ -108,8 +109,7 @@ const SAMPLE_STEPS = [
   },
   {
     no: '4',
-    image:
-      'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?auto=format&fit=crop&w=700&q=82',
+    image: sampleStep4,
     title: 'Yaklaşık 0,5–1 kg temsili numune gönder',
     short: 'Etiketlemeyi unutma.',
     details:
@@ -903,7 +903,10 @@ export default function SoilAnalysisPage({
               {SAMPLE_STEPS.map((step) => (
                 <details key={step.no} className="soil-sample-step" open={step.no === '1'}>
                   <summary>
-                    <span className="soil-step-number">{step.no}</span>
+                    <span className="soil-step-thumb">
+                      <img src={step.image} alt="" loading="lazy" decoding="async" />
+                      <span className="soil-step-number">{step.no}</span>
+                    </span>
                     <div><strong>{step.title}</strong><small>{step.short}</small></div>
                     <ChevronRight size={17} />
                   </summary>

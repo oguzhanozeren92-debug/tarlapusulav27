@@ -14,6 +14,12 @@ workflows:
       vars:
         XCODE_PROJECT: ios/App/App.xcodeproj
         XCODE_SCHEME: App
+        # Mağaza derlemesi: admin araçları pakete girmez, gerçek reklam birimleri kullanılır.
+        VITE_APP_STORE_RELEASE: 'true'
+        VITE_PUBLIC_APP_URL: 'https://tarlapusulav27.vercel.app/'
+        VITE_ADMOB_TEST_MODE: 'false'
+        VITE_APNS_ENVIRONMENT: 'production'
+        VITE_APPLE_SIGN_IN_ENABLED: 'true'
       node: 22
       xcode: 26.5
 
@@ -76,6 +82,10 @@ workflows:
     environment:
       android_signing:
         - tarlapusula_upload
+      vars:
+        VITE_APP_STORE_RELEASE: 'true'
+        VITE_PUBLIC_APP_URL: 'https://tarlapusulav27.vercel.app/'
+        VITE_ADMOB_TEST_MODE: 'false'
       node: 22
       java: 21
 

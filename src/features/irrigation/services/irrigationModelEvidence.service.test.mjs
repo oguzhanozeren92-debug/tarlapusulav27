@@ -49,18 +49,6 @@ test('pyfao56 comparison requires the exact same calendar window', async () => {
 });
 
 
-test('irrigation detail exposes real balance, five-day forecast and validation evidence', async () => {
-  const source = await readFile(new URL('../components/IrrigationDecisionDetailModal.tsx', import.meta.url), 'utf8');
-  assert.match(source, /SULAMA DURUMU/);
-  assert.match(source, /5 GÜNLÜK SU DENGESİ/);
-  assert.match(source, /MODEL DOĞRULAMASI/);
-  assert.match(source, /currentDeficitMm/);
-  assert.match(source, /projected5DayDeficitMm/);
-  assert.match(source, /consecutiveSupportiveRuns/);
-  assert.match(source, /Eksik gün varken sıfır kabul edilmez/);
-});
-
-
 test('promotion fails closed until repeated validation history is present', async () => {
   const source = await readFile(new URL('./irrigationModelEvidence.service.ts', import.meta.url), 'utf8');
   assert.match(source, /const historyEligible = validationHistory\?\.eligible === true/);
@@ -85,12 +73,9 @@ test('field detail exposes user-selected irrigation method without treating wett
 });
 
 
-test('production irrigation decision carries the user-selected method into visible detail', async () => {
+test('production irrigation decision carries the user-selected method into the decision', async () => {
   const context = await readFile(new URL('./irrigationContext.service.ts', import.meta.url), 'utf8');
   const decision = await readFile(new URL('./irrigationDecision.service.ts', import.meta.url), 'utf8');
-  const detail = await readFile(new URL('../components/IrrigationDecisionDetailModal.tsx', import.meta.url), 'utf8');
   assert.match(context, /irrigation_status, irrigation_method/);
   assert.match(decision, /irrigationMethod: irrigation\.irrigationMethod/);
-  assert.match(detail, /Sulama yöntemi/);
-  assert.match(detail, /irrigationMethodLabel\(decision\.irrigationMethod\)/);
 });

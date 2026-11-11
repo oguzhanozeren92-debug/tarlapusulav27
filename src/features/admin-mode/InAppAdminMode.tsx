@@ -1,15 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdminRole } from '../app-shell/hooks/useAdminRole';
 import ContentAdminPanel from '../content-admin/ContentAdminPanel';
 import SystemHealthPanel from '../system-health/SystemHealthPanel';
 import IssueInboxPanel from './IssueInboxPanel';
 import {
-  deleteAdminUiOverride,
   fetchAdminAudit,
   fetchAdminOverview,
   fetchAdminUserDetail,
-  saveAdminUiOverride,
   sendAdminBroadcast,
   type AdminAuditRow,
   type AdminMetrics,
@@ -19,40 +17,7 @@ import {
 } from './adminControl.service';
 import './InAppAdminMode.css';
 
-type Panel = 'overview' | 'edit' | 'content' | 'system' | 'issues' | 'users' | 'broadcast' | 'audit';
-type Preset = 'same' | 'white' | 'black' | 'transparent';
-type TextPreset = 'same' | 'black' | 'white';
-type SizePreset = 'same' | 'small' | 'normal' | 'large';
-type WidthPreset = 'same' | 'auto' | 'full';
-type RadiusPreset = 'same' | 'sharp' | 'soft' | 'round';
-
-type SelectedElement = {
-  selector: string;
-  parentSelector: string | null;
-  positionIndex: number | null;
-  label: string;
-  tag: string;
-  text: string;
-  image: string;
-  hasChildren: boolean;
-};
-
-type SiblingRow = {
-  selector: string;
-  label: string;
-  index: number;
-};
-
-type Draft = {
-  text: string;
-  image: string;
-  hidden: boolean;
-  background: Preset;
-  textTone: TextPreset;
-  size: SizePreset;
-  width: WidthPreset;
-  radius: RadiusPreset;
-};
+type Panel = 'overview' | 'content' | 'system' | 'issues' | 'users' | 'broadcast' | 'audit';
 
 const EMPTY_METRICS: AdminMetrics = {
   users: 0,
@@ -66,148 +31,6 @@ const EMPTY_METRICS: AdminMetrics = {
   active_sources: 0,
   notifications: 0,
 };
-
-const DEFAULT_DRAFT: Draft = {
-  text: '',
-  image: '',
-  hidden: false,
-  background: 'same',
-  textTone: 'same',
-  size: 'same',
-  width: 'same',
-  radius: 'same',
-};
-
-function escapeCss(value: string) {
-  if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(value);
-  return value.replace(/[^a-zA-Z0-9_-]/g, (character) => `\\${character}`);
-}
-
-function uniqueSelector(selector: string, element: Element) {
-  try {
-    const matches = document.querySelectorAll(selector);
-    return matches.length === 1 && matches[0] === element;
-  } catch {
-    return false;
-  }
-}
-
-function stableClasses(element: Element) {
-  return Array.from(element.classList)
-    .filter((name) =>
-      name &&
-      !/^(active|open|selected|hover|focus|disabled|loading|show|hide)$/i.test(name) &&
-      !name.startsWith('tp-admin-') &&
-      name.length < 80,
-    )
-    .slice(0, 3);
-}
-
-function selectorFor(element: Element | null): string | null {
-  if (!element || element === document.documentElement || element === document.body) return null;
-
-  const html = element as HTMLElement;
-  if (html.id) {
-    const byId = `#${escapeCss(html.id)}`;
-    if (uniqueSelector(byId, element)) return byId;
-  }
-
-  for (const key of ['data-cms-key', 'data-testid', 'data-block-key', 'data-screen', 'aria-label']) {
-    const value = element.getAttribute(key);
-    if (!value || value.length > 120) continue;
-    const candidate = `${element.tagName.toLowerCase()}[${key}="${value.replace(/"/g, '\\"')}"]`;
-    if (uniqueSelector(candidate, element)) return candidate;
-  }
-
-  const classes = stableClasses(element);
-  if (classes.length) {
-    const candidate = `${element.tagName.toLowerCase()}.${classes.map(escapeCss).join('.')}`;
-    if (uniqueSelector(candidate, element)) return candidate;
-  }
-
-  const parts: string[] = [];
-  let current: Element | null = element;
-  for (let depth = 0; current && depth < 6 && current !== document.body; depth += 1) {
-    const tag = current.tagName.toLowerCase();
-    const cls = stableClasses(current).slice(0, 1);
-    let part = tag + (cls.length ? `.${escapeCss(cls[0])}` : '');
-    const parent: HTMLElement | null = current.parentElement;
-    if (parent) {
-      const sameTag = Array.from(parent.children).filter((child) => child.tagName === current?.tagName);
-      if (sameTag.length > 1) part += `:nth-of-type(${sameTag.indexOf(current) + 1})`;
-    }
-    parts.unshift(part);
-    const candidate = parts.join(' > ');
-    if (uniqueSelector(candidate, element)) return candidate;
-    current = parent;
-  }
-
-  return parts.join(' > ') || null;
-}
-
-function cleanLabel(element: Element) {
-  const aria = element.getAttribute('aria-label') || element.getAttribute('title') || '';
-  const text = (element.textContent || '').replace(/\s+/g, ' ').trim();
-  const imageAlt = element instanceof HTMLImageElement ? element.alt : '';
-  return (aria || imageAlt || text || element.tagName).slice(0, 100);
-}
-
-function findEditableElement(target: EventTarget | null) {
-  let element = target instanceof HTMLElement ? target : null;
-  while (element && element !== document.body) {
-    if (element.closest('[data-tp-admin-ui="1"]')) return null;
-    const rect = element.getBoundingClientRect();
-    const tag = element.tagName.toLowerCase();
-    const useful =
-      element.hasAttribute('data-admin-editable') ||
-      ['button', 'a', 'img', 'input', 'textarea', 'select', 'label', 'h1', 'h2', 'h3', 'h4', 'p', 'li'].includes(tag) ||
-      (['span', 'strong', 'small'].includes(tag) && cleanLabel(element).length > 0) ||
-      (element.classList.length > 0 && rect.width > 40 && rect.height > 28 && rect.width < window.innerWidth * 0.98);
-    if (useful && rect.width > 8 && rect.height > 8) return element;
-    element = element.parentElement;
-  }
-  return null;
-}
-
-function selectedFrom(element: HTMLElement): SelectedElement | null {
-  const selector = selectorFor(element);
-  if (!selector) return null;
-  const parentSelector = selectorFor(element.parentElement);
-  const positionIndex = element.parentElement
-    ? Array.from(element.parentElement.children).indexOf(element)
-    : null;
-  return {
-    selector,
-    parentSelector,
-    positionIndex,
-    label: cleanLabel(element),
-    tag: element.tagName.toLowerCase(),
-    text: element.childElementCount === 0 ? (element.textContent || '').trim() : '',
-    image: element instanceof HTMLImageElement ? element.currentSrc || element.src || '' : '',
-    hasChildren: element.childElementCount > 0,
-  };
-}
-
-function styleFromDraft(draft: Draft) {
-  const style: Record<string, string> = {};
-  if (draft.background === 'white') style['background-color'] = '#ffffff';
-  if (draft.background === 'black') style['background-color'] = '#080808';
-  if (draft.background === 'transparent') style['background-color'] = 'transparent';
-  if (draft.textTone === 'black') style.color = '#111111';
-  if (draft.textTone === 'white') style.color = '#ffffff';
-  if (draft.size === 'small') style['font-size'] = '12px';
-  if (draft.size === 'normal') style['font-size'] = '15px';
-  if (draft.size === 'large') style['font-size'] = '20px';
-  if (draft.width === 'auto') style.width = 'auto';
-  if (draft.width === 'full') {
-    style.width = '100%';
-    style['max-width'] = 'none';
-  }
-  if (draft.radius === 'sharp') style['border-radius'] = '0px';
-  if (draft.radius === 'soft') style['border-radius'] = '14px';
-  if (draft.radius === 'round') style['border-radius'] = '999px';
-  return style;
-}
 
 function dateText(value: string | null | undefined) {
   if (!value) return '—';
@@ -227,11 +50,6 @@ export default function InAppAdminMode() {
   const [modeOpen, setModeOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>('overview');
   const [sheetCollapsed, setSheetCollapsed] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [selected, setSelected] = useState<SelectedElement | null>(null);
-  const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT);
-  const [siblings, setSiblings] = useState<SiblingRow[]>([]);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [issueNewCount, setIssueNewCount] = useState(0);
@@ -249,12 +67,10 @@ export default function InAppAdminMode() {
   const [broadcastCrop, setBroadcastCrop] = useState('');
   const [broadcastSelected, setBroadcastSelected] = useState<string[]>([]);
   const [broadcastBusy, setBroadcastBusy] = useState(false);
-  const hoveredRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
       setModeOpen(false);
-      setEditing(false);
       return;
     }
     try {
@@ -266,10 +82,6 @@ export default function InAppAdminMode() {
 
   const setOpen = (value: boolean) => {
     setModeOpen(value);
-    if (!value) {
-      setEditing(false);
-      setSelected(null);
-    }
     try {
       window.localStorage.setItem('tp_admin_mode_open_v1', value ? '1' : '0');
     } catch {
@@ -304,156 +116,6 @@ export default function InAppAdminMode() {
       void loadIssueCount();
     }
   }, [isAdmin, modeOpen]);
-
-  const loadExistingOverride = async (selection: SelectedElement) => {
-    const { data } = await supabase
-      .from('admin_ui_overrides')
-      .select('text_value,image_src,hidden,style')
-      .eq('selector', selection.selector)
-      .maybeSingle();
-    const style = (data?.style ?? {}) as Record<string, string>;
-    setDraft({
-      text: data?.text_value ?? selection.text,
-      image: data?.image_src ?? selection.image,
-      hidden: Boolean(data?.hidden),
-      background:
-        style['background-color'] === '#ffffff' ? 'white' :
-        style['background-color'] === '#080808' ? 'black' :
-        style['background-color'] === 'transparent' ? 'transparent' : 'same',
-      textTone: style.color === '#111111' ? 'black' : style.color === '#ffffff' ? 'white' : 'same',
-      size: style['font-size'] === '12px' ? 'small' : style['font-size'] === '15px' ? 'normal' : style['font-size'] === '20px' ? 'large' : 'same',
-      width: style.width === '100%' ? 'full' : style.width === 'auto' ? 'auto' : 'same',
-      radius: style['border-radius'] === '0px' ? 'sharp' : style['border-radius'] === '14px' ? 'soft' : style['border-radius'] === '999px' ? 'round' : 'same',
-    });
-  };
-
-  const buildSiblingRows = (element: HTMLElement) => {
-    const parent = element.parentElement;
-    if (!parent) return [];
-    return Array.from(parent.children)
-      .filter((child) => !child.closest('[data-tp-admin-ui="1"]'))
-      .slice(0, 30)
-      .map((child, index) => ({
-        selector: selectorFor(child) || '',
-        label: cleanLabel(child).slice(0, 64) || `${child.tagName} ${index + 1}`,
-        index,
-      }))
-      .filter((row) => row.selector);
-  };
-
-  const chooseElement = async (element: HTMLElement) => {
-    const selection = selectedFrom(element);
-    if (!selection) return;
-    setSelected(selection);
-    setSiblings(buildSiblingRows(element));
-    setPanel('edit');
-    setMessage('');
-    await loadExistingOverride(selection);
-  };
-
-  useEffect(() => {
-    if (!editing || !isAdmin || !modeOpen) return;
-
-    document.body.classList.add('tp-admin-pick-mode');
-    const over = (event: MouseEvent) => {
-      const next = findEditableElement(event.target);
-      if (hoveredRef.current && hoveredRef.current !== next) hoveredRef.current.classList.remove('tp-admin-edit-hover');
-      hoveredRef.current = next;
-      next?.classList.add('tp-admin-edit-hover');
-    };
-    const click = (event: MouseEvent) => {
-      const element = findEditableElement(event.target);
-      if (!element) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      void chooseElement(element);
-    };
-    document.addEventListener('mouseover', over, true);
-    document.addEventListener('click', click, true);
-    return () => {
-      document.body.classList.remove('tp-admin-pick-mode');
-      hoveredRef.current?.classList.remove('tp-admin-edit-hover');
-      hoveredRef.current = null;
-      document.removeEventListener('mouseover', over, true);
-      document.removeEventListener('click', click, true);
-    };
-  }, [editing, isAdmin, modeOpen]);
-
-  const saveSelected = async () => {
-    if (!selected) return;
-    setMessage('Kaydediliyor…');
-    try {
-      await saveAdminUiOverride({
-        selector: selected.selector,
-        label: selected.label,
-        text_value: selected.hasChildren ? null : draft.text,
-        image_src: selected.tag === 'img' ? draft.image : null,
-        hidden: draft.hidden,
-        style: styleFromDraft(draft),
-        parent_selector: selected.parentSelector,
-        position_index: selected.positionIndex,
-        enabled: true,
-      });
-      window.dispatchEvent(new CustomEvent('tp-admin-ui-overrides-updated'));
-      setMessage('Değişiklik yayınlandı. Kullanıcı görünümüne anında uygulanıyor.');
-    } catch (error: any) {
-      setMessage(error?.message || 'Değişiklik kaydedilemedi.');
-    }
-  };
-
-  const resetSelected = async () => {
-    if (!selected) return;
-    if (!window.confirm('Bu öğe için admin değişikliğini kaldırayım mı?')) return;
-    setMessage('');
-    try {
-      await deleteAdminUiOverride(selected.selector);
-      window.dispatchEvent(new CustomEvent('tp-admin-ui-overrides-updated'));
-      setDraft({ ...DEFAULT_DRAFT, text: selected.text, image: selected.image });
-      setMessage('Öğe uygulamanın kodundaki varsayılan görünümüne döndürüldü.');
-    } catch (error: any) {
-      setMessage(error?.message || 'Değişiklik kaldırılamadı.');
-    }
-  };
-
-  const selectParent = () => {
-    if (!selected?.selector) return;
-    const element = document.querySelector(selected.selector) as HTMLElement | null;
-    if (element?.parentElement && element.parentElement !== document.body) void chooseElement(element.parentElement);
-  };
-
-  const persistOrder = async (next: SiblingRow[]) => {
-    if (!selected?.parentSelector) return;
-    const parent = document.querySelector(selected.parentSelector);
-    if (parent) {
-      next.forEach((row) => {
-        const element = document.querySelector(row.selector);
-        if (element && element.parentElement === parent) parent.appendChild(element);
-      });
-    }
-    await Promise.all(next.map((row, index) =>
-      supabase.from('admin_ui_overrides').upsert({
-        selector: row.selector,
-        label: row.label,
-        parent_selector: selected.parentSelector,
-        position_index: index,
-        enabled: true,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'selector' }),
-    ));
-    setSiblings(next.map((row, index) => ({ ...row, index })));
-    window.dispatchEvent(new CustomEvent('tp-admin-ui-overrides-updated'));
-    setMessage('Sıralama kaydedildi.');
-  };
-
-  const onDropSibling = (dropIndex: number) => {
-    if (dragIndex === null || dragIndex === dropIndex) return;
-    const next = [...siblings];
-    const [moved] = next.splice(dragIndex, 1);
-    next.splice(dropIndex, 0, moved);
-    setDragIndex(null);
-    void persistOrder(next);
-  };
 
   const filteredUsers = useMemo(() => {
     const value = search.trim().toLocaleLowerCase('tr-TR');
@@ -550,7 +212,6 @@ export default function InAppAdminMode() {
   const metrics = overview?.metrics ?? EMPTY_METRICS;
   const panelTitle =
     panel === 'overview' ? 'Yönetim özeti' :
-    panel === 'edit' ? 'Ekranı düzenle' :
     panel === 'content' ? 'Haber akışı' :
     panel === 'system' ? 'Sistem sağlığı' :
     panel === 'issues' ? 'Mesaj Kutusu' :
@@ -562,7 +223,6 @@ export default function InAppAdminMode() {
     <div data-tp-admin-ui="1" className="tp-admin-mode-root">
       <div className="tp-admin-dock">
         <button className={panel === 'overview' ? 'active' : ''} onClick={() => changePanel('overview')}><b>◆</b><span>Özet</span></button>
-        <button className={panel === 'edit' ? 'active' : ''} onClick={() => { changePanel('edit'); setEditing((value) => !value); }}><b>{editing ? '●' : '✦'}</b><span>{editing ? 'Seçiliyor' : 'Düzenle'}</span></button>
         <button className={panel === 'content' ? 'active' : ''} onClick={() => changePanel('content')}><b>▤</b><span>Haber</span></button>
         <button className={panel === 'system' ? 'active' : ''} onClick={() => changePanel('system')}><b>⌁</b><span>Sistem</span></button>
         <button className={panel === 'issues' ? 'active' : ''} onClick={() => changePanel('issues')}><b>✉</b><span>Mesaj{issueNewCount ? ` (${issueNewCount})` : ''}</span></button>
@@ -571,8 +231,6 @@ export default function InAppAdminMode() {
         <button className={panel === 'audit' ? 'active' : ''} onClick={() => changePanel('audit')}><b>↺</b><span>Geçmiş</span></button>
         <button className="tp-admin-dock-close" onClick={() => setOpen(false)}><b>×</b><span>Kapat</span></button>
       </div>
-
-      {editing && <div className="tp-admin-pick-banner">DÜZENLEME AÇIK · Değiştirmek istediğin öğeye dokun</div>}
 
       <section className={`tp-admin-sheet tp-admin-sheet--${panel}${sheetCollapsed ? ' is-collapsed' : ''}`}>
         <header className="tp-admin-sheet-head">
@@ -596,72 +254,12 @@ export default function InAppAdminMode() {
               <article><strong>{numberText(metrics.active_push_users)}</strong><span>Push açık</span></article>
             </div>
             <div className="tp-admin-quick-grid">
-              <button onClick={() => { setPanel('edit'); setEditing(true); }}><b>✦</b><span>Ekranda gördüğünü düzenle</span><small>Öğeye dokun, görerek değiştir</small></button>
               <button onClick={() => changePanel('content')}><b>▤</b><span>Haber akışını yönet</span><small>Adaylar · yayınlananlar · kaynaklar</small></button>
               <button onClick={() => changePanel('issues')}><b>✉</b><span>Mesaj Kutusunu aç</span><small>{issueNewCount ? `${issueNewCount} yeni kullanıcı mesajı` : 'Hata bildirimleri · öneriler · ekran görüntüleri'}</small></button>
               <button onClick={() => changePanel('users')}><b>◎</b><span>Kullanıcıları gör</span><small>Tarla · ürün · faaliyet · puan</small></button>
               <button onClick={() => changePanel('broadcast')}><b>⌁</b><span>Bildirim gönder</span><small>Herkese veya seçili gruba</small></button>
             </div>
             <button className="tp-admin-refresh" disabled={overviewLoading} onClick={() => void loadOverview()}>{overviewLoading ? 'Yenileniyor…' : 'Verileri yenile'}</button>
-          </div>
-        )}
-
-        {panel === 'edit' && (
-          <div className="tp-admin-editor">
-            {!selected ? (
-              <div className="tp-admin-empty">
-                <b>✦</b>
-                <h3>Uygulamayı normal kullanıcı gibi kullan</h3>
-                <p>Düzenlemek istediğin kartı, yazıyı, ikonu veya butonu gördüğünde “Düzenlemeyi aç” de ve öğeye dokun.</p>
-                <button className={editing ? 'active' : ''} onClick={() => setEditing((value) => !value)}>{editing ? 'Düzenlemeyi kapat' : 'Düzenlemeyi aç'}</button>
-              </div>
-            ) : (
-              <>
-                <div className="tp-admin-selected-card">
-                  <div><small>SEÇİLİ ÖĞE · {selected.tag.toUpperCase()}</small><strong>{selected.label || 'İsimsiz öğe'}</strong></div>
-                  <div className="tp-admin-selected-actions">
-                    <button onClick={selectParent}>Üst bloğu seç</button>
-                    <button onClick={() => { setSelected(null); setSiblings([]); setEditing(true); }}>Başka öğe seç</button>
-                  </div>
-                </div>
-
-                {!selected.hasChildren && selected.tag !== 'img' && (
-                  <label className="tp-admin-field">Yazı<input value={draft.text} onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))} /></label>
-                )}
-                {selected.tag === 'img' && (
-                  <label className="tp-admin-field">Görsel / ikon adresi<input value={draft.image} onChange={(event) => setDraft((current) => ({ ...current, image: event.target.value }))} placeholder="https://…" /></label>
-                )}
-
-                <div className="tp-admin-choice-block"><span>Arka plan</span><div>{(['same','white','black','transparent'] as Preset[]).map((value) => <button key={value} className={draft.background === value ? 'active' : ''} onClick={() => setDraft((current) => ({ ...current, background: value }))}>{value === 'same' ? 'Olduğu gibi' : value === 'white' ? 'Beyaz' : value === 'black' ? 'Siyah' : 'Şeffaf'}</button>)}</div></div>
-                <div className="tp-admin-choice-block"><span>Yazı rengi</span><div>{(['same','black','white'] as TextPreset[]).map((value) => <button key={value} className={draft.textTone === value ? 'active' : ''} onClick={() => setDraft((current) => ({ ...current, textTone: value }))}>{value === 'same' ? 'Olduğu gibi' : value === 'black' ? 'Siyah' : 'Beyaz'}</button>)}</div></div>
-                <div className="tp-admin-choice-block"><span>Boyut</span><div>{(['same','small','normal','large'] as SizePreset[]).map((value) => <button key={value} className={draft.size === value ? 'active' : ''} onClick={() => setDraft((current) => ({ ...current, size: value }))}>{value === 'same' ? 'Olduğu gibi' : value === 'small' ? 'Küçük' : value === 'normal' ? 'Normal' : 'Büyük'}</button>)}</div></div>
-                <div className="tp-admin-choice-block"><span>Genişlik</span><div>{(['same','auto','full'] as WidthPreset[]).map((value) => <button key={value} className={draft.width === value ? 'active' : ''} onClick={() => setDraft((current) => ({ ...current, width: value }))}>{value === 'same' ? 'Olduğu gibi' : value === 'auto' ? 'İçeriğe göre' : 'Tam genişlik'}</button>)}</div></div>
-                <div className="tp-admin-choice-block"><span>Köşeler</span><div>{(['same','sharp','soft','round'] as RadiusPreset[]).map((value) => <button key={value} className={draft.radius === value ? 'active' : ''} onClick={() => setDraft((current) => ({ ...current, radius: value }))}>{value === 'same' ? 'Olduğu gibi' : value === 'sharp' ? 'Keskin' : value === 'soft' ? 'Yumuşak' : 'Yuvarlak'}</button>)}</div></div>
-                <label className="tp-admin-toggle"><input type="checkbox" checked={draft.hidden} onChange={(event) => setDraft((current) => ({ ...current, hidden: event.target.checked }))} /><span>Bu öğeyi kullanıcılardan gizle</span></label>
-
-                {siblings.length > 1 && (
-                  <div className="tp-admin-sorter">
-                    <div><strong>Sürükle-bırak sıralama</strong><small>Bu bloktaki öğeleri tutup taşı</small></div>
-                    <div className="tp-admin-sort-list">
-                      {siblings.map((row, index) => (
-                        <button
-                          type="button"
-                          draggable
-                          key={row.selector}
-                          onDragStart={() => setDragIndex(index)}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={() => onDropSibling(index)}
-                        >
-                          <span>☷</span><em>{row.label}</em><small>{index + 1}</small>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="tp-admin-editor-actions"><button className="primary" onClick={() => void saveSelected()}>Kaydet & yayınla</button><button onClick={() => void resetSelected()}>Değişikliği kaldır</button></div>
-              </>
-            )}
           </div>
         )}
 

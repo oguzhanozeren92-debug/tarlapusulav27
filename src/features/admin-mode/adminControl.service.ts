@@ -67,18 +67,6 @@ export type AdminAuditRow = {
   created_at: string;
 };
 
-export type UiOverrideInput = {
-  selector: string;
-  label?: string | null;
-  text_value?: string | null;
-  image_src?: string | null;
-  hidden?: boolean;
-  style?: Record<string, string>;
-  parent_selector?: string | null;
-  position_index?: number | null;
-  enabled?: boolean;
-};
-
 type InvokePayload = Record<string, unknown>;
 
 async function invokeAdmin<T>(body: InvokePayload): Promise<T> {
@@ -115,12 +103,3 @@ export async function sendAdminBroadcast(input: {
 
 export const fetchAdminAudit = (limit = 80) =>
   invokeAdmin<{ ok: boolean; rows: AdminAuditRow[] }>({ action: 'audit_list', limit });
-
-export const saveAdminUiOverride = (input: UiOverrideInput) =>
-  invokeAdmin<{ ok: boolean; row: Record<string, any> }>({ action: 'save_ui_override', ...input });
-
-export const deleteAdminUiOverride = (selector: string) =>
-  invokeAdmin<{ ok: boolean }>({ action: 'delete_ui_override', selector });
-
-export const listAdminUiOverrides = () =>
-  invokeAdmin<{ ok: boolean; rows: Array<Record<string, any>> }>({ action: 'list_ui_overrides' });
