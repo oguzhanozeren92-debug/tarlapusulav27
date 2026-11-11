@@ -81,6 +81,21 @@ const TERMS: Term[] = [
   { tr: /\bcilek/, en: "strawberry", match: ["strawberry", "fragaria"] },
   { tr: /\bcay\b|\bcayda/, en: "tea plantation", match: ["camellia sinensis", "tea plant", "tea plantation", "tea garden", "tea leaves"] },
   { tr: /\btutun/, en: "tobacco", match: ["tobacco", "nicotiana"] },
+  { tr: /\bkivi/, en: "kiwifruit", match: ["kiwifruit", "kiwi fruit", "actinidia", "kiwi vine"] },
+  { tr: /\bmuz\b|\bmuzu\b/, en: "banana plantation", match: ["banana", "musa"] },
+  { tr: /avokado/, en: "avocado", match: ["avocado", "persea"] },
+  { tr: /ahududu/, en: "raspberry", match: ["raspberry", "rubus idaeus"] },
+  { tr: /bogurtlen/, en: "blackberry", match: ["blackberry", "rubus"] },
+  { tr: /yaban mersini|maviyemis/, en: "blueberry", match: ["blueberry", "vaccinium"] },
+  { tr: /\blavanta/, en: "lavender field", match: ["lavender", "lavandula"] },
+  { tr: /\bmantar\b|mantar yetis|istiridye mantar/, en: "mushroom cultivation", match: ["mushroom", "pleurotus", "agaricus", "shiitake"] },
+  { tr: /\bkestane/, en: "chestnut", match: ["chestnut", "castanea"] },
+  { tr: /trabzon hurma/, en: "persimmon", match: ["persimmon", "diospyros"] },
+  { tr: /\bdut\b|\bdutu\b/, en: "mulberry", match: ["mulberry", "morus"] },
+  { tr: /\bhashas/, en: "poppy field", match: ["poppy", "papaver"] },
+  { tr: /\blahana|brokoli|karnabahar/, en: "cabbage field", match: ["cabbage", "broccoli", "cauliflower", "brassica oleracea"] },
+  { tr: /\bmarul|\bispanak/, en: "lettuce", match: ["lettuce", "spinach", "lactuca", "spinacia"] },
+  { tr: /\bhavuc/, en: "carrot", match: ["carrot", "daucus"] },
   // Zararlılar (organizma)
   { tr: /yaprak bit/, en: "aphid", match: ["aphid", "aphididae"], organism: true },
   { tr: /avrupa kirmizi orumce[kg]|panonychus/, en: "Panonychus ulmi European red mite", match: ["panonychus", "european red mite"], organism: true },
@@ -180,9 +195,11 @@ const GENERIC = new Set(["agriculture", "agricultural", "crop", "crops", "field"
 function escapeRe(v: string) { return v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 const wordReCache = new Map<string, RegExp>();
 // Kısa kelimeler tam kelime (çoğul eki serbest), uzun kelimeler kelime başından eşleşir: "rice" ≠ "price", "bee" ≠ "beetle"
+// Bilerek kök olarak yazılmış eşleşmeler (ön ek eşleşir); diğerleri tam kelime + İngilizce çekim eki: "cotton" ≠ "cottonmouth"
+const STEM_WORDS = new Set(["fertili", "irrigat", "pollinat", "mycorrhiz", "cultivat", "agricultur", "pseudococc", "coccinell", "contaminat", "beekeep", "freez", "salin", "phosph", "soil sampl", "rust fung", "aphididae"]);
 function hasWord(h: string, w: string) {
   let re = wordReCache.get(w);
-  if (!re) { re = w.length <= 5 ? new RegExp(`\\b${escapeRe(w)}(?:s|es)?\\b`) : new RegExp(`\\b${escapeRe(w)}`); wordReCache.set(w, re); }
+  if (!re) { re = STEM_WORDS.has(w) ? new RegExp(`\\b${escapeRe(w)}`) : new RegExp(`\\b${escapeRe(w)}(?:s|es|ed|ing|er|ers)?\\b`); wordReCache.set(w, re); }
   return re.test(h);
 }
 function tokens(v: string) {
