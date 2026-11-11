@@ -352,8 +352,8 @@ async function download(url: string) {
 // Başka bir içerikte (aday veya yayın) kullanılmış görselleri bul
 async function usedElsewhere(db: any, landings: string[], ownerCol: string, id: string) {
   const used = new Set<string>();
-  for (let i = 0; i < landings.length; i += 80) {
-    const chunk = landings.slice(i, i + 80);
+  for (let i = 0; i < landings.length; i += 25) {
+    const chunk = landings.slice(i, i + 25);
     const q = await db.from("content_images").select("original_url,candidate_id,content_id").in("original_url", chunk).neq("status", "rejected");
     if (q.error) throw q.error;
     for (const r of q.data || []) {
@@ -383,8 +383,10 @@ Deno.serve(async (req) => {
     const organismFirst = terms.some((t) => t.organism);
     const requested = Number(body.maxImages), target = Math.max(1, Math.min(Number.isFinite(requested) ? requested : (isGuide ? 4 : 1), 6)), required = isGuide ? Math.min(3, target) : 1, ownerCol = candidateId ? "candidate_id" : "content_id";
     const structured = row.structured_body && typeof row.structured_body === "object" ? row.structured_body : {};
+    // DB yalnız missing|processing|ready|error|review_needed kabul ediyor; "no_match" görsel detayında tutulur.
     const finish = async (status: string, extra: Record<string, unknown>) => {
-      const up = await db.from(table).update({ image_status: status, image_processing_at: new Date().toISOString(), structured_body: { ...structured, visual_enrichment: { engine: ENGINE, status, required_count: required, target_count: target, queries, subject_words: words.slice(0, 12), updated_at: new Date().toISOString(), ...extra } } }).eq("id", id);
+      const dbStatus = status === "no_match" ? "review_needed" : status;
+      const up = await db.from(table).update({ image_status: dbStatus, image_processing_at: new Date().toISOString(), structured_body: { ...structured, visual_enrichment: { engine: ENGINE, status, required_count: required, target_count: target, queries, subject_words: words.slice(0, 12), updated_at: new Date().toISOString(), ...extra } } }).eq("id", id);
       if (up.error) throw up.error;
     };
 
@@ -451,6 +453,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error("[CONTENT_IMAGE_JOB_V7]", e);
     if (id && table) { try { await db.from(table).update({ image_status: "error", image_processing_at: new Date().toISOString() }).eq("id", id); } catch { /* ignore */ } }
-    return reply({ error: e instanceof Error ? e.message : String(e) }, 500);
+    const msg = e instanceof Error ? e.message : (e && typeof e === "object" ? clean((e as any).message || JSON.stringify(e), 600) : String(e));
+    return reply({ error: msg }, 500);
   }
 });
