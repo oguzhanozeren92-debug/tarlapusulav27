@@ -586,6 +586,21 @@ function weather3DIcon(condition?: string) {
   return `${WEATHER_3D_BASE}/${weather3DKey(condition)}.webp`;
 }
 
+// Kartlarda tek tip 3D ikon: aynı hava durumu setinden
+function Wx3D({ kind, label }: { kind: Weather3DKey; label?: string }) {
+  return (
+    <img
+      className="tp-wx3d"
+      src={`${WEATHER_3D_BASE}/${kind}.webp`}
+      crossOrigin="anonymous"
+      alt={label ?? ''}
+      aria-hidden={label ? undefined : true}
+      draggable={false}
+      loading="lazy"
+    />
+  );
+}
+
 type WeatherPusulaInsight = {
   id: string;
   gozlem: string;
@@ -1712,7 +1727,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           </button>
         </section>
 
-        <section className="tp-wxref-card">
+        <section className="tp-wxref-card" data-sky={weather3DKey(currentCondition)}>
           <img
             className="tp-wxref-ambient-art"
             src={weather3DIcon(currentCondition)}
@@ -1737,12 +1752,12 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
               <div className="tp-wxref-minmax">
                 <span>
-                  <Icon name="thermo" size={16} />
+                  <Wx3D kind="sunny" />
                   <b>{tempMax === null ? '—' : `${Math.round(tempMax)}°C`}</b>
                   <small>En Yüksek</small>
                 </span>
                 <span>
-                  <Icon name="thermo" size={16} />
+                  <Wx3D kind="snow" />
                   <b>{tempMin === null ? '—' : `${Math.round(tempMin)}°C`}</b>
                   <small>En Düşük</small>
                 </span>
@@ -1752,17 +1767,17 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
           <div className="tp-wxref-stats">
             <span>
-              <Icon name="drop" size={18} />
+              <Wx3D kind="fog" />
               <b>{humidity === null ? '—' : `%${Math.round(humidity)}`}</b>
               <small>Nem</small>
             </span>
             <span>
-              <Icon name="wind" size={18} />
+              <Wx3D kind="wind" />
               <b>{windSpeed === null ? '—' : `${Math.round(windSpeed)} km/sa`}</b>
               <small>Rüzgâr</small>
             </span>
             <span>
-              <Icon name="globe" size={18} />
+              <Wx3D kind="partly-cloudy" />
               <b>{nasaTemperature === null ? '—' : `${Math.round(nasaTemperature)}°`}</b>
               <small>Rüzgâr Yönü</small>
             </span>
@@ -1771,7 +1786,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           <div className="tp-wxref-risk-grid">
             <article className={rainChance >= 60 ? 'is-danger' : ''}>
               <span className="tp-wxref-risk-accent" />
-              <span className="tp-wxref-risk-icon"><Icon name="rain" size={19} /></span>
+              <span className="tp-wxref-risk-icon"><Wx3D kind={rainChance >= 60 ? 'heavy-rain' : 'light-rain'} /></span>
               <div>
                 <small>Yağış Riski</small>
                 <strong>%{Math.round(rainChance)}</strong>
@@ -1781,7 +1796,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
             <article className={frostRisk === 'Var' ? 'is-danger' : 'is-calm'}>
               <span className="tp-wxref-risk-accent" />
-              <span className="tp-wxref-risk-icon"><Icon name="thermo" size={19} /></span>
+              <span className="tp-wxref-risk-icon"><Wx3D kind="snow" /></span>
               <div>
                 <small>Don Riski</small>
                 <strong>{frostRisk}</strong>
@@ -1806,7 +1821,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon"><Icon name="rain" size={17} /></span>
+              <span className="tp-wxref-data-icon"><Wx3D kind="heavy-rain" /></span>
               <div>
                 <small>Yağış Geçmişi</small>
                 <strong>{rain30dValue === null ? '—' : `${rain30dValue.toFixed(1)} mm`}</strong>
@@ -1826,7 +1841,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon"><Icon name="thermo" size={17} /></span>
+              <span className="tp-wxref-data-icon"><Wx3D kind="sunny" /></span>
               <div>
                 <small>Yüzey Sıcaklığı</small>
                 <strong>{surfaceTemperatureValue === null ? '—' : `${surfaceTemperatureValue.toFixed(1)}°C`}</strong>
@@ -1846,7 +1861,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon"><Icon name="soil" size={17} /></span>
+              <span className="tp-wxref-data-icon"><Wx3D kind="partly-cloudy" /></span>
               <div>
                 <small>Tarla İklimi</small>
                 <strong>{climatePrimaryValue}</strong>
@@ -1872,7 +1887,7 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
                 }
               }}
             >
-              <span className="tp-wxref-data-icon is-blue"><Icon name="drop" size={17} /></span>
+              <span className="tp-wxref-data-icon is-blue"><Wx3D kind="light-rain" /></span>
               <div>
                 <small>ET₀ · Su Talebi</small>
                 <strong>{et0SevenDayValue === null ? '—' : `${et0SevenDayValue.toFixed(1)} mm / 7 gün`}</strong>
@@ -5244,4 +5259,135 @@ const WEATHER_STYLES = `
     }
   }
 
+
+  /* =========================================================
+     WEATHER 3D V2 (2026-11): her hava durumuna göre gökyüzü
+     arka planı, büyük 3D ana ikon ve tüm kartlarda aynı setten
+     tek tip 3D ikonlar. En sonda: önceki katmanları ezer.
+     ========================================================= */
+  body .tp-wxr-page .tp-wxref-card{
+    --sky-a:#eaf2fb; --sky-b:#fdf4de; --sky-ink:#101214; --sky-sub:#3d4650;
+  }
+  body .tp-wxr-page .tp-wxref-card[data-sky="sunny"]{--sky-a:#fff1cf;--sky-b:#cfe6ff}
+  body .tp-wxr-page .tp-wxref-card[data-sky="partly-cloudy"]{--sky-a:#fdf0d2;--sky-b:#d9e8f6}
+  body .tp-wxr-page .tp-wxref-card[data-sky="cloudy"]{--sky-a:#eef2f6;--sky-b:#c9d4df}
+  body .tp-wxr-page .tp-wxref-card[data-sky="fog"]{--sky-a:#f1f3f4;--sky-b:#cfd5da}
+  body .tp-wxr-page .tp-wxref-card[data-sky="wind"]{--sky-a:#e9f6f2;--sky-b:#c6e2dc}
+  body .tp-wxr-page .tp-wxref-card[data-sky="light-rain"]{--sky-a:#e3ecf5;--sky-b:#b6c8da}
+  body .tp-wxr-page .tp-wxref-card[data-sky="heavy-rain"]{--sky-a:#cfdbe7;--sky-b:#93a9bf}
+  body .tp-wxr-page .tp-wxref-card[data-sky="snow"]{--sky-a:#f6fafd;--sky-b:#d4e5f3}
+  body .tp-wxr-page .tp-wxref-card[data-sky="storm"]{--sky-a:#4b5a6e;--sky-b:#1d2633;--sky-ink:#ffffff;--sky-sub:#d6dee8}
+  body .tp-wxr-page .tp-wxref-card[data-sky="night"]{--sky-a:#2a3a64;--sky-b:#0f172a;--sky-ink:#ffffff;--sky-sub:#cfd8ea}
+
+  body .tp-wxr-page .tp-wxref-card::before{display:none!important}
+  body .tp-wxr-page .tp-wxref-ambient-art{
+    position:absolute!important;
+    top:-26px!important;
+    right:-46px!important;
+    width:230px!important;
+    height:230px!important;
+    opacity:.22!important;
+    filter:blur(2px) saturate(1.1)!important;
+    pointer-events:none!important;
+    z-index:0!important;
+  }
+  body .tp-wxr-page .tp-wxref-current{
+    position:relative!important;
+    z-index:1!important;
+    grid-template-columns:132px minmax(0,1fr)!important;
+    gap:10px!important;
+    min-height:150px!important;
+    padding:14px 14px 14px 6px!important;
+    border-radius:22px!important;
+    background:
+      radial-gradient(circle at 18% 30%,rgba(255,255,255,.55),transparent 46%),
+      linear-gradient(155deg,var(--sky-a) 0%,var(--sky-b) 100%)!important;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.45),0 10px 24px rgba(17,24,39,.08)!important;
+    overflow:hidden!important;
+  }
+  body .tp-wxr-page .tp-wxref-art{
+    width:132px!important;
+    height:132px!important;
+    border-radius:0!important;
+    background:none!important;
+    box-shadow:none!important;
+  }
+  body .tp-wxr-page .tp-wxref-art img{
+    width:132px!important;
+    height:132px!important;
+    object-fit:contain!important;
+    filter:drop-shadow(0 14px 18px rgba(15,23,42,.22))!important;
+  }
+  body .tp-wxr-page .tp-wxref-current-copy>strong{
+    font-size:52px!important;
+    color:var(--sky-ink)!important;
+    -webkit-text-fill-color:var(--sky-ink)!important;
+  }
+  body .tp-wxr-page .tp-wxref-current-copy h2{
+    font-size:16px!important;
+    color:var(--sky-ink)!important;
+    -webkit-text-fill-color:var(--sky-ink)!important;
+  }
+  body .tp-wxr-page .tp-wxref-minmax{gap:12px!important}
+  body .tp-wxr-page .tp-wxref-minmax span{
+    display:grid!important;
+    grid-template-columns:26px auto!important;
+    column-gap:5px!important;
+    align-items:center!important;
+  }
+  body .tp-wxr-page .tp-wxref-minmax .tp-wx3d{grid-row:1/3;width:26px;height:26px}
+  body .tp-wxr-page .tp-wxref-minmax b{font-size:12px!important;color:var(--sky-ink)!important;-webkit-text-fill-color:var(--sky-ink)!important}
+  body .tp-wxr-page .tp-wxref-minmax small{font-size:9px!important;color:var(--sky-sub)!important;-webkit-text-fill-color:var(--sky-sub)!important}
+
+  /* Ortak 3D ikon */
+  body .tp-wxr-page .tp-wx3d{
+    display:block;
+    object-fit:contain;
+    filter:drop-shadow(0 4px 6px rgba(15,23,42,.18));
+  }
+  body .tp-wxr-page .tp-wxref-stats{min-height:66px!important;border-radius:18px!important}
+  body .tp-wxr-page .tp-wxref-stats span{
+    display:grid!important;
+    grid-template-columns:34px minmax(0,1fr)!important;
+    column-gap:6px!important;
+    align-items:center!important;
+  }
+  body .tp-wxr-page .tp-wxref-stats .tp-wx3d{grid-row:1/3;width:34px;height:34px}
+  body .tp-wxr-page .tp-wxref-stats b{font-size:12.5px!important}
+  body .tp-wxr-page .tp-wxref-stats small{font-size:9px!important}
+
+  body .tp-wxr-page .tp-wxref-risk-grid article{border-radius:18px!important;min-height:84px!important}
+  body .tp-wxr-page .tp-wxref-risk-icon,
+  body .tp-wxr-page .tp-wxref-risk-grid article.is-danger .tp-wxref-risk-icon,
+  body .tp-wxr-page .tp-wxref-risk-grid article.is-calm .tp-wxref-risk-icon,
+  body .tp-wxr-page .tp-wxref-data-icon,
+  body .tp-wxr-page .tp-wxref-data-icon.is-blue{
+    width:50px!important;
+    height:50px!important;
+    min-width:50px!important;
+    display:grid!important;
+    place-items:center!important;
+    border-radius:15px!important;
+    border:1px solid #e3e8ec!important;
+    background:linear-gradient(160deg,#ffffff 0%,#eef3f7 100%)!important;
+    box-shadow:0 4px 10px rgba(15,23,42,.06),inset 0 1px 0 #fff!important;
+    color:inherit!important;
+  }
+  body .tp-wxr-page .tp-wxref-risk-icon .tp-wx3d,
+  body .tp-wxr-page .tp-wxref-data-icon .tp-wx3d{width:44px;height:44px}
+  body .tp-wxr-page .tp-wxref-data-grid article{border-radius:18px!important;min-height:88px!important}
+
+  @media(max-width:560px){
+    body .tp-wxr-page .tp-wxref-current{grid-template-columns:116px minmax(0,1fr)!important;min-height:138px!important}
+    body .tp-wxr-page .tp-wxref-art,
+    body .tp-wxr-page .tp-wxref-art img{width:116px!important;height:116px!important}
+    body .tp-wxr-page .tp-wxref-current-copy>strong{font-size:46px!important}
+    body .tp-wxr-page .tp-wxref-stats .tp-wx3d{width:30px;height:30px}
+    body .tp-wxr-page .tp-wxref-stats span{grid-template-columns:30px minmax(0,1fr)!important;padding:1px 8px!important}
+    body .tp-wxr-page .tp-wxref-risk-icon,
+    body .tp-wxr-page .tp-wxref-data-icon,
+    body .tp-wxr-page .tp-wxref-data-icon.is-blue{width:44px!important;height:44px!important;min-width:44px!important}
+    body .tp-wxr-page .tp-wxref-risk-icon .tp-wx3d,
+    body .tp-wxr-page .tp-wxref-data-icon .tp-wx3d{width:38px;height:38px}
+  }
 `;
