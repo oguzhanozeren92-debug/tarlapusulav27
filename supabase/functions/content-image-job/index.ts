@@ -431,6 +431,11 @@ Deno.serve(async (req) => {
         await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: im.bytes, ContentType: im.type, CacheControl: "public, max-age=31536000, immutable" }));
         const ins = await db.from("content_images").insert({ candidate_id: candidateId || null, content_id: contentId || null, r2_key: key, public_url: null, original_url: c.landing || c.url, source_domain: c.source, license_type: c.license, credit_text: [c.creator, c.license.toUpperCase(), c.source].filter(Boolean).join(" · ") || c.source, alt_text: clean(candidateId ? row.title_suggested : row.title, 500) || queries[0], caption: c.title || null, image_type: isCover ? "cover" : "gallery", status: contentId ? "approved" : "pending_review", is_cover: isCover, sort_order: sortOrder }).select("id").single();
         if (ins.error || !ins.data) throw ins.error || new Error("Görsel kaydı oluşturulamadı");
+        // Paralel işler aynı fotoğrafı aynı anda seçebilir: daha önce kaydeden kazanır, biz geri çekilip sıradakini deneriz
+        const race = await db.from("content_images").select("id,created_at,candidate_id,content_id").eq("original_url", c.landing || c.url).neq("status", "rejected");
+        const mine = (race.data || []).find((x: any) => x.id === ins.data.id);
+        const lost = mine && (race.data || []).some((x: any) => x.id !== ins.data.id && x[ownerCol] !== id && (x.created_at < mine.created_at || (x.created_at === mine.created_at && x.id < mine.id)));
+        if (lost) { await db.from("content_images").update({ status: "rejected", is_cover: false }).eq("id", ins.data.id); keys.add(dk); continue; }
         const url = `${su}/functions/v1/content-image-public?id=${encodeURIComponent(ins.data.id)}`;
         await db.from("content_images").update({ public_url: url }).eq("id", ins.data.id);
         if (isCover) { await db.from("content_images").update({ is_cover: false }).eq(ownerCol, id).neq("id", ins.data.id); hasCover = true; }
