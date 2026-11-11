@@ -39,7 +39,7 @@ function chart(v: any) { if (!v || typeof v !== "object") return null; const lab
 function table(v: any) { if (!v || typeof v !== "object") return null; const columns = uniq(v.columns, 8); if (!columns.length || !Array.isArray(v.rows)) return null; const rows = v.rows.slice(0, 20).map((r: any) => Array.isArray(r) ? r.slice(0, columns.length).map((x: any) => typeof x === "number" ? x : clean(x, 160)) : []).filter((r: any[]) => r.length === columns.length); return rows.length ? { title: clean(v.title, 180) || null, columns, rows } : null; }
 
 async function callModel(model: string, key: string, messages: unknown[]) {
-  const body: Record<string, unknown> = { model, messages, temperature: 0.3, top_p: 0.95, max_tokens: 1800, stream: false };
+  const body: Record<string, unknown> = { model, messages, temperature: 0.3, top_p: 0.95, max_tokens: 4000, stream: false };
   if (model.startsWith("nvidia/nemotron")) { body.chat_template_kwargs = { enable_thinking: false }; body.temperature = 1.0; }
   if (model === "z-ai/glm-5.3-flash") { body.reasoning_effort = "low"; body.chat_template_kwargs = { clear_thinking: true }; }
   const r = await fetch(AI_URL, { method: "POST", signal: AbortSignal.timeout(model === "z-ai/glm-5.3-flash" ? 75000 : 40000), headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
