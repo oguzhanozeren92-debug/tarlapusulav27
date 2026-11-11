@@ -12,9 +12,9 @@ import OnboardingScreen from './pages/Onboarding/OnboardingScreen';
 import ReadyScreen from './pages/Onboarding/ReadyScreen';
 import HomeScreen from './pages/Home/HomeScreen';
 import NativeLocalReminderOffer from './mobile/NativeLocalReminderOffer';
-import PusulaTest from './pages/PusulaTest/PusulaTest';
 import CalendarScreen from './pages/Calendar/CalendarScreen';
 import AiAnalysisScreen from './pages/AiAnalysis/AiAnalysisScreen';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabaseClient';
 import { openArchivedPusulaPdf } from './features/pusula-pdf/services/pusulaPdfArchive.service';
 import type { WeeklyPusulaReport } from './features/pusula-pdf/types';
@@ -844,14 +844,6 @@ export default function App() {
     setScreen('soilAnalysisHub');
   };
 
-  const pusulaTestMode =
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('pusulaTest') === '1';
-
-  if (pusulaTestMode) {
-    return <PusulaTest />;
-  }
-
 
   if (pusulaIntroOpen) {
     const clearPreviewSeenFlag = () => {
@@ -1286,10 +1278,12 @@ export default function App() {
     );
   }
 
-  const cmsDesktopMenuItems = cmsMenus.filter(item=>item.is_visible && item.show_desktop && (!item.admin_only || isAdmin)).sort((a,b)=>a.position-b.position).map(item=>({screen:((item.page_key || 'home') as Screen),icon:item.icon || '•',label:item.label,badge:item.badge_text || undefined}));
+  // Yönetim yalnızca web panelinde; mağaza derlemelerinde menüde görünmez.
+  const webAdmin = isAdmin && !Capacitor.isNativePlatform() && import.meta.env.VITE_APP_STORE_RELEASE !== 'true';
+  const cmsDesktopMenuItems = cmsMenus.filter(item=>item.is_visible && item.show_desktop && (!item.admin_only || webAdmin)).sort((a,b)=>a.position-b.position).map(item=>({screen:((item.page_key || 'home') as Screen),icon:item.icon || '•',label:item.label,badge:item.badge_text || undefined}));
   const desktopMenuItems: AppMenuItem[] = [
     ...(cmsDesktopMenuItems.length ? cmsDesktopMenuItems : FALLBACK_DESKTOP_MENU_ITEMS),
-    ...(isAdmin && !(cmsDesktopMenuItems.length && cmsDesktopMenuItems.some(item=>item.screen==='adminHub')) ? [{screen:'adminHub' as Screen,icon:'◆',label:'Yönetim',badge:'ADMIN'}] : []),
+    ...(webAdmin && !(cmsDesktopMenuItems.length && cmsDesktopMenuItems.some(item=>item.screen==='adminHub')) ? [{screen:'adminHub' as Screen,icon:'◆',label:'Yönetim',badge:'ADMIN'}] : []),
   ].map((item) => {
     if (String(item.screen) === 'inventoryHub') {
       return { ...item, label: 'Depom' };
@@ -1572,7 +1566,7 @@ export default function App() {
     );
   }
 
-  if (screen === 'adminHub') {
+  if (screen === 'adminHub' && webAdmin) {
     return <AdminPageBuilder onBack={() => setScreen('home')} />;
   }
 

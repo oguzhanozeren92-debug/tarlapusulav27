@@ -352,13 +352,13 @@
 
 .soil-sample-steps{margin-top:15px;display:grid;gap:7px}
 .soil-sample-step{border:1px solid var(--soil-line);border-radius:14px;background:#fafaf8;overflow:hidden}
-.soil-sample-step summary{display:grid;grid-template-columns:32px minmax(0,1fr) 18px;gap:9px;align-items:center;padding:10px 11px;cursor:pointer;list-style:none}
+.soil-sample-step summary{display:grid;grid-template-columns:56px minmax(0,1fr) 18px;gap:9px;align-items:center;padding:10px 11px;cursor:pointer;list-style:none}
 .soil-sample-step summary::-webkit-details-marker{display:none}
 .soil-sample-step summary>div{min-width:0}
 .soil-sample-step summary strong{display:block;font-size:11px}
 .soil-sample-step summary small{display:block;margin-top:2px;color:#777770;font-size:9px}
 .soil-sample-step[open] summary>svg{transform:rotate(90deg)}
-.soil-sample-step>p{margin:0;padding:0 12px 12px 52px;color:#5f5f59;font-size:10px;line-height:1.5}
+.soil-sample-step>p{margin:0;padding:0 12px 12px 76px;color:#5f5f59;font-size:10px;line-height:1.5}
 .soil-step-number{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:#111;color:#fff;font-size:10px;font-weight:850}
 
 .soil-location-chip{margin-top:15px;display:flex;gap:9px;align-items:center;padding:11px 12px;border-radius:13px;background:#f4f4f1}
@@ -450,3 +450,8 @@
   .soil-spin,.soil-loader{animation:none}
   *{scroll-behavior:auto!important}
 }
+
+/* Numune alma adımı görselleri */
+.soil-step-thumb{position:relative;width:56px;height:64px;border-radius:11px;overflow:hidden;background:#eef0ea;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.soil-step-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.soil-step-thumb .soil-step-number{position:absolute;left:4px;bottom:4px;width:20px;height:20px;border-radius:7px;font-size:9px;box-shadow:0 2px 6px rgba(0,0,0,.25)}

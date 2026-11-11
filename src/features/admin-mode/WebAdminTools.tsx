@@ -1,13 +1,7 @@
-import AdminUiRuntime from '../admin-ui/AdminUiRuntime';
 import InAppAdminMode from './InAppAdminMode';
 
-// Content and layout administration belongs to the authenticated web dashboard.
-// Never mount these tools inside the App Store iOS/Android application.
+// Yönetim araçları yalnızca web panelinde açılır; App Store / Play Store
+// derlemelerine hiç dahil edilmez (bkz. main.tsx).
 export default function WebAdminTools() {
-  return (
-    <>
-      <AdminUiRuntime />
-      <InAppAdminMode />
-    </>
-  );
+  return <InAppAdminMode />;
 }
