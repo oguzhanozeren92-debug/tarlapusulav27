@@ -22,9 +22,10 @@ const PUSULA_BODY_SRC =
 const DRAWER_BG_SRC =
   'https://fkrqvwarxzmdrexsxtzw.supabase.co/storage/v1/object/public/ui-icons/backgrounds/d70787c4-3c37-4582-a2c2-f7d7e06b1cad%20(1).png';
 
-// Yüksek çözünürlüklü uydu başlık görseli (eski 256 px'lik küçük jpg yerine)
+// Menü arka planı: Uluslararası Uzay İstasyonu'ndan gece Dünya'nın kenarı ve şehir ışıkları.
+// NASA, kamu malı — https://commons.wikimedia.org/wiki/File:ISS-58_Ukraine_and_Russia_nighttime_view.jpg
 const DRAWER_HEADER_SRC =
-  'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/ui-icons/backgrounds/global-header-satellite-v2.webp';
+  'https://xwyfidtktauxivsosmex.supabase.co/storage/v1/object/public/ui-icons/backgrounds/drawer-v3/iss-night-limb.jpg?v=1920';
 
 const DRAWER_BG_FALLBACK_SRC =
   'https://fkrqvwarxzmdrexsxtzw.supabase.co/storage/v1/object/public/ui-icons/backgrounds/pusuladan-sana-bg-4.webp';
@@ -1319,11 +1320,9 @@ export default function AppDrawer({
            görseliyle yenilenir. Bu blok en sonda: önceki katmanları ezer. ===== */
         html body .tp-premium-drawer{
           background:
-            linear-gradient(180deg,rgba(2,8,5,.10) 0%,rgba(2,8,5,.30) 18%,rgba(2,9,5,.72) 40%,rgba(2,7,4,.86) 100%),
-            url("${DRAWER_HEADER_SRC}") center top / 100% auto no-repeat,
-            url("${DRAWER_BG_SRC}") center 70% / cover no-repeat,
-            url("${DRAWER_BG_FALLBACK_SRC}") center 70% / cover no-repeat,
-            #04100a!important;
+            linear-gradient(180deg,rgba(1,3,6,.05) 0%,rgba(1,3,6,.22) 20%,rgba(1,3,6,.62) 42%,rgba(1,3,6,.86) 70%,rgba(1,3,6,.94) 100%),
+            url("${DRAWER_HEADER_SRC}") 62% top / cover no-repeat,
+            #020406!important;
         }
         html body .tp-premium-drawer .tp-premium-drawer-x{
           width:44px!important;

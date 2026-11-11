@@ -416,6 +416,46 @@ async function usedElsewhere(db: any, landings: string[], ownerCol: string, id: 
   return used;
 }
 
+// ---- Arayüz arka planı aktarma (admin/cron): Commons'tan büyük, serbest lisanslı görseli ui-icons'a yükler ----
+async function uiAssetSearch(q: string) {
+  const p = new URLSearchParams({ action: "query", format: "json", origin: "*", generator: "search", gsrsearch: `${q} filetype:bitmap`, gsrnamespace: "6", gsrlimit: "25", prop: "imageinfo", iiprop: "url|extmetadata|size|mime", iiurlwidth: "2400", iiextmetadatafilter: "LicenseShortName|Artist|Credit|ImageDescription|ObjectName" });
+  const r = await fetch(`https://commons.wikimedia.org/w/api.php?${p}`, { signal: AbortSignal.timeout(15000), headers: { "User-Agent": "TarlaPusula-UI/1.0 (app background assets)" } });
+  if (!r.ok) throw new Error(`Commons ${r.status}`);
+  const j = await r.json();
+  return (Object.values(j?.query?.pages || {}) as any[]).map((pg: any) => {
+    const ii = pg?.imageinfo?.[0] || {}, m = ii.extmetadata || {};
+    return { title: String(pg.title || ""), width: Number(ii.width) || 0, height: Number(ii.height) || 0, mime: clean(ii.mime, 40), thumb: clean(ii.thumburl, 1800), page: clean(ii.descriptionurl, 1800), license: license(m?.LicenseShortName?.value), licenseRaw: stripHtml(m?.LicenseShortName?.value, 120), artist: stripHtml(m?.Artist?.value || m?.Credit?.value, 160), desc: stripHtml(m?.ImageDescription?.value || m?.ObjectName?.value, 240) };
+  }).filter((x) => SAFE.has(x.license) && /jpeg|png|webp/.test(x.mime) && x.width >= 1800);
+}
+async function uiAsset(db: any, su: string, body: any) {
+  if (body.mode === "ui-asset-search") {
+    const out: Record<string, unknown> = {};
+    for (const q of (Array.isArray(body.queries) ? body.queries : []).slice(0, 8)) {
+      try { out[String(q)] = (await uiAssetSearch(String(q))).slice(0, 8); } catch (e) { out[String(q)] = { error: String(e) }; }
+    }
+    return reply({ ok: true, results: out });
+  }
+  const folder = clean(body.folder || "drawer-v3", 60).replace(/[^a-z0-9-]/gi, "-");
+  const done: unknown[] = [];
+  for (const it of (Array.isArray(body.items) ? body.items : []).slice(0, 8)) {
+    const name = clean(it?.name, 60).replace(/[^a-z0-9-]/gi, "-");
+    const found = (await uiAssetSearch(String(it?.title || "").replace(/^File:/, ""))).find((x) => x.title === it?.title);
+    if (!found) { done.push({ name, error: "bulunamadı / lisans uygun değil" }); continue; }
+    const w = Math.max(640, Math.min(Number(body.width) || 2400, 2400));
+    const src = found.thumb.replace(/\/\d+px-/, `/${w}px-`);
+    const img = await fetch(src, { signal: AbortSignal.timeout(30000), headers: { "User-Agent": "TarlaPusula-UI/1.0" } });
+    if (!img.ok) { done.push({ name, error: `indirme ${img.status}` }); continue; }
+    const type = (img.headers.get("content-type") || "image/jpeg").split(";")[0];
+    const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg";
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    const path = `backgrounds/${folder}/${name}.${ext}`;
+    const up = await db.storage.from("ui-icons").upload(path, bytes, { contentType: type, upsert: true, cacheControl: "31536000" });
+    if (up.error) { done.push({ name, error: up.error.message }); continue; }
+    done.push({ name, url: `${su}/storage/v1/object/public/ui-icons/${path}`, bytes: bytes.length, title: found.title, license: found.licenseRaw, artist: found.artist, page: found.page });
+  }
+  return reply({ ok: true, items: done });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors }); if (req.method !== "POST") return reply({ error: "Sadece POST" }, 405);
   const su = clean(Deno.env.get("SUPABASE_URL"), 500), sk = clean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), 1400), rid = account(Deno.env.get("R2_ACCOUNT_ID")), ra = clean(Deno.env.get("R2_ACCESS_KEY_ID"), 500), rs = clean(Deno.env.get("R2_SECRET_ACCESS_KEY"), 1400), bucket = clean(Deno.env.get("R2_BUCKET_NAME"), 500);
@@ -423,7 +463,9 @@ Deno.serve(async (req) => {
   const db = createClient(su, sk, { auth: { persistSession: false } }); if (!(await allowed(req, db))) return reply({ error: "Yetki gerekli" }, 403);
   let id = "", table = "";
   try {
-    const body = await req.json().catch(() => ({})), candidateId = clean(body.candidateId, 100), contentId = clean(body.contentId, 100); if (!candidateId && !contentId) return reply({ error: "candidateId/contentId gerekli" }, 400);
+    const body = await req.json().catch(() => ({}));
+    if (body?.mode === "ui-asset-search" || body?.mode === "ui-asset-import") return await uiAsset(db, su, body);
+    const candidateId = clean(body.candidateId, 100), contentId = clean(body.contentId, 100); if (!candidateId && !contentId) return reply({ error: "candidateId/contentId gerekli" }, 400);
     id = candidateId || contentId; table = candidateId ? "content_candidates" : "content_items";
     const fields = candidateId ? "title_suggested,image_search_keyword,suggested_crops,suggested_tags,suggested_category,content_subtype,structured_body,source_refs" : "title,image_search_keyword,crop_tags,tags,category,content_subtype,structured_body,source_refs";
     const qr = await db.from(table).select(fields).eq("id", id).maybeSingle(); if (qr.error) throw qr.error; if (!qr.data) return reply({ error: "İçerik bulunamadı" }, 404);
