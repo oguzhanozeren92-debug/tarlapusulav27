@@ -586,6 +586,70 @@ function weather3DIcon(condition?: string) {
   return `${WEATHER_3D_BASE}/${weather3DKey(condition)}.webp`;
 }
 
+type SkyPhase = 'dawn' | 'day' | 'dusk' | 'night';
+
+// Tarlanın konumuna göre gün doğumu/batımı (NOAA yaklaşık formülü), UTC dakika
+function sunTimesUtc(lat: number, lng: number, date: Date) {
+  const rad = Math.PI / 180;
+  const start = Date.UTC(date.getUTCFullYear(), 0, 1);
+  const doy = Math.floor((date.getTime() - start) / 86400000) + 1;
+  const g = (2 * Math.PI / 365) * (doy - 1);
+  const eqtime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const cosHa = Math.cos(90.833 * rad) / (Math.cos(lat * rad) * Math.cos(decl)) - Math.tan(lat * rad) * Math.tan(decl);
+  if (!Number.isFinite(cosHa) || cosHa < -1 || cosHa > 1) return null;
+  const ha = Math.acos(cosHa) / rad;
+  return { rise: 720 - 4 * (lng + ha) - eqtime, set: 720 - 4 * (lng - ha) - eqtime };
+}
+
+function skyPhaseFor(center: { latitude: number; longitude: number } | null | undefined, now = new Date()): SkyPhase {
+  const sun = center ? sunTimesUtc(center.latitude, center.longitude, now) : null;
+  if (!sun) {
+    const h = now.getHours();
+    if (h >= 5 && h < 8) return 'dawn';
+    if (h >= 8 && h < 17) return 'day';
+    if (h >= 17 && h < 20) return 'dusk';
+    return 'night';
+  }
+  const nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const diff = (a: number, b: number) => ((((a - b) % 1440) + 2160) % 1440) - 720;
+  const fromRise = diff(nowMin, sun.rise);
+  const fromSet = diff(nowMin, sun.set);
+  if (Math.abs(fromRise) <= 50) return 'dawn';
+  if (Math.abs(fromSet) <= 50) return 'dusk';
+  return fromRise > 0 && fromSet < 0 ? 'day' : 'night';
+}
+
+// Panel arka planı: çizim manzara + hava durumuna göre hafif hareket (dekoratif)
+function WeatherSkyScene({ sky, phase }: { sky: Weather3DKey; phase: SkyPhase }) {
+  return (
+    <div className="tp-wxsky" data-sky={sky} data-phase={phase} aria-hidden="true">
+      <span className="tp-wxsky-stars" />
+      <span className="tp-wxsky-sun" />
+      <span className="tp-wxsky-cloud c1" />
+      <span className="tp-wxsky-cloud c2" />
+      <span className="tp-wxsky-cloud c3" />
+      <span className="tp-wxsky-fog" />
+      <span className="tp-wxsky-rain" />
+      <span className="tp-wxsky-snow" />
+      <span className="tp-wxsky-flash" />
+      <svg className="tp-wxsky-land" viewBox="0 0 400 60" preserveAspectRatio="none" focusable="false">
+        <path className="hill-back" d="M0 26 C 55 6 120 14 175 22 S 300 4 400 18 V60 H0Z" />
+        <g className="trees">
+          <circle cx="318" cy="12" r="5" /><rect x="317" y="15" width="2" height="5" />
+          <circle cx="332" cy="10" r="6.5" /><rect x="331" y="15" width="2" height="6" />
+          <circle cx="62" cy="15" r="5" /><rect x="61" y="18" width="2" height="5" />
+        </g>
+        <path className="hill-front" d="M0 42 C 80 26 170 40 250 34 S 350 28 400 38 V60 H0Z" />
+        <g className="rows">
+          <path d="M20 58 L120 40" /><path d="M70 60 L170 41" /><path d="M130 60 L215 40" />
+          <path d="M195 60 L262 37" /><path d="M260 60 L310 35" /><path d="M325 60 L355 33" />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 // Kartlarda tek tip 3D ikon: aynı hava durumu setinden
 function Wx3D({ kind, label }: { kind: Weather3DKey; label?: string }) {
   return (
@@ -1601,6 +1665,12 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
 
   const currentCondition =
     String((firstDay as any)?.condition ?? (firstDay as any)?.description ?? 'Güncel hava');
+  const skyPhase = skyPhaseFor(conditionCenter);
+  const skyKeyBase = weather3DKey(currentCondition);
+  // Gece açık/parçalı havada güneş yerine gece ikonu
+  const skyKey: Weather3DKey =
+    skyPhase === 'night' && (skyKeyBase === 'sunny' || skyKeyBase === 'partly-cloudy') ? 'night' : skyKeyBase;
+  const heroIconSrc = `${WEATHER_3D_BASE}/${skyKey}.webp`;
 
   const totalRain =
     safeNumber((firstDay as any)?.precipitation) ??
@@ -1727,19 +1797,20 @@ export default function WeatherHubScreen(props: WeatherHubScreenProps) {
           </button>
         </section>
 
-        <section className="tp-wxref-card" data-sky={weather3DKey(currentCondition)}>
+        <section className="tp-wxref-card" data-sky={skyKey} data-phase={skyPhase}>
           <img
             className="tp-wxref-ambient-art"
-            src={weather3DIcon(currentCondition)}
+            src={heroIconSrc}
             crossOrigin="anonymous"
             alt=""
             aria-hidden="true"
             draggable={false}
           />
           <div className="tp-wxref-current">
+            <WeatherSkyScene sky={skyKey} phase={skyPhase} />
             <div className="tp-wxref-art">
               <img
-                src={weather3DIcon(currentCondition)}
+                src={heroIconSrc}
                 crossOrigin="anonymous"
                 alt={currentCondition || 'Hava durumu'}
                 draggable={false}
@@ -5389,5 +5460,112 @@ const WEATHER_STYLES = `
     body .tp-wxr-page .tp-wxref-data-icon.is-blue{width:44px!important;height:44px!important;min-width:44px!important}
     body .tp-wxr-page .tp-wxref-risk-icon .tp-wx3d,
     body .tp-wxr-page .tp-wxref-data-icon .tp-wx3d{width:38px;height:38px}
+  }
+
+  /* ===== SKY SCENE V1: çizim manzara + hafif hareket + günün saati ===== */
+  body .tp-wxr-page .tp-wxref-card[data-phase="dawn"]{--sky-a:#ffd6c4}
+  body .tp-wxr-page .tp-wxref-card[data-phase="dusk"]{--sky-a:#ffc49c;--sky-b:#a596cf}
+  body .tp-wxr-page .tp-wxref-card[data-phase="night"]{--sky-a:#2b3c66;--sky-b:#0e1629;--sky-ink:#ffffff;--sky-sub:#cfd8ea}
+  body .tp-wxr-page .tp-wxref-current{padding-bottom:40px!important;min-height:166px!important}
+  body .tp-wxr-page .tp-wxref-art,
+  body .tp-wxr-page .tp-wxref-current-copy{position:relative!important;z-index:2!important}
+
+  .tp-wxsky{
+    --land-back:#9cc483; --land-front:#6ea258; --land-row:rgba(255,255,255,.28); --tree:#4c7d3c;
+    --cloud:rgba(255,255,255,.82); --cloud-shade:rgba(255,255,255,.55);
+    position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; border-radius:inherit;
+  }
+  .tp-wxsky[data-phase="dawn"],.tp-wxsky[data-phase="dusk"]{--land-back:#87a872;--land-front:#5c8549;--tree:#3d6531}
+  .tp-wxsky[data-phase="night"]{--land-back:#243a52;--land-front:#18293d;--land-row:rgba(255,255,255,.08);--tree:#132233;--cloud:rgba(170,185,210,.35);--cloud-shade:rgba(150,165,190,.25)}
+  .tp-wxsky[data-sky="snow"]{--land-back:#eef4f8;--land-front:#dfe9f0;--land-row:rgba(140,165,185,.35);--tree:#8aa0b2}
+  .tp-wxsky[data-sky="heavy-rain"],.tp-wxsky[data-sky="storm"]{--land-back:#6f8c66;--land-front:#4e6b48;--tree:#38522f;--cloud:rgba(96,110,130,.72);--cloud-shade:rgba(80,94,112,.55)}
+  .tp-wxsky[data-sky="light-rain"]{--cloud:rgba(150,165,185,.7);--cloud-shade:rgba(140,155,175,.5)}
+
+  .tp-wxsky-land{position:absolute;left:0;right:0;bottom:0;width:100%;height:44px;display:block}
+  .tp-wxsky-land .hill-back{fill:var(--land-back)}
+  .tp-wxsky-land .hill-front{fill:var(--land-front)}
+  .tp-wxsky-land .trees{fill:var(--tree)}
+  .tp-wxsky-land .rows path{stroke:var(--land-row);stroke-width:1.4;fill:none}
+
+  /* Güneş / ay */
+  .tp-wxsky-sun{position:absolute;top:14px;right:22px;width:46px;height:46px;border-radius:50%;display:none;
+    background:radial-gradient(circle at 40% 40%,#fff6cc,#ffd75e 60%,#ffbe3b);
+    box-shadow:0 0 0 10px rgba(255,214,94,.18),0 0 40px rgba(255,200,80,.55)}
+  .tp-wxsky[data-sky="sunny"] .tp-wxsky-sun,
+  .tp-wxsky[data-sky="partly-cloudy"] .tp-wxsky-sun,
+  .tp-wxsky[data-sky="wind"] .tp-wxsky-sun,
+  .tp-wxsky[data-sky="night"] .tp-wxsky-sun{display:block}
+  .tp-wxsky[data-phase="dawn"] .tp-wxsky-sun,.tp-wxsky[data-phase="dusk"] .tp-wxsky-sun{top:auto;bottom:26px;background:radial-gradient(circle at 40% 40%,#ffe2b8,#ff9d5c 65%,#f07a45);box-shadow:0 0 30px rgba(255,140,80,.6)}
+  .tp-wxsky[data-phase="night"] .tp-wxsky-sun{width:34px;height:34px;top:16px;background:radial-gradient(circle at 38% 38%,#ffffff,#e6ecf7 70%,#c9d3e6);box-shadow:0 0 22px rgba(220,230,255,.45)}
+
+  /* Yıldızlar (gece) */
+  .tp-wxsky-stars{position:absolute;inset:0 0 40px 0;display:none;
+    background-image:
+      radial-gradient(1.4px 1.4px at 12% 22%,#fff 50%,transparent 51%),
+      radial-gradient(1.2px 1.2px at 32% 12%,#fff 50%,transparent 51%),
+      radial-gradient(1.6px 1.6px at 58% 30%,#fff 50%,transparent 51%),
+      radial-gradient(1.1px 1.1px at 72% 10%,#fff 50%,transparent 51%),
+      radial-gradient(1.3px 1.3px at 86% 44%,#fff 50%,transparent 51%),
+      radial-gradient(1.2px 1.2px at 46% 52%,#fff 50%,transparent 51%);
+    animation:tpWxTwinkle 4.5s ease-in-out infinite}
+  .tp-wxsky[data-phase="night"] .tp-wxsky-stars{display:block}
+  .tp-wxsky[data-phase="night"][data-sky="cloudy"] .tp-wxsky-stars,
+  .tp-wxsky[data-phase="night"][data-sky*="rain"] .tp-wxsky-stars,
+  .tp-wxsky[data-phase="night"][data-sky="storm"] .tp-wxsky-stars{opacity:.25;animation:none}
+
+  /* Bulutlar */
+  .tp-wxsky-cloud{position:absolute;display:none;height:22px;border-radius:999px;background:var(--cloud);
+    filter:blur(.3px);animation:tpWxDrift 46s linear infinite}
+  .tp-wxsky-cloud::before,.tp-wxsky-cloud::after{content:'';position:absolute;bottom:6px;border-radius:50%;background:var(--cloud)}
+  .tp-wxsky-cloud::before{left:14%;width:42%;height:30px}
+  .tp-wxsky-cloud::after{left:44%;width:36%;height:24px;background:var(--cloud-shade)}
+  .tp-wxsky-cloud.c1{top:20px;width:96px;left:-10%}
+  .tp-wxsky-cloud.c2{top:46px;width:70px;left:30%;animation-duration:62s;animation-delay:-20s;opacity:.85}
+  .tp-wxsky-cloud.c3{top:12px;width:120px;left:60%;animation-duration:54s;animation-delay:-34s}
+  .tp-wxsky:is([data-sky="partly-cloudy"],[data-sky="wind"]) .tp-wxsky-cloud.c1,
+  .tp-wxsky:is([data-sky="partly-cloudy"],[data-sky="wind"]) .tp-wxsky-cloud.c2{display:block}
+  .tp-wxsky:is([data-sky="cloudy"],[data-sky="fog"],[data-sky="light-rain"],[data-sky="heavy-rain"],[data-sky="storm"],[data-sky="snow"]) .tp-wxsky-cloud{display:block}
+  .tp-wxsky[data-sky="wind"] .tp-wxsky-cloud{animation-duration:14s}
+
+  /* Sis bantları */
+  .tp-wxsky-fog{position:absolute;left:-30%;right:-30%;bottom:20px;height:60px;display:none;
+    background:
+      linear-gradient(180deg,transparent,rgba(255,255,255,.55) 40%,transparent 60%),
+      linear-gradient(180deg,transparent 55%,rgba(255,255,255,.45) 75%,transparent);
+    filter:blur(4px);animation:tpWxFog 18s ease-in-out infinite alternate}
+  .tp-wxsky[data-sky="fog"] .tp-wxsky-fog{display:block}
+
+  /* Yağmur */
+  .tp-wxsky-rain{position:absolute;inset:-40px 0 30px 0;display:none;opacity:.55;
+    background-image:repeating-linear-gradient(105deg,transparent 0 9px,rgba(255,255,255,.75) 9px 10px,transparent 10px 22px);
+    background-size:100% 60px;animation:tpWxRain .55s linear infinite}
+  .tp-wxsky:is([data-sky="light-rain"],[data-sky="heavy-rain"],[data-sky="storm"]) .tp-wxsky-rain{display:block}
+  .tp-wxsky[data-sky="light-rain"] .tp-wxsky-rain{opacity:.35;animation-duration:.8s}
+  .tp-wxsky:is([data-sky="heavy-rain"],[data-sky="storm"]) .tp-wxsky-rain{opacity:.65;animation-duration:.4s}
+
+  /* Kar */
+  .tp-wxsky-snow{position:absolute;inset:-60px 0 28px 0;display:none;
+    background-image:
+      radial-gradient(2px 2px at 10% 20%,#fff 60%,transparent 61%),
+      radial-gradient(2.4px 2.4px at 35% 60%,#fff 60%,transparent 61%),
+      radial-gradient(1.8px 1.8px at 62% 30%,#fff 60%,transparent 61%),
+      radial-gradient(2.2px 2.2px at 82% 75%,#fff 60%,transparent 61%),
+      radial-gradient(1.6px 1.6px at 50% 90%,#fff 60%,transparent 61%);
+    background-size:120px 90px;animation:tpWxSnow 7s linear infinite;filter:drop-shadow(0 0 1px rgba(120,150,180,.6))}
+  .tp-wxsky[data-sky="snow"] .tp-wxsky-snow{display:block}
+
+  /* Şimşek */
+  .tp-wxsky-flash{position:absolute;inset:0;display:none;background:rgba(255,255,255,.9);opacity:0;animation:tpWxFlash 7s linear infinite}
+  .tp-wxsky[data-sky="storm"] .tp-wxsky-flash{display:block}
+
+  @keyframes tpWxDrift{from{transform:translateX(-30px)}to{transform:translateX(420px)}}
+  @keyframes tpWxTwinkle{0%,100%{opacity:1}50%{opacity:.55}}
+  @keyframes tpWxFog{from{transform:translateX(-6%)}to{transform:translateX(6%)}}
+  @keyframes tpWxRain{from{background-position:0 0}to{background-position:-12px 60px}}
+  @keyframes tpWxSnow{from{background-position:0 0}to{background-position:20px 90px}}
+  @keyframes tpWxFlash{0%,88%,92%,100%{opacity:0}89%{opacity:.55}90%{opacity:.1}91%{opacity:.4}}
+  @media(prefers-reduced-motion:reduce){
+    .tp-wxsky *{animation:none!important}
+    .tp-wxsky-flash{display:none!important}
   }
 `;
