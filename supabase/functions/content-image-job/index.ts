@@ -31,7 +31,7 @@ function license(v: unknown) {
 const SAFE = new Set(["cc0", "pdm", "cc-by", "cc-by-sa"]);
 
 type Img = { url: string; landing: string; creator: string; license: string; title: string; source: string; width?: number; height?: number; rank?: number; query?: string };
-type Term = { tr: RegExp; en: string; match: string[]; organism?: boolean };
+type Term = { tr: RegExp; en: string; match: string[]; organism?: boolean; commodity?: boolean };
 
 // Türkçe → İngilizce/bilimsel sözlük. `match`: görsel metninde aranacak konu kelimeleri.
 const TERMS: Term[] = [
@@ -147,14 +147,14 @@ const TERMS: Term[] = [
   { tr: /mikoriza/, en: "mycorrhiza roots", match: ["mycorrhiz"] },
   { tr: /turba/, en: "peat bog", match: ["peat"] },
   // Haber konuları (hayvancılık, ticaret, piyasa)
-  { tr: /seker fabrika|seker uretim/, en: "sugar beet factory", match: ["sugar factory", "sugar beet", "sugar refinery", "beet"] },
-  { tr: /zeytinyag/, en: "olive oil", match: ["olive oil", "olive"] },
-  { tr: /\btmo\b|hububat|\btahil|\bhubu/, en: "grain harvest silo", match: ["grain", "wheat", "silo", "granary", "cereal"] },
-  { tr: /\bsut\b|\bsigir|buyukbas|hayvancilik|\bbesi\b/, en: "dairy cattle", match: ["cattle", "cow", "dairy", "bos taurus", "calf"] },
-  { tr: /\bkoyun|\bkuzu|kucukbas|\bkeci/, en: "sheep flock", match: ["sheep", "lamb", "goat", "ovis", "capra"] },
-  { tr: /\btavuk|\byumurta|kanatli|broiler/, en: "poultry chicken farm", match: ["chicken", "poultry", "hen", "gallus", "eggs"] },
-  { tr: /aricilik|\bbal\b|bal uretim/, en: "beekeeping beehive", match: ["beehive", "beekeep", "honey", "apiary"] },
-  { tr: /\bbalik|su urunleri|yetistiricilik balik/, en: "fish farming aquaculture", match: ["fish farm", "aquaculture", "trout", "sea bass", "fish"] },
+  { tr: /seker fabrika|seker uretim/, en: "sugar beet factory", match: ["sugar factory", "sugar beet", "sugar refinery", "beet"], commodity: true },
+  { tr: /zeytinyag/, en: "olive oil", match: ["olive oil", "olive"], commodity: true },
+  { tr: /\btmo\b|hububat|\btahil|\bhubu/, en: "grain harvest silo", match: ["grain", "wheat", "silo", "granary", "cereal"], commodity: true },
+  { tr: /\bsut\b|\bsigir|buyukbas|hayvancilik|\bbesi\b/, en: "dairy cattle", match: ["cattle", "cow", "dairy", "bos taurus", "calf"], commodity: true },
+  { tr: /\bkoyun|\bkuzu|kucukbas|\bkeci/, en: "sheep flock", match: ["sheep", "lamb", "goat", "ovis", "capra"], commodity: true },
+  { tr: /\btavuk|\byumurta|kanatli|broiler/, en: "poultry chicken farm", match: ["chicken", "poultry", "hen", "gallus", "eggs"], commodity: true },
+  { tr: /aricilik|\bbal\b|bal uretim/, en: "beekeeping beehive", match: ["beehive", "beekeep", "honey", "apiary"], commodity: true },
+  { tr: /\bbalik|su urunleri|yetistiricilik balik/, en: "fish farming aquaculture", match: ["fish farm", "aquaculture", "trout", "sea bass", "fish"], commodity: true },
   { tr: /ithalat|ihracat|\bliman|\bgemi/, en: "grain cargo ship port", match: ["cargo ship", "bulk carrier", "port of", "harbor", "harbour", "grain terminal", "container ship"] },
   // Konular
   { tr: /\bdon\b|\bdonu\b|zirai don|soguk zarar/, en: "frost damage crop", match: ["frost", "freez", "frozen"] },
@@ -292,7 +292,8 @@ function queryCandidates(row: any, body: any, candidate: boolean, terms: Term[])
 }
 
 const FIRST_ORGANISM = TERMS.findIndex((x) => x.organism);
-const isCropTerm = (t: Term) => !t.organism && TERMS.indexOf(t) < FIRST_ORGANISM;
+// Ürün ve emtia terimleri (tahıl, süt, zeytinyağı...) rehberlerde tek başına konu sayılmaz
+const isCropTerm = (t: Term) => Boolean(t.commodity) || (!t.organism && TERMS.indexOf(t) < FIRST_ORGANISM);
 type Subject = { words: string[]; res: RegExp[] };
 // Görselde aranacak konu: sözlük eşleşmeleri (İngilizce + Türkçe) + anahtar kelimenin baştaki konu kelimeleri.
 // Rehberlerde zararlı/hastalık/konu varsa yalnız ürün fotoğrafı yeterli sayılmaz.

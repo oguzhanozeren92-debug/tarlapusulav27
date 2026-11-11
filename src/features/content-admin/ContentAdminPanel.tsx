@@ -17,7 +17,6 @@ import {
 import { supabase } from '../../supabaseClient';
 import KnowledgeUpdateSuggestions from './KnowledgeUpdateSuggestions';
 import KnowledgeAdminPanel from '../knowledge/components/KnowledgeAdminPanel';
-import { isRelevantGuideImage } from '../knowledge/services/guideImageRelevance';
 import { translationPublicationProblem } from './services/contentTurkishQualityGate';
 import GuideCardResearchPanel from './GuideCardResearchPanel';
 import ContentCoveragePanel from './ContentCoveragePanel.tsx';
@@ -505,12 +504,9 @@ export default function ContentAdminPanel() {
       image.candidate_id === candidateId &&
       image.status !== 'rejected' &&
       Boolean(image.license_type) &&
-      SAFE_IMAGE_LICENSES.has(String(image.license_type).toLowerCase()) &&
-      isRelevantGuideImage(image, {
-        title: candidates.find(item => item.id === candidateId)?.title_suggested || '',
-        summary: candidates.find(item => item.id === candidateId)?.short_summary || '',
-        topic: candidates.find(item => item.id === candidateId)?.structured_body?.guide_card?.topic || '',
-      })
+      // Konu uygunluğu sunucuda (content-image-job) kontrol edilip uygunsuzlar "rejected" yapılıyor;
+      // burada yalnız lisans ve durum kontrol edilir. Admin'in yüklediği fotoğraf her zaman geçerlidir.
+      SAFE_IMAGE_LICENSES.has(String(image.license_type).toLowerCase())
     );
 
   const guideImageProgress = (candidate: Candidate) => {
