@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Clock3, LockKeyhole, Sprout, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useEntitlementStore } from '../entitlements/useEntitlementStore';
 import { showRewardedAdAndClaim } from '../monetization/adRuntime';
 
 type PusulaPointsModalProps = {
@@ -577,7 +576,6 @@ export default function PusulaPointsModal({
   const [loading, setLoading] = useState(false);
   const [remotePoints, setRemotePoints] = useState<number | null>(null);
   const [thresholds, setThresholds] = useState<PointThreshold[]>(FALLBACK_THRESHOLDS);
-  const entitlement = useEntitlementStore();
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [rules, setRules] = useState<Record<string, string>>({});
   const [adRewardLoading, setAdRewardLoading] = useState(false);
@@ -741,7 +739,7 @@ export default function PusulaPointsModal({
 
   const adDailyLimit = 5;
   const canWatchRewardedAd =
-    entitlement.effectivePlan !== 'premium' && todayAdCount < adDailyLimit;
+    todayAdCount < adDailyLimit;
 
   const handleWatchRewardedAd = async () => {
     if (!canWatchRewardedAd || adRewardLoading) return;
@@ -858,12 +856,11 @@ export default function PusulaPointsModal({
           </div>
         </div>
 
-        {entitlement.effectivePlan !== 'premium' ? (
           <div className="tp-points-ad-reward">
             <div className="tp-points-ad-reward-copy">
               <small>ÖDÜLLÜ REKLAM</small>
               <strong>Reklam izle · +10 Pusula Puanı</strong>
-              <span>Günde en fazla 5 kez. Plus ve Premium kullanıcıda reklam gösterilmez.</span>
+              <span>Günde en fazla 5 kez. Kazandığın puanlar yeni tarla hakkı açar.</span>
             </div>
             <button
               type="button"
@@ -882,7 +879,7 @@ export default function PusulaPointsModal({
               </div>
             ) : null}
           </div>
-        ) : null}
+        
 
         <div className="tp-points-tabs" role="tablist" aria-label="Pusula puanı sekmeleri">
           <button

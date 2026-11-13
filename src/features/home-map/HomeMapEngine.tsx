@@ -1,4 +1,5 @@
 import { shouldPlayMapOpening, openMapAtField } from '../map-opening/mapOpening';
+import { maybeShowFreeInterstitial } from '../../monetization/adRuntime';
 import { resolveOpeningTarget } from '../map-opening/openingTarget';
 import { mapRuntime } from '../../lib/mapRuntime';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -9470,6 +9471,9 @@ export function HomeInlineLayerMap({
             className="tp-map-control-btn tp-map-history-label tp-map-satellite-history-control"
             onClick={() =>
               void (async () => {
+                // Ücretsiz uygulamayı destekleyen geçiş reklamı: günde en fazla 2, arada 45 dk.
+                await maybeShowFreeInterstitial('satellite_history').catch(() => null);
+
                 if (layer === 'vegetation') {
                   await history.show();
                 } else {

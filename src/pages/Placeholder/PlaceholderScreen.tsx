@@ -1153,7 +1153,7 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
             <div>
               <small>ÜYELİK</small>
               <strong>Kullanım hakkın</strong>
-              <p>TarlaPusula'nın tüm araçlarını ücretsiz kullanabilirsin.</p>
+              <p>TarlaPusula'nın tüm araçlarını ücretsiz kullanabilirsin; puan biriktirdikçe yeni tarla hakkı açılır.</p>
             </div>
           </div>
 
@@ -1161,7 +1161,7 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
             <span className="tp-plan-badge">Ücretsiz</span>
             <small>KULLANIM</small>
             <h3>Tüm özellikler ücretsiz</h3>
-            <p>Tarla ekleme, uydu takibi, hava, Pusula asistanı ve raporlar herkese açık. Uygulama içi satın alma veya abonelik yoktur.</p>
+            <p>Uydu takibi, hava, Pusula asistanı ve raporlar herkese açık. 1. tarla hemen açık; 2. ve 3. tarla Pusula Puanı biriktirerek açılır. Uygulama içi satın alma veya abonelik yoktur.</p>
           </div>
         </section>
 
