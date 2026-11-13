@@ -249,7 +249,6 @@ export default function SatelliteHistorySheet(props: Props) {
     if (!props.open) {
       setCompareMode(false);
       setCompareDates([]);
-      setFreePreviewDate(null);
       setHistoryListOpen(false);
       setSlider(50);
       setZoom(1);
