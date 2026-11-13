@@ -87,16 +87,6 @@ export async function refreshEntitlements(): Promise<EntitlementSnapshot> {
   }
 }
 
-// Legacy API signatures remain for existing callers. Changing paid or preview
-// modes is no longer possible because there are no subscription tiers.
-export async function setDeveloperPlanMode(_mode: DeveloperPlanMode) {
-  return state;
-}
-
-export async function cycleDeveloperPlanMode() {
-  return state;
-}
-
 function ensureAuthListener() {
   if (authListenerStarted) return;
   authListenerStarted = true;

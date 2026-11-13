@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SatelliteHealthResult } from '../../../lib/satelliteService';
-import { getEntitlementSnapshot } from '../../../entitlements/useEntitlementStore';
 import {
   clearSatelliteHistoryPreviewCache,
   fetchHistoricalSatellite,
@@ -119,10 +118,6 @@ export function useSatelliteHistory(
     async (date: string) => {
       if (!fieldId || !geometry || !date) return null;
 
-      // Ücretsiz kullanıcı yalnız bulanık önizleme görür.
-      // Tam geçmiş analizi ve sayısal metrikler Premium'dur.
-      if (!getEntitlementSnapshot().isPremium) return null;
-
       const cached = cache.current.get(date);
       if (cached) return cached;
 
@@ -183,12 +178,6 @@ export function useSatelliteHistory(
 
   const select = useCallback(
     async (date: string | null) => {
-      if (date && !getEntitlementSnapshot().isPremium) {
-        // Free planda eski görüntü haritaya uygulanmaz.
-        // Sheet açık kalır ve kullanıcı blur önizlemeyi görür.
-        return;
-      }
-
       if (!date) {
         request.current += 1;
         setSelection(null);

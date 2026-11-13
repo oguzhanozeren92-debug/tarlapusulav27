@@ -212,7 +212,7 @@
   html body .tp-fields-sheet :is(p,small,.tp-fields-sheet-field-copy small) { color: #697586 !important; }
   html body .tp-fields-sheet .tp-fields-sheet-delete { background: #fff5f5 !important; border-color: #efc7c7 !important; color: #a53737 !important; }
   html body .tp-fields-sheet .tp-fields-delete-actions .danger { background: #a53737 !important; color: #fff !important; }
-  html body .tp-fields-sheet .tp-fields-delete-warning { background: #fff9e9 !important; color: #72511b !important; border-color: #eedfbe !important; }
+
   html body .tp-fields-sheet .tp-fields-delete-error { color: #a53737 !important; }
   html body :is(.tp-v1,.tp-field-detail-page,.tp-calendar-page,.tp-ai-page,
     .tp-wxr-page,.soil-page,.tp-onboarding-page,.tp-chat-shell)

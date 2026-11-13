@@ -41,7 +41,7 @@ assert(
   'Harita Pusula bandı kanonik Pusula kararına bağlı değil.',
 );
 assert(
-  home.includes('home-decision-${pusulaDecision.id}') && home.includes('pusulaDecision.gateway?.confidence'),
+  home.includes('home-decision-${pusulaDecision.id}') && home.includes('pusulaDecision.confidence'),
   'Ana Pusula logosu merkezi karar motorunu kullanmıyor.',
 );
 assert(

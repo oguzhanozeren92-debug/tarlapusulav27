@@ -541,14 +541,10 @@
   .tp-satellite-insight-badge{align-self:flex-start}
 }
 
-
 /* =========================================================
    FREE PLAN — UYDU GEÇMİŞİ TEASER
    Ücretsiz kullanıcı geçmiş tarihleri görebilir fakat
-   görüntü netliği, tarih seçimi ve karşılaştırma Premium'dur.
-   ========================================================= */
-
-.tp-satellite-free-preview-note{
+   görüntü netliği{
   display:grid;
   grid-template-columns:34px minmax(0,1fr) auto;
   align-items:center;
@@ -560,153 +556,6 @@
   background:linear-gradient(180deg,#fff,#f5f6f7);
   box-shadow:0 5px 16px rgba(0,0,0,.035)
 }
-
-.tp-satellite-free-preview-icon{
-  width:34px;
-  height:34px;
-  display:grid;
-  place-items:center;
-  border:1px solid #d9dde2;
-  border-radius:11px;
-  background:#fff;
-  color:#252b32
-}
-
-.tp-satellite-free-preview-note>div{min-width:0}
-
-.tp-satellite-free-preview-note strong{
-  display:block;
-  color:#171b20;
-  font:900 10px/1.2 system-ui,sans-serif
-}
-
-.tp-satellite-free-preview-note p{
-  margin:4px 0 0;
-  color:#68717c;
-  font:750 8px/1.45 system-ui,sans-serif
-}
-
-.tp-satellite-free-preview-note em{
-  min-height:24px;
-  display:inline-flex;
-  align-items:center;
-  padding:0 8px;
-  border:1px solid #d4d8dd;
-  border-radius:999px;
-  background:#111;
-  color:#fff;
-  font:normal 900 7px/1 system-ui,sans-serif;
-  letter-spacing:.06em
-}
-
-.tp-satellite-compare-toggle.is-free-locked{
-  border-color:#d5d9de;
-  background:#f5f6f7;
-  color:#4c5661;
-  cursor:pointer
-}
-
-.tp-satellite-history-featured-image.is-free-preview>img{
-  filter:blur(8px) saturate(.88) contrast(.92);
-  transform-origin:center center;
-  opacity:.92
-}
-
-.tp-satellite-history-featured-image.is-free-preview::after{
-  content:'';
-  position:absolute;
-  inset:0;
-  z-index:5;
-  pointer-events:none;
-  background:linear-gradient(
-    180deg,
-    rgba(255,255,255,.04),
-    rgba(255,255,255,.12)
-  )
-}
-
-.tp-satellite-free-image-lock{
-  position:absolute;
-  z-index:8;
-  left:50%;
-  top:50%;
-  width:min(270px,78%);
-  transform:translate(-50%,-50%);
-  display:grid;
-  justify-items:center;
-  gap:5px;
-  padding:12px 14px;
-  border:1px solid rgba(255,255,255,.72);
-  border-radius:14px;
-  background:rgba(20,22,25,.74);
-  color:#fff;
-  text-align:center;
-  box-shadow:0 10px 28px rgba(0,0,0,.25);
-  backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px)
-}
-
-.tp-satellite-free-image-lock strong{
-  color:#fff;
-  font:900 10px/1.2 system-ui,sans-serif
-}
-
-.tp-satellite-free-image-lock span{
-  color:rgba(255,255,255,.78);
-  font:750 8px/1.35 system-ui,sans-serif
-}
-
-.tp-satellite-history-card.is-free-locked{
-  border-color:#e0e2e5;
-  cursor:pointer
-}
-
-.tp-satellite-history-card.is-free-locked .tp-satellite-history-thumb img{
-  filter:blur(4.5px) saturate(.78) contrast(.9);
-  transform:scale(1.08);
-  opacity:.88
-}
-
-.tp-satellite-history-card.is-free-locked .tp-satellite-history-thumb::after{
-  content:'';
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  background:rgba(255,255,255,.08)
-}
-
-.tp-satellite-history-card.is-free-teaser-selected{
-  border-color:#7b838d;
-  box-shadow:0 0 0 1px #7b838d
-}
-
-.tp-satellite-history-lock-badge{
-  position:absolute;
-  z-index:3;
-  right:5px;
-  bottom:5px;
-  width:21px;
-  height:21px;
-  display:grid;
-  place-items:center;
-  border:1px solid rgba(255,255,255,.72);
-  border-radius:50%;
-  background:rgba(17,17,17,.82);
-  color:#fff;
-  box-shadow:0 3px 9px rgba(0,0,0,.18)
-}
-
-@media(max-width:560px){
-  .tp-satellite-free-preview-note{
-    grid-template-columns:32px minmax(0,1fr);
-  }
-
-  .tp-satellite-free-preview-note em{
-    grid-column:2;
-    justify-self:start
-  }
-}
-
 
 /* =========================================================
    GEÇMİŞ GÖRÜNTÜLER — AÇILIR DİKEY TARİH LİSTESİ
@@ -882,12 +731,6 @@
   color:#626a73;
   font:900 6.5px/1 system-ui,sans-serif;
   letter-spacing:.04em
-}
-
-.tp-satellite-history-date-row.is-free-locked
-.tp-satellite-history-date-row-thumb img{
-  filter:blur(3.5px) saturate(.78);
-  transform:scale(1.08)
 }
 
 @media(max-width:560px){

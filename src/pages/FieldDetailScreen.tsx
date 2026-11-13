@@ -8,7 +8,6 @@ import OrchardChillPanel from '../features/orchard-chill/components/OrchardChill
 import { useEffect, useRef, useState } from 'react';
 import PusulaLoadingOverlay from '../components/PusulaLoadingOverlay';
 import './FieldDetailLayout.css';
-import { getEntitlementSnapshot } from '../entitlements/useEntitlementStore';
 import { onboardingStyles } from '../styles/onboardingStyles';
 import type { FieldSection, FieldActivity, FieldSeason, PerennialYield } from '../types';
 
@@ -141,7 +140,6 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
   const [deleteFieldLoading, setDeleteFieldLoading] = useState(false);
   const [deleteFieldError, setDeleteFieldError] = useState('');
   const handledEntryRef = useRef('');
-  const isPremiumFieldPlan = getEntitlementSnapshot().isPremium;
 
   const confirmDeleteField = async () => {
     setDeleteFieldLoading(true);
@@ -1750,11 +1748,6 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                 <span className="tp-field-delete-kicker">TARLA SİLME</span>
                 <h2 id="field-delete-title">Emin misin?</h2>
                 <p><strong>{selectedField.name}</strong> tarlasını ve ona bağlı kayıtları kalıcı olarak sileceksin. Bu işlem geri alınamaz.</p>
-                {!isPremiumFieldPlan && (
-                  <p className="tp-field-delete-warning">
-                    Ücretsiz planda tarla değiştirme hakkı 7 günde bir yenilenir. İlk eklemeden sonraki 24 saatlik düzeltme süresi istisnadır.
-                  </p>
-                )}
                 {deleteFieldError && <p className="tp-field-delete-error" role="alert">{deleteFieldError}</p>}
                 <div className="tp-field-delete-actions">
                   <button type="button" onClick={() => setDeleteFieldOpen(false)} disabled={deleteFieldLoading}>Vazgeç</button>

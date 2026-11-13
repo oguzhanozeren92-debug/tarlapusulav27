@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GripVertical } from 'lucide-react';
 import PusulaLoadingOverlay from '../../../components/PusulaLoadingOverlay';
-import { getEntitlementSnapshot } from '../../../entitlements/useEntitlementStore';
 import { reorderUserFields } from '../services/fieldOrder.service';
 import './HomeFieldsSheet.css';
 
@@ -231,9 +230,6 @@ export default function HomeFieldsSheet({
             <span className="tp-fields-delete-kicker">TARLA SİLME</span>
             <h2 id="tp-fields-delete-title">Emin misin?</h2>
             <p><strong>{pendingField?.name || 'Bu tarla'}</strong> ve ona bağlı kayıtlar kalıcı olarak silinecek. Bu işlem geri alınamaz.</p>
-            {!getEntitlementSnapshot().isPremium && (
-              <p className="tp-fields-delete-warning">Ücretsiz planda tarla değiştirme hakkı 7 günde bir yenilenir. İlk eklemeden sonraki 24 saatlik düzeltme süresi istisnadır.</p>
-            )}
             {deleteError && <p className="tp-fields-delete-error" role="alert">{deleteError}</p>}
             <div className="tp-fields-delete-actions">
               <button type="button" onClick={closeDeleteConfirmation} disabled={deleting}>Vazgeç</button>
