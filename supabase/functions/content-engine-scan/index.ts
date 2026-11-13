@@ -133,7 +133,6 @@ const MARKET_SIGNALS = [
 
 const PRODUCER_VALUE = [
   /\b(verim|yield|ürün kayb|urun kayb|yield loss|quality|kalite)\b/i,
-  /\b(destek|hibe|teşvik|tesvik|subsidy|grant|başvuru|basvuru)\b/i,
   /\b(sulama kanalı|sulama kanali|irrigation canal|water allocation|su tahsisi|baraj doluluk)\b/i,
   /\b(risk|uyarı|uyari|threat|damage|zarar|kayıp|kayip)\b/i,
   /\b(sulama|irrigation|gübre|gubre|fertiliz|ilaçlama|ilaclama|fungicide|pesticide)\b/i,
@@ -149,7 +148,7 @@ const NEWS_EVENT_SIGNALS = [
   /\b(arttı|artti|artacak|yükseldi|yukseldi|yükselecek|yukselecek|azaldı|azaldi|azalacak|düştü|dustu|geriledi)\b/i,
   /\b(bekleniyor|tahmin ediliyor|öngörülüyor|ongoruluyor|rekolte|üretim tahmini|uretim tahmini)\b/i,
   /\b(uyarı|uyari|alarm|risk|zarar|vur(?:du|du)|don|dolu|kuraklık|kuraklik|salgın|salgin|hastalık görüldü|zararlı görüldü)\b/i,
-  /\b(yasak|serbest bırakıldı|serbest birakildi|vergi|gümrük|gumruk|destek|hibe|teşvik|tesvik|ödeme|odeme|ithalat|ihracat|fiyat|başvuru|basvuru|çağrı|cagri)\b/i,
+  /\b(yasak|serbest bırakıldı|serbest birakildi|vergi|gümrük|gumruk|ithalat|ihracat|fiyat)\b/i,
   /\b(sulama kanalı|sulama kanali|su tahsisi|baraj|kuraklık tedbiri|kuraklik tedbiri|proje başladı|proje basladi|çalışma başladı|calisma basladi)\b/i,
   /\b(started|harvest|announced|released|rose|rises|fell|falls|forecast|expected|warning|alert|outbreak|drought|frost|hail|ban|tariff|import|export|price|production)\b/i,
 ];
@@ -163,6 +162,11 @@ const EVERGREEN_NEWS_JUNK = [
 const GENERIC_FINANCE_PR = [
   /\b(ziraat bankası|ziraat bankasi|banka kredisi|kredi desteği|kredi destegi|finansman|yatırım kredisi|yatirim kredisi|tarım yatırımı|tarim yatirimi|gıda yatırımı|gida yatirimi)\b/i,
   /\b(tkdk|ipard|girişimcilik|girisimcilik|girişimci|girisimci|protokol|iş birliği|is birligi|finans paketi|yatırım paketi|yatirim paketi)\b/i,
+];
+
+// Kullanıcı tercihi (2026-11-13): destek/hibe/ödeme/kredi/başvuru haberleri akışa alınmaz.
+const SUPPORT_PAYMENT_NEWS = [
+  /\b(destek\w*|desteg\w*|hibe\w*|tesvik\w*|prim|primi|primleri|kredi\w*|faizsiz|odeme\w*|basvuru\w*|subsid\w*|grants?)\b/i,
 ];
 
 const DIRECT_FIELD_SUPPORT = [
@@ -186,6 +190,10 @@ function scientificNewsGate(item: Found, source?: Source): Gate {
 
   if (matchesAny(title, HARD_JUNK) || matchesAny(content, NEWS_HARD_JUNK)) {
     return { pass: false, score: 0, reasons: ["TarlaPusula üretici gündemi dışında"] };
+  }
+
+  if (matchesAny(title, SUPPORT_PAYMENT_NEWS)) {
+    return { pass: false, score: 0, reasons: ["Destek/hibe/ödeme haberi; akışa alınmıyor"] };
   }
 
   if (matchesAny(content, GENERIC_FINANCE_PR) && !matchesAny(content, DIRECT_FIELD_SUPPORT)) {
@@ -717,7 +725,8 @@ async function synthesize(item: Found, source: Source, apiKey: string, knowledge
 
   const prompt = `Sen TarlaPusula'nın üretici odaklı tarım haber editörüsün.
 Bu motor genel haber portalı DEĞİLDİR. HABER demek son 7 gündeki gerçek bir gelişme/olay/değişim demektir. Nasıl yapılır, nedir, rehber, yetiştiricilik anlatımı gibi zamansız bilgi içeriklerini haber diye kabul etme. Bakan, ziyaret, protokol, festival, tören, personel, kaza, magazin, kurum PR'ı ve insan hikâyesi istemiyoruz.
-ÖNCELİK bitkisel üreticinin bugün kararını etkileyen GELİŞMELERDİR: hasat/ekim başlangıcı, ürün fiyatı, rekolte ve üretim tahmini, ithalat-ihracat, girdi maliyeti, don-dolu-kuraklık, hastalık/zararlı alarmı, sulama-su durumu, gübre/ilaç erişimi, destek/mevzuat değişikliği ve yeni saha bulgusu.
+ÖNCELİK bitkisel üreticinin bugün kararını etkileyen GELİŞMELERDİR: hasat/ekim başlangıcı, ürün fiyatı, rekolte ve üretim tahmini, ithalat-ihracat, girdi maliyeti, don-dolu-kuraklık, hastalık/zararlı alarmı, sulama-su durumu, gübre/ilaç erişimi, yeni çeşit/teknoloji ve yeni saha bulgusu.
+Destek, hibe, prim, kredi, ödeme takvimi, başvuru duyurusu ve teşvik haberlerini REDDET; bu tür haberler akışta istenmiyor.
 Hayvancılık, et-süt, şirket finansmanı/yatırım turu, startup haberi, yatırımcı içeriği, şirket profili, genel gıda sanayisi ve üreticiye doğrudan etkisi olmayan iş dünyası haberlerini REDDET.
 Yabancı bir gelişme Türkiye üreticisi için anlamlı değilse yalnız tarımla ilgili olduğu için kabul etme. Ancak küresel tahıl/yağlı tohum fiyatı, üretim, rekolte, ithalat-ihracat, kuraklık, don, ürün hastalığı, gübre maliyeti ve arz-talep gelişmeleri Türkiye üreticisini dolaylı etkileyebileceği için kabul edilebilir. Yabancı ülkeye özgü marka/ruhsatlı ilaç uygulaması, yerel mevzuat veya sadece o bölgedeki üreticiye yarayan operasyonel tavsiye Türkiye için aktarılabilir güçlü bir bulgu taşımıyorsa REDDET.
 Kaynak metni kısa ise sadece kaynakta açıkça bulunan bilgileri kullan; boşlukları tahminle doldurma. Kısa haber kısa kalabilir.
