@@ -1,9 +1,5 @@
 import { useSyncExternalStore } from 'react';
 import { supabase } from '../supabaseClient';
-import {
-  getEntitlementSnapshot,
-  refreshEntitlements,
-} from '../entitlements/useEntitlementStore';
 
 /* =========================================================
    TARLAPUSULA GAMIFICATION CORE
@@ -143,11 +139,6 @@ export function getGamificationState() {
    ========================================================= */
 
 export function getUnlockedFieldCount(points: number) {
-  const entitlement = getEntitlementSnapshot();
-
-  if (entitlement.effectivePlan === 'premium') return 999;
-  if (entitlement.effectivePlan === 'plus') return 10;
-
   const safePoints = Math.max(0, Number(points) || 0);
 
   if (safePoints >= FIELD_UNLOCK_THRESHOLDS.FIELD_3) return 3;
@@ -156,20 +147,6 @@ export function getUnlockedFieldCount(points: number) {
 }
 
 export function getNextFieldUnlock(points: number) {
-  const entitlement = getEntitlementSnapshot();
-
-  if (
-    entitlement.effectivePlan === 'premium' ||
-    entitlement.effectivePlan === 'plus'
-  ) {
-    return {
-      fieldNumber: null,
-      requiredPoints: null,
-      remainingPoints: 0,
-      progressPercent: 100,
-    };
-  }
-
   const safePoints = Math.max(0, Number(points) || 0);
 
   if (safePoints < FIELD_UNLOCK_THRESHOLDS.FIELD_2) {
@@ -213,35 +190,6 @@ export function canCreateField(
   points: number,
 ) {
   const nextFieldNumber = existingRealFieldCount + 1;
-  const entitlement = getEntitlementSnapshot();
-
-  if (entitlement.status === 'idle') {
-    void refreshEntitlements();
-  }
-
-  if (entitlement.effectivePlan === 'premium') {
-    return {
-      allowed: true,
-      nextFieldNumber,
-      requiredPoints: 0,
-      remainingPoints: 0,
-      reason: 'premium' as const,
-    };
-  }
-
-  if (entitlement.effectivePlan === 'plus') {
-    return {
-      allowed: nextFieldNumber <= 10,
-      nextFieldNumber,
-      requiredPoints: 0,
-      remainingPoints: 0,
-      reason:
-        nextFieldNumber <= 10
-          ? ('plus' as const)
-          : ('configured_limit' as const),
-    };
-  }
-
   const requiredPoints =
     nextFieldNumber === 1
       ? FIELD_UNLOCK_THRESHOLDS.FIELD_1
@@ -302,7 +250,6 @@ function normalizeState(raw: any): GamificationServerState {
   );
 
   const next = getNextFieldUnlock(points);
-  const entitlement = getEntitlementSnapshot();
 
   return {
     points,
@@ -315,18 +262,14 @@ function normalizeState(raw: any): GamificationServerState {
           points,
       ) || 0,
     ),
-    unlockedFields: entitlement.effectivePlan === 'premium'
-      ? 999
-      : entitlement.effectivePlan === 'plus'
-        ? 10
-        : Math.max(
-          1,
-          Number(
-            raw?.unlocked_fields ??
-              raw?.unlockedFields ??
-              getUnlockedFieldCount(points),
-          ) || 1,
-        ),
+    unlockedFields: Math.max(
+      1,
+      Number(
+        raw?.unlocked_fields ??
+          raw?.unlockedFields ??
+          getUnlockedFieldCount(points),
+      ) || 1,
+    ),
     nextFieldNumber:
       raw?.next_field_number !== undefined
         ? raw.next_field_number

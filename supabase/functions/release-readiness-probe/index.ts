@@ -56,10 +56,6 @@ Deno.serve(async (req) => {
   const readiness = {
     checkedAt: new Date().toISOString(),
     auth: providers,
-    revenueCatBackend: {
-      secretApiKey: has('REVENUECAT_SECRET_API_KEY'),
-      webhookAuth: has('REVENUECAT_WEBHOOK_AUTH'),
-    },
     webPush: {
       vapidPublic: has('VAPID_PUBLIC_KEY'),
       vapidPrivate: has('VAPID_PRIVATE_KEY'),

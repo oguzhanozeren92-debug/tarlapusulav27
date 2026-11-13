@@ -952,11 +952,9 @@ function NotificationsHub({
 function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [plan, setPlan] = useState('free');
   const [savingName, setSavingName] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
   const [accountMessageTone, setAccountMessageTone] = useState<'success' | 'error' | ''>('');
-  const [planOpen, setPlanOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePhrase, setDeletePhrase] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -978,13 +976,12 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name,subscription_plan')
+          .select('full_name')
           .eq('id', user.id)
           .maybeSingle();
 
         if (!alive) return;
         setFullName(String(profile?.full_name ?? metadataName ?? '').trim());
-        setPlan(String(profile?.subscription_plan ?? 'free').toLowerCase());
       } catch (error) {
         console.warn('Ayarlar hesabı yüklenemedi:', error);
       }
@@ -1000,13 +997,6 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
       savePreferences(serverPreferences);
     });
   }, []);
-
-  const planLabel = plan === 'premium' ? 'Premium' : plan === 'plus' ? 'Plus' : 'Ücretsiz';
-  const planText = plan === 'premium'
-    ? 'Sınırsız tarla, tüm modüller ve tam Pusula asistanı.'
-    : plan === 'plus'
-      ? '10 tarla, gelişmiş uydu geçmişi, raporlar ve gelişmiş bildirimler.'
-      : '1 aktif tarla ve temel TarlaPusula özellikleri.';
 
   const togglePreference = (key: NotificationPreferenceKey) => {
     setPreferences((current) => {
@@ -1162,17 +1152,16 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
           <div className="tp-hub-section-head">
             <div>
               <small>ÜYELİK</small>
-              <strong>Planın ve kullanım hakkın</strong>
-              <p>Mevcut planını gör ve TarlaPusula planlarını karşılaştır.</p>
+              <strong>Kullanım hakkın</strong>
+              <p>TarlaPusula'nın tüm araçlarını ücretsiz kullanabilirsin; puan biriktirdikçe yeni tarla hakkı açılır.</p>
             </div>
           </div>
 
           <div className="tp-plan-card">
-            <span className="tp-plan-badge">{planLabel}</span>
-            <small>MEVCUT PLAN</small>
-            <h3>{planLabel}</h3>
-            <p>{planText}</p>
-            <button type="button" className="tp-hub-soft-button" onClick={() => setPlanOpen(true)}>Planları karşılaştır</button>
+            <span className="tp-plan-badge">Ücretsiz</span>
+            <small>KULLANIM</small>
+            <h3>Tüm özellikler ücretsiz</h3>
+            <p>Uydu takibi, hava, Pusula asistanı ve raporlar herkese açık. 1. tarla hemen açık; 2. ve 3. tarla Pusula Puanı biriktirerek açılır. Uygulama içi satın alma veya abonelik yoktur.</p>
           </div>
         </section>
 
@@ -1300,35 +1289,6 @@ function SettingsHub({ setScreen }: { setScreen: Setter<Screen> }) {
         </>
       ) : null}
 
-      {planOpen ? (
-        <>
-          <button type="button" className="tp-plan-modal-backdrop" aria-label="Plan karşılaştırmasını kapat" onClick={() => setPlanOpen(false)} />
-          <section className="tp-plan-modal" role="dialog" aria-modal="true" aria-label="TarlaPusula planları">
-            <div className="tp-plan-modal-head">
-              <h3>TarlaPusula planları</h3>
-              <button type="button" onClick={() => setPlanOpen(false)}>×</button>
-            </div>
-            <div className="tp-plan-grid">
-              <article className={`tp-plan-option ${plan === 'free' ? 'current' : ''}`}>
-                <span>{plan === 'free' ? 'MEVCUT' : 'PLAN'}</span>
-                <strong>Ücretsiz</strong>
-                <ul><li>1 aktif tarla</li><li>Temel uydu ve hava görünümü</li><li>Temel Pusula önerileri</li></ul>
-              </article>
-              <article className={`tp-plan-option ${plan === 'plus' ? 'current' : ''}`}>
-                <span>{plan === 'plus' ? 'MEVCUT' : 'PLAN'}</span>
-                <strong>Plus</strong>
-                <ul><li>10 tarla</li><li>Gelişmiş uydu geçmişi</li><li>Raporlar ve gelişmiş bildirimler</li><li>Sulama zamanlama</li></ul>
-              </article>
-              <article className={`tp-plan-option ${plan === 'premium' ? 'current' : ''}`}>
-                <span>{plan === 'premium' ? 'MEVCUT' : 'PLAN'}</span>
-                <strong>Premium</strong>
-                <ul><li>Sınırsız tarla</li><li>Tüm modüller</li><li>Tam Pusula asistanı</li><li>Gelişmiş analiz ve widget'lar</li></ul>
-              </article>
-            </div>
-            <div className="tp-status-note">Bu ekran plan kapsamını karşılaştırır. Mobil mağaza satın alma ve abonelik yönetimi, ilgili Plus/Premium satın alma akışından yapılır.</div>
-          </section>
-        </>
-      ) : null}
     </>
   );
 }

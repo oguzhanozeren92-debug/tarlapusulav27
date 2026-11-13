@@ -3,8 +3,6 @@ import fs from 'node:fs';
 const checks = [
   ['One-page PusulaPDF renderer', 'src/features/pusula-pdf/services/pusulaPdfRenderer.service.ts', 'const W = 1240'],
   ['No PDF addPage regression', 'src/features/pusula-pdf/services/pusulaPdfRenderer.service.ts', '__NO_ADD_PAGE__'],
-  ['RevenueCat purchase bridge', 'src/mobile/nativePurchases.ts', 'Purchases.purchasePackage'],
-  ['RevenueCat restore bridge', 'src/mobile/nativePurchases.ts', 'Purchases.restorePurchases'],
   ['Rewarded ad SSV bridge', 'src/mobile/nativeAds.ts', 'admob_ssv'],
   ['Native push token bridge', 'src/mobile/nativePush.ts', 'native_push_tokens'],
   ['Social auth live provider discovery', 'src/features/auth/services/authProviderAvailability.service.ts', '/auth/v1/settings'],

@@ -8,7 +8,6 @@ import {
 } from '../../services/unifiedMapAiService';
 import { onboardingStyles } from '../../styles/onboardingStyles';
 import type { UnifiedClimateContext } from '../../features/weather/hooks/useAppWeatherData';
-import { useEntitlementStore } from '../../entitlements/useEntitlementStore';
 import { listPusulaPdfReports, type PusulaPdfHistoryItem } from '../../features/pusula-pdf/services/pusulaPdfData.service';
 import { presetReportPeriod, reportPeriodValidation, todayLocalIso, type PusulaPdfPeriodPreset } from '../../features/pusula-pdf/services/pusulaPdfPeriod.service';
 import { supabase } from '../../supabaseClient';
@@ -438,14 +437,7 @@ const PUSULA_HUB_FINAL_STYLES = String.raw`
 .tp-ai-page .tp-pusula-hub-actions{grid-template-columns:1fr!important}
 .tp-ai-page .tp-pusula-hub-actions>.tp-pusula-hub-action{width:100%!important}
 
-.tp-ai-page .tp-premium-badge{display:inline-flex!important;margin-left:6px!important;padding:2px 5px!important;border-radius:5px!important;background:#111820!important;color:#fff!important;font-size:7px!important;line-height:1!important;letter-spacing:.08em!important;vertical-align:middle!important}
-.tp-ai-page .tp-pusula-hub-action.is-premium-locked{border-style:dashed!important;background:#fafafa!important}
-.tp-ai-page .tp-premium-info{margin:0 0 14px!important;padding:13px!important;border:1px solid #dfe3e6!important;border-radius:14px!important;background:#fff!important;display:flex!important;gap:12px!important;align-items:flex-start!important}
-.tp-ai-page .tp-premium-info>div{min-width:0!important;flex:1!important}
-.tp-ai-page .tp-premium-info span{display:block!important;color:#737d87!important;font-size:8px!important;font-weight:900!important;letter-spacing:.1em!important}
-.tp-ai-page .tp-premium-info strong{display:block!important;margin-top:4px!important;color:#111820!important;font-size:13px!important}
-.tp-ai-page .tp-premium-info p{margin:5px 0 0!important;color:#626d77!important;font-size:10px!important;line-height:1.4!important}
-.tp-ai-page .tp-premium-info button,.tp-ai-page .tp-pusula-pdf{appearance:none!important;border:1px solid #111820!important;border-radius:9px!important;background:#111820!important;color:#fff!important;padding:8px 10px!important;font-size:9px!important;font-weight:800!important;white-space:nowrap!important}
+.tp-ai-page .tp-pusula-pdf{appearance:none!important;border:1px solid #111820!important;border-radius:9px!important;background:#111820!important;color:#fff!important;padding:8px 10px!important;font-size:9px!important;font-weight:800!important;white-space:nowrap!important}
 .tp-ai-page .tp-pusula-synthesis-footer{flex-wrap:wrap!important}
 .tp-ai-page .tp-pusula-hub-field{margin-top:12px!important;padding:10px!important;border:1px solid #e1e5e8!important;border-radius:13px!important;background:#f6f7f8!important}
 .tp-ai-page .tp-pusula-hub-field>span{display:block!important;margin:0 0 7px!important;color:#7a848e!important;font-size:8px!important;font-weight:900!important;letter-spacing:.12em!important}
@@ -699,22 +691,6 @@ html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-card-head small{
   letter-spacing:0!important;
   white-space:normal!important;
   overflow-wrap:anywhere!important;
-}
-html body #root .tp-ai-page .tp-ai-tool-card .tp-premium-badge{
-  align-self:start!important;
-  justify-self:end!important;
-  margin:0!important;
-  padding:5px 7px!important;
-  border:0!important;
-  border-radius:999px!important;
-  background:#050607!important;
-  color:#fff!important;
-  -webkit-text-fill-color:#fff!important;
-  font-size:7px!important;
-  font-weight:900!important;
-  line-height:1!important;
-  letter-spacing:.08em!important;
-  white-space:nowrap!important;
 }
 html body #root .tp-ai-page .tp-ai-tool-card .tp-ai-tool-primary{
   appearance:none!important;
@@ -1205,36 +1181,6 @@ export default function AiAnalysisScreen({
   const aiAnalyzeBlock = cmsBlockFor('aiAnalysis', 'analyze-button');
 
 
-  const {
-    isPremium: entitlementIsPremium,
-    effectivePlan,
-    developerMode,
-    canOverride,
-  } = useEntitlementStore();
-
-  // Gerçek Premium + geliştirici TEST PREMIUM aynı yetkiyi açar.
-  // localStorage fallback yalnız geliştirici override yetkisi varsa kullanılır;
-  // normal kullanıcı bunu değiştirerek Premium açamaz.
-  const storedDeveloperMode =
-    canOverride && typeof window !== 'undefined'
-      ? (() => {
-          try {
-            return String(window.localStorage.getItem('tp_dev_plan_mode_v2') ?? '')
-              .trim()
-              .toLowerCase();
-          } catch {
-            return '';
-          }
-        })()
-      : '';
-
-  const isPremiumPlan =
-    entitlementIsPremium ||
-    effectivePlan === 'premium' ||
-    (canOverride && developerMode === 'premium') ||
-    (canOverride && storedDeveloperMode === 'premium');
-
-  const [premiumInfoOpen, setPremiumInfoOpen] = useState(false);
   const [pusulaPdfStatus, setPusulaPdfStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [pusulaPdfReport, setPusulaPdfReport] = useState<WeeklyPusulaReport | null>(null);
   const [pusulaPdfError, setPusulaPdfError] = useState('');
@@ -1358,7 +1304,6 @@ export default function AiAnalysisScreen({
   };
 
   const queuePusulaPdf = async () => {
-    if (!isPremiumPlan) { setPremiumInfoOpen(true); return; }
     if (!synthesisField?.id || pusulaPdfStatus === 'loading') return;
     if (pusulaPdfPeriodError) {
       setPusulaPdfError(pusulaPdfPeriodError);
@@ -1450,7 +1395,7 @@ export default function AiAnalysisScreen({
 
 
   useEffect(() => {
-    if (!synthesisField?.id || !isPremiumPlan) {
+    if (!synthesisField?.id) {
       setPusulaPdfHistory([]);
       return;
     }
@@ -1476,7 +1421,7 @@ export default function AiAnalysisScreen({
         setPusulaPdfStatus('loading');
       });
     return () => { cancelled = true; };
-  }, [synthesisField?.id, isPremiumPlan]);
+  }, [synthesisField?.id]);
 
   useEffect(() => {
     if (!synthesisField?.id) return;
@@ -1553,7 +1498,7 @@ export default function AiAnalysisScreen({
 
   const createSynthesisPdf = (freshResult?: typeof synthesisResult) => {
     const reportResult = freshResult ?? synthesisResult;
-    if (!isPremiumPlan || !synthesisField || !reportResult) return;
+    if (!synthesisField || !reportResult) return;
 
     const escapeHtml = (value: unknown) =>
       String(value ?? '')
@@ -1981,7 +1926,6 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                       Seçtiğin tarihlerdeki uydu, bitki, toprak, hava ve saha kayıtlarını yorumlayan PDF raporunu hazırla. Hazır olduğunda Pusula sana haber verir; dosyayı açıp paylaşabilirsin.
                     </small>
                   </div>
-                  {!isPremiumPlan ? <b className="tp-premium-badge">PREMIUM</b> : null}
                 </div>
 
                 <div className="tp-pdf-period-picker">
@@ -2050,7 +1994,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   </span>
                 </button>
 
-                {isPremiumPlan ? (
+                {(
                   <button
                     type="button"
                     className="tp-ai-tool-history"
@@ -2062,7 +2006,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     <small>{pusulaPdfHistory.length ? `${pusulaPdfHistory.length} rapor` : 'Henüz rapor yok'}</small>
                     <b>{pusulaPdfHistoryOpen ? 'Kapat' : 'Aç'}</b>
                   </button>
-                ) : null}
+                )}
 
                 {pusulaPdfStatus === 'loading' ? (
                   <div className="tp-pusula-pdf-progress" aria-live="polite">
@@ -2087,7 +2031,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   </div>
                 ) : null}
 
-            {isPremiumPlan && pusulaPdfHistoryOpen ? (
+            {pusulaPdfHistoryOpen ? (
               <div className="tp-pusula-pdf-ready">
                 <div className="tp-pusula-pdf-ready-head">
                   <div className="tp-pusula-pdf-ready-copy">
@@ -2201,16 +2145,6 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                 </button>
               </section>
             </div>
-          {premiumInfoOpen ? (
-            <section className="tp-premium-info" aria-live="polite">
-              <div>
-                <span>PREMIUM ÖZELLİK</span>
-                <strong>Toplu Tarla Değerlendirmesi</strong>
-                <p>Premium PusulaPDF; uydu, NDVI, hava, iklim ve tarla kayıtlarını kapsamlı bir raporda birleştirir. Hazırlama arka planda sürer; rapor tamamlandığında bildirim gönderilir.</p>
-              </div>
-              <button type="button" onClick={() => setPremiumInfoOpen(false)}>Kapat</button>
-            </section>
-          ) : null}
 
         {tpAiMode !== 'hub' ? (
           <div className="tp-ai-modebar">
@@ -2368,7 +2302,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                   >
                     ↻ Yeniden Harmanla
                   </button>
-                  {isPremiumPlan ? (
+                  {(
                     <button
                       type="button"
                       className="tp-pusula-pdf"
@@ -2376,7 +2310,7 @@ h1{font-size:22px;line-height:1.05;margin:0 0 3mm;letter-spacing:-.04em}
                     >
                       PDF Raporu Oluştur
                     </button>
-                  ) : null}
+                  )}
                 </div>
 
                 <div className="tp-pusula-caution">{synthesisResult.caution}</div>

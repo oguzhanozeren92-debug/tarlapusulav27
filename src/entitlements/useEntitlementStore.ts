@@ -22,10 +22,8 @@ export type EntitlementSnapshot = {
   error: string | null;
 };
 
-// All TarlaPusula features are free. Older features still use the historical
-// "premium" access tier internally; it never indicates a paid subscription.
-// No developer plan-switch UI, paywall, or store entitlements exist in this build.
-export const TARLAPUSULA_ALL_FEATURES_FREE = true;
+// TarlaPusula has no paid plans. Every user is on the free plan: features are
+// open, extra fields are unlocked with Pusula points (see useGamificationStore).
 
 const listeners = new Set<() => void>();
 let state: EntitlementSnapshot = {
@@ -33,10 +31,10 @@ let state: EntitlementSnapshot = {
   userEmail: '',
   realPlan: 'free',
   developerMode: 'real',
-  effectivePlan: 'premium',
+  effectivePlan: 'free',
   canOverride: false,
-  isPlus: true,
-  isPremium: true,
+  isPlus: false,
+  isPremium: false,
   isPaid: false,
   isNewUserPreview: false,
   switching: false,
@@ -85,16 +83,6 @@ export async function refreshEntitlements(): Promise<EntitlementSnapshot> {
   } finally {
     refreshPromise = null;
   }
-}
-
-// Legacy API signatures remain for existing callers. Changing paid or preview
-// modes is no longer possible because there are no subscription tiers.
-export async function setDeveloperPlanMode(_mode: DeveloperPlanMode) {
-  return state;
-}
-
-export async function cycleDeveloperPlanMode() {
-  return state;
 }
 
 function ensureAuthListener() {

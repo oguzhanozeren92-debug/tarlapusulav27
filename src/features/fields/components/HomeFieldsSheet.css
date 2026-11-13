@@ -75,10 +75,7 @@
 .tp-fields-delete-kicker { color: #ffb5b5; font-size: 11px; font-weight: 800; letter-spacing: .1em; }
 .tp-fields-delete-confirmation h2 { margin: 9px 0 12px; color: #fff; font-size: 24px; }
 .tp-fields-delete-confirmation p { margin: 0 0 14px; color: #d7e3d7; font-size: 14px; line-height: 1.55; }
-.tp-fields-delete-confirmation .tp-fields-delete-warning {
-  padding: 12px; border: 1px solid #736036; border-radius: 12px;
-  background: #292315; color: #ffe2a3;
-}
+
 .tp-fields-delete-confirmation .tp-fields-delete-error { color: #ffc3c3; }
 .tp-fields-delete-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
 .tp-fields-delete-actions button {
@@ -94,7 +91,6 @@
   .tp-fields-sheet-field-icon { flex-basis: 34px; height: 34px; }
   .tp-fields-sheet-field-status { display: none; }
 }
-
 
 /* =========================================================
    TARLALARIM — TUT / SÜRÜKLE SIRALAMA
@@ -192,7 +188,6 @@ html body .tp-fields-sheet .tp-fields-sheet-field.is-dragging {
     width: 26px;
   }
 }
-
 
 .tp-fields-delete-loading{
   margin: 16px 0 10px;

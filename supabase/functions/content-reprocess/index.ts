@@ -3,8 +3,9 @@ import { PutObjectCommand, S3Client } from "npm:@aws-sdk/client-s3@3.883.0";
 import * as cheerio from "npm:cheerio@1.0.0";
 
 const AI_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-const PRIMARY_MODEL = "nvidia/nemotron-3-super-120b-a12b";
-const FALLBACK_MODEL = "z-ai/glm-5.3-flash";
+// nemotron-3-super bu NVIDIA hesabında 404 veriyor (model kaldırıldı); GLM birincil, DeepSeek yedek.
+const PRIMARY_MODEL = "z-ai/glm-5.3-flash";
+const FALLBACK_MODEL = "deepseek-ai/deepseek-v4-flash-0731";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token, x-tp-maintenance",
@@ -314,6 +315,9 @@ false
     requestBody.temperature = 1.0;
     requestBody.top_p = 0.95;
   }
+  if (model.startsWith("deepseek-ai/")) {
+    requestBody.temperature = 0.2;
+  }
   if (model === "moonshotai/kimi-k3") {
     requestBody.temperature = 1.0;
     requestBody.reasoning_effort = "low";
@@ -327,7 +331,7 @@ false
     try {
       response = await fetch(AI_URL, {
         method: "POST",
-        signal: AbortSignal.timeout(model === "nvidia/nemotron-3-super-120b-a12b" ? 52000 : 60000),
+        signal: AbortSignal.timeout(model === FALLBACK_MODEL ? 35000 : 85000),
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
@@ -931,7 +935,7 @@ Deno.serve(async req => {
     const guideSufficient = isGuide ? (e.guide?.source_sufficiency !== "weak" && guideQuality >= 65) : null;
     return out({ ok: true, model: e.model ?? PRIMARY_MODEL, engine: isGuide ? "content-reprocess-v12-guide-autoqueue" : "content-reprocess-v12-full-turkish", id, payload: { key: pkey, url: purl, bytes: bytes.length }, image, imageError, scope: e.scope, eventDate: e.eventDate, location: e.location, guideQuality, guideSufficient, guideSourcePages: guidePages.length });
   } catch (err) {
-    console.error("[CONTENT_REPROCESS_V8]", err);
+    console.error("[CONTENT_REPROCESS_V9]", err);
     return out({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
