@@ -3,7 +3,8 @@ import * as cheerio from "npm:cheerio@1.0.0";
 
 const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const PRIMARY_MODEL = "z-ai/glm-5.3-flash";
-const FALLBACK_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+// nemotron-3-super bu hesapta 404 veriyor; yedek olarak DeepSeek kullanılır.
+const FALLBACK_MODEL = "deepseek-ai/deepseek-v4-flash-0731";
 const SAFE_LICENSES = new Set(["cc0", "cc-by", "cc-by-sa", "public-domain", "public_domain"]);
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -578,7 +579,7 @@ async function invokeNewsModel(model: string, messages: Array<{ role: string; co
 
   const res = await fetch(NVIDIA_API_URL, {
     method: "POST",
-    signal: AbortSignal.timeout(model === "microsoft/phi-4-mini-instruct" ? 18000 : 30000),
+    signal: AbortSignal.timeout(model === PRIMARY_MODEL ? 45000 : 30000),
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
   });
