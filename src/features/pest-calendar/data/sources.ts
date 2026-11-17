@@ -112,4 +112,34 @@ export const PEST_SOURCES: Record<string, PestSource> = {
     baslik: 'Endüstri ve Süs Bitkileri Zararlıları Zirai Mücadele Teknik Talimatları',
     url: 'https://www.tarimorman.gov.tr/TAGEM/Belgeler/yayin/End%C3%BCstri%20ve%20S%C3%BCs%20Bitkileri%20Zararl%C4%B1lar%C4%B1%20Zirai%20M%C3%BCcadele%20Teknik%20Talimatlar%C4%B1.pdf',
   },
+  cilElazig: {
+    id: 'cilElazig', kurum: 'Elazığ İl Tarım ve Orman Müdürlüğü',
+    baslik: 'Kayısı ağaçlarında çil (yaprakdelen) hastalığı',
+    url: 'https://elazig.tarimorman.gov.tr/Duyuru/408/Kayisi-Agaclarinda-_cil_-Yaprakdelen-Hastaligina-Karsi-Ilaclama-Zamani',
+  },
+  kayisiMalatya: {
+    id: 'kayisiMalatya', kurum: 'Malatya İl Tarım ve Orman Müdürlüğü',
+    baslik: 'Kayısıda yaprak delen (çil) hastalığı',
+    url: 'https://malatya.tarimorman.gov.tr/Duyuru/373/Kayisida-Yaprak-Delen-_cil_-Hastaligi',
+  },
+  tutunTripsiBKU: {
+    id: 'tutunTripsiBKU', kurum: 'BKÜ / Zirai Mücadele Teknik Talimatları Cilt II',
+    baslik: 'Pamukta tütün thripsi',
+    url: 'https://bku.tarimorman.gov.tr/Zararli/KaynakDetay/1028',
+  },
+  yabanciOtTagem: {
+    id: 'yabanciOtTagem', kurum: 'TAGEM',
+    baslik: 'Yabancı Ot Zirai Mücadele Teknik Talimatları',
+    url: 'https://www.tarimorman.gov.tr/TAGEM/Belgeler/yayin/Yabanc%C4%B1%20Ot%20Zirai%20M%C3%BCcadele%20Teknik%20Talimatlar%C4%B1.pdf',
+  },
+  aycicegiEMTT: {
+    id: 'aycicegiEMTT', kurum: 'TAGEM',
+    baslik: 'Ayçiçeği Entegre Mücadele Teknik Talimatı (2022)',
+    url: 'https://www.tarimorman.gov.tr/TAGEM/Belgeler/Entegre/Ay%C3%A7i%C3%A7e%C4%9Fi%20Entegre%20M%C3%BCcadele%20Teknik%20Talimat%C4%B1.pdf',
+  },
+  aycicegiTTAE: {
+    id: 'aycicegiTTAE', kurum: 'Trakya Tarımsal Araştırma Enstitüsü',
+    baslik: 'Ayçiçeği Tarımı',
+    url: 'https://arastirma.tarimorman.gov.tr/ttae/Sayfalar/Detay.aspx?SayfaId=54',
+  },
 };
