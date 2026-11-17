@@ -2,6 +2,7 @@ import MobileWheelPicker from '../components/MobileWheelPicker';
 import { MapPinned, Pencil } from 'lucide-react';
 import FieldCostSummary from '../features/field-detail/components/FieldCostSummary';
 import FieldSeasonSummary from '../features/field-detail/components/FieldSeasonSummary';
+import FieldWaterNeedCard from '../features/water-need/components/FieldWaterNeedCard';
 import PlantingWindowPanel from '../features/planting-window/components/PlantingWindowPanel';
 import CropRotationPanel from '../features/crop-rotation/components/CropRotationPanel';
 import OrchardChillPanel from '../features/orchard-chill/components/OrchardChillPanel';
@@ -367,6 +368,8 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                 )}
               </section>
             )}
+
+            {activeDetailTab === 'overview' && <FieldWaterNeedCard field={selectedField} />}
 
             {activeDetailTab === 'production' && (
             <section id="field-production" className="tp-field-detail-section">
