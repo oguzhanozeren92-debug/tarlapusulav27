@@ -12,23 +12,28 @@ for (const name of ['waterNeed.service.ts', 'rainLedger.service.ts', 'irrigation
 }
 console.log('waterNeedCore güncellendi');
 
-// Zararlı takvimi verisi ve bildirim metinleri (aylık hatırlatma + ilaçlama yoklaması).
+// Zararlı takvimi: sunucu yalnız ürün → ay listesi kullanır (küçük paket).
 const pestDst = 'supabase/functions/irrigation-water-balance-state/pestCalendarCore/';
 mkdirSync(pestDst, { recursive: true });
-for (const [from, name] of [
-  ['src/features/pest-calendar/data/', 'pestCalendar.ts'],
-  ['src/features/pest-calendar/services/', 'pestReminder.ts'],
-]) {
-  let code = readFileSync(from + name, 'utf8').replace(/from '\.\.\/data\/pestCalendar'/g, "from './pestCalendar.ts'");
-  if (name === 'pestCalendar.ts') {
-    // Sunucu yalnız ad/ay bilgisini kullanır; açıklama metinleri kopyalanmaz.
-    const { PEST_CALENDARS } = await import('../' + from + name);
-    const slim = PEST_CALENDARS.map((c) => ({ key: c.key, ad: c.ad, urunler: c.urunler, kapsam: c.kapsam,
-      girdiler: c.girdiler.map((e) => ({ id: e.id, ad: e.ad, tur: e.tur, aylar: e.aylar, mevsim: e.mevsim, zaman: '', kaynak: e.kaynak })) }));
-    const start = code.indexOf('export const PEST_CALENDARS');
-    const end = code.indexOf('\n];\n', start) + 4;
-    code = code.slice(0, start) + `export const PEST_CALENDARS: CropCalendar[] = ${JSON.stringify(slim)};\n` + code.slice(end);
-  }
-  writeFileSync(pestDst + name, `// OTOMATİK KOPYA — düzenleme: ${from}${name}, sonra scripts/sync-water-need-core.mjs\n${code}`);
+const cal = await import('../src/features/pest-calendar/data/pestCalendar.ts');
+const compact = cal.PEST_CALENDARS.map((c) => [c.ad, c.urunler,
+  c.girdiler.map((e) => [e.ad, cal.entryMonths(e)]).filter((x) => x[1].length)]);
+writeFileSync(pestDst + 'pestCalendar.ts', `// OTOMATİK ÜRETİLDİ — kaynak: src/features/pest-calendar/data/pestCalendar.ts, scripts/sync-water-need-core.mjs
+export type PestEntry = { ad: string; aylar: number[] };
+export type CropCalendar = { ad: string; girdiler: PestEntry[] };
+const DATA: Array<[string, string[], Array<[string, number[]]>]> = ${JSON.stringify(compact)};
+const fold = (v: string) => v.trim().toLocaleLowerCase('tr-TR').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
+  .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\\s+/g, ' ');
+export function calendarForCrop(crop: string | null | undefined): CropCalendar | null {
+  if (!crop) return null;
+  const hit = DATA.find(([, urunler]) => urunler.some((u) => fold(u) === fold(crop)));
+  return hit ? { ad: hit[0], girdiler: hit[2].map(([ad, aylar]) => ({ ad, aylar })) } : null;
 }
+export function splitByMonth(c: CropCalendar, month: number) {
+  return { thisMonth: c.girdiler.filter((e) => e.aylar.includes(month)), phenology: [] as PestEntry[], other: [] as PestEntry[] };
+}
+`);
+const rem = readFileSync('src/features/pest-calendar/services/pestReminder.ts', 'utf8')
+  .replace(/from '\.\.\/data\/pestCalendar'/g, "from './pestCalendar.ts'");
+writeFileSync(pestDst + 'pestReminder.ts', `// OTOMATİK KOPYA — düzenleme: src/features/pest-calendar/services/pestReminder.ts, sonra scripts/sync-water-need-core.mjs\n${rem}`);
 console.log('pestCalendarCore güncellendi');

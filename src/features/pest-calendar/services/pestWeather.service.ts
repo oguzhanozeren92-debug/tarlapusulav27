@@ -10,7 +10,7 @@
  * Bunlar istasyon ölçümü değil, model/yeniden analiz değerleridir.
  */
 
-export type TempDay = { date: string; tmax: number | null; tmin: number | null; tmean: number | null; rh: number | null };
+export type TempDay = { date: string; tmax: number | null; tmin: number | null; tmean: number | null; rh: number | null; rain?: number | null };
 
 export const EST_BASE = 10;
 export const MILDIYO = { tMin: 19, tMax: 22, rhMin: 80 } as const;
@@ -50,8 +50,8 @@ export function isMildiyoDay(d: TempDay): boolean {
 
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
 const FORECAST = 'https://api.open-meteo.com/v1/forecast';
-const VARS = 'temperature_2m_max,temperature_2m_min,temperature_2m_mean,relative_humidity_2m_mean';
-const CACHE_PREFIX = 'tp-pest-weather:v1:';
+const VARS = 'temperature_2m_max,temperature_2m_min,temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum';
+const CACHE_PREFIX = 'tp-pest-weather:v2:';
 const CACHE_TTL = 6 * 60 * 60 * 1000;
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -61,6 +61,7 @@ function parse(json: any): TempDay[] {
     date,
     tmax: num(d.temperature_2m_max?.[i]), tmin: num(d.temperature_2m_min?.[i]),
     tmean: num(d.temperature_2m_mean?.[i]), rh: num(d.relative_humidity_2m_mean?.[i]),
+    rain: num(d.precipitation_sum?.[i]),
   }));
 }
 
