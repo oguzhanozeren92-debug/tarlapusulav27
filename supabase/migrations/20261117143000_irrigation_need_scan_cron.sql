@@ -4,7 +4,7 @@ select cron.unschedule(jobid) from cron.job where jobname = 'tarlapusula-irrigat
 select cron.schedule(
   'tarlapusula-irrigation-need-scan', '7,37 * * * *',
   $cron$select net.http_post(
-    url := 'https://xwyfidtktauxivsosmex.supabase.co/functions/v1/irrigation-need-scan',
+    url := 'https://xwyfidtktauxivsosmex.supabase.co/functions/v1/irrigation-water-balance-state',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',
       (select secret from private.scheduler_secrets where name = 'push_dispatch')),
     body := '{}'::jsonb,

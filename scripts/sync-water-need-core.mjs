@@ -1,9 +1,9 @@
 // src/features/water-need/services altındaki saf hesap modüllerini
-// irrigation-need-scan edge fonksiyonuna kopyalar (Deno uzantılı import ister).
+// irrigation-water-balance-state edge fonksiyonuna kopyalar (Deno uzantılı import ister).
 // Kullanım: node scripts/sync-water-need-core.mjs
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 const src = 'src/features/water-need/services/';
-const dst = 'supabase/functions/irrigation-need-scan/waterNeedCore/';
+const dst = 'supabase/functions/irrigation-water-balance-state/waterNeedCore/';
 mkdirSync(dst, { recursive: true });
 for (const name of ['waterNeed.service.ts', 'rainLedger.service.ts', 'irrigationAlert.ts']) {
   const code = readFileSync(src + name, 'utf8')
