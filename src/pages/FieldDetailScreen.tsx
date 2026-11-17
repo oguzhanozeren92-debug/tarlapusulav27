@@ -377,7 +377,7 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
             {activeDetailTab === 'overview' && <FieldHarvestSafetyCard activities={activities ?? []} />}
 
             {activeDetailTab === 'overview' && <FieldWaterNeedCard field={selectedField} activities={activities}
-              plantingDate={annualSeasons.find((season) => season.year === selectedField.season)?.plantingDate ?? null} />}
+              plantingDate={annualSeasons.find((season: FieldSeason) => season.year === selectedField.season)?.plantingDate ?? null} />}
 
             {activeDetailTab === 'overview' && <FieldPestCalendarCard field={selectedField} />}
 
