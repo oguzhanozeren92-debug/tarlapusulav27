@@ -139,7 +139,7 @@ export function irrigationFromActivities(
 
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
 const FORECAST = 'https://api.open-meteo.com/v1/forecast';
-const CACHE_PREFIX = 'tp-rain-ledger:v1:';
+const CACHE_PREFIX = 'tp-rain-ledger:v2:';
 const CACHE_TTL = 6 * 60 * 60 * 1000;
 
 function parseDaily(payload: unknown): DailyWeather[] {
@@ -155,11 +155,12 @@ function parseDaily(payload: unknown): DailyWeather[] {
  * Sezon başından bugüne günlük yağış ve ET₀. Sonuç cihazda saklanır; 6 saatten
  * yeni kayıt varsa ağa çıkılmaz, ağ yoksa son kayıt kullanılır.
  */
-export async function loadSeasonWeather(lat: number, lng: number, start: Date, today: Date): Promise<{ daily: DailyWeather[]; cached: boolean }> {
+export async function loadSeasonWeather(lat: number, lng: number, start: Date, today: Date): Promise<{ daily: DailyWeather[]; forecast: DailyWeather[]; cached: boolean }> {
   const key = `${CACHE_PREFIX}${lat.toFixed(3)},${lng.toFixed(3)}:${isoDate(start)}`;
-  let stored: { at: number; daily: DailyWeather[] } | null = null;
+  const todayIso = isoDate(today);
+  let stored: { at: number; daily: DailyWeather[]; forecast?: DailyWeather[] } | null = null;
   try { stored = JSON.parse(window.localStorage.getItem(key) ?? 'null'); } catch { stored = null; }
-  if (stored && Date.now() - stored.at < CACHE_TTL) return { daily: stored.daily, cached: true };
+  if (stored && Date.now() - stored.at < CACHE_TTL) return { daily: stored.daily, forecast: stored.forecast ?? [], cached: true };
 
   try {
     const vars = 'precipitation_sum,et0_fao_evapotranspiration';
@@ -173,18 +174,20 @@ export async function loadSeasonWeather(lat: number, lng: number, start: Date, t
       for (const d of parseDaily(await res.json())) byDate.set(d.date, d);
     }
     const f = new URLSearchParams({ latitude: lat.toFixed(4), longitude: lng.toFixed(4),
-      daily: vars, past_days: '10', forecast_days: '1', timezone: 'auto' });
+      daily: vars, past_days: '10', forecast_days: '8', timezone: 'auto' });
     const fres = await fetch(`${FORECAST}?${f}`);
     if (!fres.ok) throw new Error(`Yağış servisi ${fres.status}`);
+    const forecast: DailyWeather[] = [];
     for (const d of parseDaily(await fres.json())) {
+      if (d.date > todayIso) { forecast.push(d); continue; }
       const prev = byDate.get(d.date);
       if (!prev || prev.rain === null || prev.et0 === null) byDate.set(d.date, d);
     }
     const daily = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-    try { window.localStorage.setItem(key, JSON.stringify({ at: Date.now(), daily })); } catch { /* depolama dolu */ }
-    return { daily, cached: false };
+    try { window.localStorage.setItem(key, JSON.stringify({ at: Date.now(), daily, forecast })); } catch { /* depolama dolu */ }
+    return { daily, forecast, cached: false };
   } catch (error) {
-    if (stored) return { daily: stored.daily, cached: true };
+    if (stored) return { daily: stored.daily, forecast: stored.forecast ?? [], cached: true };
     throw error;
   }
 }

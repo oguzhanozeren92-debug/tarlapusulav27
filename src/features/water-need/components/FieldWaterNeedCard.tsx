@@ -7,8 +7,9 @@ import {
   type IrrigationSystemId, type WaterNeedDataset,
 } from '../services/waterNeed.service';
 import {
-  buildRainLedger, irrigationFromActivities, loadSeasonWeather, seasonWindow, type DailyWeather,
+  buildRainLedger, irrigationFromActivities, isoDate, loadSeasonWeather, seasonWindow, type DailyWeather,
 } from '../services/rainLedger.service';
+import { evaluateIrrigationAlert } from '../services/irrigationAlert';
 import './FieldWaterNeedCard.css';
 
 const fmt = (value: number, digits = 0) =>
@@ -61,7 +62,7 @@ export default function FieldWaterNeedCard({ field, activities = [], plantingDat
     : null, [pick, crop, today, plantingDate]);
   const wLat = lat ?? pick?.station.enlem ?? null;
   const wLng = lng ?? pick?.station.boylam ?? null;
-  const [weather, setWeather] = useState<{ key: string; daily: DailyWeather[] } | null>(null);
+  const [weather, setWeather] = useState<{ key: string; daily: DailyWeather[]; forecast: DailyWeather[] } | null>(null);
   const [weatherError, setWeatherError] = useState('');
   const weatherKey = seasonWin && wLat !== null && wLng !== null ? `${wLat},${wLng},${seasonWin.start.toISOString()}` : '';
   useEffect(() => {
@@ -69,7 +70,7 @@ export default function FieldWaterNeedCard({ field, activities = [], plantingDat
     let cancelled = false;
     setWeatherError('');
     loadSeasonWeather(wLat, wLng, seasonWin.start, today)
-      .then((r) => { if (!cancelled) setWeather({ key: weatherKey, daily: r.daily }); })
+      .then((r) => { if (!cancelled) setWeather({ key: weatherKey, daily: r.daily, forecast: r.forecast }); })
       .catch(() => { if (!cancelled) setWeatherError('Yağış verisi şu an alınamadı.'); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,6 +83,10 @@ export default function FieldWaterNeedCard({ field, activities = [], plantingDat
       daily: weather.daily, irrigation: irrigationFromActivities(activities, field.area),
     });
   }, [pick, crop, seasonWin, weather, weatherKey, today, activities, field.area]);
+  const alert = useMemo(() => ledger && weather
+    ? evaluateIrrigationAlert({ ledger, daily: weather.daily, forecast: weather.forecast, todayIso: isoDate(today) })
+    : null, [ledger, weather, today]);
+  const weekRain = weather?.forecast.slice(0, 7) ?? [];
 
   const sys = IRRIGATION_SYSTEMS.find((s) => s.id === system) ?? IRRIGATION_SYSTEMS[0];
   const area = Number.isFinite(field.area) && field.area > 0 ? field.area : null;
@@ -150,6 +155,19 @@ export default function FieldWaterNeedCard({ field, activities = [], plantingDat
             {weatherError ? <p className="tp-water-need-empty">{weatherError}</p>
               : !ledger ? <p className="tp-water-need-empty">Sezon başından beri düşen yağışlar toplanıyor…</p>
               : <>
+                {alert && alert.status !== 'gerek-yok' && <div
+                  className={`tp-water-need-alert ${alert.status === 'sulama-zamani' ? 'urgent' : 'wait'}`} role="status">
+                  <strong>{alert.status === 'sulama-zamani' ? 'Sulama zamanı' : 'Yağış bekleniyor, sulamayı ertele'}</strong>
+                  <span>
+                    {alert.dryDays} gündür kayda değer yağış yok ve bitkinin su açığı yaklaşık {fmt(ledger.deficitNow)} mm
+                    (dekara {fmt(ledger.deficitNow)} ton).
+                    {alert.status === 'sulama-zamani'
+                      ? (alert.forecastRain > 0
+                        ? ` Önümüzdeki 3 günde yalnızca ${fmt(alert.forecastRain, 1)} mm yağış bekleniyor; sulama yapman önerilir.`
+                        : ' Önümüzdeki 3 günde yağış beklenmiyor; sulama yapman önerilir.')
+                      : ` Önümüzdeki 3 günde ${fmt(alert.forecastRain, 1)} mm yağış bekleniyor${alert.nextRainDate ? ` (${dayLabel(alert.nextRainDate)})` : ''}; yağıştan sonra sayaca tekrar bak.`}
+                  </span>
+                </div>}
                 <div className="tp-water-need-remaining">
                   <span>Bu sezon daha gereken su</span>
                   <strong>{fmt(ledger.remaining)} mm</strong>
@@ -171,12 +189,19 @@ export default function FieldWaterNeedCard({ field, activities = [], plantingDat
                   <div className="total"><dt>Şu anki su açığı</dt>
                     <dd>{ledger.deficitNow > 0 ? `${fmt(ledger.deficitNow)} mm` : 'Açık yok'}</dd></div>
                 </dl>
+                {weekRain.length > 0 && <div className="tp-water-need-forecast">
+                  <span>Önümüzdeki 7 gün beklenen yağış · toplam {fmt(weekRain.reduce((t, d) => t + (d.rain ?? 0), 0), 1)} mm</span>
+                  <ol>{weekRain.map((d) => <li key={d.date} className={(d.rain ?? 0) >= 1 ? 'wet' : undefined}>
+                    <small>{new Intl.DateTimeFormat('tr-TR', { weekday: 'short' }).format(new Date(`${d.date}T00:00:00`))}</small>
+                    <b>{d.rain === null ? '–' : fmt(d.rain, 1)}</b>
+                  </li>)}</ol>
+                </div>}
                 {ledger.rainEvents.length > 0 && <div className="tp-water-need-rains">
                   <span>Son yağışlar</span>
                   <ul>{ledger.rainEvents.map((e) => <li key={e.date}><b>{fmt(e.mm, 1)} mm</b> {dayLabel(e.date)}</li>)}</ul>
                 </div>}
                 <p className="tp-water-need-note tp-water-need-note-info">
-                  Yağışlar her gün otomatik eklenir. Sulama yaptığında İşlemler’e “Sulama” kaydını su miktarıyla (m³) girersen sayaçtan düşülür.
+                  Yağışlar her gün otomatik eklenir; uzun süre yağış olmaz ve su açığı birikirse bildirim gönderilir. Sulama yaptığında İşlemler’e “Sulama” kaydını su miktarıyla (m³) girersen sayaçtan düşülür.
                   {ledger.missingDays > 0 && ` ${ledger.missingDays} günün verisi henüz yayımlanmadı.`}
                 </p>
               </>}
