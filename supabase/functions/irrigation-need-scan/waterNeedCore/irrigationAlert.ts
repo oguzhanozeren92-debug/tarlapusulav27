@@ -1,7 +1,7 @@
 // OTOMATİK KOPYA — düzenleme: src/features/water-need/services/irrigationAlert.ts, sonra scripts/sync-water-need-core.mjs
 /**
  * "Sulama zamanı" kuralı — uygulamadaki kart ve sunucudaki günlük bildirim
- * taraması aynı eşikleri kullanır (supabase/functions/send-due-reminders/irrigationNeed.ts).
+ * taraması aynı eşikleri kullanır (supabase/functions/irrigation-need-scan/irrigationNeed.ts).
  * Sulama: uzun süredir kayda değer yağış yok + su açığı birikmiş + yakında yağış beklenmiyor.
  */
 import type { DailyWeather, RainLedger } from './rainLedger.service.ts';
