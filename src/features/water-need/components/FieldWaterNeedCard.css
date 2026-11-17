@@ -1,0 +1,57 @@
+html body .tp-water-need { margin:16px 0; padding:16px; border:1px solid #c9dbe6; border-radius:20px; background:#f2f7fa; color:#1f2a33; }
+.tp-water-need-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.tp-water-need-icon { display:grid; place-items:center; width:40px; height:40px; border-radius:12px; background:#1f6f9a; color:#fff; flex:none; }
+html body .tp-water-need .tp-water-need-kicker { font-size:11px; font-weight:800; letter-spacing:.6px; color:#3d6f8c!important; }
+html body .tp-water-need h3 { margin:2px 0 0; font-size:18px; color:#1f2a33!important; }
+html body .tp-water-need h4 { margin:0 0 10px; font-size:15px; color:#1f2a33!important; }
+html body .tp-water-need-empty { margin:4px 0 0; font-size:14px; line-height:1.55; color:#4a5866!important; }
+
+.tp-water-need-field { display:grid; gap:6px; margin:0 0 12px; font-size:13px; font-weight:700; color:#2b3946; }
+.tp-water-need-field select { width:100%; min-height:44px; padding:9px 11px; border:1px solid #c3d2dc; border-radius:11px; background:#fff; color:#1f2a33; font:inherit; font-weight:600; box-sizing:border-box; }
+
+.tp-water-need-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.tp-water-need-stats > div { display:grid; gap:3px; padding:12px; border-radius:14px; background:#fff; border:1px solid #d6e3ea; min-width:0; }
+html body .tp-water-need-stats span { font-size:12px; color:#56687a!important; }
+html body .tp-water-need-stats strong { font-size:21px; color:#155c84!important; }
+html body .tp-water-need-stats small { font-size:11.5px; color:#617383!important; }
+
+.tp-water-need-chart { display:grid; grid-template-columns:repeat(36,1fr); align-items:end; gap:2px; height:88px; margin-top:14px; padding:8px 6px 0; border-radius:12px; background:#fff; border:1px solid #d6e3ea; }
+.tp-water-need-chart span { position:relative; height:100%; display:flex; align-items:flex-end; justify-content:center; }
+.tp-water-need-chart i { display:block; width:100%; border-radius:3px 3px 0 0; background:#5aa7d1; }
+.tp-water-need-chart b { position:absolute; left:15%; right:15%; bottom:0; border-top:2px solid #237a4c; background:rgba(47,138,92,.30); }
+.tp-water-need-chart span.now i { background:#155c84; }
+.tp-water-need-chart span.now::after { content:""; position:absolute; top:-4px; left:50%; width:5px; height:5px; margin-left:-2.5px; border-radius:50%; background:#155c84; }
+.tp-water-need-months { display:grid; grid-template-columns:repeat(12,1fr); padding:4px 6px 0; font-size:10.5px; color:#6b7c8b; text-align:center; }
+html body .tp-water-need-legend { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin:6px 0 0; font-size:11.5px; color:#566878!important; }
+.tp-water-need-legend i, .tp-water-need-legend b { display:inline-block; width:12px; height:10px; border-radius:2px; vertical-align:middle; }
+.tp-water-need-legend i { background:#5aa7d1; }
+.tp-water-need-legend b { background:rgba(47,138,92,.25); border-top:2px solid #2f8a5c; }
+
+.tp-water-need-calc { margin-top:14px; padding:14px; border-radius:16px; background:#fff; border:1px solid #d6e3ea; }
+.tp-water-need-results { display:grid; gap:0; margin:4px 0 0; }
+.tp-water-need-results > div { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:10px 0; border-top:1px solid #e6eef3; }
+.tp-water-need-results > div:first-child { border-top:0; }
+.tp-water-need-results dt { font-size:13.5px; color:#3d4c59; }
+.tp-water-need-results dd { margin:0; font-size:15px; font-weight:800; color:#1f2a33; white-space:nowrap; }
+.tp-water-need-results > div.total dd { color:#155c84; font-size:16px; }
+html body .tp-water-need-note { margin:10px 0 0; font-size:12.5px; line-height:1.55; color:#5a4a1e!important; background:#fdf7e6; border-radius:10px; padding:9px 11px; }
+html body .tp-water-need-source { margin:12px 2px 0; font-size:11.5px; line-height:1.55; color:#5e6f7e!important; }
+
+/* Yağış sayacı */
+.tp-water-need-ledger { margin-top:14px; padding:14px; border-radius:16px; background:#fff; border:1px solid #d6e3ea; }
+.tp-water-need-remaining { display:grid; gap:4px; padding:12px; border-radius:14px; background:linear-gradient(135deg,#e8f3fa,#f4f9fc); border:1px solid #cfe2ee; margin-bottom:6px; }
+html body .tp-water-need-remaining span { font-size:12.5px; color:#3d6f8c!important; font-weight:700; }
+html body .tp-water-need-remaining strong { font-size:30px; line-height:1.1; color:#12557c!important; }
+html body .tp-water-need-remaining small { font-size:12px; color:#56687a!important; }
+.tp-water-need-progress { position:relative; display:flex; height:10px; margin-top:6px; border-radius:999px; background:#dbe7ee; overflow:hidden; }
+.tp-water-need-progress i { display:block; height:100%; background:#2f8a5c; }
+.tp-water-need-progress b { display:block; height:100%; background:#1f6f9a; }
+.tp-water-need-progress-legend i, .tp-water-need-progress-legend b { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 3px 0 0; vertical-align:middle; }
+.tp-water-need-progress-legend i { background:#2f8a5c; }
+.tp-water-need-progress-legend b { background:#1f6f9a; margin-left:6px; }
+.tp-water-need-rains { margin-top:8px; }
+html body .tp-water-need-rains > span { font-size:12.5px; font-weight:700; color:#3d4c59!important; }
+.tp-water-need-rains ul { display:flex; flex-wrap:wrap; gap:6px; margin:7px 0 0; padding:0; list-style:none; }
+.tp-water-need-rains li { padding:5px 9px; border-radius:999px; background:#eaf4fa; border:1px solid #cfe2ee; font-size:12px; color:#2b4a5e; }
+.tp-water-need-rains li b { color:#12557c; }
+html body .tp-water-need-note.tp-water-need-note-info { color:#2b4a5e!important; background:#eef5f9; }
