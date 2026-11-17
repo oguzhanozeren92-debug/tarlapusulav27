@@ -369,7 +369,8 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
               </section>
             )}
 
-            {activeDetailTab === 'overview' && <FieldWaterNeedCard field={selectedField} />}
+            {activeDetailTab === 'overview' && <FieldWaterNeedCard field={selectedField} activities={activities}
+              plantingDate={annualSeasons.find((season) => season.year === selectedField.season)?.plantingDate ?? null} />}
 
             {activeDetailTab === 'production' && (
             <section id="field-production" className="tp-field-detail-section">

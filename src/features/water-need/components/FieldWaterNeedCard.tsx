@@ -6,13 +6,22 @@ import {
   matchRehberCrops, pickStation, systemFromFieldMethod,
   type IrrigationSystemId, type WaterNeedDataset,
 } from '../services/waterNeed.service';
+import {
+  buildRainLedger, irrigationFromActivities, loadSeasonWeather, seasonWindow, type DailyWeather,
+} from '../services/rainLedger.service';
 import './FieldWaterNeedCard.css';
 
 const fmt = (value: number, digits = 0) =>
   new Intl.NumberFormat('tr-TR', { maximumFractionDigits: digits }).format(value);
+const dayLabel = (iso: string) =>
+  new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long' }).format(new Date(`${iso}T00:00:00`));
 const MONTH_SHORT = ['O', 'Ş', 'M', 'N', 'M', 'H', 'T', 'A', 'E', 'E', 'K', 'A'];
 
-export default function FieldWaterNeedCard({ field }: { field: Field }) {
+type ActivityLike = { type: string; activityDate: string; quantity: number | null; unit: string | null };
+
+export default function FieldWaterNeedCard({ field, activities = [], plantingDate = null }: {
+  field: Field; activities?: ActivityLike[]; plantingDate?: string | null;
+}) {
   const [dataset, setDataset] = useState<WaterNeedDataset | null>(null);
   const [error, setError] = useState('');
   const [variant, setVariant] = useState<string | null>(null);
@@ -45,6 +54,35 @@ export default function FieldWaterNeedCard({ field }: { field: Field }) {
   const result = useMemo(() => pick && crop
     ? calculateWaterNeed(pick.station, crop, { system, shadePercent: shade })
     : null, [pick, crop, system, shade]);
+  // ── Yağış sayacı ──
+  const today = useMemo(() => new Date(), []);
+  const seasonWin = useMemo(() => pick && crop
+    ? seasonWindow(pick.station.bitkiler[crop].etc, today, plantingDate)
+    : null, [pick, crop, today, plantingDate]);
+  const wLat = lat ?? pick?.station.enlem ?? null;
+  const wLng = lng ?? pick?.station.boylam ?? null;
+  const [weather, setWeather] = useState<{ key: string; daily: DailyWeather[] } | null>(null);
+  const [weatherError, setWeatherError] = useState('');
+  const weatherKey = seasonWin && wLat !== null && wLng !== null ? `${wLat},${wLng},${seasonWin.start.toISOString()}` : '';
+  useEffect(() => {
+    if (!seasonWin || wLat === null || wLng === null) return;
+    let cancelled = false;
+    setWeatherError('');
+    loadSeasonWeather(wLat, wLng, seasonWin.start, today)
+      .then((r) => { if (!cancelled) setWeather({ key: weatherKey, daily: r.daily }); })
+      .catch(() => { if (!cancelled) setWeatherError('Yağış verisi şu an alınamadı.'); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherKey]);
+  const ledger = useMemo(() => {
+    if (!pick || !crop || !seasonWin || !weather || weather.key !== weatherKey) return null;
+    return buildRainLedger({
+      etc: pick.station.bitkiler[crop].etc, eto: pick.station.eto, window: seasonWin, today,
+      seasonTotal: pick.station.bitkiler[crop].toplam,
+      daily: weather.daily, irrigation: irrigationFromActivities(activities, field.area),
+    });
+  }, [pick, crop, seasonWin, weather, weatherKey, today, activities, field.area]);
+
   const sys = IRRIGATION_SYSTEMS.find((s) => s.id === system) ?? IRRIGATION_SYSTEMS[0];
   const area = Number.isFinite(field.area) && field.area > 0 ? field.area : null;
   const maxBar = result ? Math.max(...result.etc, ...result.effectiveRain, 1) : 1;
@@ -106,6 +144,43 @@ export default function FieldWaterNeedCard({ field }: { field: Field }) {
           </div>
           <p className="tp-water-need-legend"><i /> Bitkinin tükettiği su <b /> Etkili yağış (yağışın %80'i)</p>
 
+
+          {seasonWin && <div className="tp-water-need-ledger">
+            <h4>Yağış sayacı</h4>
+            {weatherError ? <p className="tp-water-need-empty">{weatherError}</p>
+              : !ledger ? <p className="tp-water-need-empty">Sezon başından beri düşen yağışlar toplanıyor…</p>
+              : <>
+                <div className="tp-water-need-remaining">
+                  <span>Bu sezon daha gereken su</span>
+                  <strong>{fmt(ledger.remaining)} mm</strong>
+                  <small>dekara ≈ {fmt(ledger.remaining)} ton{area ? ` · tarlanın tamamı ≈ ${fmt(ledger.remaining * area)} ton` : ''}</small>
+                  <div className="tp-water-need-progress" aria-hidden="true">
+                    <i style={{ width: `${Math.min(100, (ledger.effectiveRain / Math.max(ledger.seasonNeed, 1)) * 100)}%` }} />
+                    <b style={{ width: `${Math.min(100, (ledger.irrigation / Math.max(ledger.seasonNeed, 1)) * 100)}%` }} />
+                  </div>
+                  <small className="tp-water-need-progress-legend">
+                    <i /> Yağış <b /> Sulama · sezon ihtiyacı {fmt(ledger.seasonNeed)} mm
+                  </small>
+                </div>
+                <dl className="tp-water-need-results">
+                  <div><dt>Sezon başlangıcı</dt><dd>{dayLabel(ledger.seasonStart)}{ledger.fromPlanting ? ' (ekim)' : ''}</dd></div>
+                  <div><dt>O günden beri düşen yağış</dt><dd>{fmt(ledger.rainTotal, 1)} mm</dd></div>
+                  <div><dt>Bitkiye yarayan kısmı (%80)</dt><dd>{fmt(ledger.effectiveRain, 1)} mm</dd></div>
+                  <div><dt>Kayıtlı sulamaların</dt><dd>{ledger.irrigation > 0 ? `${fmt(ledger.irrigation, 1)} mm` : 'Kayıt yok'}</dd></div>
+                  <div><dt>Bitkinin bugüne kadar tükettiği</dt><dd>{fmt(ledger.usedSoFar)} mm</dd></div>
+                  <div className="total"><dt>Şu anki su açığı</dt>
+                    <dd>{ledger.deficitNow > 0 ? `${fmt(ledger.deficitNow)} mm` : 'Açık yok'}</dd></div>
+                </dl>
+                {ledger.rainEvents.length > 0 && <div className="tp-water-need-rains">
+                  <span>Son yağışlar</span>
+                  <ul>{ledger.rainEvents.map((e) => <li key={e.date}><b>{fmt(e.mm, 1)} mm</b> {dayLabel(e.date)}</li>)}</ul>
+                </div>}
+                <p className="tp-water-need-note tp-water-need-note-info">
+                  Yağışlar her gün otomatik eklenir. Sulama yaptığında İşlemler’e “Sulama” kaydını su miktarıyla (m³) girersen sayaçtan düşülür.
+                  {ledger.missingDays > 0 && ` ${ledger.missingDays} günün verisi henüz yayımlanmadı.`}
+                </p>
+              </>}
+          </div>}
           <div className="tp-water-need-calc">
             <h4>Sulama hesaplayıcı</h4>
             <label className="tp-water-need-field">
@@ -151,6 +226,7 @@ export default function FieldWaterNeedCard({ field }: { field: Field }) {
               : `${pick.station.il} ili, `}rakım {fmt(pick.station.rakim)} m).
             {result.source === 'hesap' && ' Bu istasyonun tablosu rehberde okunamadığı için değerler rehberin kendi katsayılarıyla hesaplandı.'}
             {' '}Yılın gerçek hava durumu bu değerlerden farklı olabilir.
+            {seasonWin && ' Yağış sayacı: Open-Meteo (ERA5 arşivi ve tahmin modeli) günlük yağış ve ET₀ verisi; ölçüm değil model verisidir.'}
           </p>
         </>}
     </section>
