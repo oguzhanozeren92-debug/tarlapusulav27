@@ -13,6 +13,8 @@ import {
 } from '../features/pusula/services/pusulaContentSignals';
 import { PUSULAPDF_ALERT_KEY } from '../features/pusula-pdf/PusulaPdfReadyBridge';
 import { supabase } from '../supabaseClient';
+import { usePendingSprayCheckin } from '../features/pest-calendar/hooks/usePendingSprayCheckin';
+import type { SprayResponse } from '../features/pest-calendar/services/pestReminder';
 import { useGamificationStore } from '../gamification/useGamificationStore';
 
 const PUSULA_BODY_SRC =
@@ -68,7 +70,8 @@ type InteractiveGuideKind =
   | 'field-required'
   | 'weather-location'
   | 'support-location'
-  | 'soil-lab';
+  | 'soil-lab'
+  | 'spray-checkin';
 
 type InteractiveGuideNeed = {
   id: string;
@@ -83,7 +86,8 @@ type InteractiveGuideStep =
   | 'location-success'
   | 'location-denied'
   | 'soil-yes'
-  | 'soil-no';
+  | 'soil-no'
+  | 'spray-saved';
 
 const INTERACTIVE_SNOOZE_KEY = 'tp_pusula_interactive_snooze_v1';
 const INTERACTIVE_SESSION_PREFIX = 'tp_pusula_interactive_seen_v1:';
@@ -682,6 +686,9 @@ export default function GlobalPusulaBand({
   });
   const [interactiveNeed, setInteractiveNeed] =
     useState<InteractiveGuideNeed | null>(null);
+  const sprayCheckin = usePendingSprayCheckin();
+  const [sprayAnswer, setSprayAnswer] = useState<SprayResponse | null>(null);
+  const [sprayError, setSprayError] = useState('');
   const [interactiveOpen, setInteractiveOpen] = useState(false);
   const [interactiveStep, setInteractiveStep] =
     useState<InteractiveGuideStep>('main');
@@ -970,6 +977,17 @@ export default function GlobalPusulaBand({
     if (userGuideContext.loading) return null;
     if (screen === 'inventoryHub') return null;
 
+    if (sprayCheckin.pending) {
+      const c = sprayCheckin.pending;
+      const pests = c.pests.length ? ` Bu ayki takvimde: ${c.pests.slice(0, 3).join(', ')}.` : '';
+      return {
+        id: `spray-checkin:${c.id}`,
+        kind: 'spray-checkin',
+        title: `${c.fieldName}: bu ay ilaçlama yaptın mı?`,
+        text: `${c.crop ? `${c.crop} · ` : ''}Cevabını kaydediyorum; bir sonraki hatırlatmayı buna göre ayarlarım.${pests}`,
+      };
+    }
+
     if (
       ['fieldControlHub', 'calendar', 'aiAnalysis'].includes(screen) &&
       userGuideContext.fieldCount === 0
@@ -1079,6 +1097,7 @@ export default function GlobalPusulaBand({
     userGuideContext.city,
     userGuideContext.district,
     locationPermission,
+    sprayCheckin.pending?.id,
   ]);
 
   const requestBrowserLocation = () => {
@@ -1523,6 +1542,18 @@ export default function GlobalPusulaBand({
     if(fieldMemory.pending && fieldMemory.pending.priority>=75){
       if(openMemoryEvent())return;
     }
+    // İlaçlama yoklaması bekliyorsa haber/yayın sinyalinden önce sorulur.
+    if (sprayCheckin.pending && screen !== 'inventoryHub') {
+      const need = getInteractiveNeed();
+      if (need?.kind === 'spray-checkin') {
+        setInteractiveNeed(need);
+        setInteractiveStep('main');
+        setInsight(null);
+        setHasInteractiveSignal(false);
+        setInteractiveOpen(true);
+        return;
+      }
+    }
     if (relevantPublication && userGuideContext.userId) {
       const activeFieldId = String(fieldId ?? fieldName ?? '').trim();
       const selected = relevantPublication;
@@ -1738,6 +1769,52 @@ export default function GlobalPusulaBand({
           <div className="tp-depot-pusula-actions">
             <button type="button" onClick={() => requestNavigation('addField', 'add-field')}>Tarla / Konum Ekle</button>
             <button type="button" className="secondary" onClick={() => dismissInteractive(true)}>Şimdi değil</button>
+          </div>
+        </>
+      );
+    }
+
+    if (interactiveNeed.kind === 'spray-checkin') {
+      if (interactiveStep === 'spray-saved') {
+        const msg = sprayAnswer === 'yaptim'
+          ? 'Kaydettim. İlacı ve etiketteki hasat öncesi bekleme süresini Tarla İşlemleri’ne eklersen en erken hasat tarihini hesaplarım.'
+          : sprayAnswer === 'yapacagim'
+            ? 'Not aldım. 5 gün sonra tekrar soracağım. Uygulamadan önce Risk sekmesindeki eşiklere ve yağışsız günlere bak.'
+            : 'Tamam, kaydettim. Eşik aşılmadıysa uygulama yapmamak entegre mücadelenin de önerisi.';
+        return (
+          <>
+            <div className="tp-depot-pusula-kicker">PUSULA · İLAÇLAMA KAYDI</div>
+            <h2>Cevabın kaydedildi.</h2>
+            <p>{msg}</p>
+            <div className="tp-depot-pusula-actions">
+              <button type="button" onClick={() => setInteractiveOpen(false)}>Tamam</button>
+            </div>
+          </>
+        );
+      }
+      const checkinId = sprayCheckin.pending?.id;
+      const send = async (response: SprayResponse) => {
+        if (!checkinId) return;
+        setSprayError('');
+        try {
+          await sprayCheckin.answer(checkinId, response);
+          setSprayAnswer(response);
+          setHasInteractiveSignal(false);
+          setInteractiveStep('spray-saved');
+        } catch (error) {
+          setSprayError(error instanceof Error ? error.message : 'Cevap kaydedilemedi.');
+        }
+      };
+      return (
+        <>
+          <div className="tp-depot-pusula-kicker">PUSULA · İLAÇLAMA YOKLAMASI</div>
+          <h2>{interactiveNeed.title}</h2>
+          <p>{interactiveNeed.text}</p>
+          {sprayError ? <p>{sprayError}</p> : null}
+          <div className="tp-depot-pusula-actions">
+            <button type="button" onClick={() => void send('yaptim')}>Yaptım</button>
+            <button type="button" className="secondary" onClick={() => void send('yapacagim')}>Yapacağım</button>
+            <button type="button" className="secondary" onClick={() => void send('yapmayacagim')}>Yapmayacağım</button>
           </div>
         </>
       );
