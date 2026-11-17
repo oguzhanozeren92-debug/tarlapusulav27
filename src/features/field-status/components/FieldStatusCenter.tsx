@@ -37,6 +37,7 @@ import FieldIrrigationMethod from '../../field-detail/components/FieldIrrigation
 import FieldWaterMeasurements from '../../irrigation/components/FieldWaterMeasurements';
 import IrrigationResultPanel from '../../irrigation/components/IrrigationResultPanel';
 import OrchardChillPanel from '../../orchard-chill/components/OrchardChillPanel';
+import { IrrigationAgronomyCards, RiskAgronomyCards, SummaryAgronomyCards, useAgronomyActivities } from './FieldAgronomyCards';
 import type { FieldSeason } from '../../../types';
 import { supabase } from '../../../supabaseClient';
 import {
@@ -643,6 +644,7 @@ export default function FieldStatusCenter({
     useState<WeedSatelliteScreeningSignal | null>(null);
 
   const fieldId = String(field?.id ?? '').trim();
+  const agronomyActivities = useAgronomyActivities(open ? field : null, recordsRefreshNonce);
   const workability = useFieldWorkabilityContext({
     fieldId: open && !field?.demo ? fieldId : null,
   });
@@ -1940,6 +1942,7 @@ export default function FieldStatusCenter({
 
           {tab === 'summary' && (
             <div className="tp-field-status-stack">
+              <SummaryAgronomyCards field={field} activities={agronomyActivities} />
               <section className="tp-field-status-hero compact">
                 <div>
                   <span>BUGÜNKÜ FOTOĞRAF</span>
@@ -2621,6 +2624,8 @@ export default function FieldStatusCenter({
                 </span>
               </section>
 
+              <IrrigationAgronomyCards field={field} activities={agronomyActivities} />
+
               <details className="tp-field-status-detail-fold">
                 <summary>
                   <span><small>AYRINTILAR</small><strong>Sulama hesabı</strong><em>Su açığı, yağış, ekonomi ve model kanıtları</em></span>
@@ -2722,6 +2727,8 @@ export default function FieldStatusCenter({
               ) : (
                 <div className="tp-field-status-empty good">Şu anda aktif bir risk uyarısı yok. Bilgi ve kayıt kartları bu listeye dahil edilmez.</div>
               )}
+
+              <RiskAgronomyCards field={field} />
             </div>
           )}
 
