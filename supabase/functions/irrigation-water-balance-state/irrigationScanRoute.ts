@@ -5,6 +5,7 @@
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
 import { enqueueFieldIrrigationNeedAlerts } from './irrigationNeed.ts';
+import { enqueuePestCalendarReminders } from './pestReminderScan.ts';
 
 export async function handleIrrigationScan(req: Request): Promise<Response> {
   const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
@@ -20,7 +21,10 @@ export async function handleIrrigationScan(req: Request): Promise<Response> {
   if (!ok) return new Response(JSON.stringify({ ok: false, error: 'Unauthorized cron request.' }), { status: 401, headers });
   try {
     const stats = await enqueueFieldIrrigationNeedAlerts(db);
-    return new Response(JSON.stringify({ ok: true, ...stats }), { headers });
+    let pest: Record<string, unknown>;
+    try { pest = await enqueuePestCalendarReminders(db); }
+    catch (error) { pest = { error: error instanceof Error ? error.message : 'pest_scan_error' }; console.error('[pest-scan]', error); }
+    return new Response(JSON.stringify({ ok: true, ...stats, pest }), { headers });
   } catch (error) {
     console.error('[irrigation-need-scan]', error);
     return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'scan_error' }), { status: 500, headers });

@@ -6,6 +6,7 @@ import { PEST_SOURCES } from '../data/sources';
 import {
   EST_BASE, MILDIYO, dayReachingTarget, effectiveTemperatureSum, isMildiyoDay, isoDay, loadPestWeather, type TempDay,
 } from '../services/pestWeather.service';
+import { dryDays } from '../services/pestReminder';
 import './FieldPestCalendarCard.css';
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
@@ -68,7 +69,7 @@ export default function FieldPestCalendarCard({ field }: { field: Field }) {
   const lng = field.parcelCentroidLng ?? field.longitude ?? null;
   const hasMildiyo = !!calendar?.girdiler.some((e) => e.kural === 'mildiyo');
   const earliestBiofix = Object.values(biofix).filter(Boolean).sort()[0] ?? '';
-  const needsWeather = !!calendar && lat !== null && lng !== null && (hasMildiyo || !!earliestBiofix);
+  const needsWeather = !!calendar && lat !== null && lng !== null;
 
   useEffect(() => {
     if (!needsWeather || lat === null || lng === null) { setWeather(null); return; }
@@ -138,6 +139,17 @@ export default function FieldPestCalendarCard({ field }: { field: Field }) {
       {thisMonth.length ? (
         <ul className="tp-pest-list">{thisMonth.map((e) => <EntryRow key={e.id} entry={e} open={open === e.id} onToggle={() => toggle(e.id)} />)}</ul>
       ) : <p className="tp-pest-empty">Kaynaklarda bu ay için adı geçen bir izleme yok.</p>}
+
+      {weather && (() => {
+        const dry = dryDays(weather.forecast.map((d) => ({ date: d.date, rain: d.rain ?? null })), todayIso);
+        return (
+          <div className="tp-pest-alert">
+            <strong>Yağış beklenmeyen günler</strong>
+            <p>{dry.length ? `Önümüzdeki 7 günde: ${dry.map(dayLabel).join(', ')}.` : 'Önümüzdeki 7 günün her gününde yağış bekleniyor.'}</p>
+            <small>Tarla işi ve uygulama planı için; tahmin modelidir (günlük yağış 0,5 mm altı).</small>
+          </div>
+        );
+      })()}
 
       {mildiyo && (
         <div className={`tp-pest-alert${mildiyo.past || mildiyo.next.length ? ' is-risk' : ''}`}>

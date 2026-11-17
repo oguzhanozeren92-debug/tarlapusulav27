@@ -1,0 +1,14 @@
+// OTOMATİK ÜRETİLDİ — kaynak: src/features/pest-calendar/data/pestCalendar.ts, scripts/sync-water-need-core.mjs
+export type PestEntry = { ad: string; aylar: number[] };
+export type CropCalendar = { ad: string; girdiler: PestEntry[] };
+const DATA: Array<[string, string[], Array<[string, number[]]>]> = [["Zeytin",["Zeytin"],[["Zeytin sineği",[6,7,8]],["Zeytin güvesi",[3]],["Fidantırtılı",[4,5,6,7,8,9,10,11]],["Zeytin kabuklubiti",[7,8]],["Karakoşnil",[5,6]],["Çiçek sap sokanları",[4,5]],["Pasakarları",[4]],["Zeytin dal kanseri",[12]]]],["Elma, armut, ayva",["Elma","Armut","Ayva"],[["Elma küllemesi",[5,6]],["Virgül kabuklubiti",[1,2,4,5,7,12]],["Altın kelebek",[1,2,12]],["Yüzük kelebeği",[1,2,4,12]],["Elma ağkurdu",[3,4]],["Yaprak galerigüveleri",[4,5,7,8,9]],["Yaprakbükenler",[3,4,5]],["San Jose kabuklubiti",[1,2,12]],["Elma pamuklubiti",[5]],["Ağaç kızılkurdu",[8,9]],["Ağaç sarıkurdu",[9,10,11]],["Elma gövdekurdu",[3,4]],["Armut kaplanı",[4,6]],["Meyve gözkurtları",[3]],["Elma pasakarı",[5,8,9]]]],["Buğday ve arpa",["Buğday","Arpa"],[["Ekin kambur böceği",[3,4,5,9,10,11]]]],["Bağ",["Üzüm"],[["Kırmızıörümcek",[4]],["Bağ maymuncukları",[3,4,5]],["Thripsler",[3,4,5]],["Asma ağustosböceği",[6,7,8]]]],["Domates (açık alan)",["Domates"],[["Telkurdu",[3,4,5]]]],["Patates",["Patates"],[]],["Kiraz ve vişne",["Kiraz","Vişne"],[["Kiraz sineği",[4,5]],["Çiçek monilyası",[3,4,5]]]],["Kayısı",["Kayısı"],[["Çiçek monilyası",[3,4,5]],["Çil (yaprak delen)",[3,4,5,9,10,11]]]],["Fındık",["Fındık"],[["Fındık kurdu",[3,4,5]],["Dalkıran",[3,6,7,8]],["Fındık kahverengi koşnili",[7,8]],["Kozalak akarı",[3,4]],["Yeşil kokarca",[3,4,7]],["Fındık teke böceği",[5,6,7]],["Amerikan beyaz kelebeği",[5,7]],["Fındık filiz güvesi",[5]],["Virgül kabuklubiti",[2,3,5]],["Fındık galsineği",[3,4,5]],["Fındık yaprakdeleni",[3]],["Bakteriyel yanıklık",[3,4,5,9,10,11]]]],["Mısır",["Mısır","Şeker Mısırı"],[["Mısır koçankurdu",[3]],["Mısırkurdu",[4,5]],["Mısır maymuncuğu",[3,4,5,6]],["Bozkurt",[4]],["Çizgili yaprakkurdu",[4]],["Danaburnu",[5,6]],["Tel kurtları",[9,10]]]],["Pamuk",["Pamuk","Çukurova Pamuğu"],[]],["Ayçiçeği",["Ayçiçeği"],[["Yeşilkurt",[4,5]]]]];
+const fold = (v: string) => v.trim().toLocaleLowerCase('tr-TR').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
+  .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ');
+export function calendarForCrop(crop: string | null | undefined): CropCalendar | null {
+  if (!crop) return null;
+  const hit = DATA.find(([, urunler]) => urunler.some((u) => fold(u) === fold(crop)));
+  return hit ? { ad: hit[0], girdiler: hit[2].map(([ad, aylar]) => ({ ad, aylar })) } : null;
+}
+export function splitByMonth(c: CropCalendar, month: number) {
+  return { thisMonth: c.girdiler.filter((e) => e.aylar.includes(month)), phenology: [] as PestEntry[], other: [] as PestEntry[] };
+}
