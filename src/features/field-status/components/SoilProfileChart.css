@@ -1,0 +1,21 @@
+html body .tp-soil-chart { margin-top:10px; padding:14px; border:1px solid #e3e6e9; border-radius:18px; background:#fff; color:#17191b; }
+.tp-soil-chart-legend { display:flex; gap:14px; flex-wrap:wrap; }
+html body .tp-soil-chart-legend span { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#3d4248; }
+.tp-soil-chart-legend i { width:11px; height:11px; border-radius:3px; display:inline-block; }
+.tp-soil-chart svg { display:block; width:100%; max-width:460px; height:auto; margin:6px auto 0; }
+.tp-soil-chart svg .grid { stroke:#eceef0; stroke-width:1; }
+.tp-soil-chart svg .axis { font-size:8px; fill:#9aa0a6; }
+.tp-soil-chart svg .seg { font-size:10px; font-weight:800; fill:#2b2014; }
+.tp-soil-chart svg .seg.clay { fill:#fff; }
+.tp-soil-chart svg .depth { font-size:10px; font-weight:800; fill:#17191b; }
+.tp-soil-chart svg .meta { font-size:8.5px; fill:#6b7177; }
+html body .tp-soil-chart-cap { margin:4px 0 0; font-size:11px; color:#80868c!important; text-align:center; }
+.tp-soil-notes { margin-top:12px; border-top:1px solid #eceef0; padding-top:10px; }
+html body .tp-soil-notes-head { display:block; font-size:13px; font-weight:800; color:#17191b; }
+.tp-soil-notes ul { display:grid; gap:7px; margin:8px 0 0; padding:0; list-style:none; }
+.tp-soil-notes li { display:grid; gap:3px; padding:9px 11px; border-radius:12px; background:#f6f7f8; border-left:3px solid #8a9097; }
+.tp-soil-notes li.tone-good { border-left-color:#3f8a3a; background:#f3f8f1; }
+.tp-soil-notes li.tone-watch { border-left-color:#c2620f; background:#fff6ec; }
+html body .tp-soil-notes li b { font-size:13px; color:#17191b; }
+html body .tp-soil-notes li span { font-size:12.5px; line-height:1.5; color:#40464c; }
+html body .tp-soil-notes-foot { margin:9px 2px 0; font-size:11px; line-height:1.45; color:#80868c!important; }

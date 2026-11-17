@@ -37,6 +37,7 @@ import FieldIrrigationMethod from '../../field-detail/components/FieldIrrigation
 import FieldWaterMeasurements from '../../irrigation/components/FieldWaterMeasurements';
 import IrrigationResultPanel from '../../irrigation/components/IrrigationResultPanel';
 import OrchardChillPanel from '../../orchard-chill/components/OrchardChillPanel';
+import SoilProfileChart from './SoilProfileChart';
 import { IrrigationAgronomyCards, RiskAgronomyCards, SummaryAgronomyCards, useAgronomyActivities } from './FieldAgronomyCards';
 import type { FieldSeason } from '../../../types';
 import { supabase } from '../../../supabaseClient';
@@ -2549,26 +2550,7 @@ export default function FieldStatusCenter({
                     <div><small>Organik C</small><strong>{soilTopsoilValue(soilProfile, 'organicCarbon')?.toFixed(1) ?? '—'}</strong></div>
                   </section>
 
-                  <div className="tp-field-status-texture-bar" aria-label="Tahmini toprak tekstürü">
-                    <span style={{ flexBasis: `${Math.max(0, finite(soilProfile.texture.sandPercent) ?? 0)}%` }}>Kum %{Math.round(finite(soilProfile.texture.sandPercent) ?? 0)}</span>
-                    <span style={{ flexBasis: `${Math.max(0, finite(soilProfile.texture.siltPercent) ?? 0)}%` }}>Silt %{Math.round(finite(soilProfile.texture.siltPercent) ?? 0)}</span>
-                    <span style={{ flexBasis: `${Math.max(0, finite(soilProfile.texture.clayPercent) ?? 0)}%` }}>Kil %{Math.round(finite(soilProfile.texture.clayPercent) ?? 0)}</span>
-                  </div>
-
-                  <div className="tp-field-status-soil-profile tp-zebra-list">
-                    {soilProfile.properties.ph.layers.map((layer, index) => {
-                      const clayLayer = soilProfile.properties.clay.layers[index];
-                      const sandLayer = soilProfile.properties.sand.layers[index];
-                      return (
-                        <article key={layer.depth}>
-                          <strong>{layer.depth.replace('cm', ' cm')}</strong>
-                          <span>pH {layer.value?.toFixed(1) ?? '—'}</span>
-                          <span>Kil %{clayLayer?.value == null ? '—' : Math.round(clayLayer.value)}</span>
-                          <span>Kum %{sandLayer?.value == null ? '—' : Math.round(sandLayer.value)}</span>
-                        </article>
-                      );
-                    })}
-                  </div>
+                  <SoilProfileChart profile={soilProfile} textureLabel={textureClass(soilProfile)} />
 
                   <p className="tp-field-status-note">Kaynak: {soilProfile.provider} · {soilProfile.product} · yaklaşık {soilProfile.spatialResolutionMeters} m çözünürlük.</p>
                 </>
