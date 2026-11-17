@@ -4,6 +4,7 @@ import FieldCostSummary from '../features/field-detail/components/FieldCostSumma
 import FieldSeasonSummary from '../features/field-detail/components/FieldSeasonSummary';
 import FieldWaterNeedCard from '../features/water-need/components/FieldWaterNeedCard';
 import FieldHarvestSafetyCard from '../features/harvest-safety/components/FieldHarvestSafetyCard';
+import FieldPestCalendarCard from '../features/pest-calendar/components/FieldPestCalendarCard';
 import { activeHarvestHolds } from '../features/harvest-safety/services/preHarvestInterval';
 import PlantingWindowPanel from '../features/planting-window/components/PlantingWindowPanel';
 import CropRotationPanel from '../features/crop-rotation/components/CropRotationPanel';
@@ -376,7 +377,9 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
             {activeDetailTab === 'overview' && <FieldHarvestSafetyCard activities={activities ?? []} />}
 
             {activeDetailTab === 'overview' && <FieldWaterNeedCard field={selectedField} activities={activities}
-              plantingDate={annualSeasons.find((season) => season.year === selectedField.season)?.plantingDate ?? null} />}
+              plantingDate={annualSeasons.find((season: FieldSeason) => season.year === selectedField.season)?.plantingDate ?? null} />}
+
+            {activeDetailTab === 'overview' && <FieldPestCalendarCard field={selectedField} />}
 
             {activeDetailTab === 'production' && (
             <section id="field-production" className="tp-field-detail-section">

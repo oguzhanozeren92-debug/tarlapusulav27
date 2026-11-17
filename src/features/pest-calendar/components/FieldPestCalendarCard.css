@@ -1,0 +1,51 @@
+html body .tp-pest-card { margin:16px 0; padding:16px; border:1px solid #d8e3cf; border-radius:20px; background:#f7faf3; color:#1f2a1a; }
+.tp-pest-head { display:flex; gap:11px; align-items:flex-start; }
+.tp-pest-head > span { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:12px; background:#4d7a2a; color:#fff; }
+html body .tp-pest-head small { font-size:11px; font-weight:800; letter-spacing:.6px; color:#3f6b1e!important; }
+html body .tp-pest-head strong { display:block; margin-top:2px; font-size:17px; color:#1f2a1a!important; }
+html body .tp-pest-head p { margin:4px 0 0; font-size:13px; line-height:1.5; color:#46553d!important; }
+html body .tp-pest-card h4 { margin:16px 0 8px; font-size:13px; font-weight:800; color:#2c3b22!important; }
+
+.tp-pest-timeline { margin-top:14px; padding:10px; border-radius:14px; background:#fff; border:1px solid #e3ebdb; overflow-x:auto; }
+.tp-pest-tl-row { display:grid; grid-template-columns:minmax(96px, 128px) repeat(12, minmax(14px, 1fr)); gap:2px; align-items:center; min-height:18px; }
+html body .tp-pest-tl-row > span { font-size:11px; color:#3a4732; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:6px; }
+html body .tp-pest-tl-months em { font-style:normal; font-size:10px; font-weight:700; text-align:center; color:#7a8770; }
+html body .tp-pest-tl-months em.is-now { color:#1f2a1a; }
+.tp-pest-tl-row i { display:block; height:10px; border-radius:3px; background:#eef2ea; }
+.tp-pest-tl-row i.is-now { outline:1.5px solid #1f2a1a33; }
+.tp-pest-zararli i.on { background:#c2620f; }
+.tp-pest-hastalik i.on { background:#2f6fb0; }
+.tp-pest-yabanciot i.on { background:#6c8a2b; }
+
+.tp-pest-list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.tp-pest-entry { border-radius:12px; background:#fff; border:1px solid #e3ebdb; }
+.tp-pest-entry > button { display:flex; align-items:center; gap:8px; width:100%; padding:10px 11px; border:0; background:none; text-align:left; cursor:pointer; color:inherit; }
+html body .tp-pest-entry > button b { flex:1; font-size:14px; color:#1f2a1a; }
+.tp-pest-entry > button svg { transition:transform .15s; color:#7a8770; }
+.tp-pest-entry.is-open > button svg { transform:rotate(180deg); }
+html body .tp-pest-kind { flex:none; padding:2px 7px; border-radius:999px; font-size:10.5px; font-weight:800; color:#fff!important; background:#c2620f; }
+html body .tp-pest-hastalik .tp-pest-kind { background:#2f6fb0; }
+html body .tp-pest-yabanciot .tp-pest-kind { background:#6c8a2b; }
+.tp-pest-entry-body { padding:0 11px 11px; display:grid; gap:6px; }
+html body .tp-pest-entry-body i { font-size:12px; color:#6b7863; }
+html body .tp-pest-entry-body p { margin:0; font-size:13px; line-height:1.5; color:#33402c!important; }
+html body .tp-pest-entry-body .tp-pest-note { font-size:12px; color:#6b7863!important; }
+html body .tp-pest-entry-body a { display:inline-flex; gap:5px; align-items:center; font-size:12px; color:#3f6b1e; text-decoration:underline; }
+html body .tp-pest-empty { margin:0; font-size:13px; color:#6b7863!important; }
+
+html body .tp-pest-alert { margin-top:12px; padding:11px 12px; border-radius:14px; background:#fff; border:1px solid #e3ebdb; }
+html body .tp-pest-alert.is-risk { background:#eef5fd; border-color:#b8d3ef; }
+html body .tp-pest-alert strong { font-size:13.5px; color:#1d4f80; }
+html body .tp-pest-alert p { margin:4px 0; font-size:13px; line-height:1.5; color:#33402c!important; }
+html body .tp-pest-alert small { font-size:11.5px; color:#6b7863!important; }
+
+html body .tp-pest-dd { margin-top:12px; padding:11px 12px; border-radius:14px; background:#fff; border:1px solid #e3ebdb; display:grid; gap:8px; }
+html body .tp-pest-dd strong { font-size:13.5px; color:#1f2a1a; }
+html body .tp-pest-dd label { display:grid; gap:4px; font-size:12px; color:#46553d; }
+html body .tp-pest-dd input { padding:8px 10px; border-radius:10px; border:1px solid #cfdcc4; font-size:14px; background:#fbfdf9; color:#1f2a1a; }
+html body .tp-pest-dd p { margin:0; font-size:13px; line-height:1.5; color:#33402c!important; }
+.tp-pest-dd-bar { height:8px; border-radius:99px; background:#eef2ea; overflow:hidden; }
+.tp-pest-dd-bar span { display:block; height:100%; background:#c2620f; }
+
+html body .tp-pest-more { margin-top:12px; padding:9px 12px; width:100%; border-radius:12px; border:1px solid #cfdcc4; background:#fff; font-size:13px; font-weight:700; color:#3f6b1e; cursor:pointer; }
+html body .tp-pest-foot { margin:12px 2px 0; font-size:11.5px; line-height:1.5; color:#6b7863!important; }
