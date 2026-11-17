@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { loadMicroclimateSensorSnapshot } from '../services/microclimateSensor.service';
 import type { MicroclimateSensorSnapshot } from '../types/microclimateSensor';
@@ -8,6 +8,10 @@ export function useMicroclimateSensorContext(fieldIdInput: string | number | nul
   const [snapshot, setSnapshot] = useState<MicroclimateSensorSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Aynı tarla için hook birden çok yerde kullanılıyor (ana sayfa + Veri sekmesi).
+  // Supabase aynı adlı kanalı yeniden döndürür; abone olunmuş kanala .on() eklemek
+  // hata fırlatır ve tüm ekranı düşürür. Her kullanım kendi kanal adını alır.
+  const instanceId = useRef(Math.random().toString(36).slice(2, 10));
 
   const refresh = useCallback(async () => {
     if (!fieldId) {
@@ -35,7 +39,7 @@ export function useMicroclimateSensorContext(fieldIdInput: string | number | nul
   useEffect(() => {
     if (!fieldId) return;
     const channel = supabase
-      .channel(`tp-sensor-field-${fieldId}`)
+      .channel(`tp-sensor-field-${fieldId}-${instanceId.current}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'field_sensor_devices', filter: `field_id=eq.${fieldId}`,
       }, () => void refresh())
