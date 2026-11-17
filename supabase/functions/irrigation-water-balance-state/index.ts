@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
+import { handleIrrigationScan } from './irrigationScanRoute.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -220,6 +221,8 @@ function daysBetween(startIso: string, endIso: string) {
 }
 
 Deno.serve(async (req: Request) => {
+  // Günlük sulama taraması (pg_cron). Kullanıcı istekleri bu başlığı taşımaz.
+  if (req.headers.get('x-cron-secret')) return handleIrrigationScan(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'Yalnız POST desteklenir.' }, 405);
 

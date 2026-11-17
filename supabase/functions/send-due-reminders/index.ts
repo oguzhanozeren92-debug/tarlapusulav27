@@ -5,7 +5,6 @@ import {
   sendNativePushToUser,
 } from "../_shared/nativePush.ts";
 import { enqueueDailyWeatherNotifications, enqueueFieldFrostRiskAlerts } from "./dailyWeather.ts";
-import { enqueueFieldIrrigationNeedAlerts } from "./irrigationNeed.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1340,12 +1339,6 @@ Deno.serve(async (req) => {
         console.error("Tarla bazlı don taraması başarısız:", error);
         return { error: error instanceof Error ? error.message : "frost_scan_error" };
       });
-    // Uzun süre yağışsız + su açığı birikmiş tarlalar için "Sulama zamanı".
-    const irrigationNeed = await enqueueFieldIrrigationNeedAlerts(supabaseAdmin)
-      .catch((error) => {
-        console.error("Sulama ihtiyacı taraması başarısız:", error);
-        return { error: error instanceof Error ? error.message : "irrigation_scan_error" };
-      });
     const weatherPush = await processAppPushQueue(50);
     const fieldActivity = await processFieldActivityUpdates(cronSecret, body?.forceFieldActivity === true);
     const ndvi = await processNdviMapUpdates(false);
@@ -1360,7 +1353,6 @@ Deno.serve(async (req) => {
         reengagement,
         dailyWeather,
         fieldFrost,
-        irrigationNeed,
         weatherPush,
         fieldActivity,
         appPush,

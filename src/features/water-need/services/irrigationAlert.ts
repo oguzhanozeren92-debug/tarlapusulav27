@@ -1,6 +1,6 @@
 /**
  * "Sulama zamanı" kuralı — uygulamadaki kart ve sunucudaki günlük bildirim
- * taraması aynı eşikleri kullanır (supabase/functions/send-due-reminders/irrigationNeed.ts).
+ * taraması aynı eşikleri kullanır (supabase/functions/irrigation-water-balance-state/irrigationNeed.ts).
  * Sulama: uzun süredir kayda değer yağış yok + su açığı birikmiş + yakında yağış beklenmiyor.
  */
 import type { DailyWeather, RainLedger } from './rainLedger.service';
