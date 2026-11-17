@@ -56,3 +56,22 @@ test('sulama kayıtları: yalnız m³ ve alan varsa mm olur', () => {
   assert.deepEqual(irrigationFromActivities(acts, 10), [{ date: '2026-06-01', mm: 50 }]);
   assert.deepEqual(irrigationFromActivities(acts, 0), []);
 });
+
+import { evaluateIrrigationAlert } from './irrigationAlert.ts';
+const baseLedger = { seasonStart: '2026-06-01', deficitNow: 40 };
+const days = (from, n, rain) => Array.from({ length: n }, (_, i) => {
+  const d = new Date(Date.UTC(2026, 5, 1 + from + i)); return { date: d.toISOString().slice(0, 10), rain, et0: 5 };
+});
+
+test('uyarı: 10+ gün yağışsız, açık ≥25 mm, 3 günde yağış yok → sulama zamanı', () => {
+  const daily = [...days(0, 1, 12), ...days(1, 14, 0)]; // 1 Haziran 12 mm, sonra kuru
+  const a = evaluateIrrigationAlert({ ledger: baseLedger, daily, forecast: days(15, 3, 0), todayIso: '2026-06-15' });
+  assert.equal(a.status, 'sulama-zamani'); assert.equal(a.dryDays, 14);
+});
+test('uyarı: yağış geliyorsa ertele; yakında yağmışsa veya açık azsa gerek yok', () => {
+  const dry = [...days(0, 1, 12), ...days(1, 14, 0)];
+  assert.equal(evaluateIrrigationAlert({ ledger: baseLedger, daily: dry, forecast: [...days(15, 1, 0), ...days(16, 1, 8)], todayIso: '2026-06-15' }).status, 'yagis-bekleniyor');
+  const wet = [...days(0, 10, 0), ...days(10, 1, 9), ...days(11, 4, 0)];
+  assert.equal(evaluateIrrigationAlert({ ledger: baseLedger, daily: wet, forecast: days(15, 3, 0), todayIso: '2026-06-15' }).status, 'gerek-yok');
+  assert.equal(evaluateIrrigationAlert({ ledger: { ...baseLedger, deficitNow: 10 }, daily: dry, forecast: [], todayIso: '2026-06-15' }).status, 'gerek-yok');
+});

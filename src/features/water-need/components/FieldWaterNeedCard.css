@@ -55,3 +55,17 @@ html body .tp-water-need-rains > span { font-size:12.5px; font-weight:700; color
 .tp-water-need-rains li { padding:5px 9px; border-radius:999px; background:#eaf4fa; border:1px solid #cfe2ee; font-size:12px; color:#2b4a5e; }
 .tp-water-need-rains li b { color:#12557c; }
 html body .tp-water-need-note.tp-water-need-note-info { color:#2b4a5e!important; background:#eef5f9; }
+.tp-water-need-alert { display:grid; gap:4px; margin-bottom:10px; padding:12px 13px; border-radius:14px; border:1px solid; }
+.tp-water-need-alert.urgent { background:#fff1e6; border-color:#f3c39b; }
+.tp-water-need-alert.wait { background:#eef6ff; border-color:#bcd7f2; }
+html body .tp-water-need-alert strong { font-size:15px; color:#9a4300!important; }
+html body .tp-water-need-alert.wait strong { color:#1d5d93!important; }
+html body .tp-water-need-alert span { font-size:13px; line-height:1.5; color:#4a3a2c!important; }
+html body .tp-water-need-alert.wait span { color:#2b4a5e!important; }
+.tp-water-need-forecast { margin-top:10px; }
+html body .tp-water-need-forecast > span { font-size:12.5px; font-weight:700; color:#3d4c59!important; }
+.tp-water-need-forecast ol { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin:7px 0 0; padding:0; list-style:none; }
+.tp-water-need-forecast li { display:grid; justify-items:center; gap:2px; padding:6px 2px; border-radius:10px; background:#f3f6f8; border:1px solid #e1e8ed; }
+.tp-water-need-forecast li.wet { background:#e3f0f9; border-color:#b9d6ea; }
+html body .tp-water-need-forecast li small { font-size:10.5px; color:#6b7c8b!important; }
+html body .tp-water-need-forecast li b { font-size:12.5px; color:#1f4d6b; }
