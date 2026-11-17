@@ -1,0 +1,12 @@
+html body .tp-harvest-safety { margin:16px 0; padding:16px; border:1px solid #f0c9a0; border-radius:20px; background:#fff6ec; color:#3a2a1a; }
+.tp-harvest-safety-head { display:flex; gap:11px; align-items:flex-start; }
+.tp-harvest-safety-head > span { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:12px; background:#c2620f; color:#fff; }
+html body .tp-harvest-safety-head small { font-size:11px; font-weight:800; letter-spacing:.6px; color:#9a4d0c!important; }
+html body .tp-harvest-safety-head strong { display:block; margin-top:2px; font-size:17px; color:#3a2a1a!important; }
+html body .tp-harvest-safety-head p { margin:4px 0 0; font-size:13px; line-height:1.5; color:#5a4330!important; }
+.tp-harvest-safety ul { display:grid; gap:6px; margin:12px 0 0; padding:0; list-style:none; }
+.tp-harvest-safety li { display:grid; gap:2px; padding:9px 11px; border-radius:12px; background:#fff; border:1px solid #f1dcc4; }
+html body .tp-harvest-safety li b { font-size:14px; color:#3a2a1a; }
+html body .tp-harvest-safety li span { font-size:12.5px; color:#6b5440; }
+html body .tp-harvest-safety-note { margin:10px 2px 0; font-size:11.5px; color:#7a6450!important; }
+html body .tp-harvest-hold-warning { grid-column:1 / -1; margin:0; padding:10px 12px; border-radius:12px; background:#fff1e6; border:1px solid #f3c39b; font-size:13px; line-height:1.5; color:#7a3a06!important; }

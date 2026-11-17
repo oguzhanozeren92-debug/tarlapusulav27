@@ -3,6 +3,8 @@ import { MapPinned, Pencil } from 'lucide-react';
 import FieldCostSummary from '../features/field-detail/components/FieldCostSummary';
 import FieldSeasonSummary from '../features/field-detail/components/FieldSeasonSummary';
 import FieldWaterNeedCard from '../features/water-need/components/FieldWaterNeedCard';
+import FieldHarvestSafetyCard from '../features/harvest-safety/components/FieldHarvestSafetyCard';
+import { activeHarvestHolds } from '../features/harvest-safety/services/preHarvestInterval';
 import PlantingWindowPanel from '../features/planting-window/components/PlantingWindowPanel';
 import CropRotationPanel from '../features/crop-rotation/components/CropRotationPanel';
 import OrchardChillPanel from '../features/orchard-chill/components/OrchardChillPanel';
@@ -29,6 +31,8 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
     activityPhoto,
     activityPhotoPreview,
     activityProductName,
+    activityPhiDays,
+    setActivityPhiDays,
     activityQuantity,
     activityType,
     activityUnit,
@@ -368,6 +372,8 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                 )}
               </section>
             )}
+
+            {activeDetailTab === 'overview' && <FieldHarvestSafetyCard activities={activities ?? []} />}
 
             {activeDetailTab === 'overview' && <FieldWaterNeedCard field={selectedField} activities={activities}
               plantingDate={annualSeasons.find((season) => season.year === selectedField.season)?.plantingDate ?? null} />}
@@ -1299,6 +1305,30 @@ export default function FieldDetailScreen(props: FieldDetailScreenProps) {
                       placeholder="Örn: Üre, bordo bulamacı..."
                     />
                   </label>
+
+                  {activityType === 'İlaçlama' && (
+                    <label>
+                      Hasat öncesi bekleme süresi (gün)
+                      <input
+                        inputMode="numeric"
+                        value={activityPhiDays ?? ''}
+                        onChange={(e) => setActivityPhiDays?.(e.target.value)}
+                        placeholder="Etikette yazan gün, örn: 14"
+                      />
+                      <small>İlacın etiketinde “son ilaçlama ile hasat arasındaki süre” olarak yazar.</small>
+                    </label>
+                  )}
+
+                  {activityType === 'Hasat' && (() => {
+                    const hold = activeHarvestHolds(activities ?? [], String(activityDate || '').slice(0, 10))[0];
+                    return hold ? (
+                      <p className="tp-harvest-hold-warning" role="alert">
+                        Dikkat: {hold.productName ? `${hold.productName} ilacının` : 'Son ilaçlamanın'} bekleme süresi
+                        {' '}{new Date(`${hold.safeFrom}T00:00:00`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} tarihinde doluyor.
+                        Bu tarihten önce hasat edilen üründe ilaç kalıntısı sınırı aşabilir.
+                      </p>
+                    ) : null;
+                  })()}
 
                   {(activityType === 'Gübreleme' ||
                     activityType === 'İlaçlama') && (

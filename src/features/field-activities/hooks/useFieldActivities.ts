@@ -1,3 +1,4 @@
+import { parsePhiInput, phiNote } from '../../harvest-safety/services/preHarvestInterval';
 import { useRef, useState } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { supabase } from '../../../supabaseClient';
@@ -49,6 +50,7 @@ export function useFieldActivities({
   const [activityType, setActivityType] = useState('Saha Kontrolü');
   const [activityDate, setActivityDate] = useState(new Date().toISOString().slice(0, 10));
   const [activityProductName, setActivityProductName] = useState('');
+  const [activityPhiDays, setActivityPhiDays] = useState('');
   const [activityQuantity, setActivityQuantity] = useState('');
   const [activityUnit, setActivityUnit] = useState('');
   const [activityDoseMode, setActivityDoseMode] = useState<'per_decare' | 'total'>('per_decare');
@@ -603,6 +605,7 @@ export function useFieldActivities({
     setActivityType(type);
     setActivityDate(new Date().toISOString().slice(0, 10));
     setActivityProductName('');
+    setActivityPhiDays('');
     setActivityQuantity('');
     setActivityUnit('');
     setActivityDoseMode(type === 'Gübreleme' || type === 'İlaçlama' ? 'per_decare' : 'total');
@@ -770,6 +773,14 @@ export function useFieldActivities({
         if (durationHoursValue !== null) automaticDetails.push(`Sulama süresi: ${durationHoursValue} saat`);
       }
 
+      if (activityType === 'İlaçlama') {
+        const phi = parsePhiInput(activityPhiDays);
+        if (phi === 'invalid') {
+          setActivityMessage('Hasat öncesi bekleme süresini 0–365 gün arasında tam sayı olarak gir.');
+          return;
+        }
+        if (phi !== null) automaticDetails.push(phiNote(phi).replace(/\.$/, ''));
+      }
       const combinedNotes = [...automaticDetails, activityNotes.trim()].filter(Boolean).join(' • ');
       const { error } = await supabase.from('activities').insert({
         user_id: user.id,
@@ -1094,6 +1105,8 @@ export function useFieldActivities({
     setActivityDate,
     activityProductName,
     setActivityProductName,
+    activityPhiDays,
+    setActivityPhiDays,
     activityQuantity,
     setActivityQuantity,
     activityUnit,

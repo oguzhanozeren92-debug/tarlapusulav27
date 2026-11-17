@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { parsePhiInput, phiNote } from '../../harvest-safety/services/preHarvestInterval';
 import { createPortal } from 'react-dom';
 
 import {
@@ -265,6 +266,7 @@ export default function FieldOperationModal({
   const [irrigationAmount, setIrrigationAmount] = useState('');
   const [irrigationDurationHours, setIrrigationDurationHours] = useState('');
   const [irrigationFlowM3Hour, setIrrigationFlowM3Hour] = useState('');
+  const [phiDays, setPhiDays] = useState('');
   const [cost, setCost] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -282,6 +284,7 @@ export default function FieldOperationModal({
     setType(initialType);
     setDate(initialDate ?? localDate());
     setProductName('');
+    setPhiDays('');
     setQuantity('');
     setUnit('');
     setPlantPopulationM2('');
@@ -474,6 +477,15 @@ export default function FieldOperationModal({
         .join(' ');
     }
 
+    if (type === 'İlaçlama') {
+      const phi = parsePhiInput(phiDays);
+      if (phi === 'invalid') {
+        setError('Hasat öncesi bekleme süresini 0–365 gün arasında tam sayı olarak gir.');
+        return;
+      }
+      if (phi !== null) resolvedNotes = [phiNote(phi), resolvedNotes].filter(Boolean).join(' ');
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -586,6 +598,14 @@ export default function FieldOperationModal({
                 <div className="tp-field-operation-field full">
                   <label>{config.product}</label>
                   <input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder={config.productPlaceholder} />
+                </div>
+              ) : null}
+
+              {type === 'İlaçlama' ? (
+                <div className="tp-field-operation-field full">
+                  <label>Hasat öncesi bekleme süresi (gün)</label>
+                  <input inputMode="numeric" value={phiDays} onChange={(e) => setPhiDays(e.target.value)} placeholder="Etikette yazan gün, örn: 14" />
+                  <small>İlacın etiketinde “son ilaçlama ile hasat arasındaki süre” olarak yazar. Girersen tarlanda en erken hasat tarihini gösteririz.</small>
                 </div>
               ) : null}
 
