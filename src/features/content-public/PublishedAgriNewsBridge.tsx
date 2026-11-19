@@ -474,10 +474,18 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
   const visibleNews = activeTab === 'world' ? filteredWorldNews : turkeyNews;
 
   const closeDetail = () => {
+    const wasReading = Boolean(detail);
     detailRequestRef.current += 1;
     setDetail(null);
     setDetailPayload(null);
     setDetailLoading(false);
+
+    // A natural transition: never interrupt someone while reading an article.
+    if (wasReading) {
+      void maybeShowFreeInterstitial('agenda_deep_read').catch((cause) => {
+        console.warn('[TarlaPusula Gündem] Reklam gösterilemedi:', cause);
+      });
+    }
   };
 
   const openDetail = async (item: LiveContentRow) => {
@@ -489,11 +497,6 @@ export default function PublishedAgriNewsBridge({ onOpenSupport }: { onOpenSuppo
     setDetailPayload(null);
     const hasPayload = Boolean(item.payload_public_url && item.payload_status === 'ready');
     setDetailLoading(hasPayload);
-
-    // Reklam başarısız/yanıtsız kalsa bile okuma ekranı erişilebilir olsun.
-    void maybeShowFreeInterstitial('agenda_deep_read').catch((cause) => {
-      console.warn('[TarlaPusula Gündem] Reklam gösterilemedi:', cause);
-    });
 
     if (authUserId) void supabase.rpc('content_record_view', { p_content_id: item.id });
 
