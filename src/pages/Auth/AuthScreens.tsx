@@ -82,15 +82,6 @@ function GoogleIcon() {
   );
 }
 
-function FacebookIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" fill="#1877F2" />
-      <path fill="#fff" d="M13.34 20v-7h2.35l.35-2.73h-2.7V8.53c0-.79.22-1.33 1.35-1.33h1.44V4.76c-.25-.03-1.1-.1-2.1-.1-2.08 0-3.5 1.27-3.5 3.6v2.01H8.5V13h2.33v7h2.51Z" />
-    </svg>
-  );
-}
-
 function AppleIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -413,6 +404,14 @@ export default function AuthScreens({
   const handleSocialLogin = async (provider: SocialAuthProvider) => {
     setAuthMessage('');
 
+    // Facebook Login is unpublished on Meta. Hide the option and prevent
+    // initiating a broken OAuth flow even if Supabase still reports enabled.
+    // Preserve the underlying provider data for existing account identities.
+    if (provider === 'facebook') {
+      setAuthMessage('Facebook ile giriş şu anda kullanılamıyor. Lütfen başka bir giriş yöntemi kullan.');
+      return;
+    }
+
     if (!socialAvailability) {
       setAuthMessage(socialStatusError ? 'Sosyal giriş seçenekleri kontrol edilemedi. Bağlantını kontrol edip tekrar dene.' : 'Giriş seçenekleri kontrol ediliyor. Birkaç saniye sonra tekrar dene.');
       return;
@@ -448,9 +447,7 @@ export default function AuthScreens({
       setAuthMessage(
         provider === 'google'
           ? 'Google ile giriş şu anda başlatılamadı.'
-          : provider === 'facebook'
-            ? 'Facebook ile giriş şu anda başlatılamadı.'
-            : 'Apple ile giriş şu anda başlatılamadı.',
+          : 'Apple ile giriş şu anda başlatılamadı.',
       );
     }
   };
@@ -588,7 +585,7 @@ export default function AuthScreens({
               <div className="tp-authv2-social-login" aria-label="Sosyal giriş seçenekleri">
                 <span className="tp-authv2-social-label">veya</span>
                 <div className="tp-authv2-social-icons">
-                  {(['google', 'facebook', 'apple'] as const).map((provider) => {
+                  {(['google', 'apple'] as const).map((provider) => {
                     const available = socialAvailability?.[provider] === true;
                     const statusKnown = socialAvailability !== null;
                     const statusText = !statusKnown
@@ -606,8 +603,7 @@ export default function AuthScreens({
                         disabled={socialLoading !== null}
                         onClick={() => void handleSocialLogin(provider)}
                       >
-                        {provider === 'google' ? <GoogleIcon /> :
-                          provider === 'facebook' ? <FacebookIcon /> : <AppleIcon />}
+                        {provider === 'google' ? <GoogleIcon /> : <AppleIcon />}
                       </button>
                     );
                   })}
@@ -618,10 +614,10 @@ export default function AuthScreens({
                   </small>
                 )}
                 {socialAvailability &&
-                  (!socialAvailability.facebook || !socialAvailability.apple) && (
+                  (!socialAvailability.google || !socialAvailability.apple) && (
                     <small className="tp-authv2-social-unavailable-note">
                       {[
-                        !socialAvailability.facebook ? 'Facebook' : null,
+                        !socialAvailability.google ? 'Google' : null,
                         !socialAvailability.apple ? 'Apple' : null,
                       ].filter(Boolean).join(' ve ')} girişi henüz etkinleştirilmedi.
                     </small>
