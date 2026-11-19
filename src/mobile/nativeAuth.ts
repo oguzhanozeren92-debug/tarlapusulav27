@@ -37,7 +37,8 @@ export function isNativeOAuthAvailable() {
 }
 
 export async function startNativeOAuth(
-  provider: 'google' | 'facebook' | 'apple',
+  // Facebook OAuth is intentionally unavailable in the public iOS release.
+  provider: 'google' | 'apple',
 ) {
   if (!isNativeOAuthAvailable()) {
     throw new Error('Native giriş sistemi bu cihazda kullanılamıyor.');
