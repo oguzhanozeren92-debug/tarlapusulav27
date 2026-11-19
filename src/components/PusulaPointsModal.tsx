@@ -749,7 +749,11 @@ export default function PusulaPointsModal({
       const result = await showRewardedAdAndClaim('points_hub');
       const claim = result.claim;
       if (!result.completed) {
-        setAdRewardMessage('Reklam tamamlanmadığı için puan eklenmedi.');
+        setAdRewardMessage(
+          result.reason === 'unavailable'
+            ? 'Reklam şu anda yüklenemiyor. İnternet bağlantını kontrol edip biraz sonra tekrar dene.'
+            : 'Reklam tamamlanmadığı için puan eklenmedi.',
+        );
         return;
       }
       if (!claim?.awarded) {
