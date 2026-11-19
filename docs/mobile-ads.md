@@ -20,9 +20,11 @@ TarlaPusula'nın mevcut yerleşimleri:
 
 Interstitial politikası:
 
-- yalnız Free
-- en fazla 3 / gün
-- iki interstitial arasında en az 25 dakika
+- tüm kullanıcılar ücretsiz plandadır
+- en fazla 2 / gün
+- iki interstitial arasında en az 45 dakika
+- yalnız gerçekten gösterilen reklamlar sayaç ve süre sınırını tüketir
+- reklam, Gündem haber/makalesi kapatılınca veya uydu geçmişi açılırken uygun geçişte denenir
 - normal interstitial puan kazandırmaz
 
 Rewarded:
@@ -89,6 +91,8 @@ Uygulama reklam istemeden önce:
 
 Native bridge ayrıca `tp:ad-privacy-options` event'i üzerinden UMP privacy options formunu açabilir. Ayarlar ekranındaki gizlilik butonu buna bağlanabilir.
 
+UMP reklam isteği için henüz izin vermediyse, daha sonraki kullanıcı eyleminde yeniden kontrol edilir; başarısız ilk deneme uygulama kapanana dek kilitlenmez. ATT izninin reddedilmesi kendi başına kişiselleştirilmemiş reklamları engellemez.
+
 ## Rewarded SSV
 
 AdMob rewarded ad unit ayarındaki Server-side verification callback URL:
@@ -118,6 +122,14 @@ Bu secret boşsa **gerçek SSV ödülü reddedilir**. Böylece başka bir AdMob 
 7. Google `transaction_id` ile duplicate ödül engellenir.
 8. Mevcut `tp_award_verified_ad_reward` RPC'si puanı server-side verir.
 9. Native uygulama nonce ile sonucu kısa süre poll eder ve puan kutlamasını açar.
+
+## Reklam görünmüyorsa (iOS 1.0.1)
+
+1. AdMob panelinde TarlaPusula iOS uygulamasının **Ready** ve reklam sunumuna uygun durumda olduğunu doğrula. Yeni uygulamalara sınırlı sunum uygulanabilir; kod bunu aşamaz.
+2. Google'ın uygulama doğrulaması için, App Store'da belirtilen geliştirici web sitesinin kökünde `app-ads.txt` dosyasını yayınla ve AdMob'daki **app-ads.txt** doğrulama durumunu kontrol et.
+3. App Store'daki uygulama kimliği ile AdMob'da kayıtlı iOS uygulamasını ve `GADApplicationIdentifier` ile reklam birimi kimliklerini karşılaştır.
+4. TestFlight'ta iPhone ile giriş yap: Pusula Puanı > **Reklam İzle** (ödüllü); Gündem > haber aç > kapat (geçiş). Günlük sınır 2 ve iki reklam arası 45 dakikadır. `No fill`, UMP ve SDK yükleme sorunlarını Xcode/cihaz loglarında araştır.
+5. Test amaçlı gerçek canlı reklamlara tıklama; Google'ın demo reklam birimleri veya AdMob test cihazı kullan. Kullanıcı cihazındaki tek bir deneme ile canlı reklam sunumunu doğruladığını varsayma.
 
 ## Yayına çıkmadan önce
 
