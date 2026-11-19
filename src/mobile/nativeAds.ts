@@ -32,6 +32,7 @@ const TEST_UNITS = {
 } as const;
 
 let initPromise: Promise<boolean> | null = null;
+let sdkInitialized = false;
 let bridgeInstalled = false;
 
 
@@ -127,6 +128,7 @@ export function isNativeAdMobAvailable() {
 
 export async function ensureNativeAdMobReady() {
   if (!isNativeAdMobAvailable()) return false;
+  if (sdkInitialized) return true;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
@@ -147,9 +149,19 @@ export async function ensureNativeAdMobReady() {
   })();
 
   try {
-    return await initPromise;
+    const ready = await initPromise;
+    if (ready) {
+      sdkInitialized = true;
+    } else {
+      // UMP can become ready after a later consent attempt. Never cache a
+      // negative result for the lifetime of the iOS process.
+      initPromise = null;
+      console.info('[AdMob] Consent is not ready; a future ad request can retry.');
+    }
+    return ready;
   } catch (error) {
     initPromise = null;
+    console.warn('[AdMob] SDK initialization failed:', error);
     throw error;
   }
 }
