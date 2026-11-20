@@ -2,6 +2,8 @@ import { jsPDF } from 'jspdf';
 import type { PusulaPdfFieldPhoto, PusulaPdfSatellitePoint, PusulaPdfSnapshot } from '../types';
 import type { PusulaInsight } from './pusulaPdfInsights.service';
 import { buildPusulaPdfGuidance } from './pusulaPdfInsights.service';
+import { refreshPusulaPdfImageUrls } from './pusulaPdfImageRefresh.service';
+import { encodeQr } from './pusulaPdfQr';
 
 const W = 1240;
 const H = 1754;
@@ -29,7 +31,11 @@ const GRAY_SOFT = '#f3f6f7';
 
 const APP_WEB_URL = String(import.meta.env.VITE_PUBLIC_APP_URL || 'https://tarlapusulav27.vercel.app/').trim();
 const ANDROID_URL = String(import.meta.env.VITE_ANDROID_DOWNLOAD_URL || APP_WEB_URL).trim();
-const IOS_URL = String(import.meta.env.VITE_IOS_DOWNLOAD_URL || APP_WEB_URL).trim();
+// iPhone QR always points to the App Store listing (env can override).
+// Short canonical form: same app, opens in the scanner's own storefront, and
+// keeps the QR at version 3 (sparser modules = more reliable phone scans).
+const IOS_APP_STORE_URL = 'https://apps.apple.com/app/id6819761937';
+const IOS_URL = String(import.meta.env.VITE_IOS_DOWNLOAD_URL || IOS_APP_STORE_URL).trim();
 
 const fmt = (value?: string | null, year = true) => {
   if (!value) return '—';
@@ -170,23 +176,98 @@ function circleIcon(
   ctx.textAlign = 'left';
 }
 
-async function logo(ctx: CanvasRenderingContext2D, x: number, y: number, compact = false) {
-  const radius = compact ? 24 : 30;
-  // Use the exact same 2-image compass mark as the app header.
+// Brand band. When the field has a satellite image, the band is a rendered
+// aerial photo of THIS parcel under a dark glass layer; otherwise a vector
+// field motif. No external decoration assets.
+async function brandBand(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  seed = 1, imageSrc?: string | null, imageAlpha = 1,
+) {
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 16); ctx.clip();
+  const base = ctx.createLinearGradient(x, y, x + w, y + h);
+  base.addColorStop(0, '#062a21'); base.addColorStop(0.5, '#0c4f40'); base.addColorStop(1, '#123b55');
+  ctx.fillStyle = base; ctx.fillRect(x, y, w, h);
+  const photo = await imageBitmapFrom(imageSrc);
+  if (photo) {
+    // Sentinel pixels are 10 m; a small parcel is only a few pixels wide. Render
+    // the photo as a soft colour wash (downsample + smooth upscale) instead of
+    // stretching blocky pixels. Works without canvas filter support.
+    const tiny = document.createElement('canvas');
+    tiny.width = 48; tiny.height = Math.max(8, Math.round(48 * h / (w * 0.75)));
+    const t = tiny.getContext('2d');
+    if (t) {
+      t.imageSmoothingEnabled = true; t.imageSmoothingQuality = 'high';
+      t.drawImage(photo, 0, 0, tiny.width, tiny.height);
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.globalAlpha = imageAlpha;
+      ctx.drawImage(tiny, x + w * 0.25, y - h * 0.1, w * 0.78, h * 1.2);
+      ctx.globalAlpha = 1;
+    }
+    photo.close();
+    const veil = ctx.createLinearGradient(x, 0, x + w, 0);
+    veil.addColorStop(0, 'rgba(5,34,27,.98)'); veil.addColorStop(0.3, 'rgba(6,42,33,.93)');
+    veil.addColorStop(0.55, 'rgba(8,52,42,.62)'); veil.addColorStop(0.8, 'rgba(10,58,52,.30)');
+    veil.addColorStop(1, 'rgba(12,48,70,.42)');
+    ctx.fillStyle = veil; ctx.fillRect(x, y, w, h);
+  } else {
+    const strips = ['rgba(150,214,120,.13)', 'rgba(236,206,112,.12)', 'rgba(88,170,140,.16)', 'rgba(198,232,150,.08)'];
+    for (let i = 0; i < 16; i += 1) {
+      const sx = x + 420 + i * 58 + (seed % 2) * 20;
+      ctx.fillStyle = strips[(i + seed) % strips.length];
+      ctx.beginPath();
+      ctx.moveTo(sx, y); ctx.lineTo(sx + 40, y); ctx.lineTo(sx - 30, y + h); ctx.lineTo(sx - 70, y + h); ctx.closePath(); ctx.fill();
+    }
+  }
+  // fine contour lines
+  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+  for (let i = 0; i < 7; i += 1) {
+    const o = i * 16;
+    ctx.beginPath();
+    ctx.moveTo(x - 20, y + h * 0.2 + o);
+    ctx.bezierCurveTo(x + w * 0.2, y - 20 + o, x + w * 0.38, y + h + o * 0.4, x + w * 0.58, y + h * 0.4 + o * 0.5);
+    ctx.stroke();
+  }
+  // soft light bloom behind the brand block
+  const bloom = ctx.createRadialGradient(x + 90, y + h * 0.45, 4, x + 90, y + h * 0.45, h * 1.6);
+  bloom.addColorStop(0, 'rgba(120,230,190,.20)'); bloom.addColorStop(1, 'rgba(120,230,190,0)');
+  ctx.fillStyle = bloom; ctx.fillRect(x, y, w, h);
+  // top gloss
+  const gloss = ctx.createLinearGradient(0, y, 0, y + h * 0.5);
+  gloss.addColorStop(0, 'rgba(255,255,255,.13)'); gloss.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gloss; ctx.fillRect(x, y, w, h * 0.5);
+  // satellite orbit, thin
+  ctx.setLineDash([3, 6]); ctx.strokeStyle = 'rgba(170,245,225,.30)'; ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.ellipse(x + w * 0.5, y + h * 2.2, w * 0.36, h * 2.2 - 14, 0, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  ctx.setLineDash([]);
+  if (seed === 1) {
+    const sx = x + w * 0.5, sy = y + 14;
+    ctx.fillStyle = 'rgba(210,252,240,.9)'; ctx.fillRect(sx - 3, sy - 3, 6, 6);
+    ctx.fillStyle = 'rgba(130,205,255,.8)'; ctx.fillRect(sx - 14, sy - 2, 9, 4); ctx.fillRect(sx + 5, sy - 2, 9, 4);
+  }
+  // accent hairline
+  const edge = ctx.createLinearGradient(x, 0, x + w, 0);
+  edge.addColorStop(0, 'rgba(110,231,183,.0)'); edge.addColorStop(0.2, 'rgba(110,231,183,.9)');
+  edge.addColorStop(0.7, 'rgba(56,189,248,.9)'); edge.addColorStop(1, 'rgba(56,189,248,0)');
+  ctx.fillStyle = edge; ctx.fillRect(x, seed === 1 ? y + h - 2.5 : y, w, 2.5);
+  ctx.restore();
+}
+
+/** The app's own compass mark (same two files as the app header). Returns false if unavailable. */
+async function logoBadge(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
   const body = await imageBitmapFrom(BRAND_BODY);
   const needle = await imageBitmapFrom(BRAND_NEEDLE);
-  if (body) {
-    ctx.drawImage(body, x - radius, y - radius, radius * 2, radius * 2);
-    body.close();
-  }
-  if (needle) {
-    ctx.drawImage(needle, x - radius, y - radius, radius * 2, radius * 2);
-    needle.close();
-  }
-  // Never synthesize a surrogate green seed icon if the real mark is offline.
-  text(ctx, 'TarlaPusula', x + radius + 12, y - 1, compact ? 24 : 31, 900, INK);
-  text(ctx, 'TARLANIN AKLI, YANINDA.', x + radius + 14, y + (compact ? 20 : 24), compact ? 9 : 11, 800, MUTED);
+  if (!body && !needle) return false; // never draw a substitute mark
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.32)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = WHITE; ctx.fill();
+  ctx.restore();
+  const inner = r - 4;
+  if (body) { ctx.drawImage(body, cx - inner, cy - inner, inner * 2, inner * 2); body.close(); }
+  if (needle) { ctx.drawImage(needle, cx - inner, cy - inner, inner * 2, inner * 2); needle.close(); }
+  return true;
 }
+
 function sectionHeader(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -275,11 +356,21 @@ function statusColor(value: string) {
   return { accent: BLUE, soft: BLUE_SOFT };
 }
 
+// The same NDVI/radar image is used by several panels (hero, timeline, zone
+// classification). Download each source once per render.
+const imageBlobCache = new Map<string, Promise<Blob | null>>();
+
 function imageBitmapFrom(src: string | null | undefined) {
   if (!src) return Promise.resolve<ImageBitmap | null>(null);
-  return fetch(src)
-    .then((response) => response.ok ? response.blob() : Promise.reject(new Error(`HTTP ${response.status}`)))
-    .then((blob) => createImageBitmap(blob))
+  let blob = imageBlobCache.get(src);
+  if (!blob) {
+    blob = fetch(src)
+      .then((response) => response.ok ? response.blob() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .catch(() => null);
+    imageBlobCache.set(src, blob);
+  }
+  return blob
+    .then((value) => value ? createImageBitmap(value) : null)
     .catch(() => null);
 }
 
@@ -348,6 +439,112 @@ async function drawLayeredHero(
   }
 }
 
+type PdfActivity = { date: string; type: string };
+
+const DAY_MS = 86400000;
+
+function dayValue(date: string) {
+  return Date.parse(`${String(date).slice(0, 10)}T12:00:00Z`);
+}
+
+function dateX(date: string, start: string, end: string, x: number, w: number) {
+  const s = dayValue(start), e = dayValue(end), d = dayValue(date);
+  if (!Number.isFinite(s) || !Number.isFinite(e) || !Number.isFinite(d) || e <= s) return x + w / 2;
+  return x + clamp((d - s) / (e - s), 0, 1) * w;
+}
+
+function paddedRange(values: number[], pad = 0.12, minSpan = 0.1): [number, number] {
+  let lo = Math.min(...values), hi = Math.max(...values);
+  if (hi - lo < minSpan) { const mid = (hi + lo) / 2; lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
+  const p = (hi - lo) * pad;
+  return [lo - p, hi + p];
+}
+
+// Round axis bounds so that every grid label is a "nice" number (1, 2, 2.5, 5 × 10ⁿ).
+function niceBounds(lo: number, hi: number, steps: number): [number, number] {
+  const raw = Math.max((hi - lo) / steps, 1e-9);
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  for (const m of [1, 2, 2.5, 5, 10, 20, 25, 50]) {
+    const step = m * mag;
+    const a = Math.floor(lo / step + 1e-9) * step;
+    if (a + step * steps >= hi - 1e-9) return [a, a + step * steps];
+  }
+  return [lo, hi];
+}
+
+function periodActivities(snapshot: PusulaPdfSnapshot): PdfActivity[] {
+  const rows = Array.isArray(snapshot.activities) ? snapshot.activities as any[] : [];
+  return rows
+    .map((row) => ({
+      date: String(row?.activity_date ?? row?.date ?? '').slice(0, 10),
+      type: String(row?.activity_type ?? row?.type ?? row?.title ?? ''),
+    }))
+    .filter((row) => row.date && row.date >= snapshot.period.start && row.date <= snapshot.period.end)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function activityStyle(type: string) {
+  const t = type.toLocaleLowerCase('tr-TR');
+  if (/sula/.test(t)) return { color: BLUE, mark: 'S', label: 'Sulama' };
+  if (/gübre|gubre/.test(t)) return { color: GREEN_DARK, mark: 'G', label: 'Gübreleme' };
+  if (/ilaç|ilac/.test(t)) return { color: RED, mark: 'İ', label: 'İlaçlama' };
+  if (/hasat/.test(t)) return { color: ORANGE, mark: 'H', label: 'Hasat' };
+  return { color: MUTED, mark: '•', label: 'İşlem' };
+}
+
+function drawActivityMarkers(
+  ctx: CanvasRenderingContext2D,
+  activities: PdfActivity[],
+  start: string,
+  end: string,
+  x: number,
+  w: number,
+  y: number,
+) {
+  for (const activity of activities) {
+    const style = activityStyle(activity.type);
+    const px = dateX(activity.date, start, end, x, w);
+    ctx.save();
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = style.color;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, y - 6); ctx.lineTo(px, y - 60); ctx.stroke();
+    ctx.restore();
+    circleIcon(ctx, px, y, 6.5, style.color, style.mark, WHITE, 8);
+  }
+}
+
+function axisGrid(
+  ctx: CanvasRenderingContext2D,
+  gx: number, gy: number, gw: number, gh: number,
+  lo: number, hi: number, steps: number,
+  format: (value: number) => string,
+  color = MUTED,
+  side: 'left' | 'right' = 'left',
+) {
+  for (let k = 0; k <= steps; k += 1) {
+    const yy = gy + gh * k / steps;
+    ctx.strokeStyle = '#e4ebee'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(gx, yy); ctx.lineTo(gx + gw, yy); ctx.stroke();
+    const value = hi - (hi - lo) * k / steps;
+    ctx.textAlign = side === 'left' ? 'right' : 'left';
+    text(ctx, format(value), side === 'left' ? gx - 5 : gx + gw + 5, yy + 3.5, 8.5, 700, color);
+    ctx.textAlign = 'left';
+  }
+}
+
+function dateTicks(ctx: CanvasRenderingContext2D, start: string, end: string, gx: number, gw: number, y: number) {
+  const s = dayValue(start), e = dayValue(end);
+  const mid = new Date((s + e) / 2).toISOString().slice(0, 10);
+  text(ctx, fmt(start, false), gx, y, 9, 700, MUTED);
+  ctx.textAlign = 'center';
+  if (e - s > 6 * DAY_MS) text(ctx, fmt(mid, false), gx + gw / 2, y, 9, 700, MUTED);
+  ctx.textAlign = 'right';
+  text(ctx, fmt(end, false), gx + gw, y, 9, 700, MUTED);
+  ctx.textAlign = 'left';
+}
+
 function chart(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -355,6 +552,7 @@ function chart(
   w: number,
   h: number,
   points: PusulaPdfSatellitePoint[],
+  opts: { start: string; end: string; activities: PdfActivity[] },
 ) {
   const series = VEGETATION_INDICES.map((item) => ({
     ...item,
@@ -368,26 +566,380 @@ function chart(
     if (latestMeasurement) text(ctx, `Son sayısal ölçüm: ${fmt(latestMeasurement.date, false)}`, x + 10, y + h - 15, 9.5, 750, BLUE);
     return;
   }
-  const dates = [...new Set(ready.flatMap((item) => item.points.map((p) => p.date)))].sort();
-  const gx = x + 24, gy = y + 20, gw = w - 41, gh = h - 55;
-  ctx.strokeStyle = '#e4ebee'; ctx.lineWidth = 1;
-  for (let k = 0; k < 4; k++) {
-    const yy = gy + gh * k / 3;
-    ctx.beginPath(); ctx.moveTo(gx, yy); ctx.lineTo(gx + gw, yy); ctx.stroke();
-  }
+  const values = ready.flatMap((item) => item.points.map((p) => p[item.key] as number));
+  const [lo, hi] = niceBounds(...paddedRange(values, 0.08, 0.1), 3);
+  const gx = x + 36, gy = y + 8, gw = w - 44, gh = h - 34;
+  axisGrid(ctx, gx, gy, gw, gh, lo, hi, 3, (v) => v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const py = (value: number) => gy + gh - clamp((value - lo) / (hi - lo), 0, 1) * gh;
   for (const item of ready) {
-    ctx.beginPath(); ctx.strokeStyle = item.color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.strokeStyle = item.color; ctx.lineWidth = 2.6;
     item.points.forEach((point, index) => {
-      const px = gx + dates.indexOf(point.date) / Math.max(dates.length - 1, 1) * gw;
-      const py = gy + gh - clamp(((point[item.key] as number) + 0.2) / 1.3, 0, 1) * gh;
-      if (!index) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      const px = dateX(point.date, opts.start, opts.end, gx, gw);
+      const yy = py(point[item.key] as number);
+      if (!index) ctx.moveTo(px, yy); else ctx.lineTo(px, yy);
     });
     ctx.stroke();
+    for (const point of item.points) {
+      ctx.beginPath();
+      ctx.arc(dateX(point.date, opts.start, opts.end, gx, gw), py(point[item.key] as number), 3.3, 0, Math.PI * 2);
+      ctx.fillStyle = WHITE; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = item.color; ctx.stroke();
+    }
   }
-  text(ctx, fmt(dates[0], false), gx, y + h - 7, 9.5, 700, MUTED);
-  ctx.textAlign = 'right';
-  text(ctx, fmt(dates.at(-1), false), gx + gw, y + h - 7, 9.5, 700, MUTED);
-  ctx.textAlign = 'left';
+  drawActivityMarkers(ctx, opts.activities, opts.start, opts.end, gx, gw, gy + gh);
+  dateTicks(ctx, opts.start, opts.end, gx, gw, y + h - 6);
+}
+
+// ---------------------------------------------------------------------------
+// NDVI image classification.
+// satellite-field-analysis paints NDVI with a fixed 5-class palette, so the
+// share of each class can be read back from the image pixels exactly. This is
+// a pixel count of the delivered map, not a new model estimate.
+const NDVI_CLASSES = [
+  { rgb: [230, 26, 20], name: 'Çok zayıf', range: '<0,20', color: '#e61a14' },
+  { rgb: [245, 110, 26], name: 'Zayıf', range: '0,20–0,35', color: '#f56e1a' },
+  { rgb: [242, 194, 31], name: 'Orta', range: '0,35–0,50', color: '#f2c21f' },
+  { rgb: [112, 191, 61], name: 'İyi', range: '0,50–0,65', color: '#70bf3d' },
+  { rgb: [13, 122, 46], name: 'Çok iyi', range: '≥0,65', color: '#0d7a2e' },
+] as const;
+
+type NdviShares = { shares: number[]; pixels: number; good: number; mid: number; weak: number };
+
+async function ndviClassShares(src: string | null | undefined): Promise<NdviShares | null> {
+  const bitmap = await imageBitmapFrom(src);
+  if (!bitmap) return null;
+  try {
+    const scale = Math.min(1, 400 / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const c = canvas.getContext('2d', { willReadFrequently: true });
+    if (!c) return null;
+    c.imageSmoothingEnabled = false; // never blend two classes into a third colour
+    c.drawImage(bitmap, 0, 0, w, h);
+    const data = c.getImageData(0, 0, w, h).data;
+    const counts = [0, 0, 0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 120) continue; // outside parcel / no-data
+      let best = -1, bestDist = Infinity;
+      NDVI_CLASSES.forEach((cls, k) => {
+        const d = (data[i] - cls.rgb[0]) ** 2 + (data[i + 1] - cls.rgb[1]) ** 2 + (data[i + 2] - cls.rgb[2]) ** 2;
+        if (d < bestDist) { bestDist = d; best = k; }
+      });
+      if (best >= 0 && bestDist < 55 * 55) counts[best] += 1;
+    }
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (total < 25) return null;
+    const shares = counts.map((n) => n / total * 100);
+    return { shares, pixels: total, good: shares[3] + shares[4], mid: shares[2], weak: shares[0] + shares[1] };
+  } catch {
+    return null; // e.g. a CORS-tainted image; never guess a distribution
+  } finally {
+    bitmap.close();
+  }
+}
+
+function percentText(value: number) {
+  return `%${Math.round(value).toLocaleString('tr-TR')}`;
+}
+
+function shareBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, shares: number[]) {
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.clip();
+  let cx = x;
+  shares.forEach((share, k) => {
+    const sw = w * share / 100;
+    ctx.fillStyle = NDVI_CLASSES[k].color;
+    ctx.fillRect(cx, y, sw + 0.5, h);
+    cx += sw;
+  });
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Daily weather + water balance (recorded history only, never forecast).
+type DailyWeather = { date: string; rain: number | null; et0: number | null; tmax: number | null; tmin: number | null };
+
+function dailyWeather(rows: any[]): DailyWeather[] {
+  const byDate = new Map<string, DailyWeather>();
+  for (const row of rows) {
+    const date = wd(row);
+    if (!date) continue;
+    byDate.set(date, {
+      date,
+      rain: wv(row, 'precipitation', 'rain', 'precipitationMm'),
+      et0: wv(row, 'et0', 'referenceEt0'),
+      tmax: wv(row, 'tempMax', 'maxTemp', 'maxTemperature'),
+      tmin: wv(row, 'tempMin', 'minTemp', 'minTemperature'),
+    });
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function strokeSeries(
+  ctx: CanvasRenderingContext2D,
+  pts: Array<{ date: string; x: number; y: number }>,
+  color: string,
+  width = 2,
+) {
+  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round';
+  let prev: string | null = null;
+  for (const p of pts) {
+    // Break the line over missing days instead of interpolating them.
+    const gap = prev ? (dayValue(p.date) - dayValue(prev)) / DAY_MS > 1.5 : true;
+    if (gap) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    prev = p.date;
+  }
+  ctx.stroke();
+}
+
+function weatherChart(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  days: DailyWeather[], start: string, end: string,
+) {
+  const temps = days.flatMap((d) => [d.tmax, d.tmin]).filter(valid);
+  const rains = days.map((d) => d.rain).filter(valid);
+  if (days.length < 3 || (!temps.length && !rains.length)) {
+    rr(ctx, x, y, w, h, 9, WHITE, LINE);
+    wrap(ctx, 'Günlük grafik için yeterli hava kaydı yok; yukarıdaki toplamlar yalnız kayıtlı günlerden hesaplandı.',
+      x + 12, y + 30, 10, 700, MUTED, w - 24, 1.25, 3);
+    return;
+  }
+  const gx = x + 30, gy = y + 8, gw = w - 62, gh = h - 30;
+  const rainMax = niceBounds(0, Math.max(4, ...rains), 2)[1];
+  const [tLo, tHiSafe] = temps.length ? niceBounds(Math.min(...temps), Math.max(...temps), 2) : [0, 10];
+  axisGrid(ctx, gx, gy, gw, gh, 0, rainMax, 2, (v) => `${Math.round(v)}`, BLUE, 'left');
+  // right-hand temperature labels (grid already drawn)
+  for (let k = 0; k <= 2; k += 1) {
+    const value = tHiSafe - (tHiSafe - tLo) * k / 2;
+    text(ctx, `${Math.round(value)}°`, gx + gw + 5, gy + gh * k / 2 + 3.5, 8.5, 700, ORANGE);
+  }
+  const totalDays = Math.max(1, Math.round((dayValue(end) - dayValue(start)) / DAY_MS) + 1);
+  const barW = Math.max(2, gw / totalDays * 0.62);
+  for (const d of days) {
+    if (!valid(d.rain) || d.rain <= 0) continue;
+    const px = dateX(d.date, start, end, gx, gw);
+    const bh = Math.max(1.5, d.rain / rainMax * gh);
+    ctx.fillStyle = 'rgba(22,119,232,.55)';
+    ctx.fillRect(px - barW / 2, gy + gh - bh, barW, bh);
+  }
+  const ty = (t: number) => gy + gh - clamp((t - tLo) / (tHiSafe - tLo), 0, 1) * gh;
+  const maxPts = days.filter((d) => valid(d.tmax)).map((d) => ({ date: d.date, x: dateX(d.date, start, end, gx, gw), y: ty(d.tmax!) }));
+  const minPts = days.filter((d) => valid(d.tmin)).map((d) => ({ date: d.date, x: dateX(d.date, start, end, gx, gw), y: ty(d.tmin!) }));
+  strokeSeries(ctx, maxPts, ORANGE, 2);
+  strokeSeries(ctx, minPts, '#2d6fb7', 1.6);
+  for (const d of days) {
+    const px = dateX(d.date, start, end, gx, gw);
+    if (valid(d.tmax) && d.tmax >= 30) { ctx.beginPath(); ctx.arc(px, ty(d.tmax), 3, 0, Math.PI * 2); ctx.fillStyle = RED; ctx.fill(); }
+    if (valid(d.tmin) && d.tmin <= 0) { ctx.beginPath(); ctx.arc(px, ty(d.tmin), 3, 0, Math.PI * 2); ctx.fillStyle = '#5ab0ff'; ctx.fill(); }
+  }
+  dateTicks(ctx, start, end, gx, gw, y + h - 6);
+}
+
+function waterBalanceSeries(days: DailyWeather[]) {
+  let cumulative = 0;
+  const series: Array<{ date: string; value: number }> = [];
+  for (const d of days) {
+    if (!valid(d.rain) || !valid(d.et0)) continue; // skip, never fill
+    cumulative += d.rain - d.et0;
+    series.push({ date: d.date, value: cumulative });
+  }
+  const deepest = series.reduce<{ date: string; value: number } | null>((m, p) => (!m || p.value < m.value ? p : m), null);
+  const deficitDays = series.filter((p) => p.value < 0).length;
+  return { series, deepest, deficitDays, end: series.at(-1)?.value ?? null };
+}
+
+function waterBalanceChart(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  series: Array<{ date: string; value: number }>,
+  start: string, end: string,
+  activities: PdfActivity[],
+) {
+  const gx = x + 38, gy = y + 10, gw = w - 48, gh = h - 36;
+  const values = [0, ...series.map((p) => p.value)];
+  const [lo, top] = niceBounds(Math.min(...values), Math.max(...values, 1), 4);
+  axisGrid(ctx, gx, gy, gw, gh, lo, top, 4, (v) => `${Math.round(v)}`);
+  const py = (v: number) => gy + gh - clamp((v - lo) / (top - lo), 0, 1) * gh;
+  const zeroY = py(0);
+  const pts = series.map((p) => ({ date: p.date, x: dateX(p.date, start, end, gx, gw), y: py(p.value) }));
+  // area: blue above zero (surplus), red below (deficit)
+  const area = () => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, zeroY);
+    pts.forEach((p) => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(pts.at(-1)!.x, zeroY);
+    ctx.closePath();
+  };
+  ctx.save(); ctx.beginPath(); ctx.rect(gx, gy, gw, zeroY - gy); ctx.clip(); area(); ctx.fillStyle = 'rgba(22,119,232,.18)'; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(gx, zeroY, gw, gy + gh - zeroY); ctx.clip(); area(); ctx.fillStyle = 'rgba(236,63,66,.16)'; ctx.fill(); ctx.restore();
+  ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(gx, zeroY); ctx.lineTo(gx + gw, zeroY); ctx.stroke();
+  strokeSeries(ctx, pts, INK, 2.4);
+  drawActivityMarkers(ctx, activities, start, end, gx, gw, gy + gh);
+  text(ctx, 'mm', x + 4, gy - 1, 8.5, 800, MUTED);
+  dateTicks(ctx, start, end, gx, gw, y + h - 6);
+}
+
+// Small single-series line chart (radar backscatter etc.).
+function miniLine(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  pts: Array<{ date: string; value: number }>,
+  start: string, end: string, color: string,
+  format: (v: number) => string,
+) {
+  const gx = x + 36, gy = y + 6, gw = w - 44, gh = h - 26;
+  const [lo, hi] = niceBounds(...paddedRange(pts.map((p) => p.value), 0.1, 1), 2);
+  axisGrid(ctx, gx, gy, gw, gh, lo, hi, 2, format);
+  const mapped = pts.map((p) => ({ date: p.date, x: dateX(p.date, start, end, gx, gw), y: gy + gh - clamp((p.value - lo) / (hi - lo), 0, 1) * gh }));
+  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.2;
+  mapped.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.stroke();
+  for (const p of mapped) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = WHITE; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke();
+  }
+  dateTicks(ctx, start, end, gx, gw, y + h - 4);
+}
+
+// ---------------------------------------------------------------------------
+// Colour scales and small visual widgets.
+function hexRgb(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function scaleColor(value: number, stops: Array<[number, string]>) {
+  if (value <= stops[0][0]) return stops[0][1];
+  for (let i = 1; i < stops.length; i += 1) {
+    if (value <= stops[i][0]) {
+      const [v0, c0] = stops[i - 1], [v1, c1] = stops[i];
+      const t = (value - v0) / (v1 - v0);
+      const a = hexRgb(c0), b = hexRgb(c1);
+      return `rgb(${a.map((x, k) => Math.round(x + (b[k] - x) * t)).join(',')})`;
+    }
+  }
+  return stops.at(-1)![1];
+}
+const TEMP_STOPS: Array<[number, string]> = [
+  [-5, '#5b8fd9'], [3, '#9cc7f2'], [12, '#d6edf7'], [18, '#e6f4d4'], [24, '#fbe7a1'], [30, '#f8aa62'], [36, '#e8574b'],
+];
+const PH_STOPS: Array<[number, string]> = [
+  [4, '#e1493d'], [5.5, '#f39a35'], [6.5, '#9ccc4a'], [7.3, '#2f9e5b'], [8.0, '#3a8fd1'], [9, '#6d4fc4'],
+];
+const NDMI_STOPS: Array<[number, string]> = [
+  [-0.2, '#d9534a'], [0, '#f2b33d'], [0.2, '#9ccc4a'], [0.4, '#2f9e5b'], [0.6, '#1f6fd1'],
+];
+
+function gradientBar(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  stops: Array<[number, string]>, value: number | null,
+) {
+  const lo = stops[0][0], hi = stops.at(-1)![0];
+  const g = ctx.createLinearGradient(x, 0, x + w, 0);
+  stops.forEach(([v, c]) => g.addColorStop((v - lo) / (hi - lo), c));
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fillStyle = g; ctx.fill();
+  if (value === null) return;
+  const px = x + clamp((value - lo) / (hi - lo), 0, 1) * w;
+  ctx.beginPath(); ctx.arc(px, y + h / 2, h / 2 + 3, 0, Math.PI * 2);
+  ctx.fillStyle = WHITE; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = INK; ctx.stroke();
+}
+
+// USDA soil texture class from clay/silt/sand percentages (deterministic).
+function textureClass(clayIn: number, siltIn: number, sandIn: number) {
+  const total = clayIn + siltIn + sandIn;
+  if (!(total > 0)) return null;
+  const C = clayIn / total * 100, Si = siltIn / total * 100, S = sandIn / total * 100;
+  if (C >= 40 && Si >= 40) return 'Siltli kil';
+  if (C >= 35 && S > 45) return 'Kumlu kil';
+  if (C >= 40) return 'Kil';
+  if (C >= 27 && S <= 20) return 'Siltli killi tın';
+  if (C >= 27 && S <= 45) return 'Killi tın';
+  if (C >= 20 && Si < 28 && S > 45) return 'Kumlu killi tın';
+  if (Si >= 80 && C < 12) return 'Silt';
+  if ((Si >= 50 && C >= 12 && C < 27) || (Si >= 50 && Si < 80 && C < 12)) return 'Siltli tın';
+  if (C >= 7 && C < 27 && Si >= 28 && Si < 50 && S <= 52) return 'Tın';
+  if (Si + 1.5 * C < 15) return 'Kum';
+  if (Si + 2 * C < 30) return 'Tınlı kum';
+  return 'Kumlu tın';
+}
+function textureHint(name: string) {
+  if (/kil/i.test(name) && !/tın/i.test(name)) return 'Su tutması yüksek; ağır toprak, drenaj ve tava gelişine dikkat.';
+  if (/killi tın/i.test(name)) return 'Su tutması iyi; ağır yağışta su birikimine dikkat.';
+  if (/kum/i.test(name)) return 'Su tutması düşük; az suyla sık sulama gerekir.';
+  return 'Su tutma ve havalanma dengeli bir bünye.';
+}
+
+const TEXTURE_COLORS = { clay: '#a0522d', silt: '#d2a86b', sand: '#efd9a6' };
+
+// One square per day of the period: max temperature colour, rain, field
+// operations, and the days that have a satellite map or a radar scene.
+function periodCalendar(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, maxH: number,
+  start: string, end: string,
+  days: DailyWeather[], activities: PdfActivity[], satDates: Set<string>, radarDates: Set<string>,
+) {
+  const s = dayValue(start), e = dayValue(end);
+  const total = Math.round((e - s) / DAY_MS) + 1;
+  const firstDow = (new Date(s).getUTCDay() + 6) % 7; // Monday = 0
+  const weeks = Math.ceil((firstDow + total) / 7);
+  const gap = 4, cellW = (w - gap * 6) / 7;
+  const cellH = Math.min(46, (maxH - 18) / weeks - gap);
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const actByDate = new Map<string, PdfActivity[]>();
+  activities.forEach((a) => actByDate.set(a.date, [...(actByDate.get(a.date) ?? []), a]));
+  ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].forEach((d, i) => {
+    ctx.textAlign = 'center';
+    text(ctx, d, x + i * (cellW + gap) + cellW / 2, y + 10, 8.5, 800, MUTED);
+    ctx.textAlign = 'left';
+  });
+  for (let i = 0; i < total; i += 1) {
+    const date = new Date(s + i * DAY_MS).toISOString().slice(0, 10);
+    const slot = firstDow + i, col = slot % 7, row = Math.floor(slot / 7);
+    const cx = x + col * (cellW + gap), cy = y + 18 + row * (cellH + gap);
+    const day = byDate.get(date);
+    const fill = day && valid(day.tmax) ? scaleColor(day.tmax, TEMP_STOPS) : '#eef2f3';
+    rr(ctx, cx, cy, cellW, cellH, 7, fill, 'rgba(16,36,58,.08)');
+    text(ctx, String(Number(date.slice(8, 10))), cx + 5, cy + 12, 9, 850, INK);
+    if (day && valid(day.tmax) && cellH >= 32) {
+      ctx.textAlign = 'right';
+      text(ctx, `${Math.round(day.tmax)}°`, cx + cellW - 4, cy + 12, 8.5, 750, 'rgba(16,36,58,.62)');
+      ctx.textAlign = 'left';
+    }
+    if (day && valid(day.rain) && day.rain >= 0.5) {
+      // rain drop + amount
+      const dx = cx + 9, dy = cy + cellH - 9;
+      ctx.beginPath();
+      ctx.moveTo(dx, dy - 7); ctx.quadraticCurveTo(dx + 5, dy - 1, dx, dy + 3); ctx.quadraticCurveTo(dx - 5, dy - 1, dx, dy - 7);
+      ctx.fillStyle = BLUE; ctx.fill();
+      text(ctx, numTr(day.rain, day.rain < 10 ? 1 : 0), dx + 6, dy + 3, 8.5, 850, '#0f4fa8');
+    }
+    let mx = cx + cellW - 8;
+    const my = cy + cellH - 9;
+    for (const act of actByDate.get(date) ?? []) {
+      const st = activityStyle(act.type);
+      circleIcon(ctx, mx, my, 6, st.color, st.mark, WHITE, 7.5); mx -= 14;
+    }
+    if (radarDates.has(date)) {
+      ctx.save(); ctx.translate(mx, my); ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#5146c9'; ctx.fillRect(-4, -4, 8, 8); ctx.restore(); mx -= 13;
+    }
+    if (satDates.has(date)) {
+      ctx.beginPath(); ctx.arc(mx, my, 4.5, 0, Math.PI * 2); ctx.fillStyle = GREEN; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = WHITE; ctx.stroke();
+    }
+  }
+  return y + 18 + weeks * (cellH + gap);
+}
+
+function evenlyPick<T>(items: T[], count: number) {
+  if (items.length <= count) return items;
+  const out: T[] = [];
+  for (let i = 0; i < count; i += 1) out.push(items[Math.round(i * (items.length - 1) / (count - 1))]);
+  return [...new Set(out)];
 }
 
 
@@ -520,10 +1072,13 @@ function riskItems(guidance: ReturnType<typeof buildPusulaPdfGuidance>) {
         ? 'Mevcut kanıtlar kesin risk düzeyi hesaplamaya yetmiyor. Saha kontrolü önerilir.'
         : 'Bu risk için doğrulanmış saha ölçümü veya yeterli model kanıtı bulunmuyor.');
     const action = String(insight?.action ?? '').trim();
+    const plainDetail = /production|pyfao|aquacrop|wapor|pcse|dssat|sentez/i.test(detail)
+      ? 'Sulama modeli kısmi veriyle çalıştı; toprak su açığı 2. bölümde.'
+      : detail;
     const style = riskLevel ? statusColor(riskLevel) : insight
       ? {accent:ORANGE,soft:ORANGE_SOFT}
       : {accent:MUTED,soft:GRAY_SOFT};
-    return { label, detail, action, status, statusAccent: style.accent, statusSoft: style.soft };
+    return { label, detail: plainDetail, action, status, statusAccent: style.accent, statusSoft: style.soft };
   });
 }
 
@@ -678,39 +1233,43 @@ function bioValue(metric: PusulaBioMetric, value:number|null|undefined){
   const shown=(metric.unit==='%'?value*100:value);
   return shown.toLocaleString('tr-TR',{minimumFractionDigits:metric.unit==='%'?0:2,maximumFractionDigits:metric.unit==='%'?0:3})+(metric.unit==='%'?'%':'');
 }
-function qrImageUrl(target: string) {
-  return `https://quickchart.io/qr?size=180&margin=1&ecLevel=M&text=${encodeURIComponent(target)}`;
+function drawQrMatrix(ctx: CanvasRenderingContext2D, target: string, x: number, y: number, size: number) {
+  const matrix = encodeQr(target);
+  rr(ctx, x, y, size, size, 6, WHITE, '#d5dde1');
+  if (!matrix) { text(ctx, 'QR', x + size / 2 - 9, y + size / 2 + 5, 13, 900, MUTED); return; }
+  // 4-module quiet zone (QR spec) and pure black modules for phone cameras.
+  const quiet = 4;
+  const cell = (size - 2) / (matrix.length + quiet * 2);
+  const ox = x + 1 + quiet * cell, oy = y + 1 + quiet * cell;
+  ctx.fillStyle = '#000000';
+  matrix.forEach((row, my) => row.forEach((dark, mx) => {
+    if (dark) ctx.fillRect(ox + mx * cell, oy + my * cell, cell + 0.2, cell + 0.2);
+  }));
 }
 
-async function drawQr(
+function drawQr(
   ctx: CanvasRenderingContext2D,
   target: string,
   x: number,
   y: number,
-  size: number,
-  label: string,
   platform: 'android' | 'ios',
+  hint: string,
 ) {
-  rr(ctx, x, y, size + 72, size + 24, 12, WHITE, '#cfd9dd');
-  circleIcon(ctx, x + 21, y + 22, 13, platform === 'android' ? '#34a853' : '#111111', platform === 'android' ? 'A' : 'i', WHITE, 11);
-  text(ctx, platform === 'android' ? 'Android' : 'iOS', x + 41, y + 27, 11, 850, INK);
-  const ok = await drawImage(ctx, qrImageUrl(target), x + size + 8, y + 7, 58, 58, { cover: false, radius: 5, placeholder: 'QR' });
-  if (!ok) {
-    rr(ctx, x + size + 8, y + 7, 58, 58, 5, GRAY_SOFT, LINE);
-    text(ctx, 'QR', x + size + 27, y + 42, 13, 900, MUTED);
-  }
-  text(ctx, label, x + 12, y + size + 12, 9, 850, MUTED);
+  rr(ctx, x, y, 176, 103, 12, WHITE, '#cfd9dd');
+  circleIcon(ctx, x + 22, y + 24, 13, platform === 'android' ? '#34a853' : '#111111', platform === 'android' ? 'A' : 'i', WHITE, 11);
+  fittedText(ctx, platform === 'android' ? 'Android' : 'iPhone', x + 10, y + 62, 64, 12, 900, INK);
+  fittedText(ctx, hint, x + 10, y + 80, 64, 8.6, 750, MUTED);
+  drawQrMatrix(ctx, target, x + 79, y + 4, 95);
 }
-
 
 function footerSocial(ctx: CanvasRenderingContext2D, x: number, y: number, symbol: string, fill: string, label: string, value: string) {
   circleIcon(ctx, x + 17, y + 15, 14, fill, symbol, WHITE, 11);
-  text(ctx, label, x + 38, y + 9, 9.5, 800, MUTED);
-  text(ctx, value, x + 38, y + 26, 11, 850, INK);
+  text(ctx, label, x + 38, y + 9, 9.5, 800, '#a9e6cd');
+  text(ctx, value, x + 38, y + 26, 11, 850, WHITE);
 }
 
-export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+export async function renderPusulaPdfCanvas(snapshot: PusulaPdfSnapshot) {
+  imageBlobCache.clear();
   const { canvas, ctx } = makeCanvas();
   const guidance = buildPusulaPdfGuidance(snapshot);
   const narrative=snapshot.aiNarrative;
@@ -721,6 +1280,12 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   // Weather history is NOT a future forecast. Report the most recent recorded days.
   const weather = allWeather.filter((row) => wd(row) >= snapshot.period.start);
   const climate=periodWeatherSummary(weather,snapshot.period.start,snapshot.period.end);
+  const dailyRows=dailyWeather(weather);
+  const activities=periodActivities(snapshot);
+  const pStart=snapshot.period.start, pEnd=snapshot.period.end;
+  const imagePoints=sat.filter((p)=>p.ndviImage);
+  const latestImagePoint=imagePoints.at(-1);
+  const latestShares=await ndviClassShares(latestImagePoint?.ndviImage);
   const isHistoricalReport=snapshot.period.end<new Date(Date.now()-7*86400000).toISOString().slice(0,10);
   const hasSatelliteMeasurements=sat.some(p=>VEGETATION_INDICES.some(i=>valid(p[i.key])));
   const hasBiophysics=(snapshot.biophysical??[]).some(p=>
@@ -739,41 +1304,38 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
   // Print-safe header: a fixed, subtle topographic motif, with protected
   // logo and metadata zones. Draw decoration before any text.
-  rr(ctx, 12, 12, 1216, 94, 15, '#f4f9f8', LINE);
-  ctx.save();
-  ctx.beginPath();ctx.roundRect(12,12,1216,94,15);ctx.clip();
-  ctx.strokeStyle='rgba(29,116,88,.10)';ctx.lineWidth=1.5;
-  for(let n=0;n<11;n++){
-    const offset=n*26;
-    ctx.beginPath();ctx.moveTo(310+offset,12);
-    ctx.bezierCurveTo(390+offset,35,350+offset,88,480+offset,108);ctx.stroke();
-  }
-  ctx.restore();
-  rr(ctx, 25, 21, 319, 76, 11, 'rgba(255,255,255,.86)', '');
-  rr(ctx, 355, 21, 311, 76, 11, 'rgba(255,255,255,.78)', '');
-  rr(ctx, 674, 21, 539, 76, 11, 'rgba(255,255,255,.85)', '');
-  await logo(ctx, 50, 59);
-  fittedText(ctx, 'Dönemsel Tarla Analizi', 372, 48, 280, 19, 900, INK);
-  text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 72, 10.5, 650, MUTED);
-
+  // Brand header band.
+  const bandPhoto=[...sat].reverse().find((p)=>p.trueColorImage)?.trueColorImage
+    ?? [...sat].reverse().find((p)=>p.ndviImage)?.ndviImage ?? null;
+  await brandBand(ctx, 12, 12, 1216, 94, 1, bandPhoto);
+  const headLogo = await logoBadge(ctx, 62, 59, 36);
+  const headX = headLogo ? 110 : 34;
+  text(ctx, 'TarlaPusula', headX, 58, 30, 900, WHITE);
+  text(ctx, 'TARLANIN AKLI, YANINDA.', headX + 2, 81, 10.5, 800, '#a9e6cd');
+  const divider = (dx: number) => {
+    ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(dx, 30); ctx.lineTo(dx, 88); ctx.stroke();
+  };
+  divider(350);
+  fittedText(ctx, 'Dönemsel Tarla Analizi', 372, 50, 280, 20, 900, WHITE);
+  text(ctx, 'Daha verimli, daha bilinçli, daha güçlü tarım için.', 372, 74, 10.5, 650, '#c8eadb');
+  // metadata on a glass card
+  rr(ctx, 674, 22, 539, 74, 12, 'rgba(255,255,255,.12)', 'rgba(255,255,255,.22)');
   const headerMeta = [
-    ['Rapor Tarihi', fmt(snapshot.period.end)],
-    ['Tarla Adı', snapshot.field.name],
-    ['Ürün', snapshot.field.crop ?? 'Kayıt yok'],
-    ['Tarla Büyüklüğü', snapshot.field.areaDecare == null ? '—' : `${snapshot.field.areaDecare.toLocaleString('tr-TR')} da`],
+    ['RAPOR TARİHİ', fmt(snapshot.period.end)],
+    ['TARLA ADI', snapshot.field.name],
+    ['ÜRÜN', snapshot.field.crop ?? 'Kayıt yok'],
+    ['TARLA BÜYÜKLÜĞÜ', snapshot.field.areaDecare == null ? '—' : `${snapshot.field.areaDecare.toLocaleString('tr-TR')} da`],
   ];
-  let hx = 684;
+  let hx = 690;
   headerMeta.forEach(([label, value], index) => {
     if (index) {
-      ctx.strokeStyle = '#e4eaec';
-      ctx.beginPath();
-      ctx.moveTo(hx - 10, 29);
-      ctx.lineTo(hx - 10, 89);
-      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.20)';
+      ctx.beginPath(); ctx.moveTo(hx - 12, 32); ctx.lineTo(hx - 12, 86); ctx.stroke();
     }
-    text(ctx, label, hx, 44, 8.5, 800, MUTED);
-    wrap(ctx, value, hx, 65, 10, 850, INK, 120, 1.12, 2);
-    hx += index === 0 ? 136 : 130;
+    text(ctx, label, hx, 46, 8.3, 850, '#a9e6cd');
+    wrap(ctx, value, hx, 68, 11, 850, WHITE, 115, 1.12, 2);
+    hx += index === 0 ? 138 : 130;
   });
 
   const top = 118;
@@ -790,62 +1352,96 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   wrap(ctx, 'Uydu verileri, hava durumu, toprak analizi ve Pusula karar motorlarıyla hazırlanmış premium tarla özeti.', leftX + 16, top + 67, 11.5, 600, MUTED, leftW - 32, 1.28, 3);
   await drawLayeredHero(ctx, latest?.trueColorImage, latest?.ndviImage, leftX + 8, top + 112, leftW - 16, 272);
 
-  const gradient = ctx.createLinearGradient(leftX + 8, top + 267, leftX + 8, top + 384);
-  gradient.addColorStop(0, 'rgba(0,0,0,0)');
-  gradient.addColorStop(1, 'rgba(0,0,0,.72)');
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(leftX + 8, top + 112, leftW - 16, 272, 15);
-  ctx.clip();
-  ctx.fillStyle = gradient;
-  ctx.fillRect(leftX + 8, top + 112, leftW - 16, 272);
-  ctx.restore();
-
-  rr(ctx, leftX + 22, top + 284, 196, 87, 11, 'rgba(5,20,22,.82)', 'rgba(255,255,255,.18)');
-  circleIcon(ctx, leftX + 43, top + 302, 11, ORANGE, '●', WHITE, 7);
-  fittedText(ctx, snapshot.field.name, leftX + 62, top + 307, 140, 14, 900, WHITE);
-  fittedText(ctx, snapshot.field.areaDecare == null ? 'Alan —' : `${snapshot.field.areaDecare.toLocaleString('tr-TR')} da`, leftX + 39, top + 328, 170, 10, 750, WHITE);
-  fittedText(ctx, snapshot.field.crop ?? 'Ürün kaydı yok', leftX + 39, top + 348, 170, 10, 750, WHITE);
-  fittedText(ctx, location, leftX + 39, top + 365, 170, 9.5, 700, '#dbe7e7');
+  // Field name / crop / area already live in the header strip; the image only
+  // carries what the header does not: location and the scene date.
+  const heroChip=`${location} · Görüntü: ${latest?.date?fmt(latest.date,false):'—'}`;
+  font(ctx,9.5,800);
+  const chipW=Math.min(leftW-48,ctx.measureText(heroChip).width+26);
+  rr(ctx,leftX+20,top+346,chipW,26,13,'rgba(5,20,22,.78)','');
+  fittedText(ctx,heroChip,leftX+33,top+363,chipW-24,9.5,800,WHITE);
 
   const statY = top + 399;
   const lastNdmi = [...sat].filter((p) => valid(p.ndmi)).at(-1);
   const ndmiValue = lastNdmi?.ndmi ?? null;
-  // The cover identifies the REPORT'S FOCUS, not a second copy of its metrics.
-  // All numbers live only in their dedicated evidence sections below.
+  // NDVI class distribution of the latest map: read from the map's own pixels.
   rr(ctx,leftX+8,statY,leftW-16,104,12,'#f3f8f5',LINE);
-  fittedText(ctx,'BU RAPORUN ODAĞI',leftX+20,statY+24,leftW-40,9,850,GREEN_DARK);
-  const focus=hasSatelliteMeasurements
-    ? 'Uydu indeksleri, saha ve toprak kanıtları dönem tarihleriyle karşılaştırılır.'
-    : 'Bu tarih aralığında değerlendirme arşiv kayıtları, model referansı ve kayıtlı saha kanıtlarıyla sınırlıdır.';
-  wrap(ctx,focus,leftX+20,statY+48,12,750,INK,leftW-40,1.35,3);
-
-  rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
-  text(ctx, hasSatelliteMeasurements?'Uydu Geçmişi ve Karşılaştırma':'Uydu Arşivi ve Ölçüm Kapsamı', leftX + 16, 691, 17, 900, INK);
-  const numericDates = [...new Set(sat.filter((p) => VEGETATION_INDICES.some((v) => valid(p[v.key]))).map((p) => p.date))];
-  text(ctx, `${numericDates.length} geçerli indeks tarihi · ${sat.length} sahne/kontrol tarihi`,
-    leftX + 16, 712, 10, 750, MUTED);
-  if(hasSatelliteMeasurements){
-    chart(ctx, leftX + 14, 717, leftW - 28, 151, sat);
+  const fallbackShares=(()=>{
+    const p=[...sat].reverse().find((row)=>valid(row.highPercent)&&valid(row.mediumPercent)&&valid(row.lowPercent));
+    if(!p)return null;
+    const scale=(p.highPercent!+p.mediumPercent!+p.lowPercent!)<=1.5?100:1;
+    const hi=p.highPercent!*scale,mid=p.mediumPercent!*scale,low=p.lowPercent!*scale;
+    return {shares:[0,low,mid,hi,0],good:hi,mid,weak:low,date:p.date};
+  })();
+  const zone=latestShares
+    ? {...latestShares,date:latestImagePoint?.date??null}
+    : fallbackShares;
+  if(zone){
+    fittedText(ctx,`TARLA ALANININ NDVI DAĞILIMI · ${fmt(zone.date,false)}`,leftX+20,statY+22,leftW-40,9,850,GREEN_DARK);
+    shareBar(ctx,leftX+20,statY+32,leftW-40,18,zone.shares);
+    const parts=[
+      ['İyi / çok iyi',zone.good,NDVI_CLASSES[4].color],
+      ['Orta',zone.mid,'#c99a00'],
+      ['Zayıf',zone.weak,NDVI_CLASSES[0].color],
+    ] as const;
+    parts.forEach(([label,value,color],i)=>{
+      const x=leftX+20+i*128;
+      ctx.beginPath();ctx.arc(x+5,statY+70,5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+      text(ctx,label,x+15,statY+74,10,750,MUTED);
+      font(ctx,10,750);
+      const labelW=ctx.measureText(label).width;
+      text(ctx,percentText(value),x+20+labelW,statY+74.5,13,900,color);
+    });
+    text(ctx,latestShares?'NDVI haritasındaki parsel piksellerinin sınıf payı (Sentinel-2)':'Kayıtlı bölge yüzdeleri (Sentinel-2)',
+      leftX+20,statY+94,8.6,700,MUTED);
   }else{
-    rr(ctx,leftX+14,731,leftW-28,145,10,'#f3f8fa',LINE);
-    const sceneDates=[...new Set(sat.map(p=>p.date))].sort();
-    if(sceneDates.length){
-      fittedText(ctx,`Kontrol edilen dönem: ${fmt(sceneDates[0],false)} – ${fmt(sceneDates.at(-1)!,false)}`,
-        leftX+28,754,leftW-56,10.2,800,INK);
-      sceneDates.slice(0,14).forEach((_,i)=>{
-        const x=leftX+28+i*24;
-        ctx.beginPath();ctx.fillStyle='#9fadb4';ctx.arc(x,785,4,0,Math.PI*2);ctx.fill();
-      });
-      wrap(ctx,'Uydu sahne tarihleri mevcut; bu döneme ait parsel ortalaması sayısal olarak arşivlenmemiş. Görüntü sayısı ölçüm değildir.',
-        leftX+28,816,10.8,750,INK,leftW-57,1.25,3);
-    }else{
-      wrap(ctx,'Seçilen tarihler için kaydedilmiş uydu sahnesi yok. Hava geçmişi varsa rapor onunla hazırlanır.',
-        leftX+28,779,11.5,750,INK,leftW-56,1.28,3);
-    }
+    fittedText(ctx,'TARLA ALANININ NDVI DAĞILIMI',leftX+20,statY+24,leftW-40,9,850,GREEN_DARK);
+    wrap(ctx,'Bu dönemde sınıflandırılabilir NDVI haritası yok. Harita geldiğinde iyi / orta / zayıf alan payı burada gösterilir.',
+      leftX+20,statY+50,11,700,INK,leftW-40,1.3,3);
   }
-  text(ctx, hasSatelliteMeasurements?'NDVI • NDRE • GNDVI • SAVI':'İndeksler: sayısal parsel ölçümü gerekli',
-    leftX + 16, 891, 9.8, 800, GREEN_DARK);
+
+  // Replaces the second copy of the index chart: the same parcel, same colour
+  // scale, across the period. Each tile is a real dated NDVI map.
+  rr(ctx, leftX, 660, leftW, 244, 15, WHITE, LINE);
+  text(ctx, 'Dönem İçinde Tarlanın Değişimi', leftX + 16, 691, 17, 900, INK);
+  const stripPoints = evenlyPick(imagePoints, 4);
+  const stripShares = await Promise.all(stripPoints.map((p) => ndviClassShares(p.ndviImage)));
+  const firstShare = stripShares.find(Boolean), lastShare = [...stripShares].reverse().find(Boolean);
+  const stripSubtitle = stripPoints.length < 2
+    ? `${imagePoints.length} NDVI haritası · değişim için en az iki tarih gerekir`
+    : firstShare && lastShare && firstShare !== lastShare
+      ? `İyi / çok iyi alan payı: ${percentText(firstShare.good)} → ${percentText(lastShare.good)} · ${imagePoints.length} harita`
+      : `${imagePoints.length} NDVI haritası · aynı renk ölçeği`;
+  fittedText(ctx, stripSubtitle, leftX + 16, 712, leftW - 32, 10, 750, MUTED);
+  if (stripPoints.length) {
+    const gap = 8, tileW = (leftW - 28 - gap * 3) / 4;
+    for (let i = 0; i < stripPoints.length; i += 1) {
+      const point = stripPoints[i], share = stripShares[i];
+      const tx = leftX + 14 + i * (tileW + gap);
+      await drawImage(ctx, point.ndviImage, tx, 722, tileW, 118, { cover: false, radius: 9, placeholder: 'Yok' });
+      fittedText(ctx, fmt(point.date, false), tx + 2, 857, tileW - 4, 10, 850, INK);
+      if (share) {
+        const tone = share.good >= 50 ? NDVI_CLASSES[4].color : share.weak >= 40 ? NDVI_CLASSES[0].color : '#c99a00';
+        fittedText(ctx, `İyi ${percentText(share.good)}`, tx + 2, 874, tileW - 4, 10, 850, tone);
+      } else if (valid(point.ndvi)) {
+        fittedText(ctx, `NDVI ${numericIndexText(point.ndvi)}`, tx + 2, 874, tileW - 4, 10, 850, GREEN_DARK);
+      }
+    }
+    if (stripPoints.length === 1) {
+      wrap(ctx, 'Bu dönemde tek NDVI haritası var; karşılaştırma bir sonraki görüntüyle oluşur.',
+        leftX + 120, 760, 10.5, 700, MUTED, leftW - 140, 1.3, 4);
+    }
+    // colour scale legend
+    const legendW = (leftW - 28) / NDVI_CLASSES.length;
+    NDVI_CLASSES.forEach((cls, k) => {
+      const lx = leftX + 14 + k * legendW;
+      rr(ctx, lx, 883, 12, 10, 3, cls.color, '');
+      fittedText(ctx, cls.range, lx + 16, 892, legendW - 20, 8.5, 750, MUTED);
+    });
+  } else {
+    rr(ctx, leftX + 14, 731, leftW - 28, 145, 10, '#f3f8fa', LINE);
+    wrap(ctx, 'Seçilen tarihler için kaydedilmiş NDVI haritası yok. Harita oluştukça tarlanın dönem içi değişimi burada yan yana gösterilir.',
+      leftX + 28, 779, 11.5, 750, INK, leftW - 56, 1.28, 3);
+  }
 
   rr(ctx, leftX, 914, leftW, 230, 15, PURPLE_SOFT, '#e4d6fb');
   circleIcon(ctx, leftX + 34, 945, 18, PURPLE, '✦', WHITE, 14);
@@ -910,31 +1506,45 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
 
 
   }else{
-    // No repeated weather chart here: climate metrics have ONE home below.
-    // This entire panel is a practical record-keeping plan instead.
-    rr(ctx,leftX,1154,leftW,436,15,'#f5f9f7',LINE);
-    text(ctx,'Tarla Takip ve Kayıt Planı',leftX+18,1190,18,900,INK);
-    wrap(ctx,'Eksik ölçümleri uydurmak yerine gelecek dönemlerde daha güçlü tarla değerlendirmesi sağlayan kayıt adımları.',
-      leftX+18,1214,10.1,700,MUTED,leftW-36,1.23,3);
-    const checks=[
-      ['Tarihli saha gözlemi','Yaprak, sürgün ve meyvedeki belirtileri konum ve tarih ile kaydet.'],
-      ['Sulama günlüğü','Uygulanan su miktarını, yöntemi ve sulama gününü not et.'],
-      ['Toprak laboratuvar testi','pH ve besin kararlarını güvenilir parsel örnekleriyle doğrula.'],
-      ['Hasat ve kalite defteri','Gerçek hasat tarihi, miktarı ve kaliteyi sonraki yıl için sakla.'],
-    ];
-    checks.forEach(([title,detail],i)=>{
-      const yy=1260+i*71;
-      rr(ctx,leftX+15,yy,leftW-30,64,10,i%2===0?WHITE:'#e9f3ee',LINE);
-      circleIcon(ctx,leftX+34,yy+23,12,GREEN,i+1+'',WHITE,10);
-      fittedText(ctx,title,leftX+54,yy+24,leftW-78,12,850,INK);
-      wrap(ctx,detail,leftX+54,yy+44,9.5,670,MUTED,leftW-80,1.14,2);
+    // A visual timeline of the period instead of four fixed record-keeping tips.
+    rr(ctx,leftX,1154,leftW,436,15,'#fbfcf8',LINE);
+    text(ctx,'Dönem Takvimi',leftX+18,1190,18,900,INK);
+    fittedText(ctx,'Her kare bir gün · renk: o günün en yüksek sıcaklığı',leftX+18,1212,leftW-36,10,750,MUTED);
+    const satDates=new Set(imagePoints.map((p)=>p.date));
+    const radarDates=new Set([
+      ...(snapshot.radar?.points??[]).map((p)=>p.date),
+      ...(snapshot.radar?.images??[]).map((p)=>p.date),
+    ]);
+    periodCalendar(ctx,leftX+16,1224,leftW-32,288,pStart,pEnd,dailyRows,activities,satDates,radarDates);
+    // legend
+    text(ctx,'Sıcaklık',leftX+18,1534,9,800,MUTED);
+    gradientBar(ctx,leftX+70,1527,170,9,TEMP_STOPS.filter(([v])=>v>=0&&v<=36),null);
+    ['0°','18°','36°'].forEach((label,i)=>{
+      ctx.textAlign=i===0?'left':i===1?'center':'right';
+      text(ctx,label,leftX+70+i*85,1550,8.5,750,MUTED);
     });
-    text(ctx,'Not: Bunlar hesaplanmış ölçüm değil, kayıt önerileridir.',leftX+19,1568,9,750,GREEN_DARK);
+    ctx.textAlign='left';
+    let lgx=leftX+260;
+    ctx.beginPath();ctx.moveTo(lgx,1525);ctx.quadraticCurveTo(lgx+5,1531,lgx,1535);ctx.quadraticCurveTo(lgx-5,1531,lgx,1525);
+    ctx.fillStyle=BLUE;ctx.fill();
+    text(ctx,'Yağış mm',lgx+9,1534,9,750,MUTED);
+    lgx=leftX+18;
+    const markLegend:Array<[string,(x:number,y:number)=>void]>=[
+      ['Sulama',(mx,my)=>circleIcon(ctx,mx,my,6,BLUE,'S',WHITE,7.5)],
+      ['Gübre',(mx,my)=>circleIcon(ctx,mx,my,6,GREEN_DARK,'G',WHITE,7.5)],
+      ['Uydu haritası',(mx,my)=>{ctx.beginPath();ctx.arc(mx,my,4.5,0,Math.PI*2);ctx.fillStyle=GREEN;ctx.fill();}],
+      ['Radar',(mx,my)=>{ctx.save();ctx.translate(mx,my);ctx.rotate(Math.PI/4);ctx.fillStyle='#5146c9';ctx.fillRect(-4,-4,8,8);ctx.restore();}],
+    ];
+    markLegend.forEach(([label,draw])=>{
+      draw(lgx+6,1570);
+      text(ctx,label,lgx+16,1573.5,9,750,MUTED);
+      font(ctx,9,750);lgx+=ctx.measureText(label).width+34;
+    });
   }
 
 
   // MIDDLE COLUMN
-  rr(ctx, midX, top, midW, 384, 15, WHITE, LINE);
+  rr(ctx, midX, top, midW, 384, 15, '#f8fcf9', LINE);
   sectionHeader(ctx,midX+10,top+8,1,
     hasSatelliteMeasurements?'Bitki Sağlığı ve Gelişim Analizi':'Uydu Katmanları Ne Anlatır?',GREEN,'↑');
   text(ctx, 'Gerçek sayısal ölçümler · tarih ve kaynak doğrulaması', midX + 18, top + 55, 9.5, 700, MUTED);
@@ -950,7 +1560,7 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     text(ctx, series.length ? fmt(series.at(-1)?.date, false) : 'Kaynak yok', x + 9, top + 142, 9, 650, MUTED);
   });
   // Multi-index trend: each line uses its own real observations; never interpolate empty dates.
-  chart(ctx, midX + 18, top + 169, midW - 36, 130, sat);
+  chart(ctx, midX + 14, top + 166, midW - 28, 136, sat, { start: pStart, end: pEnd, activities });
   VEGETATION_INDICES.forEach((item, index) => {
     const col = index % 2, row = Math.floor(index / 2);
     const x = midX + 19 + col * 185;
@@ -984,25 +1594,53 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       midX+17,top+372,midW-34,9.4,750,MUTED);
   }
 
-  const hasIrrigationEvidence=ndmiValue!==null||need.mm!==null;
-  rr(ctx,midX,512,midW,204,15,hasIrrigationEvidence?WHITE:'#f4f9ff',LINE);
+  const irrSynth=layerPayload(latestLayer(snapshot,'irrigation-synthesis'));
+  const deficitMm=metricNumber(irrSynth,'currentDeficitMm');
+  const thresholdMm=metricNumber(irrSynth,'stressThresholdMm');
+  const currentKc=metricNumber(irrSynth,'currentKc');
+  const stageLabel=String(irrSynth?.metrics?.stageLabel??'').trim();
+  const decision=String(irrSynth?.metrics?.decision??'').toLowerCase();
+  const decisionLabel=decision==='wait'?'Şimdilik bekle':decision==='irrigate'||decision==='irrigate_now'?'Sulama zamanı':decision==='soon'?'Yakında sula':'';
+  const hasIrrigationEvidence=ndmiValue!==null||need.mm!==null||deficitMm!==null;
+  rr(ctx,midX,512,midW,204,15,hasIrrigationEvidence?'#f7faff':'#f4f9ff',LINE);
   sectionHeader(ctx,midX+10,520,2,
     hasIrrigationEvidence?'Su ve Sulama Analizi':'Sulama Kararının Sınırları',BLUE,'●');
   if(hasIrrigationEvidence){
     const waterCards=[
       {title:'NDMI (bitki nem)',main:numericIndexText(ndmiValue),sub:'Toprak nem sensörü değil',accent:BLUE},
-      {title:'Sulama İhtiyacı',main:need.mm===null?'—':numTr(need.mm)+' mm',sub:need.mm===null?'Model kanıtı eksik':'Kayıtlı model kararı',accent:BLUE},
-      {title:'Nem Eğilimi',main:valid(ndmiCmp.pct)?(ndmiCmp.pct < -5?'Azalıyor':ndmiCmp.pct>5?'Artıyor':'Dengeli'):'—',
-       sub:valid(ndmiCmp.pct)?'Dönem NDMI kıyası':'İki ölçüm gerekli',accent:GREEN},
+      need.mm===null&&deficitMm!==null
+        ? {title:'Toprak Su Açığı',main:numTr(deficitMm)+' mm',
+           sub:[thresholdMm!==null?`Stres eşiği ${numTr(thresholdMm,0)} mm`:'',decisionLabel].filter(Boolean).join(' · ')||'Sulama modeli',
+           accent:thresholdMm!==null&&deficitMm>=thresholdMm*0.7?RED:thresholdMm!==null&&deficitMm>=thresholdMm*0.4?ORANGE:GREEN}
+        : {title:'Sulama İhtiyacı',main:need.mm===null?'—':numTr(need.mm)+' mm',sub:need.mm===null?'Model kanıtı eksik':'Kayıtlı model kararı',accent:BLUE},
+      !valid(ndmiCmp.pct)&&currentKc!==null
+        ? {title:'Ürün Katsayısı (Kc)',main:numTr(currentKc,2),sub:stageLabel||'Fenoloji evresi',accent:GREEN}
+        : {title:'Nem Eğilimi',main:valid(ndmiCmp.pct)?(ndmiCmp.pct < -5?'Azalıyor':ndmiCmp.pct>5?'Artıyor':'Dengeli'):'—',
+           sub:valid(ndmiCmp.pct)?'Dönem NDMI kıyası':'İki ölçüm gerekli',accent:GREEN},
     ];
     waterCards.forEach((card,index)=>{
       const x=midX+14+index*124;
       rr(ctx,x,566,116,132,10,index===0?BLUE_SOFT:index===1?'#f3f8ff':GREEN_SOFT,LINE);
       ctx.textAlign='center';
       fittedText(ctx,card.title,x+58,589,104,8.5,750,MUTED);
-      fittedText(ctx,card.main,x+58,635,101,14,900,card.accent);
+      fittedText(ctx,card.main,x+58,628,101,14,900,
+        index===0&&ndmiValue!==null?scaleColor(ndmiValue,NDMI_STOPS):card.accent);
       ctx.textAlign='left';
-      wrap(ctx,card.sub,x+9,664,9,750,MUTED,98,1.2,3);
+      if(index===1&&card.title==='Toprak Su Açığı'&&deficitMm!==null&&thresholdMm!==null&&thresholdMm>0){
+        // deficit vs stress threshold
+        rr(ctx,x+12,641,92,7,3.5,'#e6ecef','');
+        rr(ctx,x+12,641,Math.max(7,92*clamp(deficitMm/thresholdMm,0,1)),7,3.5,card.accent,'');
+        text(ctx,'0',x+12,660,7.8,700,MUTED);
+        ctx.textAlign='right';text(ctx,'eşik',x+104,660,7.8,700,MUTED);ctx.textAlign='left';
+        wrap(ctx,card.sub,x+9,680,9,750,MUTED,98,1.2,2);
+      }else if(index===0&&ndmiValue!==null){
+        gradientBar(ctx,x+12,641,92,7,NDMI_STOPS,ndmiValue);
+        text(ctx,'kuru',x+12,660,7.8,700,MUTED);
+        ctx.textAlign='right';text(ctx,'nemli',x+104,660,7.8,700,MUTED);ctx.textAlign='left';
+        wrap(ctx,card.sub,x+9,680,9,750,MUTED,98,1.2,2);
+      }else{
+        wrap(ctx,card.sub,x+9,664,9,750,MUTED,98,1.2,3);
+      }
     });
   }else{
     rr(ctx,midX+16,567,midW-32,129,11,WHITE,LINE);
@@ -1026,56 +1664,90 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   } else if (soilGrids.available) {
     fittedText(ctx,soilGrids.isHistoricalRecord
       ? 'SoilGrids · 0–30 cm · 250 m model'
-      : 'SoilGrids · sonradan alınan model referansı',midX+18,782,235,9.8,900,GREEN_DARK);
-    const soilMetrics = [
-      ['pH', soilGrids.ph === null ? '—' : soilGrids.ph.toLocaleString('tr-TR', { maximumFractionDigits: 1 })],
-      ['Organik C', soilGrids.carbon === null ? '—' : `${soilGrids.carbon.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} g/kg`],
-      ['Kil / kum / silt', [soilGrids.clay,soilGrids.sand,soilGrids.silt].every(valid)
-        ? `${Math.round(soilGrids.clay!)} / ${Math.round(soilGrids.sand!)} / ${Math.round(soilGrids.silt!)} %` : '—'],
-    ];
-    soilMetrics.forEach(([label, value], index) => {
-      const yy = 815 + index * 31;
-      text(ctx, label, midX + 18, yy, 10, 700, MUTED);
-      text(ctx, value, midX + 106, yy, 10, 900, INK);
-    });
-    wrap(ctx,'Laboratuvar değildir. Sonradan sorgulandıysa geçmiş Haziran ölçümü sayılmaz; gübre dozu çıkarılmaz.',
-      midX+18,914,8.5,700,MUTED,234,1.16,2);
+      : 'SoilGrids · sonradan alınan model referansı',midX+18,780,235,9.5,900,GREEN_DARK);
+    text(ctx,'pH',midX+18,803,10,800,INK);
+    ctx.textAlign='right';
+    text(ctx,soilGrids.ph===null?'—':soilGrids.ph.toLocaleString('tr-TR',{maximumFractionDigits:1}),
+      midX+248,803,11.5,900,soilGrids.ph===null?MUTED:scaleColor(soilGrids.ph,PH_STOPS));
+    ctx.textAlign='left';
+    gradientBar(ctx,midX+18,810,230,9,PH_STOPS,soilGrids.ph);
+    text(ctx,'Asidik',midX+18,832,8.3,700,MUTED);
+    ctx.textAlign='center';text(ctx,'Nötr',midX+18+230*(7-4)/5,832,8.3,700,MUTED);
+    ctx.textAlign='right';text(ctx,'Bazik',midX+248,832,8.3,700,MUTED);
+    text(ctx,soilGrids.carbon===null?'—':`${soilGrids.carbon.toLocaleString('tr-TR',{maximumFractionDigits:1})} g/kg`,
+      midX+248,854,10.5,900,INK);
+    ctx.textAlign='left';
+    text(ctx,'Organik karbon',midX+18,854,10,800,INK);
+    text(ctx,'Kil / silt / kum',midX+18,876,10,800,INK);
+    const tex=[[soilGrids.clay,TEXTURE_COLORS.clay,WHITE],[soilGrids.silt,TEXTURE_COLORS.silt,INK],[soilGrids.sand,TEXTURE_COLORS.sand,INK]] as const;
+    if(tex.every(([v])=>valid(v))){
+      const sum=tex.reduce((a,[v])=>a+(v as number),0);
+      let bx=midX+18;
+      ctx.save();ctx.beginPath();ctx.roundRect(midX+18,883,230,16,8);ctx.clip();
+      tex.forEach(([v,color,ink])=>{
+        const bw=230*(v as number)/sum;
+        ctx.fillStyle=color;ctx.fillRect(bx,883,bw+0.5,16);
+        if(bw>34){ctx.textAlign='center';text(ctx,`%${Math.round(v as number)}`,bx+bw/2,895,8.8,850,ink);ctx.textAlign='left';}
+        bx+=bw;
+      });
+      ctx.restore();
+    }else{
+      text(ctx,'—',midX+130,876,10,850,MUTED);
+    }
+    fittedText(ctx,'Model tahmini · laboratuvar değildir; gübre dozu çıkarılmaz.',midX+18,920,232,8.4,700,MUTED);
   } else {
     text(ctx, 'Toprak model ölçümü bekleniyor', midX + 18, 809, 10, 850, MUTED);
     wrap(ctx, 'Uygun veri gelmeden besin miktarı ve pH tahmini yapılmaz.',
       midX + 18, 841, 9.5, 650, MUTED, 232, 1.25, 3);
   }
-  rr(ctx, midX + 260, 784, 112, 130, 9, ORANGE_SOFT, '#f4dfba');
-  text(ctx, 'Toprak Kararı', midX + 272, 806, 10, 900, INK);
-  wrap(ctx, soilGrids.available
-    ? 'SoilGrids yalnız bölgesel referanstır. Parsel gübreleme planı için laboratuvar analizi ekle.'
-    : 'Doğrulanmış ölçüm olmadan besin dozu önerilmez.',
-    midX + 272, 831, 9.5, 650, MUTED, 90, 1.25, 7);
+  const texture=soilGrids.available&&valid(soilGrids.clay)&&valid(soilGrids.silt)&&valid(soilGrids.sand)
+    ? textureClass(soilGrids.clay,soilGrids.silt,soilGrids.sand) : null;
+  if(texture){
+    rr(ctx, midX + 260, 784, 112, 130, 9, '#f7ece2', '#ead2bd');
+    text(ctx, 'Bünye sınıfı', midX + 271, 804, 9.5, 800, MUTED);
+    wrap(ctx, texture, midX + 271, 830, 15, 900, '#8a3f1d', 92, 1.1, 2);
+    wrap(ctx, textureHint(texture), midX + 271, texture.length>11?874:856, 8.8, 650, INK, 92, 1.22, 4);
+  }else{
+    rr(ctx, midX + 260, 784, 112, 130, 9, ORANGE_SOFT, '#f4dfba');
+    text(ctx, 'Toprak Kararı', midX + 272, 806, 10, 900, INK);
+    wrap(ctx, soilGrids.available
+      ? 'SoilGrids yalnız bölgesel referanstır. Parsel gübreleme planı için laboratuvar analizi ekle.'
+      : 'Doğrulanmış ölçüm olmadan besin dozu önerilmez.',
+      midX + 272, 831, 9.5, 650, MUTED, 90, 1.25, 7);
+  }
 
   rr(ctx,midX,946,midW,250,15,'#f5faff',LINE);
   sectionHeader(ctx,midX+10,954,4,'Dönemin Hava ve İklimi',BLUE,'●');
-  fittedText(ctx,`${fmt(snapshot.period.start,false)} – ${fmt(snapshot.period.end,false)} · ${climate.observedDays}/${climate.days} gün`,
-    midX+17,993,midW-34,10,750,MUTED);
-  const monthlyMetrics=[
-    ['Toplam yağış',climate.totalRain===null?'Veri eksik':numTr(climate.totalRain)+' mm',BLUE,BLUE_SOFT],
-    ['Referans ET₀',climate.totalEt0===null?'Veri eksik':numTr(climate.totalEt0)+' mm',TEAL,GREEN_SOFT],
-    ['30°C+ gün',climate.hotDays===null?'Veri eksik':String(climate.hotDays)+' gün',ORANGE,ORANGE_SOFT],
-    ['En yüksek',climate.maximum===null?'—':numTr(climate.maximum)+'°C',ORANGE,ORANGE_SOFT],
-    ['En düşük',climate.minimum===null?'—':numTr(climate.minimum)+'°C',BLUE,BLUE_SOFT],
-    ['Yağışlı gün',climate.rainyDays===null?'—':String(climate.rainyDays)+' gün',GREEN,GREEN_SOFT],
-  ] as const;
-  monthlyMetrics.forEach(([label,value,accent,soft],i)=>{
-    const col=i%3,row=Math.floor(i/3);
-    const x=midX+13+col*124,y=1004+row*72;
-    rr(ctx,x,y,116,63,9,soft,LINE);
-    fittedText(ctx,label,x+8,y+21,100,9,750,MUTED);
-    fittedText(ctx,value,x+8,y+47,100,15,900,accent);
+  fittedText(ctx,`${fmt(pStart,false)} – ${fmt(pEnd,false)} · ${climate.observedDays}/${climate.days} gün`,
+    midX+17,1000,150,10,750,MUTED);
+  // chart legend
+  const wxLegend:[string,string,'bar'|'line'][]=[['Yağış','rgba(22,119,232,.55)','bar'],['Maks.',ORANGE,'line'],['Min.','#2d6fb7','line']];
+  let wlx=midX+190;
+  wxLegend.forEach(([label,color,kind])=>{
+    if(kind==='bar'){ctx.fillStyle=color;ctx.fillRect(wlx,991,8,11);}
+    else{ctx.strokeStyle=color;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(wlx-2,997);ctx.lineTo(wlx+12,997);ctx.stroke();}
+    text(ctx,label,wlx+16,1000,9,750,MUTED);
+    font(ctx,9,750);wlx+=ctx.measureText(label).width+32;
   });
+  const frostDays=dailyRows.length===climate.days&&dailyRows.every((d)=>valid(d.tmin))
+    ? dailyRows.filter((d)=>d.tmin!<=0).length : null;
+  const wxTiles=[
+    ['Toplam yağış',climate.totalRain===null?'Eksik':numTr(climate.totalRain)+' mm',BLUE,BLUE_SOFT],
+    ['Referans ET₀',climate.totalEt0===null?'Eksik':numTr(climate.totalEt0)+' mm',TEAL,GREEN_SOFT],
+    ['30°C+ / donlu gün',`${climate.hotDays??'—'} / ${frostDays??'—'}`,ORANGE,ORANGE_SOFT],
+  ] as const;
+  wxTiles.forEach(([label,value,accent,soft],i)=>{
+    const x=midX+13+i*124;
+    rr(ctx,x,1008,116,40,9,soft,LINE);
+    fittedText(ctx,label,x+8,1023,100,8.5,750,MUTED);
+    fittedText(ctx,value,x+8,1041,100,13.5,900,accent);
+  });
+  weatherChart(ctx,midX+8,1054,midW-16,112,dailyRows,pStart,pEnd);
   const weatherSource=String((snapshot.weather as any)?.source??'Kayıtlı hava ölçümleri').trim();
-  wrap(ctx,`Kaynak: ${weatherSource} · Dönem toplamlarıdır; hava tahmini değildir. ET₀ tek başına sulama ihtiyacı değildir.`,
-    midX+17,1167,9.1,700,MUTED,midW-34,1.15,2);
+  fittedText(ctx,`Kaynak: ${weatherSource} · kayıtlı gözlem, tahmin değil · kırmızı nokta: 30°C+ gün`,
+    midX+17,1184,midW-34,8.8,700,MUTED);
 
-  rr(ctx, midX, 1206, midW, 384, 15, WHITE, LINE);
+  rr(ctx, midX, 1206, midW, 384, 15, '#fcfaff', LINE);
   sectionHeader(ctx, midX + 10, 1214, 5, latestPhoto?'Saha Gözlemleri':'Saha Kayıtlarının Kapsamı', PURPLE, '▣');
   if (latestPhoto?.signedUrl) {
     await drawImage(ctx, latestPhoto.signedUrl, midX + 16, 1260, 174, 195, { radius: 9, placeholder: 'Fotoğraf açılamadı' });
@@ -1112,12 +1784,16 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   const hasPeriodRiskEvidence=!!latestPeriodLayer(snapshot,'plant-health-synthesis');
   rr(ctx,rightX,top,rightW,476,15,hasPeriodRiskEvidence?'#fffafa':'#f6fbff',LINE);
   sectionHeader(ctx,rightX+10,top+8,6,
-    hasPeriodRiskEvidence?'Risk ve Öneri Analizi':'İklim Koşulları ve Kanıt Sınırları',
-    hasPeriodRiskEvidence?RED:BLUE,'!');
+    hasPeriodRiskEvidence?'Risk ve Öneri Analizi':'Su Dengesi: Yağış – ET₀',
+    hasPeriodRiskEvidence?RED:BLUE,hasPeriodRiskEvidence?'!':'≈');
   if(hasPeriodRiskEvidence){
-    riskRows.forEach((row,index)=>{
+    // Rows without evidence are listed in one line instead of full cards.
+    const shownRisks=riskRows.filter((row)=>row.status!=='Veri eksik');
+    const missingRisks=riskRows.filter((row)=>row.status==='Veri eksik');
+    shownRisks.forEach((row,index)=>{
       const yy=top+64+index*78;
       rr(ctx,rightX+12,yy-12,rightW-24,74,10,index%2===0?WHITE:'#f1f5f9',LINE);
+      ctx.beginPath();ctx.roundRect(rightX+12,yy-12,5,74,[10,0,0,10]);ctx.fillStyle=row.statusAccent;ctx.fill();
       circleIcon(ctx,rightX+34,yy+15,12,row.statusSoft,'●',row.statusAccent,8);
       fittedText(ctx,row.label,rightX+56,yy+18,180,12,900,INK);
       const pillW=95;
@@ -1125,26 +1801,56 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
       ctx.textAlign='center';
       fittedText(ctx,row.status,rightX+rightW-pillW/2-13,yy+14,pillW-8,9,850,row.statusAccent);
       ctx.textAlign='left';
-      wrap(ctx,englishFree(row.detail),rightX+20,yy+39,10,650,MUTED,rightW-39,1.17,2);
+      wrap(ctx,englishFree(row.detail),rightX+24,yy+39,10,650,MUTED,rightW-45,1.17,2);
     });
+    let ry=top+64+shownRisks.length*78;
+    if(missingRisks.length){
+      fittedText(ctx,`Kanıt yok: ${missingRisks.map((r)=>r.label.replace(/ Riski$/,'')).join(' · ')}`,
+        rightX+16,ry,rightW-32,9.5,750,MUTED);
+      ry+=14;
+    }
+    const wbR=waterBalanceSeries(dailyRows);
+    const chartH=top+466-(ry+30);
+    if(wbR.series.length>=5&&wbR.end!==null&&chartH>=110){
+      text(ctx,'Su dengesi: yağış – ET₀',rightX+16,ry+18,11.5,900,BLUE);
+      ctx.textAlign='right';
+      text(ctx,`Dönem sonu ${wbR.end>0?'+':''}${numTr(wbR.end,0)} mm`,rightX+rightW-16,ry+18,10.5,900,wbR.end<0?RED:BLUE);
+      ctx.textAlign='left';
+      rr(ctx,rightX+12,ry+26,rightW-24,chartH,10,WHITE,LINE);
+      waterBalanceChart(ctx,rightX+14,ry+30,rightW-28,chartH-8,wbR.series,pStart,pEnd,
+        activities.filter((a)=>activityStyle(a.type).label==='Sulama'));
+    }
   }else{
-    // Distinct evidence requirements, no duplicate climate measurements.
-    const requirements=[
-      ['Kuraklık stresi','Toprak nemi, ürün evresi ve kaydedilmiş sulama bilgisi gerekir.'],
-      ['Hastalık değerlendirmesi','Yaprak ıslaklığı, görüntü ve saha belirtileri gerekir.'],
-      ['Zararlı değerlendirmesi','Saha sayımı, tuzak ve tarihli zarar belirtisi gerekir.'],
-      ['Don hasarı','Bitkinin o tarihteki evresi ve sahadaki hasar gözlemi gerekir.'],
-      ['Su baskını','Parsel drenajı, topografya ve yerinde su birikimi kanıtı gerekir.'],
-    ];
-    rr(ctx,rightX+15,top+52,rightW-30,51,10,WHITE,LINE);
-    wrap(ctx,'Geçmiş hava gözlemleri tek başına hastalık, zararlı veya hasar teşhisi oluşturmaz.',
-      rightX+28,top+72,10.5,750,INK,rightW-54,1.15,2);
-    requirements.forEach(([label,detail],i)=>{
-      const yy=top+115+i*67;
-      rr(ctx,rightX+14,yy,rightW-28,60,10,i%2===0?WHITE:'#eaf4fa',LINE);
-      fittedText(ctx,label,rightX+26,yy+21,rightW-52,11.3,850,INK);
-      wrap(ctx,detail,rightX+26,yy+39,9.8,650,MUTED,rightW-51,1.18,2);
-    });
+    // Recorded rain minus reference ET0, accumulated day by day. Days missing
+    // either value are skipped (never filled), and irrigation water is not
+    // added because its amount is not recorded reliably.
+    const wb=waterBalanceSeries(dailyRows);
+    fittedText(ctx,'Biriken yağış eksi referans buharlaşma (ET₀), günlük kayıtlardan',
+      rightX+20,top+57,rightW-40,10,750,MUTED);
+    if(wb.series.length>=5&&wb.end!==null){
+      rr(ctx,rightX+12,top+68,rightW-24,262,10,WHITE,LINE);
+      waterBalanceChart(ctx,rightX+14,top+74,rightW-28,250,wb.series,pStart,pEnd,
+        activities.filter((a)=>activityStyle(a.type).label==='Sulama'));
+      const deficit=wb.deepest&&wb.deepest.value<0?wb.deepest:null;
+      const wbCards=[
+        ['Dönem sonu',`${wb.end>0?'+':''}${numTr(wb.end,0)} mm`,wb.end<0?'su açığı':'yağış fazlası',wb.end<0?RED:BLUE,wb.end<0?RED_SOFT:BLUE_SOFT],
+        ['En derin açık',deficit?`${numTr(deficit.value,0)} mm`:'Açık yok',deficit?fmt(deficit.date,false):'dönem boyunca',ORANGE,ORANGE_SOFT],
+        ['Açıkta geçen gün',`${wb.deficitDays} / ${wb.series.length}`,'gün',PURPLE,PURPLE_SOFT],
+      ] as const;
+      wbCards.forEach(([label,value,sub,accent,soft],i)=>{
+        const x=rightX+14+i*124;
+        rr(ctx,x,top+342,116,80,10,soft,LINE);
+        fittedText(ctx,label,x+9,top+362,100,9,750,MUTED);
+        fittedText(ctx,value,x+9,top+390,100,16,900,accent);
+        fittedText(ctx,sub,x+9,top+410,100,9,700,MUTED);
+      });
+      wrap(ctx,'Sulama suyu bu hesaba dahil değildir; S işaretleri kayıtlı sulama tarihleridir. ET₀ referans değerdir, ürünün gerçek tüketimi Kc ile değişir.',
+        rightX+18,top+441,9.2,700,MUTED,rightW-36,1.2,2);
+    }else{
+      rr(ctx,rightX+15,top+70,rightW-30,120,10,WHITE,LINE);
+      wrap(ctx,'Su dengesi için dönemde en az 5 günlük yağış ve ET₀ kaydı gerekir. Eksik günler tahminle doldurulmaz.',
+        rightX+28,top+98,11,750,INK,rightW-56,1.3,3);
+    }
   }
 
 
@@ -1176,29 +1882,86 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     text(ctx,'Hasat tahmini üretilmedi',rightX+27,681,14,900,INK);
     wrap(ctx,'Tarihi kesin hasat miktarı, ürün gelişim evresi ve kalite kayıtları bulunmadan verim veya hasat günü hesaplanmaz.',
       rightX+27,712,11,700,MUTED,rightW-56,1.25,4);
-    fittedText(ctx,'Eksik tahmini bir değere dönüştürmedik.',
-      rightX+27,784,rightW-56,10.3,850,ORANGE);
+    if(stageLabel){
+      font(ctx,10.5,850);
+      const chip=`Ürün evresi: ${stageLabel}`;
+      const cw=Math.min(rightW-56,ctx.measureText(chip).width+24);
+      rr(ctx,rightX+25,766,cw,26,13,ORANGE_SOFT,'#f6d6b4');
+      fittedText(ctx,chip,rightX+37,783,cw-22,10.5,850,'#b45309');
+    }else{
+      fittedText(ctx,'Eksik tahmini bir değere dönüştürmedik.',
+        rightX+27,784,rightW-56,10.3,850,ORANGE);
+    }
   }
 
-  rr(ctx, rightX, 830, rightW, 330, 15, '#fbf8ff', LINE);
-  sectionHeader(ctx,rightX+10,838,8,latestPhoto?'Kritik Gözlem':'Dönem Sonu Değerlendirmesi',PURPLE,'!');
-  rr(ctx, rightX + 16, 884, rightW - 32, 224, 12,
-    latestPhoto?.signedUrl ? PURPLE_SOFT : GRAY_SOFT, LINE);
-  circleIcon(ctx, rightX + 45, 920, 16, latestPhoto ? PURPLE : BLUE, '!', WHITE, 12);
-  fittedText(ctx,latestPhoto?'Doğrulanacak saha bulgusu':'Geçmiş veriye dayalı yorum',
-    rightX+75,926,rightW-98,16,900,INK);
-  const criticalText = latestPhoto
-    ? (diagnosis.headline || diagnosis.summary || 'Fotoğraftaki belirtiler saha gözlemiyle birlikte değerlendirilmelidir.')
-    : (climate.observedDays>0
-      ? 'Hava geçmişi dönem koşullarını gösterir. Hastalık, zararlı, gerçek su açığı ve verim için saha ölçümü ve ek ürün verisi gerekir. Bu rapor olmayan kanıttan sonuç üretmez.'
-      : 'Dönemin yeterli saha ve iklim kanıtı bulunmadığından güvenilir üretim kararı verilemez.');
-  wrap(ctx, englishFree(criticalText), rightX + 29, 975, 13, 650, MUTED, rightW - 61, 1.35, 5);
-  text(ctx, latestPhoto ? 'Kanıt: Kullanıcı saha fotoğrafı' : 'İstenen kanıt: Güncel saha fotoğrafı',
-    rightX + 29, 1081, 11, 850, BLUE);
+  // Sentinel-1 radar was collected by the worker but never printed. It sees
+  // through cloud, so it complements the optical maps instead of repeating
+  // the photo diagnosis already shown in section 5.
+  const radarPts=(snapshot.radar?.points??[])
+    .filter((p)=>p.date>=pStart&&p.date<=pEnd)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  const radarKey:'vv'|'vh'=radarPts.filter((p)=>valid(p.vv)).length>=radarPts.filter((p)=>valid(p.vh)).length?'vv':'vh';
+  const radarSeries=radarPts.filter((p)=>valid(p[radarKey])).map((p)=>({date:p.date,value:p[radarKey] as number}));
+  const radarImgs=[...(snapshot.radar?.images??[])].sort((a,b)=>a.date.localeCompare(b.date)).slice(-2);
+  const hasRadar=radarImgs.length>0||radarSeries.length>0;
+  if(hasRadar){
+    const RADAR='#5146c9';
+    rr(ctx,rightX,830,rightW,330,15,'#f7f6ff',LINE);
+    sectionHeader(ctx,rightX+10,838,8,'Radar Görünümü (Sentinel-1)',RADAR,'◉');
+    fittedText(ctx,'Bulutlu günlerde de ölçer · yüzey nemi ve bitki yapısına duyarlı',
+      rightX+20,878,rightW-40,9.8,750,MUTED);
+    if(radarImgs.length){
+      const gap=10,imgW=radarImgs.length===2?(rightW-24-gap)/2:rightW-24;
+      for(let i=0;i<radarImgs.length;i+=1){
+        const img=radarImgs[i];
+        const ix=rightX+12+i*(imgW+gap);
+        await drawImage(ctx,img.imageUrl,ix,888,imgW,124,{cover:false,radius:9,placeholder:'Radar görüntüsü açılamadı'});
+        const chip=`${radarImgs.length===2&&i===0?'Önceki':'Son'} · ${fmt(img.date,false)}`;
+        font(ctx,9,850);
+        const cw=ctx.measureText(chip).width+16;
+        rr(ctx,ix+6,894,cw,20,10,'rgba(16,20,48,.78)','');
+        text(ctx,chip,ix+14,908,9,850,WHITE);
+      }
+    }
+    if(radarSeries.length>=2){
+      text(ctx,`${radarKey.toUpperCase()} geri saçılımı (dB)`,rightX+18,1030,9.5,850,RADAR);
+      const last=radarSeries.at(-1)!,prev=radarSeries.at(-2)!;
+      const delta=last.value-prev.value;
+      ctx.textAlign='right';
+      text(ctx,`Son: ${numTr(last.value,1)} dB (${delta>=0?'+':''}${numTr(delta,1)})`,rightX+rightW-16,1030,9.5,850,INK);
+      ctx.textAlign='left';
+      miniLine(ctx,rightX+8,1036,rightW-16,78,radarSeries,pStart,pEnd,RADAR,(v)=>numTr(v,1));
+    }else{
+      wrap(ctx,radarSeries.length
+        ? `Dönemde tek radar ölçümü var: ${radarKey.toUpperCase()} ${numTr(radarSeries[0].value,1)} dB (${fmt(radarSeries[0].date,false)}). Eğilim için ikinci ölçüm gerekir.`
+        : 'Dönem için sayısal radar ölçümü arşivlenmedi; yalnız görüntüler gösteriliyor.',
+        rightX+18,1046,10.5,700,INK,rightW-36,1.3,3);
+    }
+    const orbits=new Set(radarPts.map((p)=>`${p.orbitDirection??''}${p.relativeOrbit??''}`));
+    wrap(ctx,'Geri saçılım toprak yüzeyi ıslandıkça genelde artar; pürüzlülük ve bitki örtüsü de etkiler. Tek başına sulama veya hastalık kanıtı değildir.'
+      +(orbits.size>1?' Ölçümler farklı yörüngelerden; küçük farkları yorumlama.':''),
+      rightX+18,1124,8.8,700,MUTED,rightW-36,1.18,3);
+  }else{
+    rr(ctx, rightX, 830, rightW, 330, 15, '#fbf8ff', LINE);
+    sectionHeader(ctx,rightX+10,838,8,latestPhoto?'Kritik Gözlem':'Dönem Sonu Değerlendirmesi',PURPLE,'!');
+    rr(ctx, rightX + 16, 884, rightW - 32, 224, 12,
+      latestPhoto?.signedUrl ? PURPLE_SOFT : GRAY_SOFT, LINE);
+    circleIcon(ctx, rightX + 45, 920, 16, latestPhoto ? PURPLE : BLUE, '!', WHITE, 12);
+    fittedText(ctx,latestPhoto?'Doğrulanacak saha bulgusu':'Geçmiş veriye dayalı yorum',
+      rightX+75,926,rightW-98,16,900,INK);
+    const criticalText = latestPhoto
+      ? (diagnosis.headline || diagnosis.summary || 'Fotoğraftaki belirtiler saha gözlemiyle birlikte değerlendirilmelidir.')
+      : (climate.observedDays>0
+        ? 'Hava geçmişi dönem koşullarını gösterir. Hastalık, zararlı, gerçek su açığı ve verim için saha ölçümü ve ek ürün verisi gerekir. Bu rapor olmayan kanıttan sonuç üretmez.'
+        : 'Dönemin yeterli saha ve iklim kanıtı bulunmadığından güvenilir üretim kararı verilemez.');
+    wrap(ctx, englishFree(criticalText), rightX + 29, 975, 13, 650, MUTED, rightW - 61, 1.35, 5);
+    text(ctx, latestPhoto ? 'Kanıt: Kullanıcı saha fotoğrafı' : 'İstenen kanıt: Güncel saha fotoğrafı',
+      rightX + 29, 1081, 11, 850, BLUE);
+  }
 
   rr(ctx, rightX, 1170, rightW, 250, 15, '#f7fbf8', LINE);
   sectionHeader(ctx,rightX+10,1178,9,
-    isHistoricalReport?'Raporun Kanıt Türleri':"Pusula'nın Kısa Aksiyonları",GREEN,'✓');
+    isHistoricalReport?'Bu Raporun Veri Kaynakları':"Pusula'nın Kısa Aksiyonları",GREEN,'✓');
   const narrativeActions=(narrative?.actions??[]).filter(Boolean);
   const actions = isHistoricalReport ? [
     ['Gözlem','Uydu ve geçmiş hava kayıtları tarihli gözlem verisi niteliğindedir.',GREEN,GREEN_SOFT],
@@ -1209,12 +1972,35 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
     ['Önümüzdeki 7 Gün', narrativeActions[1] ?? guidance.next7Days[1] ?? 'Uydu ve hava trendini takip et.', BLUE, BLUE_SOFT],
     ['İzle ve Planla', narrativeActions[2] ?? guidance.next7Days[2] ?? guidance.dataQualityNote, PURPLE, PURPLE_SOFT],
   ];
-  actions.forEach(([titleValue, value, accent, soft], index) => {
-    const x = rightX + 14 + index * 124;
-    rr(ctx, x, 1224, 116, 176, 9, soft, soft);
-    text(ctx, titleValue, x + 10, 1247, 9.5, 900, accent);
-    wrap(ctx, value, x + 10, 1275, 9.2, 650, INK, 96, 1.28, 7);
-  });
+  if(isHistoricalReport){
+    // What actually fed this report, at a glance (replaces three fixed sentences).
+    const numericDateCount=new Set(sat.filter((p)=>VEGETATION_INDICES.some((v)=>valid(p[v.key]))).map((p)=>p.date)).size;
+    const coverage:Array<[string,string,boolean,string]>=[
+      ['Uydu haritası',`${imagePoints.length} tarih`,imagePoints.length>0,GREEN],
+      ['Sayısal indeks',`${numericDateCount} tarih`,numericDateCount>0,TEAL],
+      ['Hava kaydı',`${climate.observedDays}/${climate.days} gün`,climate.observedDays>0,BLUE],
+      ['Radar',`${radarSeries.length} ölçüm · ${radarImgs.length} görüntü`,hasRadar,'#5146c9'],
+      ['Toprak',soilRows.some((r)=>r.value!==null)?'Laboratuvar':soilGrids.available?'SoilGrids modeli':'Yok',
+        soilRows.some((r)=>r.value!==null)||soilGrids.available,'#a74627'],
+      ['Tarla işlemi',`${activities.length} kayıt`,activities.length>0,ORANGE],
+    ];
+    coverage.forEach(([label,value,ok,accent],i)=>{
+      const col=i%2,row=Math.floor(i/2);
+      const x=rightX+14+col*188,y=1222+row*60;
+      rr(ctx,x,y,180,52,10,ok?WHITE:'#f1f3f4',ok?LINE:'#e3e7e9');
+      ctx.beginPath();ctx.roundRect(x,y,5,52,[10,0,0,10]);ctx.fillStyle=ok?accent:'#c5ced3';ctx.fill();
+      circleIcon(ctx,x+26,y+26,11,ok?accent:'#c5ced3',ok?'✓':'–',WHITE,11);
+      fittedText(ctx,label,x+44,y+22,128,10.5,850,ok?INK:MUTED);
+      fittedText(ctx,value,x+44,y+40,128,9.5,750,ok?accent:MUTED);
+    });
+  }else{
+    actions.forEach(([titleValue, value, accent, soft], index) => {
+      const x = rightX + 14 + index * 124;
+      rr(ctx, x, 1224, 116, 176, 9, soft, soft);
+      text(ctx, titleValue, x + 10, 1247, 9.5, 900, accent);
+      wrap(ctx, value, x + 10, 1275, 9.2, 650, INK, 96, 1.28, 7);
+    });
+  }
 
   // Fixed satellite-field motif, drawn as a background illustration.
   // The original compass image is retained above the pattern, never repeated
@@ -1242,30 +2028,35 @@ export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
   text(ctx,'Uydu · Toprak · Hava · Saha',rightX+22,1570,10,700,'#d6eee5');
 
   // Branded footer; social contacts remain on dedicated contrast surfaces.
-  rr(ctx, 12, 1604, 1216, 138, 15, '#f0f6f3', LINE);
-  ctx.save();ctx.beginPath();ctx.roundRect(12,1604,1216,138,15);ctx.clip();
-  ctx.fillStyle='rgba(31,117,83,.065)';
-  for(let i=0;i<9;i++){
-    ctx.beginPath();const x=90+i*158;
-    ctx.moveTo(x,1604);ctx.lineTo(x+89,1604);
-    ctx.lineTo(x-23,1742);ctx.lineTo(x-101,1742);ctx.fill();
-  }
-  ctx.restore();
-  rr(ctx, 27, 1617, 244, 111, 12, 'rgba(255,255,255,.80)', '');
-  rr(ctx, 277, 1617, 541, 111, 12, 'rgba(255,255,255,.70)', '');
-  rr(ctx, 835, 1617, 377, 111, 12, 'rgba(255,255,255,.84)', '');
-  await logo(ctx, 52, 1660, true);
+  await brandBand(ctx, 12, 1604, 1216, 138, 2,
+    [...sat].reverse().find((p)=>p.ndviImage)?.ndviImage ?? bandPhoto, 0.85);
+  const footLogo = await logoBadge(ctx, 66, 1660, 32);
+  const footX = footLogo ? 108 : 34;
+  text(ctx, 'TarlaPusula', footX, 1660, 25, 900, WHITE);
+  text(ctx, 'TARLANIN AKLI, YANINDA.', footX + 2, 1681, 9.5, 800, '#a9e6cd');
+  wrap(ctx, 'Uydu · Hava · Toprak · Saha verisiyle hazırlandı.', 32, 1716, 9.5, 700, '#c8eadb', 240, 1.2, 1);
+  rr(ctx, 277, 1617, 541, 111, 12, 'rgba(255,255,255,.10)', 'rgba(255,255,255,.22)');
+  rr(ctx, 835, 1617, 377, 111, 12, 'rgba(255,255,255,.95)', '');
   footerSocial(ctx, 286, 1634, '◎', '#e1306c', 'Instagram', '@tarlapusula');
   footerSocial(ctx, 465, 1634, 'f', '#1877f2', 'Facebook', 'tarlapusula');
   footerSocial(ctx, 632, 1634, '✉', '#15936a', 'E-posta', 'tarlapusula@gmail.com');
-  ctx.strokeStyle = '#dfe6e9';
-  ctx.beginPath();
-  ctx.moveTo(826, 1622);
-  ctx.lineTo(826, 1725);
-  ctx.stroke();
-  await drawQr(ctx, ANDROID_URL, 846, 1623, 57, 'Android indir', 'android');
-  await drawQr(ctx, IOS_URL, 1022, 1623, 57, 'iOS indir', 'ios');
+  ctx.strokeStyle = 'rgba(255,255,255,.18)';
+  ctx.beginPath(); ctx.moveTo(292, 1682); ctx.lineTo(803, 1682); ctx.stroke();
+  text(ctx, 'Tarlanı her hafta takip et', 292, 1706, 13, 900, WHITE);
+  text(ctx, 'Uygulamayı indir, PusulaPDF raporların otomatik hazırlansın.', 292, 1722, 9.5, 700, '#c8eadb');
+  // Store links come from env; until they exist, the QR opens the web app.
+  drawQr(ctx, ANDROID_URL, 845, 1621, 'android', ANDROID_URL===APP_WEB_URL?'Web uygulaması':'Google Play');
+  drawQr(ctx, IOS_URL, 1027, 1621, 'ios', 'App Store');
 
+  imageBlobCache.clear();
+  return canvas;
+}
+
+export async function generatePusulaPdf(snapshot: PusulaPdfSnapshot) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  // Stored report links expire; re-sign them so old reports keep their images.
+  const fresh = await refreshPusulaPdfImageUrls(snapshot).catch(() => snapshot);
+  const canvas = await renderPusulaPdfCanvas(fresh);
   // PNG avoids JPG halos around 8-12px labels and keeps parcel edges sharp.
   doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'MEDIUM');
   doc.setProperties({
