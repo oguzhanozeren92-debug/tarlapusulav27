@@ -836,8 +836,9 @@
     position:sticky !important;
     top:0;
     z-index:80 !important;
-    min-height:62px !important;
-    padding:0 16px !important;
+    /* Keep Atla and the logo clear of the mobile status bar. */
+    min-height:calc(62px + max(48px, env(safe-area-inset-top, 0px))) !important;
+    padding:max(48px, env(safe-area-inset-top, 0px)) 16px 0 !important;
     background:rgba(9,14,11,.88);
     backdrop-filter:blur(14px);
   }
@@ -864,7 +865,7 @@
 
   .tp-intro-progress{
     position:sticky;
-    top:62px;
+    top:calc(62px + max(48px, env(safe-area-inset-top, 0px)));
     z-index:79;
   }
 
