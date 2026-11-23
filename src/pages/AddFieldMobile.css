@@ -966,3 +966,33 @@ html body .tp-chat-field .tp-chat-shell .tp-field-form
   color: #050505;
   font-weight: 900;
 }
+
+/* TP-V42 — MonochromeUI.css'in global buton resetini (html body :is(...)
+   :is(button,[role='button']):not(...):not(...) { background:#eef1f4 !important })
+   geçersiz kılmak için, o kuralın specificity'sini (0,4,2) kesin olarak aşan
+   seçiciler. Global kuralı değiştirmiyoruz (başka ekranları bozmamak için),
+   sadece bu ekrandaki butonları daha yüksek specificity ile üstüne yazıyoruz. */
+html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-primary-action,
+html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-lookup-button,
+html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-external-button,
+html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-actions .next,
+html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-map-boundary-actions .tp-choice {
+  background: #050607 !important;
+  border-color: #050607 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-parcel-mode button.active.active {
+  background: #050607 !important;
+  border-color: #050607 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-parcel-mode button:not(.active) {
+  background: #ffffff !important;
+  border-color: rgba(17,18,20,.16) !important;
+  color: #111214 !important;
+  -webkit-text-fill-color: #111214 !important;
+}
