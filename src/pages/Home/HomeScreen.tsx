@@ -171,6 +171,7 @@ function HomeNavIcon({
 export default function HomeScreen(props: HomeScreenProps) {
   const {
     cmsRuntimeCss,
+    fieldGateNotice,
     realFields,
     setRealFields,
     favoriteFieldId,
@@ -1439,6 +1440,30 @@ export default function HomeScreen(props: HomeScreenProps) {
   return (
     <>
       <style>{cmsRuntimeCss + onboardingStyles}</style>
+
+      {fieldGateNotice ? (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            top: 14,
+            transform: 'translateX(-50%)',
+            zIndex: 2000,
+            maxWidth: 'min(92vw, 420px)',
+            padding: '10px 16px',
+            borderRadius: 10,
+            color: '#fff',
+            background: '#151b1f',
+            fontWeight: 600,
+            fontSize: 13.5,
+            textAlign: 'center',
+            boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
+          }}
+        >
+          {fieldGateNotice}
+        </div>
+      ) : null}
 
       {!pusulaGuideAway && !operationQuestionVisible ? (
         <PusulaGuide

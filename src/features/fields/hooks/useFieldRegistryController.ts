@@ -42,6 +42,14 @@ export function useFieldRegistryController({
 
   const [fieldFormLoading, setFieldFormLoading] = useState(false);
   const [fieldFormMessage, setFieldFormMessage] = useState('');
+  // "+" (Yeni tarla ekle) butonuna basıldığında tarla hakkı/puan kilidi
+  // nedeniyle form açılamıyorsa gösterilecek kısa ömürlü bildirim.
+  // NOT: setScreen('addField') çağrılmadığı için fieldFormMessage hiçbir
+  // zaman ekrana basılmıyordu (o metin sadece AddFieldScreen'in 3. adımında
+  // render ediliyor) — kullanıcıya hiçbir geri bildirim gitmiyordu ve buton
+  // "çalışmıyormuş" gibi görünüyordu. fieldGateNotice bunun yerine ana
+  // ekranda (HomeScreen) bir toast olarak gösterilir.
+  const [fieldGateNotice, setFieldGateNotice] = useState<string | null>(null);
   const [fieldName, setFieldName] = useState('');
   const [fieldCity, setFieldCity] = useState('');
   const [fieldDistrict, setFieldDistrict] = useState('');
@@ -411,6 +419,13 @@ export function useFieldRegistryController({
         // sessionStorage kapalıysa yalnızca ana ekrana dön.
       }
 
+      // setScreen('home') zaten mevcut ekran olduğu için AddFieldScreen hiç
+      // açılmıyor ve fieldFormMessage hiçbir yerde render edilmiyordu; buton
+      // kullanıcıya göre "hiçbir şey yapmıyormuş" gibi görünüyordu. Bunun
+      // yerine ana ekranda kısa süreli bir toast gösteriyoruz.
+      setFieldGateNotice(message);
+      window.setTimeout(() => setFieldGateNotice(null), 4200);
+
       setScreen('home');
       return;
     }
@@ -579,6 +594,7 @@ export function useFieldRegistryController({
     );
 
   return {
+    fieldGateNotice,
     realFields,
     setRealFields,
     selectedField,

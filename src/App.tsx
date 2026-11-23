@@ -214,6 +214,7 @@ export default function App() {
   }, []);
 
   const {
+    fieldGateNotice,
     realFields,
     setRealFields,
     selectedField,
@@ -1660,6 +1661,7 @@ export default function App() {
     <>
     <HomeScreen
       cmsRuntimeCss={cmsRuntimeCss}
+      fieldGateNotice={fieldGateNotice}
       realFields={realFields}
       setRealFields={setRealFields}
       favoriteFieldId={favoriteFieldId}
