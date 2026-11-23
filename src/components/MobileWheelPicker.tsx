@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronDown } from 'lucide-react';
 import './MobileWheelPicker.css';
 
 export type MobilePickerOption = {
@@ -72,7 +73,9 @@ export default function MobileWheelPicker({
       disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
       onClick={() => { setSearch(''); setOpen(true); }}>
       <span className={selectedOption ? '' : 'placeholder'}>{selectedOption?.label ?? placeholder}</span>
-      <span className="tp-mobile-picker-chevron" aria-hidden="true">⌄</span>
+      <span className="tp-mobile-picker-chevron" aria-hidden="true">
+        <ChevronDown size={18} strokeWidth={2.4} />
+      </span>
     </button>
 
     {open && createPortal(
