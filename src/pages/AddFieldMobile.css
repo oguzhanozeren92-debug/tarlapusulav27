@@ -967,30 +967,34 @@ html body .tp-chat-field .tp-chat-shell .tp-field-form
   font-weight: 900;
 }
 
-/* TP-V42 — MonochromeUI.css'in global buton resetini (html body :is(...)
-   :is(button,[role='button']):not(...):not(...) { background:#eef1f4 !important })
-   geçersiz kılmak için, o kuralın specificity'sini (0,4,2) kesin olarak aşan
-   seçiciler. Global kuralı değiştirmiyoruz (başka ekranları bozmamak için),
-   sadece bu ekrandaki butonları daha yüksek specificity ile üstüne yazıyoruz. */
-html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-primary-action,
-html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-lookup-button,
-html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-external-button,
-html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-field-actions .next,
-html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-map-boundary-actions .tp-choice {
+/* TP-V42 — MonochromeUI.css / WhiteAppTheme.css'in global buton resetlerini
+   (html body :is(~17 sayfa sınıfı) :is(button,[role=button],input,select,textarea)
+   :not(...):not(...):not(...) { background/color ... !important }, specificity
+   ~(0,5,2)) geçersiz kılmak için, bu kuralların specificity'sini kesin olarak
+   aşan (en az (0,8,2)) seçiciler. Global kuralları değiştirmiyoruz (başka
+   ekranları bozmamak için), sadece bu ekrandaki butonları daha yüksek
+   specificity ile üstüne yazıyoruz. Eşit specificity'de son kaynak sırası
+   kazanır ve bu dosyanın global tema dosyalarından önce mi sonra mı yüklendiği
+   garanti değil, bu yüzden eşitlik değil kesin üstünlük hedefleniyor. */
+html body .tp-chat-field.tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell.tp-chat-shell .tp-field-primary-action.tp-field-primary-action,
+html body .tp-chat-field.tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell.tp-chat-shell .tp-field-lookup-button.tp-field-lookup-button,
+html body .tp-chat-field.tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell.tp-chat-shell .tp-field-external-button.tp-field-external-button,
+html body .tp-chat-field.tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell.tp-chat-shell .tp-field-actions .next.next,
+html body .tp-chat-field.tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell.tp-chat-shell .tp-map-boundary-actions .tp-choice.tp-choice {
   background: #050607 !important;
   border-color: #050607 !important;
   color: #ffffff !important;
   -webkit-text-fill-color: #fff !important;
 }
 
-html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-parcel-mode button.active.active {
+html body .tp-chat-field.tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell.tp-chat-shell .tp-parcel-mode button.active.active.active {
   background: #050607 !important;
   border-color: #050607 !important;
   color: #ffffff !important;
   -webkit-text-fill-color: #fff !important;
 }
 
-html body .tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell .tp-parcel-mode button:not(.active) {
+html body .tp-chat-field.tp-chat-field.tp-chat-field .tp-chat-shell.tp-chat-shell.tp-chat-shell .tp-parcel-mode button:not(.active):not(.active2) {
   background: #ffffff !important;
   border-color: rgba(17,18,20,.16) !important;
   color: #111214 !important;
