@@ -1375,3 +1375,42 @@
     background:transparent !important;
   }
 }
+
+/* FIX: mobile intro CTA must stay above the transparent footer hit area */
+@media (max-width: 620px) {
+  /* The footer comes after the content in the DOM. With equal stacking levels,
+     its transparent box intercepted taps on the fixed primary CTA in iOS. */
+  .tp-intro-content {
+    z-index: 30 !important;
+  }
+
+  .tp-intro-footer {
+    z-index: 1 !important;
+    pointer-events: none !important;
+  }
+
+  .tp-intro-dots,
+  .tp-intro-dots button {
+    pointer-events: auto !important;
+  }
+
+  .tp-intro-actions {
+    z-index: 120 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Interactive mission controls must not inherit pointer-events:none from
+     the illustration wrappers. Only actual decorations stay click-through. */
+  .tp-intro-visual-wrap,
+  .tp-intro-visual,
+  .tp-intro-mission-card,
+  .tp-intro-mission-row {
+    pointer-events: auto !important;
+  }
+
+  /* Keep the small Başla control in the first mission row rather than having
+     it drop below the text on narrow iPhones. */
+  .tp-intro-mission-row.is-primary {
+    grid-template-columns: 24px minmax(0, 1fr) auto !important;
+  }
+}
