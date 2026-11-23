@@ -12,6 +12,7 @@ import OnboardingScreen from './pages/Onboarding/OnboardingScreen';
 import ReadyScreen from './pages/Onboarding/ReadyScreen';
 import HomeScreen from './pages/Home/HomeScreen';
 import NativeLocalReminderOffer from './mobile/NativeLocalReminderOffer';
+import WebPushOffer from './mobile/WebPushOffer';
 import CalendarScreen from './pages/Calendar/CalendarScreen';
 import AiAnalysisScreen from './pages/AiAnalysis/AiAnalysisScreen';
 import { Capacitor } from '@capacitor/core';
@@ -1685,6 +1686,7 @@ export default function App() {
       fieldStatusRequest={fieldStatusRequest}
     />
     <NativeLocalReminderOffer />
+    <WebPushOffer />
     </>,
     false,
   );
